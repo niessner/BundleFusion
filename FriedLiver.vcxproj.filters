@@ -39,6 +39,15 @@
     <ClCompile Include="Source\RGBDSensor.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
+    <ClCompile Include="Source\GlobalAppState.cpp" />
+    <ClCompile Include="Source\GlobalCameraTrackingState.cpp" />
+    <ClCompile Include="Source\CUDAImageManager.cpp">
+      <Filter>Sensors</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\mLib.cpp" />
+    <ClCompile Include="Source\CUDACache.cpp">
+      <Filter>Sensors</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -79,6 +88,19 @@
     <ClInclude Include="Source\RGBDSensor.h">
       <Filter>Sensors</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GlobalAppState.h" />
+    <ClInclude Include="Source\GlobalCameraTrackingState.h" />
+    <ClInclude Include="Source\CUDAImageManager.h">
+      <Filter>Sensors</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\CUDAImageUtil.h">
+      <Filter>Sensors</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\mLib.h" />
+    <ClInclude Include="Source\mLibCuda.h" />
+    <ClInclude Include="Source\CUDACache.h">
+      <Filter>Sensors</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
@@ -87,5 +109,10 @@
     <Filter Include="Sensors">
       <UniqueIdentifier>{d8cc1bbb-0889-44c1-b840-5697a564d7bb}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="Source\CUDAImageUtil.cu">
+      <Filter>Sensors</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>
