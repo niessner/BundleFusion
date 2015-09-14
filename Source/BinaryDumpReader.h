@@ -22,16 +22,15 @@ public:
 	~BinaryDumpReader();
 
 	//! initializes the sensor
-	HRESULT createFirstConnected();
+	void createFirstConnected();
 
 	//! reads the next depth frame
-	HRESULT processDepth();
+	bool processDepth();
+	
 
-
-
-	HRESULT processColor()	{
+	bool processColor()	{
 		//everything done in process depth since order is relevant (color must be read first)
-		return S_OK;
+		return true;
 	}
 
 	mat4f getRigidTransform() const {

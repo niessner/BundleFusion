@@ -29,7 +29,7 @@ BinaryDumpReader::~BinaryDumpReader()
 }
 
 
-HRESULT BinaryDumpReader::createFirstConnected()
+void BinaryDumpReader::createFirstConnected()
 {
 	releaseData();
 
@@ -61,11 +61,9 @@ HRESULT BinaryDumpReader::createFirstConnected()
 	} else {
 		m_bHasColorData = false;
 	}
-
-	return S_OK;
 }
 
-HRESULT BinaryDumpReader::processDepth()
+bool BinaryDumpReader::processDepth()
 {
 	if(m_CurrFrame >= m_NumFrames)
 	{
@@ -86,9 +84,9 @@ HRESULT BinaryDumpReader::processDepth()
 		}
 
 		m_CurrFrame++;
-		return S_OK;
+		return true;
 	} else {
-		return S_FALSE;
+		return false;
 	}
 }
 

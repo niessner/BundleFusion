@@ -14,8 +14,6 @@ RGBDSensor::RGBDSensor()
 
 	m_colorRGBX = NULL;
 
-	m_bNearMode = false;
-
 	m_currentRingBufIdx = 0;
 }
 
@@ -40,8 +38,6 @@ void RGBDSensor::init(unsigned int depthWidth, unsigned int depthHeight, unsigne
 	SAFE_DELETE_ARRAY(m_colorRGBX);
 	m_colorRGBX = new vec4uc[m_colorWidth*m_colorHeight];
 
-	m_bNearMode = false;
-
 }
 
 RGBDSensor::~RGBDSensor()
@@ -57,12 +53,6 @@ RGBDSensor::~RGBDSensor()
 	reset();
 }
 
-HRESULT RGBDSensor::toggleNearMode()
-{
-	m_bNearMode = !m_bNearMode;
-
-	return S_OK;
-}
 
 //! Get the intrinsic camera matrix of the depth sensor
 const mat4f& RGBDSensor::getDepthIntrinsics() const

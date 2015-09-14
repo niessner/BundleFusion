@@ -17,8 +17,10 @@
 #include "mLibFreeImage.h"
 #include "mLibZlib.h"
 
+
+//move this to mlib (it's currently local)
+#include "mLibCuda.h"
+
 using namespace ml;
 
 
-#define MLIB_CUDA_SAFE_CALL(b) { if(b != cudaSuccess) throw MLIB_EXCEPTION(cudaGetErrorString(b)); }
-#define MLIB_CUDA_SAFE_FREE(b) { if(!b) { MLIB_CUDA_SAFE_CALL(cudaFree(b)); b = NULL; } }

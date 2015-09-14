@@ -2,7 +2,6 @@
 
 #include <windows.h>
 #include <cassert>
-#include <d3dx9math.h>
 
 #include "mLib.h"
 
@@ -13,23 +12,17 @@ public:
 	// Default constructor
 	RGBDSensor();
 
-	//! Init
-	void init(unsigned int depthWidth, unsigned int depthHeight, unsigned int colorWidth, unsigned int colorHeight, unsigned int depthRingBufferSize = 1);
-
 	//! Destructor; releases allocated ressources
 	virtual ~RGBDSensor();
 
-	//! Connected to Depth Sensor
-	virtual HRESULT createFirstConnected() = 0;
+	//! Connected to Depth Sensor (throws an exception if it fails)
+	virtual void createFirstConnected() = 0;
 
 	//! Processes the depth data 
-	virtual HRESULT processDepth() = 0;
+	virtual bool processDepth() = 0;
 
 	//! Processes the color data
-	virtual HRESULT processColor() = 0;
-
-	//! Toggles the near-mode if available
-	virtual HRESULT toggleNearMode();
+	virtual bool processColor() = 0;
 
 	//! Get the intrinsic camera matrix of the depth sensor
 	const mat4f& getDepthIntrinsics() const;
@@ -85,6 +78,10 @@ public:
 	virtual void stopReceivingFrames() {}
 
 protected:
+
+	//! must be initialized by the child class
+	void init(unsigned int depthWidth, unsigned int depthHeight, unsigned int colorWidth, unsigned int colorHeight, unsigned int depthRingBufferSize = 1);
+
 	//! must be initialized by the child class
 	void initializeDepthIntrinsics(float fovX, float fovY, float centerX, float centerY);
 	void initializeColorIntrinsics(float fovX, float fovY, float centerX, float centerY);
@@ -114,9 +111,6 @@ protected:
 
 	LONG   m_colorWidth;
 	LONG   m_colorHeight;
-
-	bool   m_bNearMode;
-
 
 private:
 	void computePointCurrentPointCloud(PointCloudf& pc, const mat4f& transform = mat4f::identity()) const;
