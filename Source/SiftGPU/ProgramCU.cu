@@ -596,12 +596,12 @@ void ProgramCU::ComputeDOG(CuTexImage* gus, CuTexImage* dog, CuTexImage* got)
 		datai[1] = tex1Dfetch(tex, idx);\
 		datai[2] = tex1Dfetch(tex, idx + 1);\
 		if(v > nmax)\
-																						{\
+																								{\
 			   nmax = max(nmax, datai[0]);\
 			   nmax = max(nmax, datai[1]);\
 			   nmax = max(nmax, datai[2]);\
 			   if(v < nmax) return;\
-																						}else\
+																								}else\
 		{\
 			   nmin = min(nmin, datai[0]);\
 			   nmin = min(nmin, datai[1]);\
@@ -613,6 +613,9 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 	float dog_threshold0, float dog_threshold, float edge_threshold, int subpixel_localization,
 	int4* d_featureList, int* d_featureCount, unsigned int featureOctLevelidx, float keyLocScale, float keyLocOffset, const float* d_depthData)
 {
+	const unsigned int depthWidth = 640;	//!!!TODO PARAMS
+	const unsigned int depthHeight = 480;	//!!!TODO PARAMS
+
 	float data[3][3], v;
 	float datap[3][3], datan[3][3];
 #ifdef KEY_OFFSET_ONE
@@ -634,6 +637,16 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 #endif
 	{
 		d_key[index] = make_float4(result, dx, dy, ds);
+		// check if has valid depth
+		float dx = (keyLocScale * (float)col + keyLocOffset) * (float)depthWidth / (float)1296; //!!!TODO PARAMS
+		float dy = (keyLocScale * (float)row + keyLocOffset) * (float)depthHeight / (float)968; //!!!TODO PARAMS
+		if (dx < 0 || dx >= depthWidth || dy < 0 || dy >= depthHeight) return;
+		//float depth = bilinearInterpolationFloat(dx, dy, d_depthData, 640, 480);
+		int dxi = round(dx);
+		int dyi = round(dy);
+		float depth = d_depthData[dyi * depthWidth + dxi];
+
+		if (depth == MINF || depth < 0.1f || depth > 3.0f) return;
 
 		data[1][1] = v = tex1Dfetch(texC, idx[1]);
 		if (fabs(v) <= dog_threshold0) return; // if pixel value less than dog thresh
@@ -723,26 +736,11 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 			}
 		}
 		if (offset_test_passed) {
-			const unsigned int depthWidth = 640;	//!!!TODO PARAMS
-			const unsigned int depthHeight = 480;	//!!!TODO PARAMS
-
-			// check if has valid depth
-			float dx = (keyLocScale * (float)col + keyLocOffset) * (float)depthWidth / (float)1296; //!!!TODO PARAMS
-			float dy = (keyLocScale * (float)row + keyLocOffset) * (float)depthHeight / (float)968; //!!!TODO PARAMS
-			if (dx >= 0 && dx < depthWidth && dy >= 0 && dy < depthHeight) {
-				//float depth = bilinearInterpolationFloat(dx, dy, d_depthData, 640, 480);
-				int dxi = round(dx);
-				int dyi = round(dy);
-				float depth = d_depthData[dyi * depthWidth + dxi];
-
-				if (depth != MINF && depth >= 0.1f && depth <= 3.0f) { //!!!TODO PARAMS
-					result = v > nmax ? 1.0f : -1.0f;
-					int addr = atomicAdd(&d_featureCount[featureOctLevelidx], 1);
-					d_featureList[addr] = make_int4(col, row, 0, 0);
-				} // valid depth
-			}//depth coord in bounds
+			result = v > nmax ? 1.0f : -1.0f;
+			int addr = atomicAdd(&d_featureCount[featureOctLevelidx], 1);
+			d_featureList[addr] = make_int4(col, row, 0, 0);
+			d_key[index] = make_float4(result, dx, dy, ds);
 		}
-		d_key[index] = make_float4(result, dx, dy, ds);
 	}
 }
 
@@ -756,7 +754,7 @@ void ProgramCU::ComputeKEY(CuTexImage* dog, CuTexImage* key, float Tdog, float T
 	CuTexImage* dogp = dog - 1;
 	CuTexImage* dogn = dog + 1;
 #ifdef KEY_OFFSET_ONE
-	dim3 grid((width - 1 + KEY_BLOCK_DIMX - 1)/ KEY_BLOCK_DIMX,  (height - 1 + KEY_BLOCK_DIMY - 1)/KEY_BLOCK_DIMY);
+	dim3 grid((width - 1 + KEY_BLOCK_DIMX - 1) / KEY_BLOCK_DIMX, (height - 1 + KEY_BLOCK_DIMY - 1) / KEY_BLOCK_DIMY);
 #else
 	dim3 grid((width + KEY_BLOCK_DIMX - 1) / KEY_BLOCK_DIMX, (height + KEY_BLOCK_DIMY - 1) / KEY_BLOCK_DIMY);
 #endif
@@ -1036,7 +1034,7 @@ void __global__ ComputeOrientation_Kernel(float4* d_list,
 	max_vote = sMax[0];
 	float vote_threshold = max_vote * 0.8f;
 
-	
+
 	__shared__ float weights[COMPUTE_ORIENTATION_BLOCK]; // for computing first max
 	__shared__ int weightsIdx[COMPUTE_ORIENTATION_BLOCK];
 
@@ -1198,8 +1196,8 @@ void __global__ ComputeDescriptor_Kernel(float4* d_des, int num, int width, int 
 	ymax = min(height - 1.5f, floor(pt.y + bsz) + 0.5f);
 	__shared__ float des[8];
 	if (tidx < 8) des[tidx] = 0.0f;
-//#pragma unroll
-//	for (int i = 0; i < 9; ++i) des[i] = 0.0f;
+	//#pragma unroll
+	//	for (int i = 0; i < 9; ++i) des[i] = 0.0f;
 
 	__syncthreads();
 
@@ -1210,10 +1208,10 @@ void __global__ ComputeDescriptor_Kernel(float4* d_des, int num, int width, int 
 		if (i + tidx < size) {
 			float x = ((i + tidx) % xlen) + xmin;
 			float y = ((i + tidx) / xlen) + ymin;
-	//for (float y = ymin; y <= ymax; y += 1.0f)
-	//{
-	//	for (float x = xmin; x <= xmax; x += 1.0f)
-	//	{
+			//for (float y = ymin; y <= ymax; y += 1.0f)
+			//{
+			//	for (float x = xmin; x <= xmax; x += 1.0f)
+			//	{
 			float dx = x - pt.x;
 			float dy = y - pt.y;
 			float nx = crspt * dx + srspt * dy;
@@ -1235,9 +1233,9 @@ void __global__ ComputeDescriptor_Kernel(float4* d_des, int num, int width, int 
 				int fidx = fo;
 				float weight1 = fo + 1.0f - theta;
 				float weight2 = theta - fo;
-	
+
 				atomicAdd(&des[fidx], (weight1 * weight));
-				atomicAdd(&des[(fidx + 1)%8], (weight2 * weight));
+				atomicAdd(&des[(fidx + 1) % 8], (weight2 * weight));
 			}
 		}
 	}
@@ -1334,7 +1332,7 @@ float warpAllReduceSum(float val) {
 void __global__ NormalizeDescriptor_Kernel(float4* d_des, int num)
 {
 	const unsigned int tidx = threadIdx.x;
-	
+
 	int idx = blockIdx.x;
 	if (idx >= num) return;
 	int sidx = idx << 5;
@@ -1342,7 +1340,7 @@ void __global__ NormalizeDescriptor_Kernel(float4* d_des, int num)
 
 	//float4 temp = tex1Dfetch(texDataF4, sidx + tidx);
 	float4 temp = d_des[sidx + tidx];
-	norm1 = (temp.x*temp.x + temp.y*temp.y + temp.z*temp.z + temp.w*temp.w);	
+	norm1 = (temp.x*temp.x + temp.y*temp.y + temp.z*temp.z + temp.w*temp.w);
 	norm1 = warpAllReduceSum(norm1);	//sum it up!
 	norm1 = rsqrt(norm1);				//only 1 thread needed
 
@@ -1351,14 +1349,14 @@ void __global__ NormalizeDescriptor_Kernel(float4* d_des, int num)
 	temp.y = min(0.2f, temp.y * norm1);
 	temp.z = min(0.2f, temp.z * norm1);
 	temp.w = min(0.2f, temp.w * norm1);
-	
+
 	norm2 = (temp.x*temp.x + temp.y*temp.y + temp.z*temp.z + temp.w*temp.w);
 	norm2 = warpAllReduceSum(norm2);	// sum it up!
 	norm2 = rsqrt(norm2);				// only 1 thread needed
 
-	temp.x *= norm2;		
+	temp.x *= norm2;
 	temp.y *= norm2;
-	temp.z *= norm2;		
+	temp.z *= norm2;
 	temp.w *= norm2;
 	d_des[sidx + tidx] = temp;
 
@@ -1379,7 +1377,7 @@ void ProgramCU::ComputeDescriptor(CuTexImage*list, CuTexImage* got, float* d_out
 
 	if (rect)
 	{
-		printf("ERROR");	
+		printf("ERROR");
 		printf(__FUNCTION__);
 		while (1) {
 			//if (GlobalUtil::_UseDynamicIndexing)
@@ -1397,7 +1395,7 @@ void ProgramCU::ComputeDescriptor(CuTexImage*list, CuTexImage* got, float* d_out
 		//ComputeDescriptor_Kernel<false> << <grid, block >> >((float4*)dtex->_cuData, num, width, height);
 
 		const unsigned int threadsPerBlock = DESCRIPTOR_COMPUTE_BLOCK_SIZE;
-		dim3 grid(num * 16);	
+		dim3 grid(num * 16);
 		dim3 block(threadsPerBlock);
 		ComputeDescriptor_Kernel << <grid, block >> >((float4*)d_outDescriptors, num, width, height);
 	}
@@ -1650,8 +1648,8 @@ void __global__ MultiplyDescriptor_Kernel(int* d_result, int num1, int num2, int
 	}
 #elif MULT_BLOCK_DIMY
 	if (threadIdx.x < 8 * MULT_BLOCK_DIMY) {	//reads 64*uin4 = 1024 bytes => 8 features (a 128 bytes)
-		sharedFeatures[cache_idx1/4] = tex1Dfetch(texDes1, read_idx1 + offset1 / sizeof(uint4));
-	}
+		sharedFeatures[cache_idx1 / 4] = tex1Dfetch(texDes1, read_idx1 + offset1 / sizeof(uint4));
+}
 #else
 #error
 	if (threadIdx.x < 1)
@@ -1671,7 +1669,7 @@ void __global__ MultiplyDescriptor_Kernel(int* d_result, int num1, int num2, int
 #pragma unroll
 	for (int i = 0; i < 8; ++i)	//this loops reads one loop (8*uint4 = 128 bytes) -> Loop over desc2; a single one
 	{
-		uint4 v = tex1Dfetch(texDes2, read_idx2 + i + offset2/sizeof(uint4));
+		uint4 v = tex1Dfetch(texDes2, read_idx2 + i + offset2 / sizeof(uint4));
 		unsigned char* p2 = (unsigned char*)(&v);
 #pragma unroll
 		for (int k = 0; k < MULT_BLOCK_DIMY; ++k)	//this loops reads one loop (8*uint4 = 128 bytes) -> Loop over desc1; over 8 features
@@ -1679,12 +1677,12 @@ void __global__ MultiplyDescriptor_Kernel(int* d_result, int num1, int num2, int
 			//k is the k-th feature of desc1
 			//i is the i-th prat of the feature of desc1/2
 			const unsigned char* p1 = &((unsigned char*)sharedFeatures)[k * 128] + i * 16;
-			
+
 			//uint4 v = tex1Dfetch(texDes1, blockIdx.y*MULT_BLOCK_DIMY*8 + (k*8) + i);
 			//unsigned char* p1 = (unsigned char*)&v;
 
-			results[k] += 
-				 (IMUL(p1[0], p2[0]) + IMUL(p1[1], p2[1])
+			results[k] +=
+				(IMUL(p1[0], p2[0]) + IMUL(p1[1], p2[1])
 				+ IMUL(p1[2], p2[2]) + IMUL(p1[3], p2[3])
 				+ IMUL(p1[4], p2[4]) + IMUL(p1[5], p2[5])
 				+ IMUL(p1[6], p2[6]) + IMUL(p1[7], p2[7])
@@ -1722,7 +1720,7 @@ void __global__ MultiplyDescriptor_Kernel(int* d_result, int num1, int num2, int
 		}
 	}
 
-	}
+}
 
 
 void ProgramCU::MultiplyDescriptor(CuTexImage* des1, CuTexImage* des2, CuTexImage* texDot, CuTexImage* texCRT)
@@ -1835,17 +1833,17 @@ void ProgramCU::GetRowMatch(CuTexImage* texDot, CuTexImage* texMatch, float* d_m
 	RowMatch_Kernel << <grid, block >> >((int*)texDot->_cuData,
 		(int*)texMatch->_cuData, num2, d_matchDistances, distmax, ratiomax);
 
-	
+
 	ProgramCU::CheckErrorCUDA(__FUNCTION__);
 }
 
 #define COLMATCH_BLOCK_WIDTH 32
 
-texture<int4,  1, cudaReadModeElementType> texCT;
+texture<int4, 1, cudaReadModeElementType> texCT;
 
 void __global__  ColMatch_Kernel(int height, int num2, float distmax, float ratiomax, const int* d_rowResult, float* d_matchDistances, uint2* d_outKeyPointIndices, float* d_outMatchDistances, int* d_numMatches, uint2 keyPointOffset)
-{	
-	
+{
+
 	const int baseIdx = blockIdx.x;
 
 	int3 localResult = make_int3(0, -1, 0);
@@ -1865,7 +1863,7 @@ void __global__  ColMatch_Kernel(int height, int num2, float distmax, float rati
 	}
 
 	__shared__ int3 result[COLMATCH_BLOCK_WIDTH];
-	
+
 	result[threadIdx.x] = localResult;
 #if !(COLMATCH_BLOCK_WIDTH == 32)
 	__syncthreads();
@@ -1914,7 +1912,7 @@ void __global__  ColMatch_Kernel(int height, int num2, float distmax, float rati
 		if (*d_numMatches > MAX_MATCHES_PER_IMAGE_PAIR_RAW) *d_numMatches = MAX_MATCHES_PER_IMAGE_PAIR_RAW;
 	}
 
-}
+	}
 
 void ProgramCU::GetColMatch(CuTexImage* texCRT, float distmax, float ratiomax, CuTexImage* rowMatch, float* d_matchDistances, uint2* d_outKeyPointIndices, float* d_outMatchDistances, int* d_numMatches, uint2 keyPointOffset, int* numMatches)
 {
@@ -1943,9 +1941,9 @@ void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, i
 	const float factor = 2.0*3.14159265358979323846 / 65535.0;
 
 	if (idx < numInputElements) {
-		const float* src = (const float*)d_raw + 4*idx;
+		const float* src = (const float*)d_raw + 4 * idx;
 		unsigned short * orientations = (unsigned short*)(&src[3]);
-		if (src[2]*keyLocScale >= 5) {
+		if (src[2] * keyLocScale >= 5) {
 			if (orientations[0] != 65535) {
 				int currFeature = atomicAdd(d_featureCount, 1);
 				d_out[currFeature].x = src[0];
@@ -2028,7 +2026,7 @@ void ProgramCU::CreateGlobalKeyPointList(CuTexImage* curLevelList, float4* d_out
 	dim3 grid((curNumFeatures + threadsPerBlock - 1) / threadsPerBlock);
 	dim3 block(threadsPerBlock, 1, 1);
 
-	CreateGlobalKeyPointList_Kernel <<< grid, block >>> ((float4*)curLevelList->_cuData, d_outKeypointList, curNumFeatures, keyLocScale, keyLocOffset, d_depthData);
+	CreateGlobalKeyPointList_Kernel << < grid, block >> > ((float4*)curLevelList->_cuData, d_outKeypointList, curNumFeatures, keyLocScale, keyLocOffset, d_depthData);
 
 	ProgramCU::CheckErrorCUDA(__FUNCTION__);
 }
@@ -2049,7 +2047,7 @@ void ProgramCU::ConvertDescriptorToUChar(float* d_descriptorsFloat, unsigned int
 	dim3 grid((numDescriptorElements + threadsPerBlock - 1) / threadsPerBlock);
 	dim3 block(threadsPerBlock, 1, 1);
 
-	ConvertDescriptorToUChar_Kernel <<< grid, block >>> (d_descriptorsFloat, numDescriptorElements, d_descriptorsUChar);
+	ConvertDescriptorToUChar_Kernel << < grid, block >> > (d_descriptorsFloat, numDescriptorElements, d_descriptorsUChar);
 
 	ProgramCU::CheckErrorCUDA(__FUNCTION__);
 }
