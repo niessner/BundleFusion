@@ -331,7 +331,7 @@ void processCurrentFrame()
 	if (g_SubmapManager.isLastFrame(curFrame) || g_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
 
 		// cache
-		g_SubmapManager.globalCache->copyCacheFrameFrom(g_SubmapManager.currentLocalCache, curLocalFrame);
+		g_SubmapManager.globalCache->copyCacheFrameFrom(g_SubmapManager.currentLocalCache, 0);
 		
 		// if valid local
 		if (validImagesLocal[1]) {
