@@ -101,8 +101,7 @@ void init() {
 	g_CudaImageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 		GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, getRGBDSensor());
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
-	g_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage,
-		submapSize);
+	g_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage, submapSize);
 	//TODO fix
 	if (GlobalAppState::get().s_sensorIdx == 3) {
 		g_SubmapManager.setTotalNumFrames(((BinaryDumpReader*)getRGBDSensor())->getNumTotalFrames());
@@ -312,7 +311,7 @@ void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::
 
 		if (validImages[prev] == 0 || num1 == 0 || num2 == 0) {
 			unsigned int numMatch = 0;
-			cutilSafeCall(cudaMemcpy(imagePairMatch.d_numMatches, &numMatch, sizeof(unsigned int), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(imagePairMatch.d_numMatches, &numMatch, sizeof(unsigned int), cudaMemcpyHostToDevice));
 		}
 		else {
 			Timer timer;
