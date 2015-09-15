@@ -6,10 +6,6 @@
 #include "../GlobalBundlingState.h"
 #include "../TimingLog.h"
 
-//!!!TODO PARAMS etc
-float4* SIFTMatchFilter::s_correspondence = new float4[160 * 120];
-float4* SIFTMatchFilter::s_correspondenceNormals = new float4[160 * 120];
-
 void SIFTMatchFilter::filterFrames(SIFTImageManager* siftManager)
 {
 	const unsigned int numImages = siftManager->getNumImages();
@@ -345,21 +341,19 @@ float2 SIFTMatchFilter::computeProjectiveError(const float* inputDepth, const fl
 
 	// input -> model
 	float4x4 transformEstimate = transform;
-	computeCorrespondences(width, height, inputDepth, inputCamPos, inputNormals, inputColor,
-		modelDepth, modelCamPos, modelNormals, modelColor, s_correspondence, s_correspondenceNormals,
-		transformEstimate, distThres, normalThres, colorThresh, level);
 	float sumResidual0, sumWeight0; unsigned int numCorr0;
-	computeProjCorrespondenceError(width, height, inputCamPos, s_correspondence, s_correspondenceNormals,
-		transformEstimate, sumResidual0, sumWeight0, numCorr0);
+	computeCorrespondences(width, height, inputDepth, inputCamPos, inputNormals, inputColor,
+		modelDepth, modelCamPos, modelNormals, modelColor,
+		transformEstimate, distThres, normalThres, colorThresh, level,
+		sumResidual0, sumWeight0, numCorr0);
 
 	// model -> input
 	transformEstimate = transform.getInverse();
-	computeCorrespondences(width, height, modelDepth, modelCamPos, modelNormals, modelColor,
-		inputDepth, inputCamPos, inputNormals, inputColor, s_correspondence, s_correspondenceNormals,
-		transformEstimate, distThres, normalThres, colorThresh, level);
 	float sumResidual1, sumWeight1; unsigned int numCorr1;
-	computeProjCorrespondenceError(width, height, modelCamPos, s_correspondence, s_correspondenceNormals,
-		transformEstimate, sumResidual1, sumWeight1, numCorr1);
+	computeCorrespondences(width, height, modelDepth, modelCamPos, modelNormals, modelColor,
+		inputDepth, inputCamPos, inputNormals, inputColor,
+		transformEstimate, distThres, normalThres, colorThresh, level,
+		sumResidual1, sumWeight1, numCorr1);
 
 	float sumRes = (sumResidual0 + sumResidual1) * 0.5f;
 	float sumWeight = (sumWeight0 + sumWeight1) * 0.5f;
@@ -516,12 +510,13 @@ float SIFTMatchFilter::cameraToDepthZ(const float4& pos)
 void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int height,
 	const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
 	const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor,
-	float4* output, float4* outputNormals,
-	const float4x4& transform,
-	float distThres, float normalThres, float colorThresh,
-	unsigned int level)
+	const float4x4& transform, float distThres, float normalThres, float colorThresh, unsigned int level,
+	float& sumResidual, float& sumWeight, unsigned int& numCorr)
 {
 	const float INVALID = -std::numeric_limits<float>::infinity();
+	sumResidual = 0.0f;
+	sumWeight = 0.0f;
+	numCorr = 0;
 
 	float levelFactor = (float)(1 << level);
 	//mean = vec3f(0.0f, 0.0f, 0.0f);
@@ -530,8 +525,6 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 		for (unsigned int x = 0; x < width; x++) {
 
 			const unsigned int idx = y * width + x;
-			output[idx] = make_float4(INVALID);
-			outputNormals[idx] = make_float4(INVALID);
 
 			float4 pInput = input[idx]; // point
 			float4 nInput = inputNormals[idx]; nInput.w = 0.0f; // vector
@@ -558,9 +551,11 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 
 						bool b = ((tgtDepth != INVALID && projInputDepth < tgtDepth) && d > distThres); // bad matches that are known
 						if ((dNormal >= normalThres && d <= distThres /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
-							output[idx] = pTarget;
-							nTarget.w = std::max(0.0f, 0.5f*((1.0f - d / distThres) + (1.0f - cameraToKinectProjZ(pTransInput.z)))); // for weighted ICP;
-							outputNormals[idx] = nTarget;
+							const float weight = std::max(0.0f, 0.5f*((1.0f - d / distThres) + (1.0f - cameraToKinectProjZ(pTransInput.z)))); // for weighted ICP;
+
+							sumResidual += length(pTransInput - pTarget);	//residual
+							sumWeight += weight;			//corr weight
+							numCorr++;					//corr number
 						}
 					} // projected to valid depth
 				} // inside image
@@ -570,36 +565,3 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 
 }
 
-void SIFTMatchFilter::computeProjCorrespondenceError(unsigned int width, unsigned int height, const float4* input, const float4* target, const float4* targetNormals,
-	const float4x4& deltaTransform, float& sumResidual, float& sumWeight, unsigned int& numCorr)
-{
-	const float INVALID = -std::numeric_limits<float>::infinity();
-
-	sumResidual = 0.0f;
-	sumWeight = 0.0f;
-	numCorr = 0;
-	for (unsigned int y = 0; y < height; y++) {
-		for (unsigned int x = 0; x < width; x++) {
-			const unsigned int idx = y * width + x;
-
-			if (target[idx].x != INVALID && input[idx].x != INVALID && targetNormals[idx].x != INVALID) {
-				const float g_meanStDevInv = 1.0f;
-				const float4 g_mean = make_float4(0.0f);
-
-				const float4 inputT = g_meanStDevInv*((deltaTransform * input[idx]) - g_mean);
-				const float4 targetT = g_meanStDevInv*(target[idx] - g_mean);
-				const float weight = targetNormals[idx].w;
-
-				sumResidual += length(targetT - inputT);	//residual
-				sumWeight += weight;			//corr weight
-				numCorr++;					//corr number
-			}
-
-		} // x
-	} // y
-}
-
-void SIFTMatchFilter::printTimings(const std::string& filename)
-{
-	TimingLog::printTimings(filename);
-}

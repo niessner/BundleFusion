@@ -273,8 +273,6 @@ int main(int argc, char** argv)
 	TimingLog::printTimings("timingLog.txt");
 	std::vector<int> validImagesGlobal; g_SubmapManager.global->getValidImagesDEBUG(validImagesGlobal);
 	getRGBDSensor()->saveRecordedPointCloud("refined.ply", validImagesGlobal, g_SubmapManager.globalTrajectory);
-	//TODO stupid hack
-	SIFTMatchFilter::free();
 	destroy();
 
 	getchar();

@@ -18,13 +18,6 @@ public:
 	SIFTGPU_EXPORT static void filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames);
 
 	SIFTGPU_EXPORT static void filterFrames(SIFTImageManager* siftManager);
-
-	SIFTGPU_EXPORT static void printTimings(const std::string& filename);
-
-	static void free() {
-		SAFE_DELETE_ARRAY(s_correspondence);
-		SAFE_DELETE_ARRAY(s_correspondenceNormals);
-	}
 private:
 
 	static unsigned int filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform);
@@ -73,17 +66,8 @@ private:
 	static void computeCorrespondences(unsigned int width, unsigned int height,
 		const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
 		const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor,
-		float4* output, float4* outputNormals,
-		const float4x4& transform,
-		float distThres, float normalThres, float colorThresh,
-		unsigned int level);
-	static void computeProjCorrespondenceError(unsigned int width, unsigned int height,
-		const float4* input, const float4* target, const float4* targetNormals,
-		const float4x4& deltaTransform, float& sumResidual, float& sumWeight, unsigned int& numCorr);
-
-	//tmp buffers for dense verify
-	static float4*	 s_correspondence;
-	static float4*	 s_correspondenceNormals;
+		const float4x4& transform, float distThres, float normalThres, float colorThresh, unsigned int level,
+		float& sumResidual, float& sumWeight, unsigned int& numCorr);
 };
 
 template<typename T>
