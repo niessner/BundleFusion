@@ -49,6 +49,7 @@ public:
 	}
 
 	const std::vector<CUDACachedFrame>& getCacheFrames() const { return m_cache; }
+	const CUDACachedFrame* getCacheFramesGPU() const { return d_cache; }
 
 	const void copyCacheFrameFrom(CUDACache* other, unsigned int frameFrom) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_depthDownsampled, other->m_cache[frameFrom].d_depthDownsampled, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
@@ -66,6 +67,8 @@ private:
 		for (CUDACachedFrame& f : m_cache) {
 			f.alloc(m_width, m_height);
 		}
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_cache, sizeof(CUDACachedFrame)*m_maxNumImages));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_cache, m_cache.data(), sizeof(CUDACachedFrame)*m_maxNumImages, cudaMemcpyHostToDevice));
 	}
 
 	void free() {
@@ -73,6 +76,7 @@ private:
 			f.free();
 		}
 		m_cache.clear();
+		MLIB_CUDA_SAFE_FREE(d_cache);
 	}
 
 	unsigned int m_width;
@@ -84,5 +88,6 @@ private:
 	unsigned int m_maxNumImages;
 
 	std::vector < CUDACachedFrame > m_cache;
+	CUDACachedFrame*				d_cache;
 
 };
