@@ -57,14 +57,14 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, std::vector<ml::mat4f>& trans
 		poses[i] = Pose(rotations[i].x, rotations[i].y, rotations[i].z, translations[i].x, translations[i].y, translations[i].z);
 	transforms = PoseHelper::convertToMatrices(poses);
 
-	bool removed = removeMaxResidualCUDA(siftManager);
+	bool removed = removeMaxResidualCUDA(siftManager, numImages);
 
 	if (!removed && useVerify) m_bVerify = m_solver->useVerification(d_correspondences, m_numCorrespondences);
 
 	return removed;
 }
 
-bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager)
+bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages)
 {
 	ml::vec2ui imageIndices;
 	bool remove = m_solver->getMaxResidual(siftManager->getGlobalCorrespondencesDEBUG(), imageIndices, m_maxResidual);
@@ -72,7 +72,7 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager)
 		std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
 		// invalidate correspondence
 		siftManager->InvalidateImageToImageCU(make_uint2(imageIndices.x, imageIndices.y));
-		//bundle->filterFramesByMatches(); // need to re-adjust for removed matches
+		siftManager->CheckForInvalidFramesCU(m_solver->getVarToCorrNumEntriesPerRow(), numImages); // need to re-adjust for removed matches
 		return true;
 	}
 	else std::cout << "\thighest residual " << m_maxResidual << " from images (" << imageIndices << ")" << std::endl;

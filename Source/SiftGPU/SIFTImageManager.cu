@@ -417,38 +417,37 @@ void SIFTImageManager::InvalidateImageToImageCU(const uint2& imageToImageIdx) {
 }
 
 
-//#define CHECK_FOR_INVALID_FRAMES_THREADS_X 32
-//
-//void __global__ CheckForInvalidFramesCU_Kernel(const int* d_varToCorrNumEntriesPerRow, unsigned int* d_invalidFramesList, int* d_numInvalidFrames, unsigned int numVars)
-//{
-//	const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
-//
-//	if (idx < numVars) {
-//		if (d_varToCorrNumEntriesPerRow[idx] == 0) { // no connections!
-//			int addr = atomicAdd(d_numInvalidFrames, 1);
-//
-//		}
-//	}
-//
-//}
-//
-//void SIFTImageManager::CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesPerRow, unsigned int* d_invalidFramesList, int* d_numInvalidFrames, unsigned int numVars)
-//{
-//	const unsigned int threadsPerBlock = CHECK_FOR_INVALID_FRAMES_THREADS_X;
-//	dim3 grid((numVars + threadsPerBlock - 1) / threadsPerBlock);
-//	dim3 block(threadsPerBlock);
-//
-//	//CUDATimer timer;
-//	//timer.startEvent(__FUNCTION__);
-//
-//	cutilSafeCall(cudaMemset(d_numInvalidFrames, 0, sizeof(int));
-//	CheckForInvalidFramesCU_Kernel << <grid, block >> >(d_varToCorrNumEntriesPerRow, d_invalidFramesList, d_numInvalidFrames, numVars);
-//
-//	//timer.endEvent();
-//	//timer.evaluate();
-//
-//	CheckErrorCUDA(__FUNCTION__);
-//}
+#define CHECK_FOR_INVALID_FRAMES_THREADS_X 16
+
+void __global__ CheckForInvalidFramesCU_Kernel(const int* d_varToCorrNumEntriesPerRow, int* d_validImages, unsigned int numVars)
+{
+	const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
+
+	if (idx < numVars) {
+		if (d_varToCorrNumEntriesPerRow[idx] == 0) { // no connections!
+			printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
+			d_validImages[idx] = 0;
+		}
+	}
+
+}
+
+void SIFTImageManager::CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesPerRow, unsigned int numVars)
+{
+	const unsigned int threadsPerBlock = CHECK_FOR_INVALID_FRAMES_THREADS_X;
+	dim3 grid((numVars + threadsPerBlock - 1) / threadsPerBlock);
+	dim3 block(threadsPerBlock);
+
+	//CUDATimer timer;
+	//timer.startEvent(__FUNCTION__);
+
+	CheckForInvalidFramesCU_Kernel << <grid, block >> >(d_varToCorrNumEntriesPerRow, d_validImages, numVars);
+
+	//timer.endEvent();
+	//timer.evaluate();
+
+	CheckErrorCUDA(__FUNCTION__);
+}
 
 
 

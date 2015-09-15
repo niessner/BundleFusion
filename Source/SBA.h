@@ -46,7 +46,7 @@ private:
 
 	bool alignCUDA(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify);
 
-	bool removeMaxResidualCUDA(SIFTImageManager* siftManager);
+	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	
 	float3*			d_xRot;
 	float3*			d_xTrans;
