@@ -343,12 +343,12 @@ void RGBDSensor::computePointCurrentPointCloud(PointCloudf& pc, const mat4f& tra
 			vec3f n = getNormal(x,y);
 			if (n.x != -FLT_MAX) {
 				pc.m_points.push_back(p);
-				pc.m_normals.push_back(n);
+				pc.m_normals.push_back(-n);
 
 				unsigned int cx = math::round(scaleWidth * x);
 				unsigned int cy = math::round(scaleHeight * y);
 				vec4uc c = m_colorRGBX[cy * getColorWidth() + cx];
-				pc.m_colors.push_back(vec4f(c.z/255.0f, c.y/255.0f, c.x/255.0f, 1.0f));	//there's a swap... dunno why really
+				pc.m_colors.push_back(vec4f(c.x/255.0f, c.y/255.0f, c.z/255.0f, 1.0f));	//there's a swap... dunno why really
 			}
 		}
 	}
@@ -377,6 +377,32 @@ void RGBDSensor::saveRecordedPointCloud(const std::string& filename)
 		pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
 		pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
 	}
+	PointCloudIOf::saveToFile(filename, pc);
+	m_recordedPoints.clear();
+}
+
+void RGBDSensor::saveRecordedPointCloud(const std::string& filename, const std::vector<int>& validImages, const std::vector<mat4f>& trajectory)
+{
+	MLIB_ASSERT(m_recordedPoints.size() == validImages.size() &&
+		m_recordedPoints.size() <= trajectory.size());
+	std::cout << "recorded " << m_recordedPoints.size() << " frames" << std::endl;
+	// apply transforms
+	PointCloudf pc;
+	for (unsigned int i = 0; i < m_recordedPoints.size(); i++) {
+		PointCloudf& p = m_recordedPoints[i];
+		mat4f invTranspose = trajectory[i].getInverse().getTranspose();
+		for (auto& pt : p.m_points)
+			pt = trajectory[i] * pt;
+		for (auto& n : p.m_normals) {
+			n = invTranspose * n;
+			n.normalize();
+		}
+
+		pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
+		pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
+		pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
+	}
+
 	PointCloudIOf::saveToFile(filename, pc);
 	m_recordedPoints.clear();
 }

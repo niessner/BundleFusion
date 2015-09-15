@@ -121,7 +121,8 @@ void destroy() {
 }
 
 //TODO fix
-void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames, const std::vector<int>& validImages);
+void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames, const std::vector<int>& validImages,
+	unsigned int frameStart, unsigned int frameSkip, bool print = false);
 void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager);
 void processCurrentFrame();
 void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame)
@@ -185,28 +186,33 @@ void printMatch(const SIFTImageManager* siftManager, const std::string& filename
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
-//void printCurrentMatches(const std::string& outDir, const SIFTImageManager* siftManager, bool filtered,
-//	unsigned int frameStart, unsigned int frameSkip)
-//{
-//	const unsigned int numFrames = siftManager->getNumImages();
-//	if (numFrames <= 1) return;
-//
-//	MLIB_ASSERT(util::directoryExists(outDir));
-//
-//	// get images
-//	unsigned int curFrame = numFrames - 1;
-//	ColorImageR8G8B8A8 curImage;
-//	binaryDumpReader->getColorImage(curFrame * frameSkip + frameStart, curImage);
-//
-//	//print out images
-//	for (unsigned int prev = 0; prev < curFrame; prev++) {
-//		ColorImageR8G8B8A8 prevImage;
-//		binaryDumpReader->getColorImage(prev * frameSkip + frameStart, prevImage);
-//
-//		printMatch(siftManager, outDir + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
-//			prevImage, curImage, 0.7f, filtered);
-//	}
-//}
+void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, bool filtered,
+	unsigned int frameStart, unsigned int frameSkip)
+{
+	const unsigned int numFrames = siftManager->getNumImages();
+	if (numFrames <= 1) return;
+
+	const std::string dir = util::directoryFromPath(outPath);
+	MLIB_ASSERT(util::directoryExists(dir));
+
+	// get images
+	unsigned int curFrame = numFrames - 1;
+	ColorImageR8G8B8A8 curImage(g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curImage.getPointer(), g_CudaImageManager->getIntegrateColor(curFrame * frameSkip + frameStart), 
+		sizeof(uchar4) * curImage.getNumPixels(), cudaMemcpyDeviceToHost));
+	curImage.reSample(g_CudaImageManager->getSIFTWidth(), g_CudaImageManager->getSIFTHeight());
+
+	//print out images
+	for (unsigned int prev = 0; prev < curFrame; prev++) {
+		ColorImageR8G8B8A8 prevImage(g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevImage.getPointer(), g_CudaImageManager->getIntegrateColor(prev * frameSkip + frameStart),
+			sizeof(uchar4) * prevImage.getNumPixels(), cudaMemcpyDeviceToHost));
+		prevImage.reSample(g_CudaImageManager->getSIFTWidth(), g_CudaImageManager->getSIFTHeight());
+
+		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
+			prevImage, curImage, 0.7f, filtered);
+	}
+}
 
 //int WINAPI main(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 int main(int argc, char** argv)
@@ -264,7 +270,8 @@ int main(int argc, char** argv)
 	}
 
 	//!!!DEBUG
-	getRGBDSensor()->saveRecordedPointCloud("refined.ply");
+	std::vector<int> validImagesGlobal; g_SubmapManager.global->getValidImagesDEBUG(validImagesGlobal);
+	getRGBDSensor()->saveRecordedPointCloud("refined.ply", validImagesGlobal, g_SubmapManager.globalTrajectory);
 	//TODO stupid hack
 	SIFTMatchFilter::free();
 	destroy();
@@ -294,7 +301,11 @@ void processCurrentFrame()
 	// process cuda cache
 	const unsigned int curLocalFrame = g_SubmapManager.currentLocal->getNumImages() - 1;
 	g_SubmapManager.currentLocalCache->storeFrame(g_CudaImageManager->getLastIntegrateDepth(), g_CudaImageManager->getLastIntegrateColor(), g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
-
+	if (curLocalFrame == 0 || g_SubmapManager.isLastLocalFrame(curFrame)) {
+		//!!!DEBUG
+		getRGBDSensor()->recordPointCloud();
+		//!!!
+	}
 	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);
 
 
@@ -313,7 +324,7 @@ void processCurrentFrame()
 	std::vector<int> validImagesLocal; currentLocal->getValidImagesDEBUG(validImagesLocal);
 	if (curLocalFrame > 0) {
 		const std::vector<CUDACache::CUDACachedFrame>& cachedFrames = g_SubmapManager.currentLocalCache->getCacheFrames();
-		MatchAndFilter(currentLocal, cachedFrames, validImagesLocal);
+		MatchAndFilter(currentLocal, cachedFrames, validImagesLocal, curFrame - curLocalFrame, 1);
 	}
 
 	// global frame
@@ -348,16 +359,12 @@ void processCurrentFrame()
 			if (global->getNumImages() > 1) {
 				const std::vector<CUDACache::CUDACachedFrame>& cachedFrames = g_SubmapManager.globalCache->getCacheFrames();
 
-				MatchAndFilter(global, cachedFrames, validImagesGlobal);
+				MatchAndFilter(global, cachedFrames, validImagesGlobal, 0, submapSize);
 				//printCurrentMatches("output/matches/", binaryDumpReader, global, true, 0, submapSize);
 
 				if (validImagesGlobal.back()) {
 					// solve global
 					solve(g_SubmapManager.globalTrajectory, global);
-
-					//!!!DEBUG
-					getRGBDSensor()->recordPointCloud(g_SubmapManager.globalTrajectory.back());
-					//!!!
 				}
 			}
 
@@ -382,7 +389,8 @@ void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager)
 	//if (useVerify) bundle->verifyTrajectory();
 }
 
-void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames, const std::vector<int>& validImages)
+void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames, const std::vector<int>& validImages,
+	unsigned int frameStart, unsigned int frameSkip, bool print /*= false*/) // frameStart/frameSkip for debugging (printing matches)
 {
 	// match with every other
 	const unsigned int curFrame = siftManager->getNumImages() - 1;
@@ -415,7 +423,7 @@ void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::
 	if (curFrame > 0) { // can have a match to another frame
 		//sort the current key point matches
 		siftManager->SortKeyPointMatchesCU(curFrame);
-		//printCurrentMatches("output/matches/", binaryDumpReader, siftManager, false);
+		if (print) printCurrentMatches("debug/", siftManager, false, frameStart, frameSkip);
 
 		//filter matches
 		SIFTMatchFilter::filterKeyPointMatches(siftManager);
@@ -424,7 +432,7 @@ void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::
 		SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);
 
 		SIFTMatchFilter::filterFrames(siftManager);
-		//printCurrentMatches("output/matchesFilt/", binaryDumpReader, siftManager, true);
+		if (print) printCurrentMatches("debug/filt", siftManager, true, frameStart, frameSkip);
 
 		// add to global correspondences
 		siftManager->AddCurrToResidualsCU(curFrame);

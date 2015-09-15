@@ -104,7 +104,8 @@ __global__ void resampleFloat_Kernel(float* d_output, unsigned int outputWidth, 
 		const unsigned int yInput = (unsigned int)(y*scaleHeight + 0.5f);
 
 		if (xInput < inputWidth && yInput < inputHeight) {
-			d_output[y*outputWidth + x] = bilinearInterpolationFloat(x*scaleWidth, y*scaleHeight, d_input, inputWidth, inputHeight);
+			d_output[y*outputWidth + x] = d_input[yInput*inputWidth + xInput];
+			//d_output[y*outputWidth + x] = bilinearInterpolationFloat(x*scaleWidth, y*scaleHeight, d_input, inputWidth, inputHeight);
 		}
 	}
 }

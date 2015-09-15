@@ -65,6 +65,7 @@ public:
 	//! accumulates
 	void recordPointCloud(const mat4f& transform = mat4f::identity());
 	void saveRecordedPointCloud(const std::string& filename);
+	void saveRecordedPointCloud(const std::string& filename, const std::vector<int>& validImages, const std::vector<mat4f>& trajectory);
 
 	//! saves all previously recorded frames to file
 	void saveRecordedFramesToFile(const std::string& filename);
@@ -122,5 +123,5 @@ private:
 	std::list<vec4uc*>	m_recordedColorData;
 
 	std::vector<mat4f> m_recordedTrajectory;
-	std::list<PointCloudf> m_recordedPoints;
+	std::vector<PointCloudf> m_recordedPoints;
 };

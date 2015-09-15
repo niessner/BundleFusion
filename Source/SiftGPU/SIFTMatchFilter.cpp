@@ -201,8 +201,8 @@ float2 SIFTMatchFilter::computeSurfaceArea(const SIFTKeyPoint* keys, const uint2
 	const unsigned int newWidth = subDepthWidth / subSampleFactor;
 	const unsigned int newHeight = subDepthHeight / subSampleFactor;
 	const unsigned int numSampledPoints = newWidth * newHeight;
-	const float widthFactor = (float)(depthWidth - 1) / (float)(subDepthWidth - 1);
-	const float heightFactor = (float)(depthHeight - 1) / (float)(subDepthHeight - 1);
+	const float widthFactor = (float)depthWidth / (float)subDepthWidth;
+	const float heightFactor = (float)depthHeight / (float)subDepthHeight;
 	//const ml::vec2f defaultSrcPt = srcPtsProj[0];// if invalid fill with this for pca... //!!!TODO check
 	//const ml::vec2f defaultTgtPt = tgtPtsProj[0];// if invalid fill with this for pca... //!!!TODO check
 
@@ -433,8 +433,8 @@ void SIFTMatchFilter::computeNormals(const float3* input, unsigned int width, un
 
 void SIFTMatchFilter::reSampleColor(const uchar4* input, unsigned int width, unsigned int height, unsigned int newWidth, unsigned int newHeight, float3* output)
 {
-	const float scaleWidthFactor = (float)(width - 1) / (float)(newWidth - 1);
-	const float scaleHeightFactor = (float)(height - 1) / (float)(newHeight - 1);
+	const float scaleWidthFactor = (float)width / (float)newWidth;
+	const float scaleHeightFactor = (float)height / (float)newHeight;
 
 	for (unsigned int i = 0; i < newHeight; i++) {
 		for (unsigned int j = 0; j < newWidth; j++) {

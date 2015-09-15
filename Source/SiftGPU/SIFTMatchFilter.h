@@ -102,8 +102,8 @@ private:
 template<typename T>
 void SIFTMatchFilter::reSample(const T* input, unsigned int width, unsigned int height, unsigned int newWidth, unsigned int newHeight, T* output)
 {
-	const float scaleWidthFactor = (float)(width - 1) / (float)(newWidth - 1);
-	const float scaleHeightFactor = (float)(height - 1) / (float)(newHeight - 1);
+	const float scaleWidthFactor = (float)width / (float)newWidth;
+	const float scaleHeightFactor = (float)height / (float)newHeight;
 
 	for (unsigned int i = 0; i < newHeight; i++) {
 		for (unsigned int j = 0; j < newWidth; j++) {
