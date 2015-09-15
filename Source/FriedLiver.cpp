@@ -124,6 +124,89 @@ void destroy() {
 void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames, const std::vector<int>& validImages);
 void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager);
 void processCurrentFrame();
+void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame)
+{
+	ColorImageR8G8B8A8 im(g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(im.getPointer(), g_CudaImageManager->getIntegrateColor(allFrame), sizeof(uchar4) * g_CudaImageManager->getIntegrationWidth() * g_CudaImageManager->getIntegrationHeight(), cudaMemcpyDeviceToHost));
+	im.reSample(g_CudaImageManager->getSIFTWidth(), g_CudaImageManager->getSIFTHeight());
+
+	std::vector<SIFTKeyPoint> keys(siftManager->getNumKeyPointsPerImage(frame));
+	const SIFTImageGPU& cur = siftManager->getImageGPU(frame);
+	cutilSafeCall(cudaMemcpy(keys.data(), cur.d_keyPoints, sizeof(SIFTKeyPoint) * keys.size(), cudaMemcpyDeviceToHost));
+
+	for (unsigned int i = 0; i < keys.size(); i++) {
+		const SIFTKeyPoint& key = keys[i];
+
+		RGBColor c = RGBColor::randomColor();
+		vec4uc color(c.r, c.g, c.b, c.a);
+		vec2i p0 = math::round(vec2f(key.pos.x, key.pos.y));
+		ImageHelper::drawCircle(im, p0, math::round(key.scale), color);
+	}
+	FreeImageWrapper::saveImage(filename, im);
+}
+template<typename T>
+void printMatch(const SIFTImageManager* siftManager, const std::string& filename,
+	const vec2ui& imageIndices, const BaseImage<T>& image1, const BaseImage<T>& image2, float distMax, bool filtered)
+{
+	// get data
+	std::vector<SIFTKeyPoint> keys;
+	siftManager->getSIFTKeyPointsDEBUG(keys); // prev frame
+
+	std::vector<uint2> keyPointIndices;
+	std::vector<float> matchDistances;
+	if (filtered) {
+		siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(imageIndices.x, keyPointIndices, matchDistances);
+	}
+	else {
+		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(imageIndices.x, keyPointIndices, matchDistances);
+	}
+	if (keyPointIndices.size() == 0) return;
+
+	ColorImageR32G32B32 matchImage(image1.getWidth() * 2, image1.getHeight());
+	ColorImageR32G32B32 im1(image1);
+	ColorImageR32G32B32 im2(image2);
+	matchImage.copyIntoImage(im1, 0, 0);
+	matchImage.copyIntoImage(im2, image1.getWidth(), 0);
+
+	RGBColor lowColor = ml::RGBColor::Blue;
+	RGBColor highColor = ml::RGBColor::Red;
+	for (unsigned int i = 0; i < keyPointIndices.size(); i++) {
+		const SIFTKeyPoint& key1 = keys[keyPointIndices[i].x];
+		const SIFTKeyPoint& key2 = keys[keyPointIndices[i].y];
+
+		RGBColor c = RGBColor::interpolate(lowColor, highColor, matchDistances[i] / distMax);
+		vec3f color(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f);
+		vec2i p0 = ml::math::round(ml::vec2f(key1.pos.x, key1.pos.y));
+		vec2i p1 = ml::math::round(ml::vec2f(key2.pos.x + image1.getWidth(), key2.pos.y));
+		ImageHelper::drawCircle(matchImage, p0, ml::math::round(key1.scale), color);
+		ImageHelper::drawCircle(matchImage, p1, ml::math::round(key2.scale), color);
+		ImageHelper::drawLine(matchImage, p0, p1, color);
+	}
+	FreeImageWrapper::saveImage(filename, matchImage);
+}
+
+//void printCurrentMatches(const std::string& outDir, const SIFTImageManager* siftManager, bool filtered,
+//	unsigned int frameStart, unsigned int frameSkip)
+//{
+//	const unsigned int numFrames = siftManager->getNumImages();
+//	if (numFrames <= 1) return;
+//
+//	MLIB_ASSERT(util::directoryExists(outDir));
+//
+//	// get images
+//	unsigned int curFrame = numFrames - 1;
+//	ColorImageR8G8B8A8 curImage;
+//	binaryDumpReader->getColorImage(curFrame * frameSkip + frameStart, curImage);
+//
+//	//print out images
+//	for (unsigned int prev = 0; prev < curFrame; prev++) {
+//		ColorImageR8G8B8A8 prevImage;
+//		binaryDumpReader->getColorImage(prev * frameSkip + frameStart, prevImage);
+//
+//		printMatch(siftManager, outDir + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
+//			prevImage, curImage, 0.7f, filtered);
+//	}
+//}
 
 //int WINAPI main(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 int main(int argc, char** argv)
@@ -163,11 +246,6 @@ int main(int argc, char** argv)
 
 		init();
 		
-		//TODO debug stuff
-		const std::string outputDirectory = GlobalBundlingState::get().s_outputDirectory;
-		if (!util::directoryExists(outputDirectory)) util::makeDirectory(outputDirectory);
-		const std::string outGlobalDir = outputDirectory + "keys/";
-		if (!util::directoryExists(outGlobalDir)) util::makeDirectory(outGlobalDir);
 		//TODO 
 		while (g_CudaImageManager->process()) {
 			processCurrentFrame();
@@ -185,8 +263,11 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
+	//!!!DEBUG
+	getRGBDSensor()->saveRecordedPointCloud("refined.ply");
 	//TODO stupid hack
 	SIFTMatchFilter::free();
+	destroy();
 
 	getchar();
 	return 0;
@@ -211,8 +292,11 @@ void processCurrentFrame()
 	TimingLog::countSiftDetection++;
 
 	// process cuda cache
-	const unsigned int curLocalIdx = g_SubmapManager.getCurrLocalIdx(curFrame);
+	const unsigned int curLocalFrame = g_SubmapManager.currentLocal->getNumImages() - 1;
 	g_SubmapManager.currentLocalCache->storeFrame(g_CudaImageManager->getLastIntegrateDepth(), g_CudaImageManager->getLastIntegrateColor(), g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
+
+	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);
+
 
 	// local submaps
 	if (g_SubmapManager.isLastLocalFrame(curFrame)) {
@@ -221,12 +305,11 @@ void processCurrentFrame()
 		cutilSafeCall(cudaMemcpy(curNext.d_keyPointDescs, cur.d_keyPointDescs, sizeof(SIFTKeyPointDesc) * numKeypoints, cudaMemcpyDeviceToDevice));
 		g_SubmapManager.nextLocal->finalizeSIFTImageGPU(numKeypoints);
 
-		g_SubmapManager.nextLocalCache->copyCacheFrameFrom(g_SubmapManager.currentLocalCache, curLocalIdx);
+		g_SubmapManager.nextLocalCache->copyCacheFrameFrom(g_SubmapManager.currentLocalCache, curLocalFrame);
 	}
 
 	// match with every other local
 	SIFTImageManager* currentLocal = g_SubmapManager.currentLocal;
-	const unsigned int curLocalFrame = currentLocal->getNumImages() - 1;
 	std::vector<int> validImagesLocal; currentLocal->getValidImagesDEBUG(validImagesLocal);
 	if (curLocalFrame > 0) {
 		const std::vector<CUDACache::CUDACachedFrame>& cachedFrames = g_SubmapManager.currentLocalCache->getCacheFrames();
@@ -237,7 +320,7 @@ void processCurrentFrame()
 	if (g_SubmapManager.isLastFrame(curFrame) || g_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
 
 		// cache
-		g_SubmapManager.globalCache->copyCacheFrameFrom(g_SubmapManager.currentLocalCache, curLocalIdx);
+		g_SubmapManager.globalCache->copyCacheFrameFrom(g_SubmapManager.currentLocalCache, curLocalFrame);
 		
 		// if valid local
 		if (validImagesLocal[1]) {
@@ -270,8 +353,11 @@ void processCurrentFrame()
 
 				if (validImagesGlobal.back()) {
 					// solve global
-					const std::string outGlobalDir = GlobalBundlingState::get().s_outputDirectory + "keys/";
 					solve(g_SubmapManager.globalTrajectory, global);
+
+					//!!!DEBUG
+					getRGBDSensor()->recordPointCloud(g_SubmapManager.globalTrajectory.back());
+					//!!!
 				}
 			}
 
@@ -322,9 +408,7 @@ void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::
 			TimingLog::timeSiftMatching += timer.getElapsedTimeMS();
 			TimingLog::countSiftMatching++;
 			//unsigned int numMatch; cutilSafeCall(cudaMemcpy(&numMatch, imagePairMatch.d_numMatches, sizeof(int), cudaMemcpyDeviceToHost));
-			//std::cout << "images (" << prev << ", " << curGlobalFrame << "): " << numMatch << " matches" << std::endl;
-			////printMatch(&siftManager, outDir + std::to_string(prev) + "-" + std::to_string(curGlobalFrame) + ".png", ml::vec2ui(prev, curGlobalFrame),
-			////	intensityImages[prev], intensityImages[curGlobalFrame], distMax, false);
+			//std::cout << "images (" << prev << ", " << curFrame << "): " << numMatch << " matches" << std::endl;
 		}
 	}
 

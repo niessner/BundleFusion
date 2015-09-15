@@ -330,7 +330,9 @@ ml::vec3f RGBDSensor::getNormal(unsigned int x, unsigned int y) const
 
 void RGBDSensor::computePointCurrentPointCloud(PointCloudf& pc, const mat4f& transform /*= mat4f::identity()*/) const
 {
-	if (!(getColorWidth() == getDepthWidth() && getColorHeight() == getDepthHeight()))	throw MLIB_EXCEPTION("invalid dimensions");
+	//if (!(getColorWidth() == getDepthWidth() && getColorHeight() == getDepthHeight()))	throw MLIB_EXCEPTION("invalid dimensions");
+	const float scaleWidth = (float)(getColorWidth() - 1) / (float)(getDepthWidth() - 1);
+	const float scaleHeight = (float)(getColorHeight() - 1) / (float)(getDepthHeight() - 1);
 
 	for (unsigned int i = 0; i < getDepthWidth()*getDepthHeight(); i++) {
 		unsigned int x = i % getDepthWidth();
@@ -342,7 +344,10 @@ void RGBDSensor::computePointCurrentPointCloud(PointCloudf& pc, const mat4f& tra
 			if (n.x != -FLT_MAX) {
 				pc.m_points.push_back(p);
 				pc.m_normals.push_back(n);
-				vec4uc c = m_colorRGBX[i];
+
+				unsigned int cx = math::round(scaleWidth * x);
+				unsigned int cy = math::round(scaleHeight * y);
+				vec4uc c = m_colorRGBX[cy * getColorWidth() + cx];
 				pc.m_colors.push_back(vec4f(c.z/255.0f, c.y/255.0f, c.x/255.0f, 1.0f));	//there's a swap... dunno why really
 			}
 		}

@@ -18,8 +18,8 @@
 	X(unsigned int, s_numNonLinIterations) \
 	X(unsigned int, s_numLinIterations) \
 	X(unsigned int, s_downsampledWidth) \
-	X(unsigned int, s_downsampledHeight) \
-	X(std::string, s_outputDirectory) 
+	X(unsigned int, s_downsampledHeight) 
+	//X(std::string, s_outputDirectory) 
 
 using namespace ml;
 

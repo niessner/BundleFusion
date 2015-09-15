@@ -65,7 +65,7 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager)
 		timer.stop();
 		TimingLog::timeKeyPointMatchFilter += timer.getElapsedTimeMS();
 		TimingLog::countKeyPointMatchFilter++;
-		std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
+		//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
 
 		transforms[i] = transform;
 
@@ -122,7 +122,7 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 		std::vector<uint2> keyPointIndices;
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
-		std::cout << "(" << i << ", " << curFrame << "): ";
+		//std::cout << "(" << i << ", " << curFrame << "): ";
 		ml::Timer timer;
 		bool valid =
 			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices);
@@ -145,7 +145,7 @@ bool SIFTMatchFilter::filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoin
 	const float minSurfaceAreaPca = 0.04f;
 	float2 areas = computeSurfaceArea(keys.data(), keyPointIndices.data(), depth0, depth1, (unsigned int)keyPointIndices.size());
 
-	std::cout << "area ratio = " << areas.x << " " << areas.y << std::endl;
+	//std::cout << "area ratio = " << areas.x << " " << areas.y << std::endl;
 
 	if (areas.x < minSurfaceAreaPca && areas.y < minSurfaceAreaPca) // invalid
 		return false;
@@ -279,14 +279,14 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 	for (unsigned int i = 0; i < curFrame; i++) { // previous frames
 		// get data
 		ml::DepthImage32 prvDepth(downSampWidth, downSampHeight);
-		cutilSafeCall(cudaMemcpy(prvDepth.getPointer(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(prvDepth.getPointer(), cachedFrames[i].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 		ml::ColorImageR8G8B8A8 prvColor(downSampWidth, downSampHeight);
-		cutilSafeCall(cudaMemcpy(prvColor.getPointer(), cachedFrames[curFrame].d_colorDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(prvColor.getPointer(), cachedFrames[i].d_colorDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 
 		std::vector<uint2> keyPointIndices;
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
-		std::cout << "(" << i << ", " << curFrame << "): ";
+		//std::cout << "(" << i << ", " << curFrame << "): ";
 		ml::Timer timer;
 		bool valid =
 			filterImagePairByDenseVerify(prvDepth.getPointer(), curDepth.getPointer(), (uchar4*)prvColor.getPointer(), (uchar4*)curColor.getPointer(), transforms[i],
@@ -314,7 +314,7 @@ bool SIFTMatchFilter::filterImagePairByDenseVerify(const float* depth0, const fl
 	const float verifySiftCorrThresh = 0.02f;
 	float2 projErrors = computeProjectiveError(depth0, depth1, color0, color1, transform, width, height);
 
-	std::cout << "proj errors = " << projErrors.x << " " << projErrors.y << std::endl;
+	//std::cout << "proj errors = " << projErrors.x << " " << projErrors.y << std::endl;
 	if (projErrors.x == -std::numeric_limits<float>::infinity() || (projErrors.x > verifySiftErrThresh) || (projErrors.y < verifySiftCorrThresh)) { // tracking lost or bad match
 		return false; // invalid
 	}
@@ -335,11 +335,6 @@ float2 SIFTMatchFilter::computeProjectiveError(const float* depth0, const float*
 	const float distThres = 0.15f;
 	const float normalThres = 0.97f;
 	const float colorThresh = 0.1f;
-
-	//!!!
-	FreeImageWrapper::saveImage("t0.png", ColorImageR32G32B32(DepthImage32(width, height, depth0)));
-	FreeImageWrapper::saveImage("t1.png", ColorImageR32G32B32(DepthImage32(width, height, depth1)));
-	//!!!
 
 	computeCameraSpacePositions(depth0, width, height, s_input);	// camera space positions
 	computeNormals((float3*)s_input, width, height, s_inputNormals);		// normals

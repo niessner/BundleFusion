@@ -89,7 +89,7 @@ public:
 
 	bool isLastFrame(unsigned int curFrame) const { return (curFrame + 1) == m_numTotalFrames; }
 	bool isLastLocalFrame(unsigned int curFrame) const { return (curFrame >= m_submapSize && (curFrame % m_submapSize) == 0); }
-	unsigned int getCurrLocalIdx(unsigned int curFrame) const {
+	unsigned int getCurrLocal(unsigned int curFrame) const {
 		const unsigned int curLocalIdx = (curFrame + 1 == m_numTotalFrames) ? (curFrame / m_submapSize) : (curFrame / m_submapSize) - 1; // adjust for endframe
 		return curLocalIdx;
 	}

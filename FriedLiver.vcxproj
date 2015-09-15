@@ -152,6 +152,7 @@
     <ClInclude Include="Source\GlobalAppState.h" />
     <ClInclude Include="Source\GlobalBundlingState.h" />
     <ClInclude Include="Source\GlobalCameraTrackingState.h" />
+    <ClInclude Include="Source\ImageHelper.h" />
     <ClInclude Include="Source\mLib.h" />
     <ClInclude Include="Source\mLibCuda.h" />
     <ClInclude Include="Source\PoseHelper.h" />

@@ -195,6 +195,7 @@
     <ClInclude Include="Source\Solver\CUDASolverBundling.h">
       <Filter>SolverBundling</Filter>
     </ClInclude>
+    <ClInclude Include="Source\ImageHelper.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

@@ -59,6 +59,16 @@ class GlobalUtil;
 class SiftParam
 {
 public:
+	SIFTGPU_EXPORT SiftParam();
+	SIFTGPU_EXPORT ~SiftParam() {
+		SAFE_DELETE_ARRAY(_sigma);
+	}
+
+	void		 ParseSiftParam();
+
+	float GetLevelSigma(int lev);
+	float GetInitialSmoothSigma(int octave_min);
+
 	std::vector<unsigned int> m_filterWidths;
 
 	float*		_sigma;
@@ -82,11 +92,6 @@ public:
 	float		_dog_threshold;
 	//edge elimination
 	float		_edge_threshold;
-	void		 ParseSiftParam();
-public:
-	float GetLevelSigma(int lev);
-	float GetInitialSmoothSigma(int octave_min);
-	SIFTGPU_EXPORT SiftParam();
 };
 
 class SiftPyramid;

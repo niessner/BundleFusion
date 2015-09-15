@@ -14,3 +14,5 @@
 #include "SiftGPU/SiftGPU.h"
 #include "SiftGPU/SiftMatch.h"
 #include "SiftGPU/SIFTMatchFilter.h"
+
+#include "ImageHelper.h"

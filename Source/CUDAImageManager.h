@@ -123,6 +123,10 @@ public:
 		return m_data.back().d_colorIntegration;
 	}
 
+	const uchar4* getIntegrateColor(unsigned int frame) const {
+		return m_data[frame].d_colorIntegration;
+	}
+
 	// called after process
 	unsigned int getCurrFrameNumber() const {
 		MLIB_ASSERT(m_currFrame > 0);
@@ -134,6 +138,12 @@ public:
 	}
 	unsigned int getIntegrationHeight() const {
 		return m_heightIntegration;
+	}
+	unsigned int getSIFTWidth() const {
+		return m_widthSIFT;
+	}
+	unsigned int getSIFTHeight() const {
+		return m_heightSIFT;
 	}
 
 private:
