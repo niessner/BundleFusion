@@ -9,8 +9,10 @@ void CUDACache::storeFrame(const float* d_depth, const uchar4* d_color, unsigned
 	CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, m_width, m_height, d_depth, inputWidth, inputHeight);
 	CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, m_width, m_height, d_color, inputWidth, inputHeight);
 
-
 	CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(frame.d_cameraposDownsampled, frame.d_depthDownsampled, *(float4x4*)&m_intrinsicsInv, m_width, m_height);
+	CUDAImageUtil::computeNormals(frame.d_normalsDownsampled, frame.d_cameraposDownsampled, m_width, m_height);
+
+	//CUDAImageUtil::jointBilateralFilterFloatMap(frame.d_colorDownsampled)
 
 	m_currentFrame++;
 }

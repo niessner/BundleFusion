@@ -13,7 +13,11 @@ public:
 	
 	static void resampleFloat(float* d_output, unsigned int outputWidth, unsigned int outputHeight, const float* d_input, unsigned int inputWidth, unsigned int inputHeight);
 	static void resampleUCHAR4(uchar4* d_output, unsigned int outputWidth, unsigned int outputHeight, const uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight);
+
 	static void convertDepthFloatToCameraSpaceFloat4(float4* d_output, float* d_input, const float4x4& intrinsicsInv, unsigned int width, unsigned int height);
+	static void computeNormals(float4* d_output, float4* d_input, unsigned int width, unsigned int height);
+
+	static void jointBilateralFilterFloatMap(uchar4* d_output, uchar4* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height);
 };
 
 //TODO 

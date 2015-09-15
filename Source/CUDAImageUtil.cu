@@ -234,3 +234,121 @@ void CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(float4* d_output, float
 	MLIB_CUDA_CHECK_ERR(__FUNCTION__);
 #endif
 }
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Compute Normal Map
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+__global__ void computeNormals_Kernel(float4* d_output, float4* d_input, unsigned int width, unsigned int height)
+{
+	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if(x >= width || y >= height) return;
+
+	d_output[y*width+x] = make_float4(MINF, MINF, MINF, MINF);
+
+	if(x > 0 && x < width-1 && y > 0 && y < height-1)
+	{
+		const float4 CC = d_input[(y+0)*width+(x+0)];
+		const float4 PC = d_input[(y+1)*width+(x+0)];
+		const float4 CP = d_input[(y+0)*width+(x+1)];
+		const float4 MC = d_input[(y-1)*width+(x+0)];
+		const float4 CM = d_input[(y+0)*width+(x-1)];
+
+		if(CC.x != MINF && PC.x != MINF && CP.x != MINF && MC.x != MINF && CM.x != MINF)
+		{
+			const float3 n = cross(make_float3(PC)-make_float3(MC), make_float3(CP)-make_float3(CM));
+			const float  l = length(n);
+
+			if(l > 0.0f)
+			{
+				d_output[y*width+x] = make_float4(n/-l, 1.0f);
+			}
+		}
+	}
+}
+
+void CUDAImageUtil::computeNormals(float4* d_output, float4* d_input, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	computeNormals_Kernel<<<gridSize, blockSize>>>(d_output, d_input, width, height);
+
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Joint Bilateral Filter
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ float gaussD(float sigma, int x, int y)
+{
+	return exp(-((x*x+y*y)/(2.0f*sigma*sigma)));
+}
+inline __device__ float gaussR(float sigma, float dist)
+{
+	return exp(-(dist*dist)/(2.0*sigma*sigma));
+}
+
+__global__ void bilateralFilterUCHAR4_Kernel(uchar4* d_output, uchar4* d_color, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+{
+	const int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if(x >= width || y >= height) return;
+
+	const int kernelRadius = (int)ceil(2.0*sigmaD);
+
+	d_output[y*width+x] = d_color[y*width+x];
+
+	float3 sum = make_float3(0.0f, 0.0f, 0.0f);
+	float sumWeight = 0.0f;
+
+	//const uchar4 center = d_color[y*width+x];
+	const float depthCenter = d_depth[y*width+x];
+	if(depthCenter != MINF)
+	{
+		for(int m = x-kernelRadius; m <= x+kernelRadius; m++)
+		{
+			for(int n = y-kernelRadius; n <= y+kernelRadius; n++)
+			{		
+				if(m >= 0 && n >= 0 && m < width && n < height)
+				{
+					const uchar4 cur = d_color[n*width+m];
+					const float currentDepth = d_depth[n*width+m];
+
+					if (currentDepth != MINF) {
+						const float weight = gaussD(sigmaD, m-x, n-y)*gaussR(sigmaR, currentDepth-depthCenter);
+
+						sumWeight += weight;
+						sum += weight*make_float3(cur.x, cur.y, cur.z);
+					}
+				}
+			}
+		}
+
+		if (sumWeight > 0.0f) {
+			float3 res = sum / sumWeight;
+			d_output[y*width + x] = make_uchar4((uchar)res.x, (uchar)res.y, (uchar)res.z, 255);
+		}
+	}
+}
+
+void CUDAImageUtil::jointBilateralFilterFloatMap(uchar4* d_output, uchar4* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	bilateralFilterUCHAR4_Kernel<<<gridSize, blockSize>>>(d_output, d_input, d_depth, sigmaD, sigmaR, width, height);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
