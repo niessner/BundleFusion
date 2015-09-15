@@ -20,17 +20,7 @@ public:
 		uchar4*	d_colorIntegration;
 	};
 
-	CUDAImageManager() {}
-	~CUDAImageManager() {
-		reset();
-
-		MLIB_CUDA_SAFE_FREE(d_depthInput);
-		MLIB_CUDA_SAFE_FREE(d_colorInput);
-		MLIB_CUDA_SAFE_FREE(d_intensitySIFT);
-	}
-
-	void init(unsigned int widthIntegration, unsigned int heightIntegration, unsigned int widthSIFT, unsigned int heightSIFT, RGBDSensor* sensor) {
-
+	CUDAImageManager(unsigned int widthIntegration, unsigned int heightIntegration, unsigned int widthSIFT, unsigned int heightSIFT, RGBDSensor* sensor) {
 		m_RGBDSensor = sensor;
 
 		m_widthSIFT = widthSIFT;
@@ -46,6 +36,14 @@ public:
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
 
 		m_currFrame = 0;
+	}
+
+	~CUDAImageManager() {
+		reset();
+
+		MLIB_CUDA_SAFE_FREE(d_depthInput);
+		MLIB_CUDA_SAFE_FREE(d_colorInput);
+		MLIB_CUDA_SAFE_FREE(d_intensitySIFT);
 	}
 
 	void reset() {

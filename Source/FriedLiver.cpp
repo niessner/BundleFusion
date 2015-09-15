@@ -5,7 +5,7 @@
 #include "FriedLiver.h"
 
 
-CUDAImageManager		g_CudaImageManager;
+CUDAImageManager*		g_CudaImageManager = NULL;
 SubmapManager			g_SubmapManager;
 SBA						g_SparseBundler;
 
@@ -98,7 +98,7 @@ void init() {
 
 
 	// init CUDA
-	g_CudaImageManager.init(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
+	g_CudaImageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 		GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, getRGBDSensor());
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	g_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage,
@@ -170,7 +170,7 @@ int main(int argc, char** argv)
 		const std::string outGlobalDir = outputDirectory + "keys/";
 		if (!util::directoryExists(outGlobalDir)) util::makeDirectory(outGlobalDir);
 		//TODO 
-		while (g_CudaImageManager.process()) {
+		while (g_CudaImageManager->process()) {
 			processCurrentFrame();
 		}
 
@@ -196,16 +196,16 @@ int main(int argc, char** argv)
 
 void processCurrentFrame()
 {
-	const unsigned int curFrame = g_CudaImageManager.getCurrFrameNumber();
+	const unsigned int curFrame = g_CudaImageManager->getCurrFrameNumber();
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	std::cout << "[ frame " << curFrame << " ]" << std::endl;
 
 	// run SIFT
 	SIFTImageGPU& cur = g_SubmapManager.currentLocal->createSIFTImageGPU();
 	Timer timer; //TODO 
-	int success = g_sift->RunSIFT(g_CudaImageManager.getIntensityImage(), g_CudaImageManager.getDepthInput());
+	int success = g_sift->RunSIFT(g_CudaImageManager->getIntensityImage(), g_CudaImageManager->getDepthInput());
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection on frame " + std::to_string(curFrame));
-	unsigned int numKeypoints = g_sift->GetKeyPointsAndDescriptorsCUDA(cur, g_CudaImageManager.getDepthInput());
+	unsigned int numKeypoints = g_sift->GetKeyPointsAndDescriptorsCUDA(cur, g_CudaImageManager->getDepthInput());
 	g_SubmapManager.currentLocal->finalizeSIFTImageGPU(numKeypoints);
 	timer.stop();
 	TimingLog::timeSiftDetection += timer.getElapsedTimeMS();
@@ -213,7 +213,7 @@ void processCurrentFrame()
 
 	// process cuda cache
 	const unsigned int curLocalIdx = g_SubmapManager.getCurrLocalIdx(curFrame);
-	g_SubmapManager.currentLocalCache->storeFrame(g_CudaImageManager.getLastIntegrateDepth(), g_CudaImageManager.getLastIntegrateColor(), g_CudaImageManager.getIntegrationWidth(), g_CudaImageManager.getIntegrationHeight());
+	g_SubmapManager.currentLocalCache->storeFrame(g_CudaImageManager->getLastIntegrateDepth(), g_CudaImageManager->getLastIntegrateColor(), g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
 
 	// local submaps
 	if (g_SubmapManager.isLastLocalFrame(curFrame)) {
