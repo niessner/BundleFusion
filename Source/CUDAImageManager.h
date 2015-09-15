@@ -38,6 +38,19 @@ public:
 		m_currFrame = 0;
 	}
 
+	void allocDEBUG(unsigned int numImages, unsigned int width, unsigned int height) {
+		std::cout << "allocating " << numImages << " " << width << " x " << height << std::endl;
+		for (unsigned int i = 0; i < numImages; i++) {
+			size_t numFree, numTotal;
+			m_data.push_back(CUDARGBDInputFrame());
+			m_data.back().alloc(width, height);
+			cudaMemGetInfo(&numFree, &numTotal);
+			std::cout << i << " Free: " << (numFree / (1024 * 1024)) << "\tTotal: " << (numTotal / (1024 * 1024)) << std::endl;
+		}
+		std::cout << std::endl;
+		std::cout << "done!" << std::endl;
+	}
+
 	~CUDAImageManager() {
 		reset();
 

@@ -89,13 +89,11 @@ RGBDSensor* getRGBDSensor()
 
 
 
-void init() {
-	
+void init() {	
 	if (getRGBDSensor() == NULL) throw MLIB_EXCEPTION("No RGBD sensor specified");
 
 	//init the input RGBD sensor
 	getRGBDSensor()->createFirstConnected();
-
 
 	// init CUDA
 	g_CudaImageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
