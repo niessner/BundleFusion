@@ -38,6 +38,10 @@ public:
 		return m_data.m_trajectory[m_CurrFrame-1];
 	}
 
+	unsigned int getNumTotalFrames() const {
+		return m_NumFrames;
+	}
+
 private:
 	//! deletes all allocated data
 	void releaseData();

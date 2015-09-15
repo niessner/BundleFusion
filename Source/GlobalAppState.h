@@ -27,15 +27,10 @@
 	X(unsigned int, s_sensorIdx) \
 	X(unsigned int, s_windowWidth) \
 	X(unsigned int, s_windowHeight) \
-	X(unsigned int, s_adapterWidth) \
-	X(unsigned int, s_adapterHeight) \
+	X(unsigned int, s_integrationWidth) \
+	X(unsigned int, s_integrationHeight) \
 	X(float, s_sensorDepthMax) \
 	X(float, s_sensorDepthMin) \
-	X(bool, s_enableColorCropping) \
-	X(unsigned int, s_colorCropX) \
-	X(unsigned int, s_colorCropY) \
-	X(unsigned int, s_colorCropWidth) \
-	X(unsigned int, s_colorCropHeight) \
 	X(unsigned int, s_hashNumBuckets) \
 	X(unsigned int, s_hashNumSDFBlocks) \
 	X(unsigned int, s_hashMaxCollisionLinkedListSize) \

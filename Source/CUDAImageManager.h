@@ -1,4 +1,4 @@
-
+#pragma once
 #include "RGBDSensor.h"
 #include "CUDAImageUtil.h"
 
@@ -12,8 +12,8 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_colorIntegration, sizeof(uchar4)*widthIntegration*heightIntegration));
 		}
 		void free() {
-			MLIB_CUDA_SAFE_FREE(d_depthIntegration); 
-			MLIB_CUDA_SAFE_FREE(d_colorIntegration);			
+			MLIB_CUDA_SAFE_FREE(d_depthIntegration);
+			MLIB_CUDA_SAFE_FREE(d_colorIntegration);
 		}
 
 		float*	d_depthIntegration;
@@ -44,6 +44,8 @@ public:
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthInput, sizeof(float)*bufferDimDepthInput));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_colorInput, sizeof(uchar4)*bufferDimColorInput));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
+
+		m_currFrame = 0;
 	}
 
 	void reset() {
@@ -54,7 +56,7 @@ public:
 	}
 
 	bool process() {
-		
+
 		if (!m_RGBDSensor->processDepth()) return false;	// Order is important!
 		if (!m_RGBDSensor->processColor()) return false;
 
@@ -71,8 +73,10 @@ public:
 		if ((m_RGBDSensor->getColorWidth() == m_widthIntegration) && (m_RGBDSensor->getColorHeight() == m_heightIntegration)) {
 			CUDAImageUtil::copy<uchar4>(frame.d_colorIntegration, d_colorInput, m_widthIntegration, m_heightIntegration);
 			//std::swap(frame.d_colorIntegration, d_colorInput);
-		} else {
-			CUDAImageUtil::resample<uchar4>(frame.d_colorIntegration, m_widthIntegration, m_heightIntegration, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+		}
+		else {
+			CUDAImageUtil::resampleUCHAR4(frame.d_colorIntegration, m_widthIntegration, m_heightIntegration, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+			//CUDAImageUtil::resample<uchar4>(frame.d_colorIntegration, m_widthIntegration, m_heightIntegration, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////
@@ -84,18 +88,24 @@ public:
 		if ((m_RGBDSensor->getDepthWidth() == m_widthIntegration) && (m_RGBDSensor->getDepthHeight() == m_heightIntegration)) {
 			CUDAImageUtil::copy<float>(frame.d_depthIntegration, d_depthInput, m_widthIntegration, m_heightIntegration);
 			//std::swap(frame.d_depthIntegration, d_depthInput);
-		} else {
-			CUDAImageUtil::resample<float>(frame.d_depthIntegration, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
+		}
+		else {
+			CUDAImageUtil::resampleFloat(frame.d_depthIntegration, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
+			//CUDAImageUtil::resample<float>(frame.d_depthIntegration, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////
 		// SIFT Intensity Image
 		////////////////////////////////////////////////////////////////////////////////////
 		CUDAImageUtil::resampleToIntensity(d_intensitySIFT, m_widthSIFT, m_heightSIFT, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+
+		m_currFrame++;
+		return true;
 	}
 
 
-	const float* getIntensityImage() const {
+	//TODO not const because direct assignment in SiftGPU
+	float* getIntensityImage() {
 		return d_intensitySIFT;
 	}
 
@@ -105,6 +115,27 @@ public:
 
 	const uchar4* getColorInput() const {
 		return d_colorInput;
+	}
+
+	const float* getLastIntegrateDepth() const {
+		return m_data.back().d_depthIntegration;
+	}
+
+	const uchar4* getLastIntegrateColor() const {
+		return m_data.back().d_colorIntegration;
+	}
+
+	// called after process
+	unsigned int getCurrFrameNumber() const {
+		MLIB_ASSERT(m_currFrame > 0);
+		return m_currFrame - 1;
+	}
+
+	unsigned int getIntegrationWidth() const {
+		return m_widthIntegration;
+	}
+	unsigned int getIntegrationHeight() const {
+		return m_heightIntegration;
 	}
 
 private:
@@ -126,5 +157,7 @@ private:
 
 	//! all image data on the GPU
 	std::vector<CUDARGBDInputFrame>	m_data;
+
+	unsigned int m_currFrame;
 
 };
