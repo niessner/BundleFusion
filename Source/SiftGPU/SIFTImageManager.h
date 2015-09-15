@@ -117,6 +117,12 @@ public:
 
 	SIFTGPU_EXPORT void FilterKeyPointMatchesCU(unsigned int numCurrImagePairs);
 
+	SIFTGPU_EXPORT void FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
+		const float4x4 intrinsics,
+		const float** d_depthInputs, const float4** d_camPosInputs, const float4** d_normalInputs, const uchar4** d_colorInputs,
+		const float** d_depthModels, const float4** d_camPosModels, const float4** d_normalModels, const uchar4** d_colorModels,
+		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh);
+
 	SIFTGPU_EXPORT void AddCurrToResidualsCU(unsigned int numCurrImagePairs);
 
 	SIFTGPU_EXPORT void InvalidateImageToImageCU(const uint2& imageToImageIdx);

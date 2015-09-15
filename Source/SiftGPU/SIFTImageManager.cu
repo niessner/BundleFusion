@@ -293,7 +293,144 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs) {
 	}
 }
 
+__device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
+	float distThresh, float normalThresh, float colorThresh, const float4x4& transform, const float4x4& intrinsics,
+	const float* d_inputDepth, const float4* d_inputCamPos, const float4* d_inputNormal, const uchar4* d_inputColor,
+	const float* d_modelDepth, const float4* d_modelCamPos, const float4* d_modelNormal, const uchar4* d_modelColor)
+{
+	float3 out = make_float3(0.0f);
 
+	float4 pInput = d_inputCamPos[idx]; // point
+	float4 nInput = d_inputNormal[idx]; nInput.w = 0.0f; // vector
+	//uchar4 cInput = d_inputColor[idx];
+
+	if (pInput.x != MINF && nInput.x != MINF) {
+		const float4 pTransInput = transform * pInput;
+		const float4 nTransInput = transform * nInput;
+
+		float3 tmp = intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z);
+		int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z), (int)roundf(tmp.y / tmp.z)); // subsampled space
+
+		if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)imageWidth && screenPos.y < (int)imageHeight) {
+			float4 pTarget = d_modelCamPos[screenPos.y * imageWidth + screenPos.x]; //getBestCorrespondence1x1
+			float4 nTarget = d_modelNormal[screenPos.y * imageWidth + screenPos.x];
+			//uchar4 cTarget = d_modelColor[screenPos.y * imageWidth + screenPos.x];
+
+			if (pTarget.x != MINF && nTarget.x != MINF) {
+				float d = length(pTransInput - pTarget);
+				float dNormal = dot(make_float3(nTransInput.x, nTransInput.y, nTransInput.z), make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
+				//float c = length(make_float3((cInput.x - cTarget.x) / 255.0f, (cInput.y - cTarget.y) / 255.0f, (cInput.z - cTarget.z) / 255.0f));
+
+				float projInputDepth = (intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z)).z;
+				float tgtDepth = d_modelDepth[screenPos.y * imageWidth + screenPos.x];
+
+				bool b = ((tgtDepth != MINF && projInputDepth < tgtDepth) && d > distThresh); // bad matches that are known
+				if ((dNormal >= normalThresh && d <= distThresh /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
+					const float cameraToKinectProjZ = (pTransInput.z - 0.1f) / (3.0f - 0.1f); //TODO PARAMS HERE
+					const float weight = max(0.0f, 0.5f*((1.0f - d / distThresh) + (1.0f - cameraToKinectProjZ))); // for weighted ICP;
+
+					out.x = length(pTransInput - pTarget);	//residual
+					out.y = weight;							//corr weight
+					out.z = 1.0f;			
+				}
+			} // projected to valid depth
+		} // inside image
+	}
+
+	return out;
+}
+
+
+//we launch 1 thread for two array entries
+void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, unsigned int imageHeight, const float4x4 intrinsics,
+	int* d_currNumFilteredMatchesPerImagePair, const float4x4* d_currFilteredTransforms, 
+	const float** d_depthInputs, const float4** d_camPosInputs, const float4** d_normalInputs, const uchar4** d_colorInputs,
+	const float** d_depthModels, const float4** d_camPosModels, const float4** d_normalModels, const uchar4** d_colorModels,
+	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
+{
+	const unsigned int imagePairIdx = blockIdx.x;
+	const unsigned int numMatches = d_currNumFilteredMatchesPerImagePair[imagePairIdx];
+	if (numMatches == 0)	return;
+	
+	const unsigned int tidx = threadIdx.x;
+	const unsigned int idx = threadIdx.y * imageWidth + tidx;
+
+	const float* d_inputDepth = d_depthInputs[imagePairIdx];
+	const float4* d_inputCamPos = d_camPosInputs[imagePairIdx];
+	const float4* d_inputNormal = d_normalInputs[imagePairIdx];
+	const uchar4* d_inputColor = d_colorInputs[imagePairIdx];
+
+	const float* d_modelDepth = d_depthModels[imagePairIdx];
+	const float4* d_modelCamPos = d_camPosModels[imagePairIdx];
+	const float4* d_modelNormal = d_normalModels[imagePairIdx];
+	const uchar4* d_modelColor = d_colorModels[imagePairIdx];
+
+	const float4x4 transform = d_currFilteredTransforms[imagePairIdx];
+
+	__shared__ float sumResidual;
+	__shared__ float sumWeight;
+	__shared__ unsigned int numCorr;
+
+	if (tidx == 0) {
+		sumResidual = 0.0f;
+		sumWeight = 0.0f;
+		numCorr = 0;
+	} 
+	__syncthreads();
+
+	float3 inputToModel = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform, intrinsics,
+		d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor, 
+		d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor);
+	float3 modelToInput = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform.getInverse(), intrinsics,
+		d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor,
+		d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor);
+
+	sumResidual +=	inputToModel.x + modelToInput.x;	//residual
+	sumWeight +=	inputToModel.y + modelToInput.y;	//corr weight
+	numCorr +=		inputToModel.z + modelToInput.z;	//corr number
+
+	__syncthreads();
+
+	//write results back
+	if (tidx == 0) {
+		float err = sumResidual / sumWeight;
+		float corr = (float)numCorr / (float)(imageWidth * imageHeight);
+
+		printf("[%d]: %f %f\n", imagePairIdx, err, corr);
+
+		if (corr < corrThresh || err > errThresh) { // invalid!
+			d_currNumFilteredMatchesPerImagePair[imagePairIdx] = 0;
+		}
+	}
+}
+
+//TODO camera stuff here
+void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
+	const float4x4 intrinsics,
+	const float** d_depthInputs, const float4** d_camPosInputs, const float4** d_normalInputs, const uchar4** d_colorInputs,
+	const float** d_depthModels, const float4** d_camPosModels, const float4** d_normalModels, const uchar4** d_colorModels,
+	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
+{
+	if (numCurrImagePairs == 0) return;
+	
+	dim3 grid(numCurrImagePairs);
+	dim3 block(imageWidth, imageHeight);
+
+	//CUDATimer timer;
+	//timer.startEvent(__FUNCTION__);
+
+	FilterMatchesByDenseVerifyCU_Kernel << <grid, block >> >(
+		imageWidth, imageHeight, intrinsics,
+		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms, 
+		d_depthInputs, d_camPosInputs, d_normalInputs, d_colorInputs,
+		d_depthModels, d_camPosModels, d_normalModels, d_colorModels,
+		distThresh, normalThresh, colorThresh, errThresh, corrThresh);
+
+	//timer.endEvent();
+	//timer.evaluate();
+
+	CheckErrorCUDA(__FUNCTION__);
+}
 
 
 void __global__ AddCurrToResidualsCU_Kernel(
