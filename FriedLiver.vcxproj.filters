@@ -48,6 +48,32 @@
     <ClCompile Include="Source\CUDACache.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
+    <ClCompile Include="Source\TimingLog.cpp" />
+    <ClCompile Include="Source\SiftGPU\GlobalUtil.cpp">
+      <Filter>SiftGPU</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SiftGPU\CuTexImage.cpp">
+      <Filter>SiftGPU</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SiftGPU\SiftPyramid.cpp">
+      <Filter>SiftGPU</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SiftGPU\SiftGPU.cpp">
+      <Filter>SiftGPU</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SiftGPU\SiftMatch.cpp">
+      <Filter>SiftGPU</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SiftGPU\SIFTImageManager.cpp">
+      <Filter>SiftGPU</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SiftGPU\SIFTMatchFilter.cpp">
+      <Filter>SiftGPU</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SBA.cpp" />
+    <ClCompile Include="Source\Solver\CUDASolverBundling.cpp">
+      <Filter>SolverBundling</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -101,6 +127,74 @@
     <ClInclude Include="Source\CUDACache.h">
       <Filter>Sensors</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GlobalBundlingState.h" />
+    <ClInclude Include="Source\TimingLog.h" />
+    <ClInclude Include="Source\SiftGPU\CUDATimer.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\cudaUtil.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\cuda_kabschReference.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\cuda_SimpleMatrixUtil.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\cuda_SVD.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\GlobalUtil.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\CuTexImage.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\GlobalDefines.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\ProgramCU.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\MatrixConversion.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\SiftPyramid.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\SiftGPU.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\SiftMatch.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\SIFTImageManager.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\SIFTMatchFilter.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SBA.h" />
+    <ClInclude Include="Source\SubmapManager.h" />
+    <ClInclude Include="Source\PoseHelper.h" />
+    <ClInclude Include="Source\Solver\ICPUtil.h">
+      <Filter>SolverBundling</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Solver\SolverBundlingEquations.h">
+      <Filter>SolverBundling</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Solver\SolverBundlingParameters.h">
+      <Filter>SolverBundling</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Solver\SolverBundlingState.h">
+      <Filter>SolverBundling</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Solver\SolverBundlingUtil.h">
+      <Filter>SolverBundling</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Solver\CUDASolverBundling.h">
+      <Filter>SolverBundling</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
@@ -109,10 +203,25 @@
     <Filter Include="Sensors">
       <UniqueIdentifier>{d8cc1bbb-0889-44c1-b840-5697a564d7bb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="SiftGPU">
+      <UniqueIdentifier>{694bcb65-5f08-4463-94a0-229cddaf3a87}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SolverBundling">
+      <UniqueIdentifier>{a70dd124-67b4-4e19-95e2-4524ebad65c1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Source\CUDAImageUtil.cu">
       <Filter>Sensors</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\SiftGPU\ProgramCU.cu">
+      <Filter>SiftGPU</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\SiftGPU\SIFTImageManager.cu">
+      <Filter>SiftGPU</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\Solver\SolverBundling.cu">
+      <Filter>SolverBundling</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

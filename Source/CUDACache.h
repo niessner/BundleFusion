@@ -19,19 +19,18 @@ public:
 		uchar4* d_colorDownsampled;
 	};
 
-	CUDACache() {}
-	CUDACache(unsigned int widthDownSampled, unsigned int heightDownSampled, unsigned int maxNumImages) {
-		init(widthDownSampled, heightDownSampled, maxNumImages);
-	}
-	~CUDACache() { free(); }
-
-	void init(unsigned int widthDownSampled, unsigned int heightDownSampled, unsigned int maxNumImages) {
+	CUDACache(unsigned int widthDownSampled, unsigned int heightDownSampled, unsigned int maxNumImages) 
+	{
 		m_width = widthDownSampled;
 		m_height = heightDownSampled;
 		m_maxNumImages = maxNumImages;
 
 		alloc();
 		m_currentFrame = 0;
+
+	}
+	~CUDACache() { 
+		free(); 
 	}
 
 	void storeFrame(const float* d_depth, const uchar4* d_color, unsigned int inputWidth, unsigned int inputHeight) {
