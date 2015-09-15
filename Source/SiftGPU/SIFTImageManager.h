@@ -121,7 +121,7 @@ public:
 
 	SIFTGPU_EXPORT void InvalidateImageToImageCU(const uint2& imageToImageIdx);
 
-	SIFTGPU_EXPORT void CheckForInvalidFramesCU(const int* d_variablesToCorrespondences, const int* d_varToCorrNumEntriesPerRow, unsigned int numVars, const uint2& imageIndices); // imageindices <- recently invalidated
+	SIFTGPU_EXPORT void CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesPerRow, unsigned int* d_invalidFramesList, int* d_numInvalidFrames, unsigned int numVars);
 
 	void getValidImagesDEBUG(std::vector<int>& valid) const {
 		valid.resize(getNumImages());

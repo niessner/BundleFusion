@@ -249,6 +249,8 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 		//GlobalCameraTrackingState::getInstance().print();
 
+		TimingLog::init();
+
 
 		init();
 		
@@ -270,6 +272,7 @@ int main(int argc, char** argv)
 	}
 
 	//!!!DEBUG
+	TimingLog::printTimings("timingLog.txt");
 	std::vector<int> validImagesGlobal; g_SubmapManager.global->getValidImagesDEBUG(validImagesGlobal);
 	getRGBDSensor()->saveRecordedPointCloud("refined.ply", validImagesGlobal, g_SubmapManager.globalTrajectory);
 	//TODO stupid hack
