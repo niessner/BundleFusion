@@ -36,6 +36,23 @@ public:
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
 
 		m_currFrame = 0;
+
+
+		const float scaleWidthDepth = (float)m_widthIntegration / (float)m_RGBDSensor->getDepthWidth();
+		const float scaleHeightDepth = (float)m_heightIntegration / (float)m_RGBDSensor->getDepthHeight();
+
+		// adapt intrinsics
+		m_intrinsics = m_RGBDSensor->getDepthIntrinsics();
+		m_intrinsics._m00 *= scaleWidthDepth;  m_intrinsics._m02 *= scaleWidthDepth;
+		m_intrinsics._m11 *= scaleHeightDepth; m_intrinsics._m12 *= scaleHeightDepth;
+
+		m_intrinsicsInv = m_RGBDSensor->getDepthIntrinsicsInv();
+		m_intrinsicsInv._m00 /= scaleWidthDepth; m_intrinsicsInv._m11 /= scaleHeightDepth;
+
+		// adapt extrinsics
+		m_extrinsics = m_RGBDSensor->getDepthExtrinsics();
+		m_extrinsicsInv = m_RGBDSensor->getDepthExtrinsicsInv();
+
 	}
 
 	void allocDEBUG(unsigned int numImages, unsigned int width, unsigned int height) {
@@ -159,8 +176,31 @@ public:
 		return m_heightSIFT;
 	}
 
+
+
+	const mat4f& getIntrinsics() const	{
+		return m_intrinsics;
+	}
+
+	const mat4f& getIntrinsicsInv() const {
+		return m_intrinsicsInv;
+	}
+
+	const mat4f& getExtrinsics() const	{
+		return m_extrinsics;
+	}
+
+	const mat4f& getExtrinsicsInv() const {
+		return m_extrinsicsInv;
+	}
+
 private:
 	RGBDSensor* m_RGBDSensor;	
+
+	mat4f m_intrinsics;
+	mat4f m_intrinsicsInv;
+	mat4f m_extrinsics;
+	mat4f m_extrinsicsInv;
 
 	//! resolution for sift key point detection
 	unsigned int m_widthSIFT;

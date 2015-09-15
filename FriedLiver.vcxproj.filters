@@ -135,15 +135,6 @@
     <ClInclude Include="Source\SiftGPU\cudaUtil.h">
       <Filter>SiftGPU</Filter>
     </ClInclude>
-    <ClInclude Include="Source\SiftGPU\cuda_kabschReference.h">
-      <Filter>SiftGPU</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\SiftGPU\cuda_SimpleMatrixUtil.h">
-      <Filter>SiftGPU</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\SiftGPU\cuda_SVD.h">
-      <Filter>SiftGPU</Filter>
-    </ClInclude>
     <ClInclude Include="Source\SiftGPU\GlobalUtil.h">
       <Filter>SiftGPU</Filter>
     </ClInclude>
@@ -196,6 +187,18 @@
       <Filter>SolverBundling</Filter>
     </ClInclude>
     <ClInclude Include="Source\ImageHelper.h" />
+    <ClInclude Include="Source\SiftGPU\cuda_kabschReference.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\cuda_EigenValue.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\cuda_kabsch.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SiftGPU\cuda_SimpleMatrixUtil.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

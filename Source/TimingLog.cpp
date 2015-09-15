@@ -16,3 +16,9 @@ unsigned int TimingLog::countSiftDetection = 0;
 
 double TimingLog::timeSiftMatching = 0.0f;
 unsigned int TimingLog::countSiftMatching = 0;
+
+double TimingLog::timeFuseToGlobalKey = 0.0f;
+unsigned int TimingLog::countFuseToGlobalKey = 0;
+
+double TimingLog::timeSolveSparseBundling = 0.0f;
+unsigned int TimingLog::countSolveSparseBundling = 0;

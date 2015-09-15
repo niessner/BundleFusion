@@ -99,7 +99,7 @@ void init() {
 	g_CudaImageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 		GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, getRGBDSensor());
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
-	g_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage, submapSize);
+	g_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage, submapSize, g_CudaImageManager);
 	//TODO fix
 	if (GlobalAppState::get().s_sensorIdx == 3) {
 		g_SubmapManager.setTotalNumFrames(((BinaryDumpReader*)getRGBDSensor())->getNumTotalFrames());

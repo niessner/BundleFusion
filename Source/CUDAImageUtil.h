@@ -3,6 +3,7 @@
 #define CUDA_IMAGE_UTIL_H
 
 #include <cuda_runtime.h>
+#include "mLibCuda.h"
 
 class CUDAImageUtil {
 public:
@@ -12,6 +13,7 @@ public:
 	
 	static void resampleFloat(float* d_output, unsigned int outputWidth, unsigned int outputHeight, const float* d_input, unsigned int inputWidth, unsigned int inputHeight);
 	static void resampleUCHAR4(uchar4* d_output, unsigned int outputWidth, unsigned int outputHeight, const uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight);
+	static void convertDepthFloatToCameraSpaceFloat4(float4* d_output, float* d_input, const float4x4& intrinsicsInv, unsigned int width, unsigned int height);
 };
 
 //TODO 

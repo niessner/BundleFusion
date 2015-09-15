@@ -1,6 +1,7 @@
 
 #include "stdafx.h"
 #include "SBA.h"
+#include "TimingLog.h"
 
 #define POSESIZE 6
 
@@ -24,7 +25,9 @@ void SBA::align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transform
 	//if (GlobalAppState::get().s_enableDetailedTimings) m_solver->evaluateTimings();
 	
 	timer.stop();
-	std::cout << "[ align Time:] " << timer.getElapsedTimeMS() << " sec" << std::endl;
+	TimingLog::timeSolveSparseBundling += timer.getElapsedTimeMS();
+	TimingLog::countSolveSparseBundling += curIt * maxNumIters;
+	std::cout << "[ align Time:] " << timer.getElapsedTimeMS() << " ms" << std::endl;
 
 }
 

@@ -192,3 +192,45 @@ void CUDAImageUtil::resampleToIntensity(float* d_output, unsigned int outputWidt
 	MLIB_CUDA_CHECK_ERR(__FUNCTION__);
 #endif
 }
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Convert Depth to Camera Space Positions
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+__global__ void convertDepthFloatToCameraSpaceFloat4_Kernel(float4* d_output, float* d_input, float4x4 intrinsicsInv, unsigned int width, unsigned int height)
+{
+	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x < width && y < height) {
+		d_output[y*width + x] = make_float4(MINF, MINF, MINF, MINF);
+
+		float depth = d_input[y*width + x];
+
+		if (depth != MINF)
+		{
+			float4 cameraSpace(intrinsicsInv*make_float4((float)x*depth, (float)y*depth, depth, depth));
+			d_output[y*width+x] = make_float4(cameraSpace.x, cameraSpace.y, cameraSpace.w, 1.0f);
+			//d_output[y*width + x] = make_float4(depthCameraData.kinectDepthToSkeleton(x, y, depth), 1.0f);
+		}
+	}
+}
+
+void CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(float4* d_output, float* d_input, const float4x4& intrinsicsInv, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	convertDepthFloatToCameraSpaceFloat4_Kernel<< <gridSize, blockSize >> >(d_output, d_input, intrinsicsInv, width, height);
+
+#ifdef _DEBUG
+	MLIB_CUDA_SAFE_CALL(cudaDeviceSynchronize());
+	MLIB_CUDA_CHECK_ERR(__FUNCTION__);
+#endif
+}

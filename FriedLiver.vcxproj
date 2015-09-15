@@ -160,9 +160,10 @@
     <ClInclude Include="Source\SBA.h" />
     <ClInclude Include="Source\SiftGPU\CUDATimer.h" />
     <ClInclude Include="Source\SiftGPU\cudaUtil.h" />
+    <ClInclude Include="Source\SiftGPU\cuda_EigenValue.h" />
+    <ClInclude Include="Source\SiftGPU\cuda_kabsch.h" />
     <ClInclude Include="Source\SiftGPU\cuda_kabschReference.h" />
     <ClInclude Include="Source\SiftGPU\cuda_SimpleMatrixUtil.h" />
-    <ClInclude Include="Source\SiftGPU\cuda_SVD.h" />
     <ClInclude Include="Source\SiftGPU\CuTexImage.h" />
     <ClInclude Include="Source\SiftGPU\GlobalDefines.h" />
     <ClInclude Include="Source\SiftGPU\GlobalUtil.h" />

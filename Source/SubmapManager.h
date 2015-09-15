@@ -25,14 +25,22 @@ public:
 		m_submapSize = 0;
 	}
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
-		unsigned int submapSize, unsigned int numTotalFrames = (unsigned int)-1)
+		unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames = (unsigned int)-1)
 	{
 		// cache
 		const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth;
 		const unsigned int downSampHeight = GlobalBundlingState::get().s_downsampledHeight;
-		currentLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages);
-		nextLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages);
-		globalCache = new CUDACache(downSampWidth, downSampHeight, maxNumGlobalImages);
+
+
+		const float scaleWidth = (float)downSampWidth / (float)imageManager->getIntegrationWidth();
+		const float scaleHeight = (float)downSampHeight / (float)imageManager->getIntegrationHeight();
+		mat4f intrinsicsDownsampled = imageManager->getIntrinsics();
+		intrinsicsDownsampled._m00 *= scaleWidth;  intrinsicsDownsampled._m02 *= scaleWidth;
+		intrinsicsDownsampled._m11 *= scaleHeight; intrinsicsDownsampled._m12 *= scaleHeight;
+
+		currentLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
+		nextLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
+		globalCache = new CUDACache(downSampWidth, downSampHeight, maxNumGlobalImages, intrinsicsDownsampled);
 
 		// sift manager
 		currentLocal = new SIFTImageManager(maxNumLocalImages, maxNumKeysPerImage);
