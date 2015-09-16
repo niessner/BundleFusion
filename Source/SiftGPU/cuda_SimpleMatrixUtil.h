@@ -330,6 +330,12 @@ public:
 		m21 = values[3];	m22 = values[4];	m23 = values[5];
 		m31 = values[6];	m32 = values[7];	m33 = values[8];
 	}
+	// initialize row-wise
+	inline __device__ __host__ float3x3(const float3& v0, const float3& v1, const float3& v2) {
+		m11 = v0.x;	m12 = v0.y;	m13 = v0.z;
+		m21 = v1.x;	m22 = v1.y;	m23 = v1.z;
+		m31 = v2.x;	m32 = v2.y;	m33 = v2.z;
+	}
 
 	inline __device__ __host__ float3x3(const float3x3& other) {
 		m11 = other.m11;	m12 = other.m12;	m13 = other.m13;
@@ -542,6 +548,14 @@ public:
 		res.m11 = diag;		res.m12 = 0.0f;		res.m13 = 0.0f;
 		res.m21 = 0.0f;		res.m22 = diag;		res.m23 = 0.0f;
 		res.m31 = 0.0f;		res.m32 = 0.0f;		res.m33 = diag;
+		return res;
+	}
+
+	static inline __device__ __host__ float3x3 getDiagonalMatrix(float d0, float d1, float d2) {
+		float3x3 res;
+		res.m11 = d0;		res.m12 = 0.0f;		res.m13 = 0.0f;
+		res.m21 = 0.0f;		res.m22 = d1;		res.m23 = 0.0f;
+		res.m31 = 0.0f;		res.m32 = 0.0f;		res.m33 = d2;
 		return res;
 	}
 

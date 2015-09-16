@@ -212,7 +212,8 @@ void printCurrentMatches(const std::string& outPath, const SIFTImageManager* sif
 	}
 }
 
-#include "SiftGPU/cuda_EigenValue.h"
+//#include "SiftGPU/cuda_EigenValue.h"
+//#include "SiftGPU/cuda_SVD.h"
 
 //int WINAPI main(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 int main(int argc, char** argv)
@@ -228,6 +229,35 @@ int main(int argc, char** argv)
 	//float2 ev0 = computeEigenVector(m, evs.x);
 	//float2 ev1 = computeEigenVector(m, evs.y);
 	//auto res = ((mat2f*)&m)->eigenSystem();
+	//int a = 5;
+	//getchar();
+	//exit(1);
+
+	//float3x3 m(0.038489, -0.012003, -0.004768,
+	//	-0.012003, 0.015097, 0.006327,
+	//	-0.004768, 0.006327, 0.002659);
+	//float3x3 m(1, 2, 3, 4, 5, 6, 7, 8, 9);
+	//m = m * m.getTranspose();
+	////float3 evs = computeEigenValues(m);
+	////float3 ev0 = computeEigenVector(m, evs.x);
+	////float3 ev1 = computeEigenVector(m, evs.y);
+	////float3 ev2 = computeEigenVector(m, evs.z);
+	//
+	//float3 evs, ev0, ev1, ev2;
+	//Timer t;
+	//for (unsigned int i = 0; i < 100000; i++)
+	//	MYEIGEN::eigenSystem(m, evs, ev0, ev1, ev2);
+	//t.stop();
+	//std::cout << "first " << t.getElapsedTimeMS() << std::endl;
+	//t.start();
+	//for (unsigned int i = 0; i < 100000; i++)
+	//	MYEIGEN::eigenSystem3x3(m, evs, ev0, ev1, ev2);
+	//std::cout << "second: " << t.getElapsedTimeMS() << std::endl;
+	//float3x3 re(ev0, ev1, ev2);
+	//re = re * float3x3::getDiagonalMatrix(evs.x, evs.y, evs.z) * re.getInverse();
+
+	//auto res = ((mat3f*)&m)->eigenSystem();
+	//mat3f res2 = (mat3f)res.eigenvectors * mat3f::diag(res.eigenvalues[0], res.eigenvalues[1], res.eigenvalues[2]) * ((mat3f)res.eigenvectors).getInverse();
 	//int a = 5;
 	//getchar();
 	//exit(1);
