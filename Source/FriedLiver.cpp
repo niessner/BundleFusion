@@ -480,8 +480,9 @@ void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, c
 		//siftManager->loadFromFile("debug/debug.sift");
 
 		const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
-		SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
-		//siftManager->FilterMatchesBySurfaceAreaCU(curFrame, MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()), GlobalBundlingState::get().s_surfAreaPcaThresh);
+		//SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
+		siftManager->FilterMatchesBySurfaceAreaCU(curFrame, MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()), GlobalBundlingState::get().s_surfAreaPcaThresh);
+		
 		//printCurrentMatches("debug/", siftManager, true, frameStart, frameSkip);
 
 		//SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);

@@ -811,7 +811,7 @@ public:
 	}
 
 	//! prints the matrix; only host	
-	__host__ void print() {
+	__host__ void print() const {
 		std::cout <<
 			m11 << " " << m12 << " " << m13 << " " << m14 << std::endl <<
 			m21 << " " << m22 << " " << m23 << " " << m24 << std::endl <<
@@ -1167,7 +1167,7 @@ public:
 	}
 
 	//! prints the matrix	
-	inline __device__ __host__ void print() {
+	inline __device__ __host__ void print() const {
 		printf("%.3f %.3f %.3f %.3f\n%.3f %.3f %.3f %.3f\n%.3f %.3f %.3f %.3f\n\n",
 			entries[0],  entries[1],  entries[2],  entries[3],
 			entries[4],  entries[5],  entries[6],  entries[7],

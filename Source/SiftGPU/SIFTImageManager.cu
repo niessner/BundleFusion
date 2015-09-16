@@ -308,8 +308,7 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	const uint2* d_keyPointMatchIndices = d_filteredMatchKeyPointIndicesGlobal + imagePairIdx * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED;
 	
 	float area0 = 0.0f; 
-	float area1 = 0.0f;
-		
+	float area1 = 0.0f;		
 	
 
 	// compute area image 0
@@ -319,25 +318,47 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	float3 evs, ev0, ev1, ev2;
 	bool res;
 
-	res = MYEIGEN::eigenSystem((float3x3)V, evs, ev0, ev1, ev2);
+	res = MYEIGEN::eigenSystem(V, evs, ev0, ev1, ev2);
 	__shared__ float2 pointsProj[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];
 	if (res) { // project
 		projectKeysToPlane(pointsProj, d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which, ev0, ev1, ev2, mean);
 		area0 = computeAreaOrientedBoundingBox2(pointsProj, numMatches);
 	}
 
+	////if (threadIdx.x == 0)
+	//{
+	//	float3x3 V_ = V;
+	//	float3 mean_ = mean;
+	//	__syncthreads();
+	//	printf("matches: %d\n", numMatches);
+	//	V_.print();
+	//	printf("mean: [%f %f %f]\n", mean_.x, mean_.y, mean_.z);
+	//	printf("evs [%f | %f | %f]\n", evs.x, evs.y, evs.z);
+	//	printf("ev0 [%f | %f | %f]\n", ev0.x, ev0.y, ev0.z);
+	//	printf("ev1 [%f | %f | %f]\n", ev1.x, ev1.y, ev1.z);
+	//	printf("ev2 [%f | %f | %f]\n", ev2.x, ev2.y, ev2.z);
+	//	printf("res %d\n", (int)res);
+	//	printf("area0: %f\n", area0);
+	//}
+	//if (threadIdx.x == 0) {
+	//	colorIntrinsicsInv.print();
+	//	for (unsigned int i = 0; i < numMatches; i++) {
+	//		printf("pointsProj[%d] = [%f | %f] \t\t idx: [%d | %d]\n", i, pointsProj[i].x, pointsProj[i].y, d_keyPointMatchIndices[i].x, d_keyPointMatchIndices[i].y);
+	//	}
+	//}
+
 	// compute area image 1
 	which = 1;
 	computeKeyPointMatchesCovariance(d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which);
 
-	res = MYEIGEN::eigenSystem((float3x3)V, evs, ev0, ev1, ev2);
+	res = MYEIGEN::eigenSystem(V, evs, ev0, ev1, ev2);
 	if (res) {// project
 		projectKeysToPlane(pointsProj, d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which, ev0, ev1, ev2, mean);
 		area1 = computeAreaOrientedBoundingBox2(pointsProj, numMatches);
 	}
 
 	if (threadIdx.x == 0) {
-		printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
+		//printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
 		if (area0 < areaThresh && area1 < areaThresh) {
 			d_numFilteredMatchesPerImagePair[imagePairIdx] = 0;
 		}
@@ -348,7 +369,8 @@ void SIFTImageManager::FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePai
 	if (numCurrImagePairs == 0) return;
 
 	dim3 grid(numCurrImagePairs);
-	dim3 block(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+	const unsigned int threadsPerBlock = ((MAX_MATCHES_PER_IMAGE_PAIR_FILTERED + 31) / 32) * 32;
+	dim3 block(threadsPerBlock);
 
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
