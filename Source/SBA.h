@@ -36,7 +36,7 @@ public:
 		if (d_xTrans) cutilSafeCall(cudaFree(d_xTrans));
 	}
 
-	void align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify);
+	void align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal);
 
 	float getMaxResidual() const { return m_maxResidual; }
 	const std::vector<float>& getLinearConvergenceAnalysis() const { return m_solver->getLinearConvergenceAnalysis(); }

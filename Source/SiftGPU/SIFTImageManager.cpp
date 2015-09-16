@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "SIFTImageManager.h"
-#include "../TimingLog.h"
 #include "../GlobalBundlingState.h"
 
 SIFTGPU_EXPORT SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
@@ -360,7 +359,6 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4* tr
 	getSIFTKeyPointDescsDEBUG(allDesc);
 	std::vector<bool> keyMarker(allKeys.size(), false);
 
-	Timer timer;
 	//!!!TODO camera stuff
 	const float _colorIntrinsics[16] = {
 		1180.31299f, 0.0f, 649.0f, 0.0f,
@@ -396,9 +394,6 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4* tr
 			} // not already found
 		}// valid corr
 	} // correspondences/residual
-	timer.stop();
-	TimingLog::timeFuseToGlobalKey += timer.getElapsedTimeMS();
-	TimingLog::countFuseToGlobalKey++;
 
 	unsigned int numKeys = (unsigned int)curKeys.size();
 	SIFTImageGPU& cur = global->createSIFTImageGPU();

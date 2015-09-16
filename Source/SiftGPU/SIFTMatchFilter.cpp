@@ -4,7 +4,6 @@
 #include "cuda_kabschReference.h"
 //#include "cuda_kabsch.h"
 #include "../GlobalBundlingState.h"
-#include "../TimingLog.h"
 
 void SIFTMatchFilter::filterFrames(SIFTImageManager* siftManager)
 {
@@ -47,13 +46,9 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager)
 		std::vector<float> matchDistances;
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
-		ml::Timer timer;
 		float4x4 transform;
 		unsigned int newNumMatches = 
 			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform);
-		timer.stop();
-		TimingLog::timeKeyPointMatchFilter += timer.getElapsedTimeMS();
-		TimingLog::countKeyPointMatchFilter++;
 		//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
 
 		transforms[i] = transform;
@@ -112,12 +107,8 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
 		//std::cout << "(" << i << ", " << curFrame << "): ";
-		ml::Timer timer;
 		bool valid =
 			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices);
-		timer.stop();
-		TimingLog::timeSurfaceAreaFilter += timer.getElapsedTimeMS();
-		TimingLog::countSurfaceAreaFilter++;
 
 		if (!valid) {
 			// invalidate
@@ -286,14 +277,10 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
 		//std::cout << "(" << i << ", " << curFrame << "): ";
-		ml::Timer timer;
 		bool valid =
 			filterImagePairByDenseVerify(prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(), 
 			curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(), 
 			transforms[i], downSampWidth, downSampHeight);
-		timer.stop();
-		TimingLog::timeDenseVerifyFilter += timer.getElapsedTimeMS();
-		TimingLog::countDenseVerifyFilter++;
 		//if (valid) std::cout << "VALID" << std::endl;
 		//else std::cout << "INVALID" << std::endl;
 

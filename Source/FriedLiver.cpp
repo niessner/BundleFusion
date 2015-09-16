@@ -121,7 +121,7 @@ void destroy() {
 //TODO fix
 void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, const std::vector<int>& validImages,
 	unsigned int frameStart, unsigned int frameSkip, bool print = false);
-void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager);
+void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager, bool isLocal);
 void processCurrentFrame();
 void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame)
 {
@@ -297,9 +297,12 @@ int main(int argc, char** argv)
 
 		init();
 		
-		//TODO 
+		//TODO
+		Timer timer;
 		while (g_CudaImageManager->process()) {
+			if (GlobalBundlingState::get().s_enableGlobalTimings) { timer.start(); }
 			processCurrentFrame();
+			if (GlobalBundlingState::get().s_enableGlobalTimings) { timer.stop(); TimingLog::addTotalFrameTime(timer.getElapsedTimeMS()); }
 		}
 
 	}
@@ -332,17 +335,17 @@ void processCurrentFrame()
 	const unsigned int curFrame = g_CudaImageManager->getCurrFrameNumber();
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	std::cout << "[ frame " << curFrame << " ]" << std::endl;
+	Timer timer; //TODO 
+	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addLocalFrameTiming();
 
 	// run SIFT
 	SIFTImageGPU& cur = g_SubmapManager.currentLocal->createSIFTImageGPU();
-	Timer timer; //TODO 
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 	int success = g_sift->RunSIFT(g_CudaImageManager->getIntensityImage(), g_CudaImageManager->getDepthInput());
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection on frame " + std::to_string(curFrame));
 	unsigned int numKeypoints = g_sift->GetKeyPointsAndDescriptorsCUDA(cur, g_CudaImageManager->getDepthInput());
 	g_SubmapManager.currentLocal->finalizeSIFTImageGPU(numKeypoints);
-	timer.stop();
-	TimingLog::timeSiftDetection += timer.getElapsedTimeMS();
-	TimingLog::countSiftDetection++;
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = timer.getElapsedTimeMS(); }
 
 	// process cuda cache
 	const unsigned int curLocalFrame = g_SubmapManager.currentLocal->getNumImages() - 1;
@@ -374,6 +377,7 @@ void processCurrentFrame()
 
 	// global frame
 	if (g_SubmapManager.isLastFrame(curFrame) || g_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
+		if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 
 		// cache
 		g_SubmapManager.globalCache->copyCacheFrameFrom(g_SubmapManager.currentLocalCache, 0);
@@ -385,17 +389,19 @@ void processCurrentFrame()
 			//if (!util::directoryExists(curLocalOutDir)) util::makeDirectory(curLocalOutDir);
 			const std::string curLocalOutDir = "";
 			std::vector<mat4f> currentLocalTrajectory(currentLocal->getNumImages(), mat4f::identity());
-			solve(currentLocalTrajectory, g_SubmapManager.currentLocal);
+			solve(currentLocalTrajectory, g_SubmapManager.currentLocal, true);
 			g_SubmapManager.localTrajectories.push_back(currentLocalTrajectory);
 
 			// fuse to global
 			SIFTImageManager* global = g_SubmapManager.global;
 			const mat4f lastTransform = g_SubmapManager.globalTrajectory.back();
+			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 			//g_SubmapManager.currentLocal->fuseToGlobal(global, (float4x4*)currentLocalTrajectory.data(), currentLocal->getNumImages() - 1); // overlap frame
 			SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
 			unsigned int numGlobalKeys = g_SubmapManager.currentLocal->FuseToGlobalKeyCU(curGlobalImage, g_SubmapManager.getCurrentLocalTrajectoryGPU(),
 				MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsics()), MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()));
 			global->finalizeSIFTImageGPU(numGlobalKeys);
+			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = timer.getElapsedTimeMS(); }
 
 			//unsigned int gframe = (unsigned int)global->getNumImages() - 1;
 			//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
@@ -411,7 +417,7 @@ void processCurrentFrame()
 
 				if (validImagesGlobal.back()) {
 					// solve global
-					solve(g_SubmapManager.globalTrajectory, global);
+					solve(g_SubmapManager.globalTrajectory, global, false);
 				}
 			}
 
@@ -428,17 +434,20 @@ void processCurrentFrame()
 	} // global
 }
 
-void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager)
+void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager, bool isLocal)
 {
 	MLIB_ASSERT(transforms.size() == siftManager->getNumImages());
 	bool useVerify = false; //TODO do we need verify?
-	g_SparseBundler.align(siftManager, transforms, GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations, useVerify);
+	g_SparseBundler.align(siftManager, transforms, GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations, useVerify, isLocal);
 	//if (useVerify) bundle->verifyTrajectory();
 }
 
 void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, const std::vector<int>& validImages,
 	unsigned int frameStart, unsigned int frameSkip, bool print /*= false*/) // frameStart/frameSkip for debugging (printing matches)
 {
+	bool isLocal = (frameSkip == 1);
+	Timer timer;
+
 	// match with every other
 	const unsigned int curFrame = siftManager->getNumImages() - 1;
 	for (unsigned int prev = 0; prev < curFrame; prev++) {
@@ -455,13 +464,11 @@ void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, c
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(imagePairMatch.d_numMatches, &numMatch, sizeof(unsigned int), cudaMemcpyHostToDevice));
 		}
 		else {
-			Timer timer;
+			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 			g_siftMatcher->SetDescriptors(0, num1, (unsigned char*)image_i.d_keyPointDescs);
 			g_siftMatcher->SetDescriptors(1, num2, (unsigned char*)image_j.d_keyPointDescs);
 			g_siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset);
-			timer.stop();
-			TimingLog::timeSiftMatching += timer.getElapsedTimeMS();
-			TimingLog::countSiftMatching++;
+			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeSiftMatching = timer.getElapsedTimeMS(); }
 			//unsigned int numMatch; cutilSafeCall(cudaMemcpy(&numMatch, imagePairMatch.d_numMatches, sizeof(int), cudaMemcpyDeviceToHost));
 			//std::cout << "images (" << prev << ", " << curFrame << "): " << numMatch << " matches" << std::endl;
 		}
@@ -469,33 +476,37 @@ void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, c
 
 	if (curFrame > 0) { // can have a match to another frame
 		//sort the current key point matches
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }		
 		siftManager->SortKeyPointMatchesCU(curFrame);
-		if (print) printCurrentMatches("debug/", siftManager, false, frameStart, frameSkip);
+		//if (print) printCurrentMatches("debug/", siftManager, false, frameStart, frameSkip);
 
 		//filter matches
 		SIFTMatchFilter::filterKeyPointMatches(siftManager);
 		//global->FilterKeyPointMatchesCU(curFrame);
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = timer.getElapsedTimeMS(); }
 
-		//siftManager->saveToFile("debug/debug.sift");
-		//siftManager->loadFromFile("debug/debug.sift");
-
-		const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
+		//const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
 		//SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
 		siftManager->FilterMatchesBySurfaceAreaCU(curFrame, MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()), GlobalBundlingState::get().s_surfAreaPcaThresh);
-		
-		//printCurrentMatches("debug/", siftManager, true, frameStart, frameSkip);
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterSurfaceArea = timer.getElapsedTimeMS(); }
 
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		//SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);
 		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
 		siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
 			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
 			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh);
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterDenseVerify = timer.getElapsedTimeMS(); }
 
-
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		SIFTMatchFilter::filterFrames(siftManager);
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeFilterFrames = timer.getElapsedTimeMS(); }
 		if (print) printCurrentMatches("debug/filt", siftManager, true, frameStart, frameSkip);
 
 		// add to global correspondences
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		siftManager->AddCurrToResidualsCU(curFrame);
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeAddCurrResiduals = timer.getElapsedTimeMS(); }
 	}
 }

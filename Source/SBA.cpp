@@ -2,11 +2,12 @@
 #include "stdafx.h"
 #include "SBA.h"
 #include "TimingLog.h"
+#include "GlobalBundlingState.h"
 
 #define POSESIZE 6
 
 
-void SBA::align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify)
+void SBA::align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal)
 {
 	m_bVerify = false;
 
@@ -14,6 +15,7 @@ void SBA::align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transform
 	m_maxResidual = -1.0f;
 
 	ml::Timer timer;
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 	bool removed = false;
 	const unsigned int maxIts = 60;//GlobalAppState::get().s_maxNumResidualsRemoved; //!!!TODO PARAMS
 	unsigned int curIt = 0;
@@ -24,9 +26,7 @@ void SBA::align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transform
 
 	//if (GlobalAppState::get().s_enableDetailedTimings) m_solver->evaluateTimings();
 	
-	timer.stop();
-	TimingLog::timeSolveSparseBundling += timer.getElapsedTimeMS();
-	TimingLog::countSolveSparseBundling += curIt * maxNumIters;
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve = timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve = curIt * maxNumIters; }
 	std::cout << "[ align Time:] " << timer.getElapsedTimeMS() << " ms" << std::endl;
 
 }

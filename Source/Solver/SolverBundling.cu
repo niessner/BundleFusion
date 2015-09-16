@@ -449,15 +449,15 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 
 	const unsigned int Ncorr = input.numberOfCorrespondences;
 	const int blocksPerGridCorr = (Ncorr + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-	if (timer) timer->startEvent("PCGIteration::applyJ");
+	//if (timer) timer->startEvent("PCGIteration::applyJ");
 	PCGStep_Kernel0 << <blocksPerGridCorr, THREADS_PER_BLOCK >> >(input, state, parameters);
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
-	if (timer) timer->endEvent();
+	//if (timer) timer->endEvent();
 
-	if (timer) timer->startEvent("PCGIteration::applyJT");
+	//if (timer) timer->startEvent("PCGIteration::applyJT");
 	PCGStep_Kernel1a << < N, THREADS_PER_BLOCK_JT >> >(input, state, parameters);
 	#ifdef _DEBUG
 			cutilSafeCall(cudaDeviceSynchronize());
@@ -469,9 +469,8 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 				cutilSafeCall(cudaDeviceSynchronize());
 				cutilCheckMsg(__FUNCTION__);
 	#endif
-	if (timer) timer->endEvent();
+	//if (timer) timer->endEvent();
 
-	if (timer) timer->startEvent("PCGIteration::Kernel2&3");
 	PCGStep_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
@@ -483,7 +482,6 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
-	if (timer) timer->endEvent();
 }
 
 /////////////////////////////////////////////////////////////////////////

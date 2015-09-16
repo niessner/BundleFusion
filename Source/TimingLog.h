@@ -4,99 +4,134 @@
 #include <iostream>
 
 class TimingLog
-{	
-	public:
+{
+public:
+	struct FrameTiming {
+		double timeSiftDetection; // fuse for global / sift detection for local
+		double timeSiftMatching;
+		double timeMatchFilterKeyPoint;
+		double timeMatchFilterSurfaceArea;
+		double timeMatchFilterDenseVerify;
+		double timeFilterFrames;
+		double timeAddCurrResiduals;
+		double timeSolve;
+		unsigned int numItersSolve;
 
-		static void init()
-		{
-			resetTimings();
+		FrameTiming() {
+			timeSiftDetection = 0;
+			timeSiftMatching = 0;
+			timeMatchFilterKeyPoint = 0;
+			timeMatchFilterSurfaceArea = 0;
+			timeMatchFilterDenseVerify = 0;
+			timeFilterFrames = 0;
+			timeAddCurrResiduals = 0;
+			timeSolve = 0;
+			numItersSolve = 0;
 		}
 
-		static void destroy()
-		{
+		void print(std::ostream* out) {
+			*out << "\tTime SIFT Detection: " << std::to_string(timeSiftDetection) << "ms" << std::endl;
+			*out << "\tTime SIFT Matching: " << std::to_string(timeSiftMatching) << "ms" << std::endl;
+			*out << "\tTime Match Filter Key Point: " << std::to_string(timeMatchFilterKeyPoint) << "ms" << std::endl;
+			*out << "\tTime Match Filter Surface Area: " << std::to_string(timeMatchFilterSurfaceArea) << "ms" << std::endl;
+			*out << "\tTime Match Filter Dense Verify: " << std::to_string(timeMatchFilterDenseVerify) << "ms" << std::endl;
+			*out << "\tTime Solve: " << std::to_string(timeSolve) << "ms" << std::endl;
+			*out << "\t#iters solve: " << std::to_string(numItersSolve) << std::endl;
 		}
+	};
 
-		static void printTimings(const std::string& filename)
+
+	static void init()
+	{
+		resetTimings();
+	}
+
+	static void destroy()
+	{
+	}
+
+	static void printTimings(const std::string& filename) 
+	{
+		//if(GlobalAppState::get().s_timingsDetailledEnabled)
 		{
-			//if(GlobalAppState::get().s_timingsDetailledEnabled)
-			{
-				std::ofstream outFile;
-				bool logToFile = false;
-				if (!filename.empty()) {
-					logToFile = true;
-					outFile.open(filename, std::ios::out);
-				}
-				std::ostream &out = (logToFile ? outFile : std::cout);
-
-
-				out << "Total Time SIFT Detection: " << timeSiftDetection << " ms" << std::endl;
-				if (countSiftDetection > 0) out << "Time SIFT Detection Per Frames: " << timeSiftDetection / countSiftDetection << " ms (total " << countSiftDetection << ")" << std::endl;
-				out << "Total Time SIFT Matching: " << timeSiftMatching << " ms" << std::endl;
-				if (countSiftMatching > 0) out << "Time SIFT Matching: " << timeSiftMatching / countSiftMatching << " ms (total " << countSiftMatching << ")" << std::endl;
-				out << std::endl;
-
-				out << "Total Time Key Point Match Filter: " << timeKeyPointMatchFilter << " ms" << std::endl;
-				if (countKeyPointMatchFilter > 0) out << "Time Key Point Match Filter Per 2Frames: " << timeKeyPointMatchFilter / countKeyPointMatchFilter << " ms (total " << countKeyPointMatchFilter << ")" << std::endl;
-				out << "Total Time Surface Area Filter: " << timeSurfaceAreaFilter << " ms" << std::endl;
-				if (countSurfaceAreaFilter > 0) out << "Time Surface Area Filter Per 2Frames: " << timeSurfaceAreaFilter / countSurfaceAreaFilter << " ms (total " << countSurfaceAreaFilter << ")" << std::endl;
-				out << "Total Time Dense Verify Filter: " << timeDenseVerifyFilter << " ms" << std::endl;
-				if (countDenseVerifyFilter > 0) out << "Time Dense Verify Filter Per 2Frames: " << timeDenseVerifyFilter / countDenseVerifyFilter << " ms (total " << countDenseVerifyFilter << ")" << std::endl;
-				out << std::endl;
-
-				out << "Total Time Fuse To Global Key: " << timeFuseToGlobalKey << " ms" << std::endl;
-				if (countFuseToGlobalKey > 0) out << "Time Fuse To Global Key Per Frame: " << timeFuseToGlobalKey / countFuseToGlobalKey << " ms (total " << countFuseToGlobalKey << ")" << std::endl;
-				out << std::endl;
-
-				out << "Total Time Solve: " << timeSolveSparseBundling << " ms" << std::endl;
-				if (countSolveSparseBundling > 0) out << "Time Solver Per NonLinear Iteration: " << timeSolveSparseBundling / countSolveSparseBundling << " ms (total " << countSolveSparseBundling << ")" << std::endl;
-				out << std::endl;
-
-				out << std::endl;
+			std::ofstream outFile;
+			bool logToFile = false;
+			if (!filename.empty()) {
+				logToFile = true;
+				outFile.open(filename, std::ios::out);
 			}
+			std::ostream &out = (logToFile ? outFile : std::cout);
+			
+			out << "Global Timings Per Frame:" << std::endl;
+			for (unsigned int i = 0; i < m_globalFrameTimings.size(); i++) {
+				out << "[ frame " << i << " ]" << std::endl;
+				m_globalFrameTimings[i].print(&out);
+			}
+			out << std::endl << std::endl;
+
+			out << "Local Timings Per Frame:" << std::endl;
+			for (unsigned int i = 0; i < m_localFrameTimings.size(); i++) {
+				out << "[ frame " << i << " ]" << std::endl;
+				m_localFrameTimings[i].print(&out);
+			}
+
+			out << "Total Timings Per Frame:" << std::endl;
+			for (unsigned int i = 0; i < m_totalFrameTimings.size(); i++) {
+				out << "[ frame " << i << " ] " << m_totalFrameTimings[i] << " ms" << std::endl;
+			}
+
+			out << std::endl;
+			out << std::endl;
 		}
+	}
 
-		static void resetTimings()
-		{
-			timeKeyPointMatchFilter = 0.0f;
-			countKeyPointMatchFilter = 0;
+	static void printCurrentLocalFrame() 
+	{
+		if (m_localFrameTimings.empty()) return;
 
-			timeSurfaceAreaFilter = 0.0f;
-			countSurfaceAreaFilter = 0;
+		std::ostream &out = std::cout;
+		out << "[ frame " << m_localFrameTimings.size() - 1 << " ]" << std::endl;
+		m_localFrameTimings.back().print(&out);
+	}
 
-			timeDenseVerifyFilter = 0.0f;
-			countDenseVerifyFilter = 0;
+	static void printCurrentGlobalFrame()
+	{
+		if (m_globalFrameTimings.empty()) return;
 
-			timeSiftDetection = 0.0f;
-			countSiftDetection = 0;
+		std::ostream &out = std::cout;
+		out << "[ frame " << m_globalFrameTimings.size() - 1 << " ]" << std::endl;
+		m_globalFrameTimings.back().print(&out);
+	}
 
-			timeSiftMatching = 0.0f;
-			countSiftMatching = 0;
+	static void resetTimings()
+	{
+		m_localFrameTimings.clear();
+		m_globalFrameTimings.clear();
+		m_totalFrameTimings.clear();
+	}
 
-			timeFuseToGlobalKey = 0.0f;
-			countFuseToGlobalKey = 0;
+	static void addLocalFrameTiming()
+	{
+		m_localFrameTimings.push_back(FrameTiming());
+	}
+	static void addGlobalFrameTiming()
+	{
+		m_globalFrameTimings.push_back(FrameTiming());
+	}
 
-			timeSolveSparseBundling = 0.0f;
-			countSolveSparseBundling = 0;
-		}
+	static FrameTiming& getFrameTiming(bool local)
+	{ 
+		if (local) return m_localFrameTimings.back();
+		else return m_globalFrameTimings.back();
+	}
 
-		static double timeSiftDetection;
-		static unsigned int countSiftDetection;
+	static void addTotalFrameTime(double t)
+	{
+		m_totalFrameTimings.push_back(t);
+	}
 
-		static double timeSiftMatching;
-		static unsigned int countSiftMatching;
-
-		static double timeKeyPointMatchFilter;
-		static unsigned int countKeyPointMatchFilter;
-
-		static double timeSurfaceAreaFilter;
-		static unsigned int countSurfaceAreaFilter;
-
-		static double timeDenseVerifyFilter;
-		static unsigned int countDenseVerifyFilter;
-
-		static double timeFuseToGlobalKey;
-		static unsigned int countFuseToGlobalKey;
-
-		static double timeSolveSparseBundling;
-		static unsigned int countSolveSparseBundling;
+private:
+	static std::vector<FrameTiming> m_localFrameTimings;
+	static std::vector<FrameTiming> m_globalFrameTimings;
+	static std::vector<double> m_totalFrameTimings;
 };
