@@ -316,6 +316,7 @@ int main(int argc, char** argv)
 
 	//!!!DEBUG
 	g_SubmapManager.evaluateTimings();
+	g_SparseBundler.evaluateSolverTimings();
 	TimingLog::printTimings("timingLog.txt");
 	std::vector<int> validImagesGlobal; g_SubmapManager.global->getValidImagesDEBUG(validImagesGlobal);
 	getRGBDSensor()->saveRecordedPointCloud("refined.ply", validImagesGlobal, g_SubmapManager.globalTrajectory);

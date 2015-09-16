@@ -55,8 +55,10 @@ __global__ void EvalMaxResidualDevice(SolverInput input, SolverState state, Solv
 	}
 }
 
-extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverParameters& parameters)
+extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
+	if (timer) timer->startEvent(__FUNCTION__);
+
 	const unsigned int N = input.numberOfCorrespondences * 3; // Number of correspondences (*3 per xyz)
 	EvalMaxResidualDevice<<<(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(input, state, parameters);
 
@@ -64,6 +66,7 @@ extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverPa
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
+	if (timer) timer->endEvent();
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -95,15 +98,15 @@ __global__ void EvalResidualDevice(SolverInput input, SolverState state, SolverP
 	}
 }
 
-float EvalResidual(SolverInput& input, SolverState& state, SolverParameters& parameters)
+float EvalResidual(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
+	if (timer) timer->startEvent(__FUNCTION__);
+
 	float residual = 0.0f;
 
 	const unsigned int N = input.numberOfCorrespondences; // Number of block variables
 	ResetResidualDevice << < 1, 1, 1 >> >(input, state, parameters);
-	cutilSafeCall(cudaDeviceSynchronize());
 	EvalResidualDevice << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(input, state, parameters);
-	cutilSafeCall(cudaDeviceSynchronize());
 
 	residual = state.getSumResidual();
 
@@ -111,6 +114,7 @@ float EvalResidual(SolverInput& input, SolverState& state, SolverParameters& par
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
+	if (timer) timer->endEvent();
 
 	return residual;
 }
@@ -171,18 +175,22 @@ __global__ void CountHighResidualsDevice(SolverInput input, SolverState state, S
 	}
 }
 
-extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters)
+extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
+	if (timer) timer->startEvent(__FUNCTION__);
+
 	const unsigned int N = input.numberOfCorrespondences * 3; // Number of correspondences (*3 per xyz)
 	int count = 0;
 	cutilSafeCall(cudaMemcpy(state.d_countHighResidual, &count, sizeof(int), cudaMemcpyHostToDevice));
 	CountHighResidualsDevice<<<(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(input, state, parameters);
-
+	
+	cutilSafeCall(cudaMemcpy(&count, state.d_countHighResidual, sizeof(int), cudaMemcpyDeviceToHost));
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-	cutilSafeCall(cudaMemcpy(&count, state.d_countHighResidual, sizeof(int), cudaMemcpyDeviceToHost));
+
+	if (timer) timer->endEvent();
 	return count;
 }
 
@@ -233,7 +241,7 @@ __global__ void PCGInit_Kernel2(unsigned int N, SolverState state)
 	if (x > 0 && x < N) state.d_rDotzOld[x] = state.d_scanAlpha[0];				// store result for next kernel call
 }
 
-void Initialization(SolverInput& input, SolverState& state, SolverParameters& parameters)
+void Initialization(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
 	const unsigned int N = input.numberOfImages;
 
@@ -244,6 +252,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 		std::cout << "Too many variables for this block size. Maximum number of variables for two kernel scan: " << THREADS_PER_BLOCK*THREADS_PER_BLOCK << std::endl;
 		while (1);
 	}
+
+	if (timer) timer->startEvent(__FUNCTION__);
 
 	float init = 0.0f;
 	cutilSafeCall(cudaMemcpy(state.d_scanAlpha, &init, sizeof(float), cudaMemcpyHostToDevice));
@@ -263,6 +273,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
+
+	if (timer) timer->endEvent();
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -437,21 +449,15 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 
 	const unsigned int Ncorr = input.numberOfCorrespondences;
 	const int blocksPerGridCorr = (Ncorr + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-	if (timer) {
-		timer->startEvent("applyJ");
-	}
+	if (timer) timer->startEvent("PCGIteration::applyJ");
 	PCGStep_Kernel0 << <blocksPerGridCorr, THREADS_PER_BLOCK >> >(input, state, parameters);
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
-	if (timer) {
-		timer->endEvent();
-	}
+	if (timer) timer->endEvent();
 
-	if (timer) {
-		timer->startEvent("applyJT");
-	}
+	if (timer) timer->startEvent("PCGIteration::applyJT");
 	PCGStep_Kernel1a << < N, THREADS_PER_BLOCK_JT >> >(input, state, parameters);
 	#ifdef _DEBUG
 			cutilSafeCall(cudaDeviceSynchronize());
@@ -463,10 +469,9 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 				cutilSafeCall(cudaDeviceSynchronize());
 				cutilCheckMsg(__FUNCTION__);
 	#endif
-	if (timer) {
-		timer->endEvent();
-	}
+	if (timer) timer->endEvent();
 
+	if (timer) timer->startEvent("PCGIteration::Kernel2&3");
 	PCGStep_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
@@ -478,6 +483,7 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
+	if (timer) timer->endEvent();
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -514,7 +520,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	printf("#nonlinear iterations = %d\n", parameters.nNonLinearIterations);
 	printf("#linear iterations = %d\n", parameters.nLinIterations);
 
-	float initialResidual = EvalResidual(input, state, parameters);
+	float initialResidual = EvalResidual(input, state, parameters, timer);
 	//convergenceAnalysis->addSample(residual);
 	printf("initial = %f\n", initialResidual);
 	convergenceAnalysis[0] = initialResidual; // initial residual
@@ -523,7 +529,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
 	{
-		Initialization(input, state, parameters);
+		Initialization(input, state, parameters, timer);
 		
 		//float linearResidual = EvalLinearRes(input, state, parameters);
 		//linConvergenceAnalysis[idx++] = linearResidual;
@@ -538,7 +544,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 
 		//ApplyLinearUpdate(input, state, parameters);	//this should be also done in the last PCGIteration
 
-		float residual = EvalResidual(input, state, parameters);
+		float residual = EvalResidual(input, state, parameters, timer);
 		convergenceAnalysis[nIter + 1] = residual;
 		printf("[niter %d] %f\n", nIter, residual);
 	}
@@ -569,9 +575,7 @@ extern "C" void buildVariablesToCorrespondencesTableCUDA(EntryJ* d_correspondenc
 {
 	const unsigned int N = numberOfCorrespondences;
 
-	if (timer) {
-		timer->startEvent("buildVariablesToCorrespondencesTableCUDA");
-	}
+	if (timer) timer->startEvent(__FUNCTION__);
 
 	BuildVariablesToCorrespondencesTableDevice << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(d_correspondences, numberOfCorrespondences, maxNumCorrespondencesPerImage, d_variablesToCorrespondences, d_numEntriesPerRow);
 	
@@ -580,7 +584,5 @@ extern "C" void buildVariablesToCorrespondencesTableCUDA(EntryJ* d_correspondenc
 		cutilCheckMsg(__FUNCTION__);
 	#endif
 
-	if (timer) {
-		timer->endEvent();
-	}
+	if (timer) timer->endEvent();
 }

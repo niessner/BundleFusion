@@ -1,18 +1,19 @@
 
 #include "stdafx.h"
 #include "CUDASolverBundling.h"
+#include "../GlobalBundlingState.h"
 
-extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverParameters& parameters);
+extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 extern "C" void buildVariablesToCorrespondencesTableCUDA(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int maxNumCorrespondencesPerImage, int* d_variablesToCorrespondences, int* d_numEntriesPerRow, CUDATimer* timer);
 extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, SolverParameters& parameters, float* convergenceAnalysis, CUDATimer* timer);
 
-extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters);
+extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
 CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxCorrPerImage) : m_maxNumberOfImages(maxNumberOfImages), m_maxCorrPerImage(maxCorrPerImage)
 , THREADS_PER_BLOCK(512) // keep consistent with the GPU
 {
 	m_timer = NULL;
-	//if (GlobalAppState::get().s_enableDetailedTimings) m_timer = new CUDATimer();
+	if (GlobalBundlingState::get().s_enableDetailedTimings) m_timer = new CUDATimer();
 
 	//!!!TODO PARAMS
 	m_verifyOptDistThresh = 0.02f;//GlobalAppState::get().s_verifyOptDistThresh;
@@ -122,7 +123,7 @@ void CUDASolverBundling::buildVariablesToCorrespondencesTable(EntryJ* d_correspo
 
 void CUDASolverBundling::computeMaxResidual(SolverInput& solverInput, SolverParameters& parameters)
 {
-	evalMaxResidual(solverInput, m_solverState, parameters);
+	evalMaxResidual(solverInput, m_solverState, parameters, m_timer);
 	// copy to cpu
 	unsigned int n = (solverInput.numberOfCorrespondences*3 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 	cutilSafeCall(cudaMemcpy(m_solverState.h_maxResidual, m_solverState.d_maxResidual, sizeof(float) * n, cudaMemcpyDeviceToHost));
@@ -177,7 +178,7 @@ bool CUDASolverBundling::useVerification(EntryJ* d_correspondences, unsigned int
 	solverInput.maxNumberOfImages = m_maxNumberOfImages;
 	solverInput.maxCorrPerImage = m_maxCorrPerImage;
 
-	unsigned int numHighResiduals = countHighResiduals(solverInput, m_solverState, parameters);
+	unsigned int numHighResiduals = countHighResiduals(solverInput, m_solverState, parameters, m_timer);
 	unsigned int total = solverInput.numberOfCorrespondences * 3;
 	std::cout << "[ useVerification ] " << numHighResiduals << " / " << total << " = " << (float)numHighResiduals / total << " vs " << parameters.verifyOptPercentThresh << std::endl;
 	if ((float)numHighResiduals / total >= parameters.verifyOptPercentThresh) return true;

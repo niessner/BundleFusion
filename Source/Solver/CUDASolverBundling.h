@@ -34,7 +34,11 @@ class CUDASolverBundling
 		const int* getVarToCorrNumEntriesPerRow() const { return d_numEntriesPerRow; }
 
 		void evaluateTimings() {
-			if (m_timer) m_timer->evaluate(true);
+			if (m_timer) {
+				std::cout << "********* SOLVER TIMINGS *********" << std::endl;
+				m_timer->evaluate(true, true);
+				std::cout << std::endl << std::endl;
+			}
 		}
 
 	private:

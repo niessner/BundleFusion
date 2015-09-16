@@ -42,6 +42,10 @@ public:
 	const std::vector<float>& getLinearConvergenceAnalysis() const { return m_solver->getLinearConvergenceAnalysis(); }
 	bool useVerification() const { return m_bVerify; }
 
+	void evaluateSolverTimings() {
+		m_solver->evaluateTimings();
+	}
+
 private:
 
 	bool alignCUDA(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify);
