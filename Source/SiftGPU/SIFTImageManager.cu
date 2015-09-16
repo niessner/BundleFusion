@@ -3,6 +3,7 @@
 #include "CUDATimer.h"
 #include "cuda_kabsch.h"
 #include "cuda_svd3.h"
+#include "cuda_surfaceArea.h"
 
 #define SORT_NUM_BLOCK_THREADS_X (MAX_MATCHES_PER_IMAGE_PAIR_RAW / 2)
 
@@ -243,8 +244,6 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	}
 }
 
-
-
 void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs) {
 
 	if (numCurrImagePairs == 0) return;
@@ -288,6 +287,77 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs) {
 	//		transforms[i].print();
 	//	}
 	//}
+}
+
+
+//we launch 1 thread for two array entries
+void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
+	const SIFTKeyPoint* d_keyPointsGlobal,
+	int* d_numFilteredMatchesPerImagePair,
+	const uint2* d_filteredMatchKeyPointIndicesGlobal, 
+	const float4x4 colorIntrinsicsInv,
+	float areaThresh)
+{
+	const unsigned int imagePairIdx = blockIdx.x;	
+	const unsigned int tidx = threadIdx.x;
+
+	const unsigned int numMatches = d_numFilteredMatchesPerImagePair[imagePairIdx];
+	if (numMatches == 0)	return;
+	const uint2* d_keyPointMatchIndices = d_filteredMatchKeyPointIndicesGlobal + imagePairIdx * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED;
+	
+	if (tidx == 0) {
+		float area0 = 0.0f; float area1 = 0.0f;
+		
+		float2 pointsProj[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];
+
+		// compute area image 0
+		unsigned int which = 0;
+		matNxM<3, 3> C;
+		float3 mean;
+		computeKeyPointMatchesCovariance(d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which, C, mean);
+		float3 evs, ev0, ev1, ev2;
+		bool res = MYEIGEN::eigenSystem((float3x3)C, evs, ev0, ev1, ev2);
+		if (res) { // project
+			projectKeysToPlane(pointsProj, d_keyPointsGlobal, d_keyPointMatchIndices, numMatches,
+				colorIntrinsicsInv, which, ev0, ev1, ev2, mean);
+			area0 = computeAreaOrientedBoundingBox2(pointsProj, numMatches);
+		}
+
+		// compute area image 1
+		which = 1;
+		computeKeyPointMatchesCovariance(d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which, C, mean);
+		res = MYEIGEN::eigenSystem((float3x3)C, evs, ev0, ev1, ev2);
+		if (res) {// project
+			projectKeysToPlane(pointsProj, d_keyPointsGlobal, d_keyPointMatchIndices, numMatches,
+				colorIntrinsicsInv, which, ev0, ev1, ev2, mean);
+			area1 = computeAreaOrientedBoundingBox2(pointsProj, numMatches);
+		}
+
+		//printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
+		if (area0 < areaThresh && area1 < areaThresh) {
+			d_numFilteredMatchesPerImagePair[imagePairIdx] = 0;
+		}
+	}
+}
+
+void SIFTImageManager::FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv, float areaThresh) {
+	if (numCurrImagePairs == 0) return;
+
+	dim3 grid(numCurrImagePairs);
+	dim3 block(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
+
+	FilterMatchesBySurfaceAreaCU_Kernel << <grid, block >> >(
+		d_keyPoints,
+		d_currNumFilteredMatchesPerImagePair,
+		d_currFilteredMatchKeyPointIndices,
+		colorIntrinsicsInv,
+		areaThresh);
+
+	if (m_timer) m_timer->endEvent();
+
+	CheckErrorCUDA(__FUNCTION__);
 }
 
 

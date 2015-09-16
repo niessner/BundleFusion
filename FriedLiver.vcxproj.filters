@@ -200,6 +200,9 @@
       <Filter>SiftGPU</Filter>
     </ClInclude>
     <ClInclude Include="Source\CUDACacheUtil.h" />
+    <ClInclude Include="Source\SiftGPU\cuda_surfaceArea.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

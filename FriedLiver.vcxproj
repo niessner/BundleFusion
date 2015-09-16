@@ -165,6 +165,7 @@
     <ClInclude Include="Source\SiftGPU\cuda_kabsch.h" />
     <ClInclude Include="Source\SiftGPU\cuda_kabschReference.h" />
     <ClInclude Include="Source\SiftGPU\cuda_SimpleMatrixUtil.h" />
+    <ClInclude Include="Source\SiftGPU\cuda_surfaceArea.h" />
     <ClInclude Include="Source\SiftGPU\CuTexImage.h" />
     <ClInclude Include="Source\SiftGPU\GlobalDefines.h" />
     <ClInclude Include="Source\SiftGPU\GlobalUtil.h" />

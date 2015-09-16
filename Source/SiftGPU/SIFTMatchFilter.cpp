@@ -111,7 +111,7 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 		std::vector<uint2> keyPointIndices;
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
-		//std::cout << "(" << i << ", " << curFrame << "): ";
+		std::cout << "(" << i << ", " << curFrame << "): ";
 		ml::Timer timer;
 		bool valid =
 			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices);
@@ -131,10 +131,10 @@ bool SIFTMatchFilter::filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoin
 {
 	if (keyPointIndices.size() < MIN_NUM_MATCHES_FILTERED) return false;
 
-	const float minSurfaceAreaPca = 0.04f;
+	const float minSurfaceAreaPca = 0.032f;
 	float2 areas = computeSurfaceArea(keys.data(), keyPointIndices.data(), depth0, depth1, (unsigned int)keyPointIndices.size());
 
-	//std::cout << "area ratio = " << areas.x << " " << areas.y << std::endl;
+	std::cout << "areas = " << areas.x << " " << areas.y << std::endl;
 
 	if (areas.x < minSurfaceAreaPca && areas.y < minSurfaceAreaPca) // invalid
 		return false;
@@ -173,77 +173,79 @@ float2 SIFTMatchFilter::computeSurfaceArea(const SIFTKeyPoint* keys, const uint2
 		tgtPtsProj[i] = ml::vec2f(t | tgtAxes[0].first, t | tgtAxes[1].first); // projected point (2d plane basis)
 	}
 
-	//!!!TODO PARAMS
-	const ml::mat4f depthIntrinsicsInverse(
-		0.0017152658f, 0.0f, -0.548885047f, 0.0f,
-		0.0f, 0.0017152658f, -0.4116638f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f);
-	const unsigned int depthWidth = 640;
-	const unsigned int depthHeight = 480;
-	const unsigned int subDepthWidth = GlobalBundlingState::get().s_downsampledWidth;
-	const unsigned int subDepthHeight = GlobalBundlingState::get().s_downsampledHeight;
-	const float depthMin = 0.1f;
-	const float depthMax = 3.0f;
-	const unsigned int subSampleFactor = 2; 
+	////!!!TODO PARAMS
+	//const ml::mat4f depthIntrinsicsInverse(
+	//	0.0017152658f, 0.0f, -0.548885047f, 0.0f,
+	//	0.0f, 0.0017152658f, -0.4116638f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f);
+	//const unsigned int depthWidth = 640;
+	//const unsigned int depthHeight = 480;
+	//const unsigned int subDepthWidth = GlobalBundlingState::get().s_downsampledWidth;
+	//const unsigned int subDepthHeight = GlobalBundlingState::get().s_downsampledHeight;
+	//const float depthMin = 0.1f;
+	//const float depthMax = 3.0f;
+	//const unsigned int subSampleFactor = 2; 
 
-	const unsigned int newWidth = subDepthWidth / subSampleFactor;
-	const unsigned int newHeight = subDepthHeight / subSampleFactor;
-	const unsigned int numSampledPoints = newWidth * newHeight;
-	const float widthFactor = (float)depthWidth / (float)subDepthWidth;
-	const float heightFactor = (float)depthHeight / (float)subDepthHeight;
-	//const ml::vec2f defaultSrcPt = srcPtsProj[0];// if invalid fill with this for pca... //!!!TODO check
-	//const ml::vec2f defaultTgtPt = tgtPtsProj[0];// if invalid fill with this for pca... //!!!TODO check
+	//const unsigned int newWidth = subDepthWidth / subSampleFactor;
+	//const unsigned int newHeight = subDepthHeight / subSampleFactor;
+	//const unsigned int numSampledPoints = newWidth * newHeight;
+	//const float widthFactor = (float)depthWidth / (float)subDepthWidth;
+	//const float heightFactor = (float)depthHeight / (float)subDepthHeight;
+	////const ml::vec2f defaultSrcPt = srcPtsProj[0];// if invalid fill with this for pca... //!!!TODO check
+	////const ml::vec2f defaultTgtPt = tgtPtsProj[0];// if invalid fill with this for pca... //!!!TODO check
 
-	const float maxDepth = 1.0f;
+	//const float maxDepth = 1.0f;
 
-	// all points projected (subsampled)
-	std::vector<ml::vec2f> allPointsSrc;//(numSampledPoints);
-	std::vector<ml::vec2f> allPointsTgt;//(numSampledPoints);
-	for (unsigned int y = 0; y < subDepthHeight; y += subSampleFactor) {
-		for (unsigned int x = 0; x < subDepthWidth; x += subSampleFactor) {
-			//const unsigned int idx = (y / subSampleFactor) * newWidth + (x / subSampleFactor);
-			unsigned int yi = math::round(y * heightFactor);
-			unsigned int xi = math::round(x * widthFactor);
+	//// all points projected (subsampled)
+	//std::vector<ml::vec2f> allPointsSrc;//(numSampledPoints);
+	//std::vector<ml::vec2f> allPointsTgt;//(numSampledPoints);
+	//for (unsigned int y = 0; y < subDepthHeight; y += subSampleFactor) {
+	//	for (unsigned int x = 0; x < subDepthWidth; x += subSampleFactor) {
+	//		//const unsigned int idx = (y / subSampleFactor) * newWidth + (x / subSampleFactor);
+	//		unsigned int yi = math::round(y * heightFactor);
+	//		unsigned int xi = math::round(x * widthFactor);
 
-			float sdepth = depth0[y * subDepthWidth + x];
-			if (sdepth != -std::numeric_limits<float>::infinity() && sdepth >= depthMin && sdepth <= depthMax) {
-				if (sdepth > maxDepth) sdepth = maxDepth;
-				// depth to camera
-				ml::vec3f cSrc = depthIntrinsicsInverse * (sdepth * ml::vec3f((float)xi, (float)yi, 1.0f));
-				ml::vec3f cProj3dSrc = cSrc - (srcNormal | (cSrc - srcMean)) * srcNormal;
-				ml::vec3f s = cProj3dSrc - srcMean;
-				//allPointsSrc[idx] = ml::vec2f(s | srcAxes[0].first, s | srcAxes[1].first);
-				allPointsSrc.push_back(ml::vec2f(s | srcAxes[0].first, s | srcAxes[1].first));
-			}
-			//else 
-			//	allPointsSrc[idx] = defaultSrcPt;
-			float tdepth = depth1[y * subDepthWidth + x];
-			if (tdepth != -std::numeric_limits<float>::infinity() && tdepth >= depthMin && tdepth <= depthMax) {
-				if (tdepth > maxDepth) tdepth = maxDepth;
-				ml::vec3f cTgt = depthIntrinsicsInverse * (tdepth * ml::vec3f((float)xi, (float)yi, 1.0f));
-				ml::vec3f cProj3dTgt = cTgt - (tgtNormal | (cTgt - tgtMean)) * tgtNormal;
-				ml::vec3f s = cProj3dTgt - tgtMean;
-				//allPointsTgt[idx] = ml::vec2f(s | tgtAxes[0].first, s | tgtAxes[1].first);
-				allPointsTgt.push_back(ml::vec2f(s | tgtAxes[0].first, s | tgtAxes[1].first));
-			}
-			//else
-			//	allPointsTgt[idx] = defaultTgtPt;
-		}
-	}
+	//		float sdepth = depth0[y * subDepthWidth + x];
+	//		if (sdepth != -std::numeric_limits<float>::infinity() && sdepth >= depthMin && sdepth <= depthMax) {
+	//			if (sdepth > maxDepth) sdepth = maxDepth;
+	//			// depth to camera
+	//			ml::vec3f cSrc = depthIntrinsicsInverse * (sdepth * ml::vec3f((float)xi, (float)yi, 1.0f));
+	//			ml::vec3f cProj3dSrc = cSrc - (srcNormal | (cSrc - srcMean)) * srcNormal;
+	//			ml::vec3f s = cProj3dSrc - srcMean;
+	//			//allPointsSrc[idx] = ml::vec2f(s | srcAxes[0].first, s | srcAxes[1].first);
+	//			allPointsSrc.push_back(ml::vec2f(s | srcAxes[0].first, s | srcAxes[1].first));
+	//		}
+	//		//else 
+	//		//	allPointsSrc[idx] = defaultSrcPt;
+	//		float tdepth = depth1[y * subDepthWidth + x];
+	//		if (tdepth != -std::numeric_limits<float>::infinity() && tdepth >= depthMin && tdepth <= depthMax) {
+	//			if (tdepth > maxDepth) tdepth = maxDepth;
+	//			ml::vec3f cTgt = depthIntrinsicsInverse * (tdepth * ml::vec3f((float)xi, (float)yi, 1.0f));
+	//			ml::vec3f cProj3dTgt = cTgt - (tgtNormal | (cTgt - tgtMean)) * tgtNormal;
+	//			ml::vec3f s = cProj3dTgt - tgtMean;
+	//			//allPointsTgt[idx] = ml::vec2f(s | tgtAxes[0].first, s | tgtAxes[1].first);
+	//			allPointsTgt.push_back(ml::vec2f(s | tgtAxes[0].first, s | tgtAxes[1].first));
+	//		}
+	//		//else
+	//		//	allPointsTgt[idx] = defaultTgtPt;
+	//	}
+	//}
 
 	// compute areas
 	ml::OBB2f srcOBB(srcPtsProj);
 	ml::OBB2f tgtOBB(tgtPtsProj);
 	area = ml::vec2f((float)srcOBB.getArea(), (float)tgtOBB.getArea());
 
-	ml::OBB2f srcAllOBB(allPointsSrc);
-	ml::OBB2f tgtAllOBB(allPointsTgt);
-	totalAreas = ml::vec2f((float)srcAllOBB.getArea(), (float)tgtAllOBB.getArea());
+	//ml::OBB2f srcAllOBB(allPointsSrc);
+	//ml::OBB2f tgtAllOBB(allPointsTgt);
+	//totalAreas = ml::vec2f((float)srcAllOBB.getArea(), (float)tgtAllOBB.getArea());
 
-	totalAreas = ml::math::max(totalAreas, 0.001f);
+	//totalAreas = ml::math::max(totalAreas, 0.001f);
+	////std::cout << "total areas = " << totalAreas.x << " " << totalAreas.y << std::endl;
 
-	return make_float2(area.x / totalAreas.x, area.y / totalAreas.y);
+	//return make_float2(area.x / totalAreas.x, area.y / totalAreas.y);
+	return make_float2(area.x, area.y);
 }
 
 void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames)

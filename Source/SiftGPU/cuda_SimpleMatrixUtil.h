@@ -29,6 +29,12 @@ public:
 		m21 = values[2];	m22 = values[3];
 	}
 
+	// initialize row-wise
+	inline __device__ __host__ float2x2(const float2& a0, const float2& a1) {
+		m11 = a0.x;	m12 = a0.y;
+		m21 = a1.x;	m22 = a1.y;
+	}
+
 	inline __device__ __host__ float2x2(const float2x2& other)
 	{
 		m11 = other.m11;	m12 = other.m12;

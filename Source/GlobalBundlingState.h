@@ -23,7 +23,8 @@
 	X(float, s_verifySiftCorrThresh) \
 	X(float, s_projCorrDistThres) \
 	X(float, s_projCorrNormalThres) \
-	X(float, s_projCorrColorThresh)
+	X(float, s_projCorrColorThresh) \
+	X(float, s_surfAreaPcaThresh)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;

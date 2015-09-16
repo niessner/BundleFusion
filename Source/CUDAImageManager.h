@@ -53,19 +53,13 @@ public:
 		m_extrinsics = m_RGBDSensor->getDepthExtrinsics();
 		m_extrinsicsInv = m_RGBDSensor->getDepthExtrinsicsInv();
 
-	}
-
-	void allocDEBUG(unsigned int numImages, unsigned int width, unsigned int height) {
-		std::cout << "allocating " << numImages << " " << width << " x " << height << std::endl;
-		for (unsigned int i = 0; i < numImages; i++) {
-			size_t numFree, numTotal;
-			m_data.push_back(CUDARGBDInputFrame());
-			m_data.back().alloc(width, height);
-			cudaMemGetInfo(&numFree, &numTotal);
-			std::cout << i << " Free: " << (numFree / (1024 * 1024)) << "\tTotal: " << (numTotal / (1024 * 1024)) << std::endl;
-		}
-		std::cout << std::endl;
-		std::cout << "done!" << std::endl;
+		const float scaleWidthSIFT = (float)m_widthSIFT / (float)m_RGBDSensor->getColorWidth();
+		const float scaleHeightSIFT = (float)m_heightSIFT / (float)m_RGBDSensor->getColorHeight();
+		m_SIFTintrinsics = m_RGBDSensor->getColorIntrinsics();
+		m_SIFTintrinsics._m00 *= scaleWidthSIFT;  m_SIFTintrinsics._m02 *= scaleWidthSIFT;
+		m_SIFTintrinsics._m11 *= scaleHeightSIFT; m_SIFTintrinsics._m12 *= scaleHeightSIFT;
+		m_SIFTintrinsicsInv = m_RGBDSensor->getColorIntrinsicsInv();
+		m_SIFTintrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTintrinsicsInv._m11 /= scaleHeightSIFT;
 	}
 
 	~CUDAImageManager() {
@@ -194,6 +188,14 @@ public:
 		return m_extrinsicsInv;
 	}
 
+	const mat4f& getSIFTIntrinsics() const	{
+		return m_SIFTintrinsics;
+	}
+
+	const mat4f& getSIFTIntrinsicsInv() const {
+		return m_SIFTintrinsicsInv;
+	}
+
 private:
 	RGBDSensor* m_RGBDSensor;	
 
@@ -205,6 +207,8 @@ private:
 	//! resolution for sift key point detection
 	unsigned int m_widthSIFT;
 	unsigned int m_heightSIFT;
+	mat4f m_SIFTintrinsics;
+	mat4f m_SIFTintrinsicsInv;
 
 	//! resolution for integration both depth and color data
 	unsigned int m_widthIntegration;

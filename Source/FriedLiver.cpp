@@ -437,19 +437,14 @@ void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, c
 		//filter matches
 		SIFTMatchFilter::filterKeyPointMatches(siftManager);
 		//global->FilterKeyPointMatchesCU(curFrame);
-		const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
-		SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
+
+		//const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
+		//SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
+		siftManager->FilterMatchesBySurfaceAreaCU(curFrame, MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()), GlobalBundlingState::get().s_surfAreaPcaThresh);
 
 		//SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);
-		////!!!
-		//const ml::mat4f depthIntrinsics(583.0f, 0.0f, 320.0f, 0.0f,
-		//	0.f, 583.0f, 240.f, 0.0f,
-		//	0.f, 0.f, 1.f, 0.0f,
-		//	0.f, 0.f, 0.f, 1.0f);
-		////!!!
 		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
-
-		siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()), //MatrixConversion::toCUDA(depthIntrinsics),
+		siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
 			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
 			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh);
 
