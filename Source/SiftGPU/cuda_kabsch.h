@@ -452,7 +452,6 @@ unsigned int filterKeyPointMatches(
 	while (!done) {
 		if (idx == numRawMatches || curNumMatches >= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) {
 			if (curNumMatches < MIN_NUM_MATCHES_FILTERED || curMaxResidual >= maxResThresh || !validTransform) { // invalid
-				printf("Done! found invalid match (%d)\n", curNumMatches);
 				curNumMatches = 0;
 			}
 			done = true;

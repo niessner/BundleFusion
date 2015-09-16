@@ -481,8 +481,8 @@ void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, c
 		//if (print) printCurrentMatches("debug/", siftManager, false, frameStart, frameSkip);
 
 		//filter matches
-		SIFTMatchFilter::filterKeyPointMatches(siftManager);
-		//global->FilterKeyPointMatchesCU(curFrame);
+		//SIFTMatchFilter::filterKeyPointMatches(siftManager);
+		siftManager->FilterKeyPointMatchesCU(curFrame);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = timer.getElapsedTimeMS(); }
 
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
