@@ -402,7 +402,8 @@ __global__ void PCGStep_Kernel2(SolverInput input, SolverState state)
 	}
 }
 
-__global__ void PCGStep_Kernel3(SolverInput input, SolverState state, bool lastIteration)
+template<bool lastIteration>
+__global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 {
 	const unsigned int N = input.numberOfImages;
 	const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -476,8 +477,14 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
-
-	PCGStep_Kernel3 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state, lastIteration);
+	
+	if (lastIteration) {
+		PCGStep_Kernel3<true> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
+	}
+	else {
+		PCGStep_Kernel3<false> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
+	}
+	
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);

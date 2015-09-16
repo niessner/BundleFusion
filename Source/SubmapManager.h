@@ -60,7 +60,7 @@ public:
 		m_numTotalFrames = numTotalFrames;
 		m_submapSize = submapSize;
 
-		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currentLocalTransforms, sizeof(float4x4) * m_submapSize));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currentLocalTransforms, sizeof(float4x4) * (m_submapSize + 1)));
 
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
 			m_localTimer = new CUDATimer();
@@ -96,7 +96,7 @@ public:
 	}
 
 	const float4x4* getCurrentLocalTrajectoryGPU() const {
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currentLocalTransforms, localTrajectories.back().data(), sizeof(float4x4) * m_submapSize, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currentLocalTransforms, localTrajectories.back().data(), sizeof(float4x4) * localTrajectories.back().size(), cudaMemcpyHostToDevice));
 		return d_currentLocalTransforms;
 	}
 
