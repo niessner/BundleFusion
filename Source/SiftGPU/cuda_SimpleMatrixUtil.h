@@ -1216,6 +1216,12 @@ class matNxM
 			for(unsigned int i = 0; i<N*M; i++) entries[i] = 0.0f;
 		}
 
+		inline __device__ __host__ void setZero() volatile
+		{
+			__CONDITIONAL_UNROLL__
+				for (unsigned int i = 0; i < N*M; i++) entries[i] = 0.0f;
+		}
+
 		inline __device__ __host__ void setIdentity()
 		{
 			setZero();

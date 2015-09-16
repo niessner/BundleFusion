@@ -19,4 +19,14 @@
 #define __CONDITIONAL_UNROLL__ 
 #endif
 
+
+#ifdef __CUDACC__
+__inline__ __device__
+float warpReduceSum(float val) {
+	for (int offset = warpSize / 2; offset > 0; offset /= 2)
+		val += __shfl_down(val, offset);
+	return val;
+}
+#endif
+
 #endif
