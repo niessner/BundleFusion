@@ -9,6 +9,7 @@
 int CheckErrorCUDA(const char* location)
 {
 #if (defined(_DEBUG) || defined(DEBUG))
+	cudaDeviceSynchronize();
 	cudaError_t e = cudaGetLastError();
 	if (e)
 	{
@@ -143,13 +144,11 @@ void SIFTImageManager::SortKeyPointMatchesCU(unsigned int numImagePairs) {
 	dim3 grid(numImagePairs);
 	dim3 block(SORT_NUM_BLOCK_THREADS_X);
 
-	//CUDATimer timer;
-	//timer.startEvent(__FUNCTION__);
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	SortKeyPointMatchesCU_Kernel << <grid, block >> >(d_currNumMatchesPerImagePair, d_currMatchDistances, d_currMatchKeyPointIndices);
 
-	//timer.endEvent();
-	//timer.evaluate();
+	if (m_timer) m_timer->endEvent();
 
 	CheckErrorCUDA(__FUNCTION__);
 
@@ -253,8 +252,7 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs) {
 	dim3 grid(numCurrImagePairs);
 	dim3 block(FILTER_NUM_BLOCK_THREADS_X);
 
-	CUDATimer timer;
-	timer.startEvent(__FUNCTION__);
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	FilterKeyPointMatchesCU_Kernel << <grid, block >> >(
 		d_keyPoints,
@@ -266,32 +264,34 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs) {
 		d_currFilteredMatchKeyPointIndices,
 		d_currFilteredTransforms);
 
-	timer.endEvent();
-	timer.evaluate();
+	if (m_timer) m_timer->endEvent();
 
 	CheckErrorCUDA(__FUNCTION__);
 
 	//DEBUG
-	{
-		std::vector<int> numMatches(numCurrImagePairs);
-		std::vector<float> matchDistancesGlob(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED*numCurrImagePairs);
-		std::vector<float4x4> transforms(numCurrImagePairs);
-		cutilSafeCall(cudaMemcpy(numMatches.data(), d_currNumFilteredMatchesPerImagePair, sizeof(int)*numCurrImagePairs, cudaMemcpyDeviceToHost));
-		cutilSafeCall(cudaMemcpy(matchDistancesGlob.data(), d_currFilteredMatchDistances, sizeof(float)*numCurrImagePairs*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyDeviceToHost));
-		cutilSafeCall(cudaMemcpy(transforms.data(), d_currFilteredTransforms, sizeof(float4x4)*numCurrImagePairs, cudaMemcpyDeviceToHost));
-		for (unsigned int i = 0; i < numCurrImagePairs; i++) {
-			unsigned int newNumMatches = numMatches[i];
-			float checkSum = 0.0f;
-			for (unsigned int k = 0; k < newNumMatches; k++) {
-				checkSum += matchDistancesGlob[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED*i + k];
-			}
-			std::cout << "checkSum: " << checkSum << std::endl;
-		}
-		for (unsigned int i = 0; i < numCurrImagePairs; i++) {
-			transforms[i].print();
-		}
-	}
+	//{
+	//	std::vector<int> numMatches(numCurrImagePairs);
+	//	std::vector<float> matchDistancesGlob(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED*numCurrImagePairs);
+	//	std::vector<float4x4> transforms(numCurrImagePairs);
+	//	cutilSafeCall(cudaMemcpy(numMatches.data(), d_currNumFilteredMatchesPerImagePair, sizeof(int)*numCurrImagePairs, cudaMemcpyDeviceToHost));
+	//	cutilSafeCall(cudaMemcpy(matchDistancesGlob.data(), d_currFilteredMatchDistances, sizeof(float)*numCurrImagePairs*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyDeviceToHost));
+	//	cutilSafeCall(cudaMemcpy(transforms.data(), d_currFilteredTransforms, sizeof(float4x4)*numCurrImagePairs, cudaMemcpyDeviceToHost));
+	//	for (unsigned int i = 0; i < numCurrImagePairs; i++) {
+	//		unsigned int newNumMatches = numMatches[i];
+	//		float checkSum = 0.0f;
+	//		for (unsigned int k = 0; k < newNumMatches; k++) {
+	//			checkSum += matchDistancesGlob[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED*i + k];
+	//		}
+	//		std::cout << "checkSum: " << checkSum << std::endl;
+	//	}
+	//	for (unsigned int i = 0; i < numCurrImagePairs; i++) {
+	//		transforms[i].print();
+	//	}
+	//}
 }
+
+
+#define FILTER_DENSE_VERIFY_THREAD_SPLIT 32
 
 __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, float colorThresh, const float4x4& transform, const float4x4& intrinsics,
@@ -310,7 +310,9 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 
 		float3 tmp = intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z);
 		int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z), (int)roundf(tmp.y / tmp.z)); // subsampled space
-
+		//float3 tmp = intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z);
+		//int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z) / 4, (int)roundf(tmp.y / tmp.z) / 4); // subsampled space
+		
 		if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)imageWidth && screenPos.y < (int)imageHeight) {
 			float4 pTarget = d_modelCamPos[screenPos.y * imageWidth + screenPos.x]; //getBestCorrespondence1x1
 			float4 nTarget = d_modelNormal[screenPos.y * imageWidth + screenPos.x];
@@ -326,12 +328,13 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 
 				bool b = ((tgtDepth != MINF && projInputDepth < tgtDepth) && d > distThresh); // bad matches that are known
 				if ((dNormal >= normalThresh && d <= distThresh /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
+
 					const float cameraToKinectProjZ = (pTransInput.z - 0.1f) / (3.0f - 0.1f); //TODO PARAMS HERE
 					const float weight = max(0.0f, 0.5f*((1.0f - d / distThresh) + (1.0f - cameraToKinectProjZ))); // for weighted ICP;
 
 					out.x = length(pTransInput - pTarget);	//residual
 					out.y = weight;							//corr weight
-					out.z = 1.0f;			
+					out.z = 1.0f;	
 				}
 			} // projected to valid depth
 		} // inside image
@@ -340,65 +343,93 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 	return out;
 }
 
+__inline__ __device__
+float warpReduceSum(float val) {
+  for (int offset = warpSize/2; offset > 0; offset /= 2) 
+    val += __shfl_down(val, offset);
+  return val;
+}
 
 //we launch 1 thread for two array entries
 void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, unsigned int imageHeight, const float4x4 intrinsics,
-	int* d_currNumFilteredMatchesPerImagePair, const float4x4* d_currFilteredTransforms, 
-	const float** d_depthInputs, const float4** d_camPosInputs, const float4** d_normalInputs, const uchar4** d_colorInputs,
-	const float** d_depthModels, const float4** d_camPosModels, const float4** d_normalModels, const uchar4** d_colorModels,
+	int* d_currNumFilteredMatchesPerImagePair, const float4x4* d_currFilteredTransforms, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
 {
-	const unsigned int imagePairIdx = blockIdx.x;
+	const unsigned int curImageIdx = gridDim.x;
+	const unsigned int imagePairIdx = blockIdx.x; // prev image idx
 	const unsigned int numMatches = d_currNumFilteredMatchesPerImagePair[imagePairIdx];
 	if (numMatches == 0)	return;
+
+	const float*  d_inputDepth = d_cachedFrames[imagePairIdx].d_depthDownsampled;
+	const float4* d_inputCamPos = d_cachedFrames[imagePairIdx].d_cameraposDownsampled;
+	const float4* d_inputNormal = d_cachedFrames[imagePairIdx].d_normalsDownsampled;
+	const uchar4* d_inputColor = d_cachedFrames[imagePairIdx].d_colorDownsampled;
 	
-	const unsigned int tidx = threadIdx.x;
-	const unsigned int idx = threadIdx.y * imageWidth + tidx;
-
-	const float* d_inputDepth = d_depthInputs[imagePairIdx];
-	const float4* d_inputCamPos = d_camPosInputs[imagePairIdx];
-	const float4* d_inputNormal = d_normalInputs[imagePairIdx];
-	const uchar4* d_inputColor = d_colorInputs[imagePairIdx];
-
-	const float* d_modelDepth = d_depthModels[imagePairIdx];
-	const float4* d_modelCamPos = d_camPosModels[imagePairIdx];
-	const float4* d_modelNormal = d_normalModels[imagePairIdx];
-	const uchar4* d_modelColor = d_colorModels[imagePairIdx];
+	const float*  d_modelDepth = d_cachedFrames[curImageIdx].d_depthDownsampled;
+	const float4* d_modelCamPos = d_cachedFrames[curImageIdx].d_cameraposDownsampled;
+	const float4* d_modelNormal = d_cachedFrames[curImageIdx].d_normalsDownsampled;
+	const uchar4* d_modelColor = d_cachedFrames[curImageIdx].d_colorDownsampled;
 
 	const float4x4 transform = d_currFilteredTransforms[imagePairIdx];
 
+
+	float local_sumResidual = 0.0f;
+	float local_sumWeight = 0.0f;
+	float local_numCorr = 0.0f;
+
+	for (unsigned int i = 0; i < FILTER_DENSE_VERIFY_THREAD_SPLIT; i++) {
+		const unsigned int idxX = threadIdx.x;
+		const unsigned int idxY = threadIdx.y*FILTER_DENSE_VERIFY_THREAD_SPLIT + i;
+		if (idxY < imageHeight) {
+			const unsigned int idx = idxY * imageWidth + idxX;
+
+			float3 inputToModel = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform, intrinsics,
+				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor,
+				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor);
+			float3 modelToInput = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform.getInverse(), intrinsics,
+				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor,
+				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor);
+
+			local_sumResidual += inputToModel.x + modelToInput.x;	//residual
+			local_sumWeight += inputToModel.y + modelToInput.y;		//corr weight
+			local_numCorr += inputToModel.z + modelToInput.z;		//corr number
+		}
+	}
+
 	__shared__ float sumResidual;
 	__shared__ float sumWeight;
-	__shared__ unsigned int numCorr;
+	__shared__ float numCorr;
 
-	if (tidx == 0) {
+	if (threadIdx.x == 0 && threadIdx.y == 0) {
 		sumResidual = 0.0f;
 		sumWeight = 0.0f;
 		numCorr = 0;
 	} 
 	__syncthreads();
 
-	float3 inputToModel = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform, intrinsics,
-		d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor, 
-		d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor);
-	float3 modelToInput = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform.getInverse(), intrinsics,
-		d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor,
-		d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor);
+	//atomicAdd(&sumResidual, local_sumResidual);
+	//atomicAdd(&sumWeight, local_sumWeight);
+	//atomicAdd(&numCorr, local_numCorr);
 
-	sumResidual +=	inputToModel.x + modelToInput.x;	//residual
-	sumWeight +=	inputToModel.y + modelToInput.y;	//corr weight
-	numCorr +=		inputToModel.z + modelToInput.z;	//corr number
+	local_sumResidual = warpReduceSum(local_sumResidual);
+	local_sumWeight = warpReduceSum(local_sumWeight);
+	local_numCorr = warpReduceSum(local_numCorr);
+
+	if (threadIdx.x % warpSize == 0) {
+		atomicAdd(&sumResidual, local_sumResidual);
+		atomicAdd(&sumWeight, local_sumWeight);
+		atomicAdd(&numCorr, local_numCorr);
+	}
 
 	__syncthreads();
 
 	//write results back
-	if (tidx == 0) {
+	if (threadIdx.x == 0 && threadIdx.y == 0) {
 		float err = sumResidual / sumWeight;
-		float corr = (float)numCorr / (float)(imageWidth * imageHeight);
+		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
+		//printf("[%d-%d]: %f %f\n", imagePairIdx, curImageIdx, err, corr);
 
-		printf("[%d]: %f %f\n", imagePairIdx, err, corr);
-
-		if (corr < corrThresh || err > errThresh) { // invalid!
+		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
 			d_currNumFilteredMatchesPerImagePair[imagePairIdx] = 0;
 		}
 	}
@@ -406,28 +437,22 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 
 //TODO camera stuff here
 void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
-	const float4x4 intrinsics,
-	const float** d_depthInputs, const float4** d_camPosInputs, const float4** d_normalInputs, const uchar4** d_colorInputs,
-	const float** d_depthModels, const float4** d_camPosModels, const float4** d_normalModels, const uchar4** d_colorModels,
+	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
 {
 	if (numCurrImagePairs == 0) return;
 	
 	dim3 grid(numCurrImagePairs);
-	dim3 block(imageWidth, imageHeight);
+	dim3 block(imageWidth, (imageHeight + FILTER_DENSE_VERIFY_THREAD_SPLIT - 1) / FILTER_DENSE_VERIFY_THREAD_SPLIT);
 
-	//CUDATimer timer;
-	//timer.startEvent(__FUNCTION__);
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	FilterMatchesByDenseVerifyCU_Kernel << <grid, block >> >(
 		imageWidth, imageHeight, intrinsics,
-		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms, 
-		d_depthInputs, d_camPosInputs, d_normalInputs, d_colorInputs,
-		d_depthModels, d_camPosModels, d_normalModels, d_colorModels,
+		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms, d_cachedFrames,
 		distThresh, normalThresh, colorThresh, errThresh, corrThresh);
 
-	//timer.endEvent();
-	//timer.evaluate();
+	if (m_timer) m_timer->endEvent();
 
 	CheckErrorCUDA(__FUNCTION__);
 }
@@ -493,8 +518,7 @@ void SIFTImageManager::AddCurrToResidualsCU(unsigned int numCurrImagePairs) {
 	const unsigned int threadsPerBlock = ((MAX_MATCHES_PER_IMAGE_PAIR_FILTERED + 31) / 32) * 32;
 	dim3 block(threadsPerBlock);
 
-	//CUDATimer timer;
-	//timer.startEvent(__FUNCTION__);
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	AddCurrToResidualsCU_Kernel << <grid, block >> >(
 		d_globMatches,
@@ -508,8 +532,7 @@ void SIFTImageManager::AddCurrToResidualsCU(unsigned int numCurrImagePairs) {
 
 	cutilSafeCall(cudaMemcpy(&m_globNumResiduals, d_globNumResiduals, sizeof(unsigned int), cudaMemcpyDeviceToHost));
 
-	//timer.endEvent();
-	//timer.evaluate();
+	if (m_timer) m_timer->endEvent();
 
 	CheckErrorCUDA(__FUNCTION__);
 }

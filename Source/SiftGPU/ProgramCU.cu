@@ -1414,6 +1414,7 @@ void ProgramCU::ComputeDescriptor(CuTexImage*list, CuTexImage* got, float* d_out
 int ProgramCU::CheckErrorCUDA(const char* location)
 {
 #if (defined(_DEBUG) || defined(DEBUG))
+	cudaDeviceSynchronize();
 	cudaError_t e = cudaGetLastError();
 	if (e)
 	{

@@ -14,5 +14,7 @@
 #include "SiftGPU/SiftGPU.h"
 #include "SiftGPU/SiftMatch.h"
 #include "SiftGPU/SIFTMatchFilter.h"
+#include "SiftGPU/MatrixConversion.h"
+#include "SiftGPU/CUDATimer.h"
 
 #include "ImageHelper.h"

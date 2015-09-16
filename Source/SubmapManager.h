@@ -2,6 +2,9 @@
 #ifndef SUBMAP_MANAGER_H
 #define SUBMAP_MAnAGER_H
 
+#include "SiftGPU/CUDATimer.h"
+#include "GlobalBundlingState.h"
+
 class SubmapManager {
 public:
 	CUDACache* currentLocalCache;
@@ -23,6 +26,9 @@ public:
 		global = NULL;
 		m_numTotalFrames = 0;
 		m_submapSize = 0;
+
+		m_localTimer = NULL;
+		m_globalTimer = NULL;
 	}
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
 		unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames = (unsigned int)-1)
@@ -51,6 +57,14 @@ public:
 
 		m_numTotalFrames = numTotalFrames;
 		m_submapSize = submapSize;
+
+		if (GlobalBundlingState::get().s_enableDetailedTimings) {
+			m_localTimer = new CUDATimer();
+			m_globalTimer = new CUDATimer();
+
+			currentLocal->setTimer(m_localTimer);
+			global->setTimer(m_globalTimer);
+		}
 	}
 	void setTotalNumFrames(unsigned int n) {
 		m_numTotalFrames = n;
@@ -63,6 +77,12 @@ public:
 		SAFE_DELETE(currentLocalCache);
 		SAFE_DELETE(nextLocalCache);
 		SAFE_DELETE(globalCache);
+	}
+	void evaluateTimings() {
+		if (GlobalBundlingState::get().s_enableDetailedTimings) {
+			m_localTimer->evaluate(true, true);
+			m_globalTimer->evaluate(true, true);
+		}
 	}
 
 	// update complete trajectory with new global trajectory info
@@ -88,6 +108,7 @@ public:
 		SIFTImageManager* tmp = currentLocal;
 		currentLocal = nextLocal;
 		nextLocal = tmp;
+		currentLocal->setTimer(m_localTimer);
 
 		currentLocalCache->reset();
 		CUDACache* tmpCache = currentLocalCache;
@@ -106,6 +127,9 @@ private:
 
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;
+
+	CUDATimer* m_localTimer;
+	CUDATimer* m_globalTimer;
 };
 
 #endif

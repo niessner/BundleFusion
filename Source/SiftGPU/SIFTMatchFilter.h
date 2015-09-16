@@ -13,9 +13,9 @@ public:
 
 	SIFTGPU_EXPORT static void filterKeyPointMatches(SIFTImageManager* siftManager);
 
-	SIFTGPU_EXPORT static void filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames);
+	SIFTGPU_EXPORT static void filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames);
 
-	SIFTGPU_EXPORT static void filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames);
+	SIFTGPU_EXPORT static void filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames);
 
 	SIFTGPU_EXPORT static void filterFrames(SIFTImageManager* siftManager);
 private:

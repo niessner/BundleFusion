@@ -199,6 +199,7 @@
     <ClInclude Include="Source\SiftGPU\cuda_SimpleMatrixUtil.h">
       <Filter>SiftGPU</Filter>
     </ClInclude>
+    <ClInclude Include="Source\CUDACacheUtil.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

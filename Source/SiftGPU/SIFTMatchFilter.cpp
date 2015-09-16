@@ -88,7 +88,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<S
 	//return numTry;
 }
 
-void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames)
+void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -246,7 +246,7 @@ float2 SIFTMatchFilter::computeSurfaceArea(const SIFTKeyPoint* keys, const uint2
 	return make_float2(area.x / totalAreas.x, area.y / totalAreas.y);
 }
 
-void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames)
+void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -283,7 +283,7 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 		std::vector<uint2> keyPointIndices;
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
-		std::cout << "(" << i << ", " << curFrame << "): ";
+		//std::cout << "(" << i << ", " << curFrame << "): ";
 		ml::Timer timer;
 		bool valid =
 			filterImagePairByDenseVerify(prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(), 
@@ -313,7 +313,7 @@ bool SIFTMatchFilter::filterImagePairByDenseVerify(const float* inputDepth, cons
 	const float verifySiftCorrThresh = 0.02f;
 	float2 projErrors = computeProjectiveError(inputDepth, inputCamPos, inputNormals, inputColor, modelDepth, modelCamPos, modelNormals, modelColor, transform, width, height);
 
-	std::cout << "proj errors = " << projErrors.x << " " << projErrors.y << std::endl;
+	//std::cout << "proj errors = " << projErrors.x << " " << projErrors.y << std::endl;
 	if (projErrors.x == -std::numeric_limits<float>::infinity() || (projErrors.x > verifySiftErrThresh) || (projErrors.y < verifySiftCorrThresh)) { // tracking lost or bad match
 		return false; // invalid
 	}
@@ -535,7 +535,8 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 				const float4 nTransInput = transform * nInput;
 
 				float2 screenPosf = cameraToDepth(pTransInput);
-				int2 screenPos = make_int2((int)(round(screenPosf.x) / levelFactor), (int)(round(screenPosf.y) / levelFactor)); // subsampled space
+				//int2 screenPos = make_int2((int)(round(screenPosf.x) / levelFactor), (int)(round(screenPosf.y) / levelFactor)); // subsampled space
+				int2 screenPos = make_int2((int)round(screenPosf.x / levelFactor), (int)round(screenPosf.y / levelFactor)); // subsampled space
 
 				if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)width && screenPos.y < (int)height) {
 					float4 pTarget; float4 nTarget; uchar4 cTarget;

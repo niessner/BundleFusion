@@ -1,6 +1,21 @@
 #include "stdafx.h"
 #include "CUDACache.h"
 
+
+CUDACache::CUDACache(unsigned int widthDownSampled, unsigned int heightDownSampled, unsigned int maxNumImages, const mat4f& intrinsics)
+{
+	m_width = widthDownSampled;
+	m_height = heightDownSampled;
+	m_maxNumImages = maxNumImages;
+
+	m_intrinsics = intrinsics;
+	m_intrinsicsInv = m_intrinsics.getInverse();
+
+	alloc();
+	m_currentFrame = 0;
+}
+
+
 void CUDACache::storeFrame(const float* d_depth, const uchar4* d_color, unsigned int inputWidth, unsigned int inputHeight)
 {
 	CUDACachedFrame& frame = m_cache[m_currentFrame];

@@ -136,6 +136,7 @@
   <ItemGroup>
     <ClInclude Include="Source\BinaryDumpReader.h" />
     <ClInclude Include="Source\CUDACache.h" />
+    <ClInclude Include="Source\CUDACacheUtil.h" />
     <ClInclude Include="Source\CUDAImageManager.h" />
     <ClInclude Include="Source\CUDAImageUtil.h" />
     <ClInclude Include="Source\DXUT\Core\DXUT.h" />

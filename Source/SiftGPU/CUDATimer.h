@@ -56,37 +56,52 @@ public:
         cudaEventRecord(timingInfo.endEvent, 0);
     }
 
-    void evaluate(bool showSum = false) {
-        std::vector<std::string> aggregateTimingNames;
-        std::vector<float> aggregateTimes;
-        std::vector<int> aggregateCounts;
-        for (int i = 0; i < timingEvents.size(); ++i) {
-            TimingInfo& eventInfo = timingEvents[i];
-            cudaEventSynchronize(eventInfo.endEvent);
-            cudaEventElapsedTime(&eventInfo.duration, eventInfo.startEvent, eventInfo.endEvent);
-            int index = findFirstIndex(aggregateTimingNames, eventInfo.eventName);
-            if (index < 0) {
-                aggregateTimingNames.push_back(eventInfo.eventName);
-                aggregateTimes.push_back(eventInfo.duration);
-                aggregateCounts.push_back(1);
-            } else {
-                aggregateTimes[index]   = aggregateTimes[index]     + eventInfo.duration;
-                aggregateCounts[index]  = aggregateCounts[index]    + 1;
-            }
+	void evaluate(bool showSum = false, bool showMax = false) {
+		std::vector<std::string> aggregateTimingNames;
+		std::vector<float> aggregateTimes;
+		std::vector<int> aggregateCounts;
+		std::vector<float> maxTimes;
+		for (int i = 0; i < timingEvents.size(); ++i) {
+			TimingInfo& eventInfo = timingEvents[i];
+			cudaEventSynchronize(eventInfo.endEvent);
+			cudaEventElapsedTime(&eventInfo.duration, eventInfo.startEvent, eventInfo.endEvent);
+			int index = findFirstIndex(aggregateTimingNames, eventInfo.eventName);
+			if (index < 0) {
+				aggregateTimingNames.push_back(eventInfo.eventName);
+				aggregateTimes.push_back(eventInfo.duration);
+				aggregateCounts.push_back(1);
+				maxTimes.push_back(eventInfo.duration);
+			}
+			else {
+				aggregateTimes[index] = aggregateTimes[index] + eventInfo.duration;
+				aggregateCounts[index] = aggregateCounts[index] + 1;
+				if (maxTimes[index] < eventInfo.duration)
+					maxTimes[index] = eventInfo.duration;
+			}
 
 			//if (eventInfo.eventName == "MultiplyDescriptor") {
 			//	printf("time %f\n", eventInfo.duration);
 			//}
-        }
-        printf("------------------------------------------------------------\n");
-        printf("          Kernel          |   Count  |   Total   | Average \n");
-        printf("--------------------------+----------+-----------+----------\n");
-        for (int i = 0; i < aggregateTimingNames.size(); ++i) {
-            printf("--------------------------+----------+-----------+----------\n");
-            printf(" %-24s |   %4d   | %8.3fms| %7.4fms\n", aggregateTimingNames[i].c_str(), aggregateCounts[i], aggregateTimes[i], aggregateTimes[i] / aggregateCounts[i]);
-        }
-        printf("------------------------------------------------------------\n");
+		}
+		printf("------------------------------------------------------------\n");
+		printf("          Kernel          |   Count  |   Total   | Average \n");
+		printf("--------------------------+----------+-----------+----------\n");
+		for (int i = 0; i < aggregateTimingNames.size(); ++i) {
+			printf("--------------------------+----------+-----------+----------\n");
+			printf(" %-24s |   %4d   | %8.3fms| %7.4fms\n", aggregateTimingNames[i].c_str(), aggregateCounts[i], aggregateTimes[i], aggregateTimes[i] / aggregateCounts[i]);
+		}
+		printf("------------------------------------------------------------\n\n");
 
+		if (showMax) {
+			printf("------------------------------------------------------------\n");
+			printf("          Kernel          |   Count  |   Total   | Max \n");
+			printf("--------------------------+----------+-----------+----------\n");
+			for (int i = 0; i < aggregateTimingNames.size(); ++i) {
+				printf("--------------------------+----------+-----------+----------\n");
+				printf(" %-24s |   %4d   | %8.3fms| %7.4fms\n", aggregateTimingNames[i].c_str(), aggregateCounts[i], aggregateTimes[i], maxTimes[i]);
+			}
+			printf("------------------------------------------------------------\n\n");
+		}
 		if (showSum) {
 			int sumCount = 0;
 			float sumAvg = 0.0f;

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "SIFTImageManager.h"
 #include "../TimingLog.h"
+#include "../GlobalBundlingState.h"
 
 SIFTGPU_EXPORT SIFTImageManager::SIFTImageManager(unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
 {
@@ -8,6 +9,7 @@ SIFTGPU_EXPORT SIFTImageManager::SIFTImageManager(unsigned int maxImages /*= 500
 	m_maxKeyPointsPerImage = maxKeyPointsPerImage;
 
 	alloc();
+	m_timer = NULL;
 }
 
 SIFTGPU_EXPORT SIFTImageManager::~SIFTImageManager()

@@ -18,7 +18,12 @@
 	X(unsigned int, s_numNonLinIterations) \
 	X(unsigned int, s_numLinIterations) \
 	X(unsigned int, s_downsampledWidth) \
-	X(unsigned int, s_downsampledHeight) 
+	X(unsigned int, s_downsampledHeight) \
+	X(float, s_verifySiftErrThresh) \
+	X(float, s_verifySiftCorrThresh) \
+	X(float, s_projCorrDistThres) \
+	X(float, s_projCorrNormalThres) \
+	X(float, s_projCorrColorThresh)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;

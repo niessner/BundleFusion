@@ -119,7 +119,7 @@ void destroy() {
 }
 
 //TODO fix
-void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames, const std::vector<int>& validImages,
+void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, const std::vector<int>& validImages,
 	unsigned int frameStart, unsigned int frameSkip, bool print = false);
 void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager);
 void processCurrentFrame();
@@ -270,6 +270,7 @@ int main(int argc, char** argv)
 	}
 
 	//!!!DEBUG
+	g_SubmapManager.evaluateTimings();
 	TimingLog::printTimings("timingLog.txt");
 	std::vector<int> validImagesGlobal; g_SubmapManager.global->getValidImagesDEBUG(validImagesGlobal);
 	getRGBDSensor()->saveRecordedPointCloud("refined.ply", validImagesGlobal, g_SubmapManager.globalTrajectory);
@@ -322,8 +323,7 @@ void processCurrentFrame()
 	SIFTImageManager* currentLocal = g_SubmapManager.currentLocal;
 	std::vector<int> validImagesLocal; currentLocal->getValidImagesDEBUG(validImagesLocal);
 	if (curLocalFrame > 0) {
-		const std::vector<CUDACache::CUDACachedFrame>& cachedFrames = g_SubmapManager.currentLocalCache->getCacheFrames();
-		MatchAndFilter(currentLocal, cachedFrames, validImagesLocal, curFrame - curLocalFrame, 1);
+		MatchAndFilter(currentLocal, g_SubmapManager.currentLocalCache, validImagesLocal, curFrame - curLocalFrame, 1);
 	}
 
 	// global frame
@@ -356,9 +356,7 @@ void processCurrentFrame()
 			// match with every other global
 			std::vector<int> validImagesGlobal; global->getValidImagesDEBUG(validImagesGlobal);
 			if (global->getNumImages() > 1) {
-				const std::vector<CUDACache::CUDACachedFrame>& cachedFrames = g_SubmapManager.globalCache->getCacheFrames();
-
-				MatchAndFilter(global, cachedFrames, validImagesGlobal, 0, submapSize);
+				MatchAndFilter(global, g_SubmapManager.globalCache, validImagesGlobal, 0, submapSize);
 				//printCurrentMatches("output/matches/", binaryDumpReader, global, true, 0, submapSize);
 
 				if (validImagesGlobal.back()) {
@@ -388,7 +386,7 @@ void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager)
 	//if (useVerify) bundle->verifyTrajectory();
 }
 
-void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::CUDACachedFrame>& cachedFrames, const std::vector<int>& validImages,
+void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, const std::vector<int>& validImages,
 	unsigned int frameStart, unsigned int frameSkip, bool print /*= false*/) // frameStart/frameSkip for debugging (printing matches)
 {
 	// match with every other
@@ -427,8 +425,22 @@ void MatchAndFilter(SIFTImageManager* siftManager, const std::vector<CUDACache::
 		//filter matches
 		SIFTMatchFilter::filterKeyPointMatches(siftManager);
 		//global->FilterKeyPointMatchesCU(curFrame);
+		const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
 		SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
-		SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);
+
+		//SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);
+		////!!!
+		//const ml::mat4f depthIntrinsics(583.0f, 0.0f, 320.0f, 0.0f,
+		//	0.f, 583.0f, 240.f, 0.0f,
+		//	0.f, 0.f, 1.f, 0.0f,
+		//	0.f, 0.f, 0.f, 1.0f);
+		////!!!
+		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
+
+		siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()), //MatrixConversion::toCUDA(depthIntrinsics),
+			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
+			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh);
+
 
 		SIFTMatchFilter::filterFrames(siftManager);
 		if (print) printCurrentMatches("debug/filt", siftManager, true, frameStart, frameSkip);
