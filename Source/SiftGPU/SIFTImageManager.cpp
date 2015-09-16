@@ -3,10 +3,11 @@
 #include "../TimingLog.h"
 #include "../GlobalBundlingState.h"
 
-SIFTGPU_EXPORT SIFTImageManager::SIFTImageManager(unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
+SIFTGPU_EXPORT SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
 {
 	m_maxNumImages = maxImages;
 	m_maxKeyPointsPerImage = maxKeyPointsPerImage;
+	m_submapSize = submapSize;
 
 	alloc();
 	m_timer = NULL;
@@ -156,6 +157,8 @@ SIFTGPU_EXPORT void SIFTImageManager::saveToFile(const std::string& s)
 		out.write((char*)globMatchesKeyPointIndices.data(), sizeof(uint2)*m_globNumResiduals);
 	}
 
+	out.write((char*)&m_submapSize, sizeof(unsigned int));
+
 	out.close();
 }
 
@@ -240,6 +243,9 @@ SIFTGPU_EXPORT void SIFTImageManager::loadFromFile(const std::string& s)
 			CUDA_SAFE_CALL(cudaMemcpy(d_globMatchesKeyPointIndices, globMatchesKeyPointIndices.data(), sizeof(uint2)*m_globNumResiduals, cudaMemcpyHostToDevice));
 		}
 	}
+	{
+		in.read((char*)&m_submapSize, sizeof(unsigned int));
+	}
 
 	for (unsigned int i = 0; i < numImages; i++) {
 		m_SIFTImagesGPU[i].d_keyPoints = d_keyPoints + m_numKeyPointsPerImagePrefixSum[i];
@@ -287,6 +293,11 @@ void SIFTImageManager::alloc()
 	CUDA_SAFE_CALL(cudaMalloc(&d_globMatches, sizeof(EntryJ)*maxResiduals));
 	CUDA_SAFE_CALL(cudaMalloc(&d_globMatchesKeyPointIndices, sizeof(uint2)*maxResiduals));
 
+	CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyCount, sizeof(int)));
+	CUDA_SAFE_CALL(cudaMemset(d_fuseGlobalKeyCount, 0, sizeof(int)));
+	CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyMarker, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
+	cutilSafeCall(cudaMemset(d_fuseGlobalKeyMarker, 0, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
+
 	initializeMatching();
 }
 
@@ -319,6 +330,9 @@ void SIFTImageManager::free()
 	CUDA_SAFE_CALL(cudaFree(d_globNumResiduals));
 	CUDA_SAFE_CALL(cudaFree(d_globMatches));
 	CUDA_SAFE_CALL(cudaFree(d_globMatchesKeyPointIndices));
+
+	CUDA_SAFE_CALL(cudaFree(d_fuseGlobalKeyCount));
+	CUDA_SAFE_CALL(cudaFree(d_fuseGlobalKeyMarker));
 }
 
 void SIFTImageManager::initializeMatching()

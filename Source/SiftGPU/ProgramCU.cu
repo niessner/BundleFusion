@@ -1908,12 +1908,7 @@ void __global__  ColMatch_Kernel(int height, int num2, float distmax, float rati
 		}
 	}
 
-	__syncthreads();
-	if (threadIdx.x == 0) {
-		if (*d_numMatches > MAX_MATCHES_PER_IMAGE_PAIR_RAW) *d_numMatches = MAX_MATCHES_PER_IMAGE_PAIR_RAW;
-	}
-
-	}
+}
 
 void ProgramCU::GetColMatch(CuTexImage* texCRT, float distmax, float ratiomax, CuTexImage* rowMatch, float* d_matchDistances, uint2* d_outKeyPointIndices, float* d_outMatchDistances, int* d_numMatches, uint2 keyPointOffset, int* numMatches)
 {

@@ -195,9 +195,10 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 
 	const float* d_matchDistances = &d_matchDistancesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	const uint2* d_matchKeyPointIndices = &d_matchKeyPointIndicesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
-	const unsigned int numMatches = d_numMatchesPerImagePair[imagePairIdx];
+	unsigned int numMatches = d_numMatchesPerImagePair[imagePairIdx];
 
 	if (numMatches == 0)	return;
+	if (numMatches > MAX_MATCHES_PER_IMAGE_PAIR_RAW) numMatches = MAX_MATCHES_PER_IMAGE_PAIR_RAW;
 
 	__shared__ float matchDistances[MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	__shared__ uint2 matchKeyPointIndices[MAX_MATCHES_PER_IMAGE_PAIR_RAW];
@@ -632,13 +633,11 @@ void SIFTImageManager::InvalidateImageToImageCU(const uint2& imageToImageIdx) {
 	dim3 grid((m_globNumResiduals + threadsPerBlock - 1) / threadsPerBlock);
 	dim3 block(threadsPerBlock);
 
-	//CUDATimer timer;
-	//timer.startEvent(__FUNCTION__);
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	InvalidateImageToImageCU_Kernel << <grid, block >> >(d_globMatches, m_globNumResiduals, imageToImageIdx);
 
-	//timer.endEvent();
-	//timer.evaluate();
+	if (m_timer) m_timer->endEvent();
 
 	CheckErrorCUDA(__FUNCTION__);
 }
@@ -665,19 +664,95 @@ void SIFTImageManager::CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesP
 	dim3 grid((numVars + threadsPerBlock - 1) / threadsPerBlock);
 	dim3 block(threadsPerBlock);
 
-	//CUDATimer timer;
-	//timer.startEvent(__FUNCTION__);
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	CheckForInvalidFramesCU_Kernel << <grid, block >> >(d_varToCorrNumEntriesPerRow, d_validImages, numVars);
 
-	//timer.endEvent();
-	//timer.evaluate();
+	if (m_timer) m_timer->endEvent();
 
 	CheckErrorCUDA(__FUNCTION__);
 }
 
 
+#define MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X 128
+#define FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X 512
 
+void __global__ FuseToGlobalKeyCU_Kernel(unsigned int maxNumKeysAll, int* d_fuseGlobalKeyMarker,
+	const SIFTKeyPoint* d_allLocalKeyPoints, const SIFTKeyPointDesc* d_allLocalKeyPointDescs,
+	SIFTKeyPoint* d_curGlobalKeyPoints, SIFTKeyPointDesc* d_curGlobalKeyPointsDescs,
+	const float4x4* transforms, float4x4 colorIntrinsics, float4x4 colorIntrinsicsInv, int* d_fuseGlobalKeyCount,
+	unsigned int maxNumKeysPerImage)
+{
+	const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
+
+	if (idx < maxNumKeysAll) {
+		if (d_fuseGlobalKeyMarker[idx] > 0) {
+			int addr = atomicAdd(d_fuseGlobalKeyCount, 1);
+			if (addr < maxNumKeysPerImage) {
+				const unsigned int imgIdx = d_fuseGlobalKeyMarker[idx] - 1;
+				const SIFTKeyPoint key = d_allLocalKeyPoints[idx];
+				float3 pos = colorIntrinsicsInv * (key.depth * make_float3(key.pos.x, key.pos.y, 1.0f));
+				float3 projPos = colorIntrinsics * (transforms[imgIdx] * pos);
+				float2 loc = make_float2(pos.x / pos.z, pos.y / pos.z);
+				
+				SIFTKeyPoint newKey;
+				newKey.pos = loc;
+				newKey.scale = key.scale;
+				newKey.depth = projPos.z;
+				d_curGlobalKeyPoints[addr] = newKey;
+				d_curGlobalKeyPointsDescs[addr] = d_allLocalKeyPointDescs[idx];
+			}
+			// unmark for next time
+			d_fuseGlobalKeyMarker[idx] = 0;
+		} // marked
+	}
+}
+void __global__ MarkKeysToFuseToGlobalKeyCU_Kernel(unsigned int globNumResiduals, const EntryJ* d_correspondences, uint2* d_correspondenceKeyIndices,
+	int* d_fuseGlobalKeyMarker)
+{
+	const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
+
+	if (idx < globNumResiduals) {
+		const EntryJ& corr = d_correspondences[idx];
+		if (corr.isValid()) {
+			const uint2 keyIndices = d_correspondenceKeyIndices[idx];
+			d_fuseGlobalKeyMarker[keyIndices.x] = corr.imgIdx_i + 1; // just pick the first one (offset by 1 since 0 invalid)
+		} // valid corr
+	} // residual/correspondence
+}
+
+unsigned int SIFTImageManager::FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms,
+	const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv)
+{
+	dim3 gridMark((m_globNumResiduals + MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X - 1) / MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X);
+	dim3 blockMark(MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X);
+
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
+	
+	MarkKeysToFuseToGlobalKeyCU_Kernel << <gridMark, blockMark >> >(m_globNumResiduals, d_globMatches,
+		d_globMatchesKeyPointIndices, d_fuseGlobalKeyMarker);
+	
+	CheckErrorCUDA(__FUNCTION__);
+
+	
+	const unsigned int maxNumKeysAll = m_submapSize * m_maxKeyPointsPerImage;
+	dim3 gridFuse((maxNumKeysAll + FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X - 1) / FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X);
+	dim3 blockFuse(FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X);
+
+	cutilSafeCall(cudaMemset(d_fuseGlobalKeyCount, 0, sizeof(int)));
+	FuseToGlobalKeyCU_Kernel << <gridFuse, blockFuse >> >(maxNumKeysAll, d_fuseGlobalKeyMarker,
+		d_keyPoints, d_keyPointDescs, globalImage.d_keyPoints, globalImage.d_keyPointDescs,
+		transforms, colorIntrinsics, colorIntrinsicsInv, d_fuseGlobalKeyCount, m_maxKeyPointsPerImage);
+	unsigned int numKeys;
+	cutilSafeCall(cudaMemcpy(&numKeys, d_fuseGlobalKeyCount, sizeof(int), cudaMemcpyDeviceToHost));
+	if (numKeys > m_maxKeyPointsPerImage) numKeys = m_maxKeyPointsPerImage;
+
+	if (m_timer) m_timer->endEvent();
+
+	CheckErrorCUDA(__FUNCTION__);
+
+	return numKeys;
+}
 
 
 

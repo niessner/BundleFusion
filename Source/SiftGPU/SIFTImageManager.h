@@ -65,7 +65,7 @@ class SIFTImageManager {
 public:
 	friend class SIFTMatchFilter;
 
-	SIFTGPU_EXPORT SIFTImageManager(
+	SIFTGPU_EXPORT SIFTImageManager(unsigned int submapSize, 
 		unsigned int maxImages = 500,
 		unsigned int maxKeyPointsPerImage = 4096);
 
@@ -130,6 +130,8 @@ public:
 	SIFTGPU_EXPORT void InvalidateImageToImageCU(const uint2& imageToImageIdx);
 
 	SIFTGPU_EXPORT void CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesPerRow, unsigned int numVars);
+
+	SIFTGPU_EXPORT unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
 
 	void getValidImagesDEBUG(std::vector<int>& valid) const {
 		valid.resize(getNumImages());
@@ -228,6 +230,10 @@ private:
 
 	unsigned int m_maxNumImages;			//max number of images maintained by the manager
 	unsigned int m_maxKeyPointsPerImage;	//max number of SIFT key point that can be detected per image
+
+	int* d_fuseGlobalKeyCount;
+	int* d_fuseGlobalKeyMarker; // which local keys are used for global key fuse
+	unsigned int m_submapSize;
 
 	CUDATimer *m_timer;
 };
