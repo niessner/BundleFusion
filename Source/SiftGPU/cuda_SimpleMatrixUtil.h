@@ -18,6 +18,11 @@ public:
 	{
 	}
 
+	inline __device__ __host__ float2x2(float a11, float a12, float a21, float a22) {
+		m11 = a11;	m12 = a12;
+		m21 = a21;	m22 = a22;
+	}
+
 	inline __device__ __host__ float2x2(const float values[4])
 	{
 		m11 = values[0];	m12 = values[1];
@@ -49,20 +54,6 @@ public:
 		m11 = other.m11;	m12 = other.m12;
 		m21 = other.m21;	m22 = other.m22;
 		return *this;
-	}
-
-	inline __device__ __host__ float2x2 getInverse()
-	{
-		float2x2 res;
-		res.m11 =  m22; res.m12 = -m12;
-		res.m21 = -m21; res.m22 =  m11;
-
-		return res*(1.0f/det());
-	}
-
-	inline __device__ __host__ float det()
-	{
-		return m11*m22-m21*m12;
 	}
 
 	inline __device__ __host__ float2 operator*(const float2& v) const
@@ -110,6 +101,40 @@ public:
 	{
 		return entries2[i][j];
 	}
+
+	static inline __device__ __host__  void swap(float& v0, float& v1) {
+		float tmp = v0;
+		v0 = v1;
+		v1 = tmp;
+	}
+
+	inline __device__ __host__ void transpose() {
+		swap(m12, m21);
+	}
+	inline __device__ __host__ float2x2 getTranspose() const {
+		float2x2 ret = *this;
+		ret.transpose();
+		return ret;
+	}
+
+	inline __device__ __host__ void invert() {
+		*this = getInverse();
+	}
+	inline __device__ __host__ float2x2 getInverse()
+	{
+		float2x2 res;
+		res.m11 = m22; res.m12 = -m12;
+		res.m21 = -m21; res.m22 = m11;
+
+		return res*(1.0f / det());
+	}
+
+	inline __device__ __host__ float det()
+	{
+		return m11*m22 - m21*m12;
+	}
+
+
 
 	union
 	{

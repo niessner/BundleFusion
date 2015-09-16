@@ -40,9 +40,11 @@ __host__ __device__ inline float3 computeEigenValues(const float3x3& aTa) {
 
 /* Computes the EigenVector of eigenValue eig (Vielfachheit 1!!) and symmetric 3x3 Matrix aTa  */
 __device__ __host__ inline float3 computeEigenVector(const float3x3& aTa, float eig) {
-	float3 res = make_float3(aTa(0, 1) * aTa(1, 2) - aTa(0, 2) * (aTa(1, 1) - eig),
-		aTa(0, 1) * aTa(0, 2) - aTa(1, 2) * (aTa(0, 0) - eig),
-		(aTa(0, 0) - eig) * (aTa(1, 1) - eig) - aTa(0, 1) * aTa(0, 1));
+	float3 res = make_float3(
+			aTa(0, 1) * aTa(1, 2) - aTa(0, 2) * (aTa(1, 1) - eig),
+			aTa(0, 1) * aTa(0, 2) - aTa(1, 2) * (aTa(0, 0) - eig),
+			(aTa(0, 0) - eig) * (aTa(1, 1) - eig) - aTa(0, 1) * aTa(0, 1)
+			);
 	return normalize(res);
 }
 /* Computes the EigenVector of eigenValue eig (Vielfachheit 2!!) and symmetric 3x3 Matrix aTa  */
@@ -51,8 +53,40 @@ __device__ __host__ inline float3 computeEigenVector(const float3x3& aTa, float 
 //trivial 
 
 
+__host__ __device__ inline float2 computeEigenValues(const float2x2& aTa) 
+{
+	float disc = 0.5f * sqrtf((aTa(0,0) - aTa(1,1))*(aTa(0,0) - aTa(1,1)) + 4 * aTa(0,1)*aTa(0,1));
 
+	float lambda1 = (aTa(0,0) + aTa(1,1)) / 2 + disc;
+	float lambda2 = (aTa(0,0) + aTa(1,1)) / 2 - disc;
 
+	return make_float2(lambda1, lambda2);
+	//if (fabs(lambda1) < FLT_EPSILON || fabs(lambda2) < FLT_EPSILON)
+	//{
+	//	printf("\twarning: lambda1 = %f, lambda2 = %f\n", lambda1, lambda2);
+	//	return false;
+	//}
+
+	//v1x = -aTa(0,1);  v1y = aTa(0,0) - lambda1;
+	//v2x = -aTa(0,1);  v2y = aTa(0,0) - lambda2;
+	//double v1mag = sqrt(v1x*v1x + v1y*v1y);
+	//double v2mag = sqrt(v2x*v2x + v2y*v2y);
+	//v1x /= v1mag;  v1y /= v1mag;
+	//v2x /= v2mag;  v2y /= v2mag;
+}
+
+__host__ __device__ inline float2 computeEigenVector(const float2x2& aTa, float lambda) {
+	float v1x = -aTa(0,1);  
+	float v1y = aTa(0,0) - lambda;
+	float v1mag = sqrtf(v1x*v1x + v1y*v1y);	
+	v1x /= v1mag;  
+	v1y /= v1mag;
+	return make_float2(v1x, v1y);
+
+	//double v2mag = sqrt(v2x*v2x + v2y*v2y);
+	//v2x = -aTa(0,1);  v2y = aTa(0,0) - lambda2;
+	//v2x /= v2mag;  v2y /= v2mag;
+}
 
 
 #endif //_EIGENVALUEDECOMPOSITION_H_

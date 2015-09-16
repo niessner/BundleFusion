@@ -212,6 +212,8 @@ void printCurrentMatches(const std::string& outPath, const SIFTImageManager* sif
 	}
 }
 
+#include "SiftGPU/cuda_EigenValue.h"
+
 //int WINAPI main(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 int main(int argc, char** argv)
 {
@@ -219,6 +221,16 @@ int main(int argc, char** argv)
 #if defined(DEBUG) | defined(_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif 
+
+	//float2x2 m(1, 2, 3, 4);
+	//m = m * m.getTranspose();
+	//float2 evs = computeEigenValues(m);
+	//float2 ev0 = computeEigenVector(m, evs.x);
+	//float2 ev1 = computeEigenVector(m, evs.y);
+	//auto res = ((mat2f*)&m)->eigenSystem();
+	//int a = 5;
+	//getchar();
+	//exit(1);
 
 	try {
 		std::string fileNameDescGlobalApp;
