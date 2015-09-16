@@ -28,7 +28,6 @@ __device__ void computeKeyPointMatchesCovariance(
 
 	if (threadIdx.x == 0) {
 		mean = matNxM<3, 1>(pt) / (float)numMatches;
-		V.setZero();
 	}
 
 	matNxM<3, 3> curr;	curr.setZero();
@@ -51,8 +50,9 @@ __device__ void computeKeyPointMatchesCovariance(
 
 
 __shared__ matNxM<2, 1> mean2x1;
+__shared__ matNxM<2, 2> cov2x2;
 
-__device__ void computeCovariance2d(volatile float2* points, unsigned int numPoints, matNxM<2,2>& cov)
+__device__ void computeCovariance2d(volatile float2* points, unsigned int numPoints)
 {
 	float2 p0 = make_float2(0.0f);
 	if (threadIdx.x < numPoints) {
@@ -74,18 +74,20 @@ __device__ void computeCovariance2d(volatile float2* points, unsigned int numPoi
 		curr = (p - mean2x1) * (p - mean2x1).getTranspose();
 	}
 	for (unsigned int j = 0; j < 4; j++) {
-		curr(j) = warpReduceSumAll(curr(j));
+		curr(j) = warpReduceSum(curr(j));
 	}
-
-	cov = curr / (float)numPoints;
+	if (threadIdx.x == 0) {
+		cov2x2 = curr / (float)numPoints;
+	}
 }
 
 
 __device__ float computeAreaOrientedBoundingBox2(volatile float2* points, unsigned int numPoints)
 {
 	
-	matNxM<2,2> cov;
-	computeCovariance2d(points, numPoints, cov);
+	
+	computeCovariance2d(points, numPoints);
+	matNxM<2, 2> cov = cov2x2;
 
 	float2 evs = computeEigenValues((float2x2)cov);
 	float2 ev0 = computeEigenVector((float2x2)cov, evs.x);
@@ -106,16 +108,8 @@ __device__ float computeAreaOrientedBoundingBox2(volatile float2* points, unsign
 		const unsigned int i = threadIdx.x;
 		const float2 p = make_float2(points[i].x, points[i].y);
 		float2 curr = worldToOBBSpace * p;
-
 		minValues = curr;
 		maxValues = curr;
-
-		
-		//if (curr.x < minValues.x)	minValues.x = curr.x;
-		//if (curr.y < minValues.y)	minValues.y = curr.y;
-
-		//if (curr.x > maxValues.x)	maxValues.x = curr.x;
-		//if (curr.y > maxValues.y)	maxValues.y = curr.y;
 	}
 
 	minValues.x = warpReduceMin(minValues.x);
@@ -123,7 +117,6 @@ __device__ float computeAreaOrientedBoundingBox2(volatile float2* points, unsign
 
 	maxValues.x = warpReduceMax(maxValues.x);
 	maxValues.y = warpReduceMax(maxValues.y);
-
 	
 	float extentX = maxValues.x - minValues.x;
 	float extentY = maxValues.y - minValues.y;

@@ -140,7 +140,12 @@ public:
 		return m11*m22 - m21*m12;
 	}
 
-
+	inline __device__ __host__ void print() const {
+		printf("%f %f\n%f %f\n\n",
+			entries[0], entries[1],
+			entries[2], entries[3]
+			);
+	}
 
 	union
 	{
