@@ -306,62 +306,41 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	if (numMatches == 0)	return;
 	const uint2* d_keyPointMatchIndices = d_filteredMatchKeyPointIndicesGlobal + imagePairIdx * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED;
 	
-	float area0 = 0.0f; float area1 = 0.0f;
+	float area0 = 0.0f; 
+	float area1 = 0.0f;
 		
-	float2 pointsProj[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];
+	
 
 	// compute area image 0
 	unsigned int which = 0;
 	computeKeyPointMatchesCovariance(d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which);
-	if (threadIdx.x == 0) {
-		float3 evs, ev0, ev1, ev2;
-		evs = computeEigenValues((float3x3)V);
-		ev0 = computeEigenVector((float3x3)V, evs.x);
-		ev1 = computeEigenVector((float3x3)V, evs.y);
-		ev2 = computeEigenVector((float3x3)V, evs.z);
 
-		//float3x3::swap(ev0.y, ev1.x);
-		//float3x3::swap(ev0.z, ev2.x);
-		//float3x3::swap(ev1.z, ev2.y);
+	float3 evs, ev0, ev1, ev2;
+	bool res;
 
-		bool res = true;
+	//if (threadIdx.x == 0) {
+	res = MYEIGEN::eigenSystem((float3x3)V, evs, ev0, ev1, ev2);
+	//}
 
-		printf("%f, %f, %f\n%f, %f, %f\n%f, %f, %f\n\n",
-			V(0, 0), V(0, 1), V(0, 2),
-			V(1, 0), V(1, 1), V(1, 2),
-			V(2, 0), V(2, 1), V(2, 2));
-
-		printf("evs = %f %f %f\n", evs.x, evs.y, evs.z);
-		printf("ev0 = %f %f %f\n", ev0.x, ev0.y, ev0.z);
-		printf("ev1 = %f %f %f\n", ev1.x, ev1.y, ev1.z);
-		printf("ev2 = %f %f %f\n\n", ev2.x, ev2.y, ev2.z);
-
-		res = MYEIGEN::eigenSystem((float3x3)V, evs, ev0, ev1, ev2);
-
-		printf("evs = %f %f %f\n", evs.x, evs.y, evs.z);
-		printf("ev0 = %f %f %f\n", ev0.x, ev0.y, ev0.z);
-		printf("ev1 = %f %f %f\n", ev1.x, ev1.y, ev1.z);
-		printf("ev2 = %f %f %f\n", ev2.x, ev2.y, ev2.z);
-
-		if (res) { // project
-			projectKeysToPlane(pointsProj, d_keyPointsGlobal, d_keyPointMatchIndices, numMatches,
-				colorIntrinsicsInv, which, ev0, ev1, ev2, mean);
-			area0 = computeAreaOrientedBoundingBox2(pointsProj, numMatches);
-		}
+	__shared__ float2 pointsProj[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];
+	if (res) { // project
+		projectKeysToPlane(pointsProj, d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which, ev0, ev1, ev2, mean);
+		area0 = computeAreaOrientedBoundingBox2(pointsProj, numMatches);
 	}
 
-	// compute area image 1
-	which = 1;
-	computeKeyPointMatchesCovariance(d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which);
-	if (threadIdx.x == 0) {
-		float3 evs, ev0, ev1, ev2;
-		bool res = MYEIGEN::eigenSystem((float3x3)V, evs, ev0, ev1, ev2);
-		if (res) {// project
-			projectKeysToPlane(pointsProj, d_keyPointsGlobal, d_keyPointMatchIndices, numMatches,
-				colorIntrinsicsInv, which, ev0, ev1, ev2, mean);
-			area1 = computeAreaOrientedBoundingBox2(pointsProj, numMatches);
-		}
+	//// compute area image 1
+	//which = 1;
+	//computeKeyPointMatchesCovariance(d_keyPointsGlobal, d_keyPointMatchIndices, numMatches, colorIntrinsicsInv, which);
+	//if (threadIdx.x == 0) {
+	//	float3 evs, ev0, ev1, ev2;
+	//	bool res = MYEIGEN::eigenSystem((float3x3)V, evs, ev0, ev1, ev2);
+	//	if (res) {// project
+	//		projectKeysToPlane(pointsProj, d_keyPointsGlobal, d_keyPointMatchIndices, numMatches,
+	//			colorIntrinsicsInv, which, ev0, ev1, ev2, mean);
+	//		area1 = computeAreaOrientedBoundingBox2(pointsProj, numMatches);
+	//	}
 
+	if (threadIdx.x == 0) {
 		printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
 		if (area0 < areaThresh && area1 < areaThresh) {
 			d_numFilteredMatchesPerImagePair[imagePairIdx] = 0;

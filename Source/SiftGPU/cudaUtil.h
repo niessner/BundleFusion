@@ -27,6 +27,42 @@ float warpReduceSum(float val) {
 		val += __shfl_down(val, offset);
 	return val;
 }
+__inline__ __device__
+float warpReduceMax(float val) {
+	for (int offset = 32 / 2; offset > 0; offset /= 2) {
+		val = max(val, __shfl_down(val, offset, 32));
+	}
+	return val;
+}
+__inline__ __device__
+float warpReduceMin(float val) {
+	for (int offset = 32 / 2; offset > 0; offset /= 2) {
+		val = min(val, __shfl_down(val, offset, 32));
+	}
+	return val;
+}
+
+__inline__ __device__
+float warpReduceSumAll(float val) {
+	for (int offset = 32 / 2; offset > 0; offset /= 2) {
+		val += __shfl_xor(val, offset, 32);
+	}
+	return val;
+}
+__inline__ __device__
+float warpReduceMaxAll(float val) {
+	for (int offset = 32 / 2; offset > 0; offset /= 2) {
+		val = max(val, __shfl_xor(val, offset, 32));
+	}
+	return val;
+}
+__inline__ __device__
+float warpReduceMinAll(float val) {
+	for (int offset = 32 / 2; offset > 0; offset /= 2) {
+		val = min(val, __shfl_xor(val, offset, 32));
+	}
+	return val;
+}
 #endif
 
 #endif

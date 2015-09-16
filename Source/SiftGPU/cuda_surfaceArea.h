@@ -50,65 +50,103 @@ __device__ void computeKeyPointMatchesCovariance(
 }
 
 
-__device__ void computeCovariance2d(
-	const float2* points, unsigned int numPoints, matNxM<2,2>& cov)
-{
-	matNxM<2, 1> p0;	p0.setZero();
-	for (unsigned int i = 0; i < numPoints; i++) {
-		p0 = p0 + matNxM<2, 1>((const float*)&points[i]);
-	}
-	p0 = p0 / (float)numPoints;
+__shared__ matNxM<2, 1> mean2x1;
 
-	cov.setZero();	//covariance matrix	
-	for (unsigned int i = 0; i < numPoints; i++) {
-		const matNxM<2, 1> p((const float*)&points[i]);
-		cov += (p - p0) * (p - p0).getTranspose();
+__device__ void computeCovariance2d(volatile float2* points, unsigned int numPoints, matNxM<2,2>& cov)
+{
+	float2 p0 = make_float2(0.0f);
+	if (threadIdx.x < numPoints) {
+		const unsigned int i = threadIdx.x;
+		p0 = make_float2(points[i].x, points[i].y);
 	}
-	cov /= (float)numPoints;
+	p0.x = warpReduceSum(p0.x);
+	p0.y = warpReduceSum(p0.y);
+	
+	
+	if (threadIdx.x == 0) {
+		mean2x1 = matNxM<2,1>(p0) / (float)numPoints;
+	}
+
+	matNxM<2, 2> curr;	curr.setZero();
+	if (threadIdx.x < numPoints) {
+		const unsigned int i = threadIdx.x;
+		const matNxM<2, 1> p((volatile const float*)&points[i]);
+		curr = (p - mean2x1) * (p - mean2x1).getTranspose();
+	}
+	for (unsigned int j = 0; j < 4; j++) {
+		curr(j) = warpReduceSumAll(curr(j));
+	}
+
+	cov = curr / (float)numPoints;
 }
 
 
-__device__ float computeAreaOrientedBoundingBox2(const float2* points, unsigned int numPoints)
+__device__ float computeAreaOrientedBoundingBox2(volatile float2* points, unsigned int numPoints)
 {
+	
 	matNxM<2,2> cov;
 	computeCovariance2d(points, numPoints, cov);
+
 	float2 evs = computeEigenValues((float2x2)cov);
 	float2 ev0 = computeEigenVector((float2x2)cov, evs.x);
 	float2 ev1 = computeEigenVector((float2x2)cov, evs.y);
-	
+
 	float2 axis0 = normalize(ev0);
 	float2 axis1 = normalize(ev1);
 
 	// find bounds
 	float2x2 worldToOBBSpace(axis0, axis1);
+
+
 	float2 minValues = make_float2(FLT_MAX, FLT_MAX);
 	float2 maxValues = make_float2(-FLT_MAX, -FLT_MAX);
-	for (unsigned int i = 0; i < numPoints; i++) {
-		float2 curr = worldToOBBSpace * points[i];
-		if (curr.x < minValues.x)	minValues.x = curr.x;
-		if (curr.y < minValues.y)	minValues.y = curr.y;
 
-		if (curr.x > maxValues.x)	maxValues.x = curr.x;
-		if (curr.y > maxValues.y)	maxValues.y = curr.y;
+	//for (unsigned int i = 0; i < numPoints; i++) {
+	if (threadIdx.x < numPoints) {
+		const unsigned int i = threadIdx.x;
+		const float2 p = make_float2(points[i].x, points[i].y);
+		float2 curr = worldToOBBSpace * p;
+
+		minValues = curr;
+		maxValues = curr;
+
+		
+		//if (curr.x < minValues.x)	minValues.x = curr.x;
+		//if (curr.y < minValues.y)	minValues.y = curr.y;
+
+		//if (curr.x > maxValues.x)	maxValues.x = curr.x;
+		//if (curr.y > maxValues.y)	maxValues.y = curr.y;
 	}
+
+	minValues.x = warpReduceMin(minValues.x);
+	minValues.y = warpReduceMin(minValues.y);
+
+	maxValues.x = warpReduceMax(maxValues.x);
+	maxValues.y = warpReduceMax(maxValues.y);
+
+	
 	float extentX = maxValues.x - minValues.x;
 	float extentY = maxValues.y - minValues.y;
 
 	if (extentX < 0.00001f || extentY < 0.00001f) return 0.0f;
-	return extentX * extentY;
+	else return extentX * extentY;
+
 }
 
-__device__ void projectKeysToPlane(float2* pointsProj,
+__device__ void projectKeysToPlane(volatile float2* pointsProj,
 	const SIFTKeyPoint* d_keyPointsGlobal, const uint2* d_filteredMatchKeyPointIndicesGlobal,
 	unsigned int numMatches, const float4x4& colorIntrinsicsInv, unsigned int which,
 	const float3& ev0, const float3& ev1, const float3& ev2, const float3& mean)
 {
-	for (unsigned int i = 0; i < numMatches; i++) {
+	//for (unsigned int i = 0; i < numMatches; i++) {
+	if (threadIdx.x < numMatches) {
+		const unsigned int i = threadIdx.x;
 		unsigned int keyPointIdx = ((unsigned int*)&d_filteredMatchKeyPointIndicesGlobal[i])[which];
 		const SIFTKeyPoint& key = d_keyPointsGlobal[keyPointIdx];
 		float3 pt = colorIntrinsicsInv * (key.depth * make_float3(key.pos.x, key.pos.y, 1.0f));
 		float3 s = (pt - dot(ev2, pt - mean) * ev2) - mean;
-		pointsProj[i] = make_float2(dot(s, ev0), dot(s, ev1));
+		pointsProj[i].x = dot(s, ev0);
+		pointsProj[i].y = dot(s, ev1);
 	}
 	//for (unsigned int i = numMatches; i < MAX_MATCHES_PER_IMAGE_PAIR_FILTERED; i++) {
 	//	pointsProj[i] = make_float2(0.0f);
