@@ -406,7 +406,7 @@ void processCurrentFrame()
 			//	return (left.depth < right.depth);
 			//});
 			////!!!
-
+			
 			// switch local submaps
 			g_SubmapManager.switchLocal();
 
