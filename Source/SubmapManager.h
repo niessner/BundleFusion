@@ -80,7 +80,10 @@ public:
 	}
 	void evaluateTimings() {
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
+			std::cout << "LOCAL TIMINGS" << std::endl;
 			m_localTimer->evaluate(true, true);
+			std::cout << std::endl;
+			std::cout << "GLOBAL TIMINGS" << std::endl;
 			m_globalTimer->evaluate(true, true);
 		}
 	}
