@@ -484,7 +484,7 @@ void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, c
 		//global->FilterKeyPointMatchesCU(curFrame);
 
 		//siftManager->saveToFile("debug/debug.sift");
-		siftManager->loadFromFile("debug/debug.sift");
+		//siftManager->loadFromFile("debug/debug.sift");
 
 		const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
 		SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
