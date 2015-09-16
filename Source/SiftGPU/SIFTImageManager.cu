@@ -337,7 +337,7 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	}
 
 	if (threadIdx.x == 0) {
-		//printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
+		printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
 		if (area0 < areaThresh && area1 < areaThresh) {
 			d_numFilteredMatchesPerImagePair[imagePairIdx] = 0;
 		}
