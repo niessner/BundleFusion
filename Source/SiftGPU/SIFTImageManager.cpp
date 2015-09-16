@@ -380,6 +380,7 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4* tr
 			uint2 k0 = make_uint2(corr.imgIdx_i, keyIndices.x);
 			//uint2 k1 = make_uint2(corr.imgIdx_j, keyIndices.y);
 			// pick first one (not overlap frame)
+
 			if (!keyMarker[k0.y] && curKeys.size() < m_maxKeyPointsPerImage) {
 				// project to first frame
 				float3 pos = colorIntrinsics * (transforms[k0.x] * corr.pos_i);

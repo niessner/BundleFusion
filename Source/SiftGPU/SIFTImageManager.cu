@@ -685,34 +685,27 @@ void __global__ FuseToGlobalKeyCU_Kernel(unsigned int maxNumKeysAll, int* d_fuse
 {
 	const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
 
-	if (idx == 0) {
-		SIFTKeyPoint newKey;
-		newKey.pos = make_float2(0.0f);
-		newKey.depth = 0.0f;
-		newKey.scale = 0.0f;
-		d_curGlobalKeyPoints[0] = newKey;
+	if (idx < maxNumKeysAll) {
+		if (d_fuseGlobalKeyMarker[idx] > 0) {
+			int addr = atomicAdd(d_fuseGlobalKeyCount, 1);
+			if (addr < maxNumKeysPerImage) {
+				const unsigned int imgIdx = d_fuseGlobalKeyMarker[idx] - 1;
+				const SIFTKeyPoint key = d_allLocalKeyPoints[idx];
+				float3 pos = colorIntrinsicsInv * (key.depth * make_float3(key.pos.x, key.pos.y, 1.0f));
+				float3 projPos = colorIntrinsics * (transforms[imgIdx] * pos);
+				float2 loc = make_float2(projPos.x / projPos.z, projPos.y / projPos.z);
+				
+				SIFTKeyPoint newKey;
+				newKey.pos = loc;
+				newKey.scale = key.scale;
+				newKey.depth = projPos.z;
+				d_curGlobalKeyPoints[addr] = newKey;
+				d_curGlobalKeyPointsDescs[addr] = d_allLocalKeyPointDescs[idx];
+			}
+			// unmark for next time
+			d_fuseGlobalKeyMarker[idx] = 0;
+		} // marked
 	}
-	//if (idx < maxNumKeysAll) {
-	//	if (d_fuseGlobalKeyMarker[idx] > 0) {
-	//		int addr = atomicAdd(d_fuseGlobalKeyCount, 1);
-	//		if (addr < maxNumKeysPerImage) {
-	//			const unsigned int imgIdx = d_fuseGlobalKeyMarker[idx] - 1;
-	//			const SIFTKeyPoint key = d_allLocalKeyPoints[idx];
-	//			float3 pos = colorIntrinsicsInv * (key.depth * make_float3(key.pos.x, key.pos.y, 1.0f));
-	//			float3 projPos = colorIntrinsics * (transforms[imgIdx] * pos);
-	//			float2 loc = make_float2(pos.x / pos.z, pos.y / pos.z);
-	//			
-	//			SIFTKeyPoint newKey;
-	//			newKey.pos = loc;
-	//			newKey.scale = key.scale;
-	//			newKey.depth = projPos.z;
-	//			d_curGlobalKeyPoints[addr] = newKey;
-	//			d_curGlobalKeyPointsDescs[addr] = d_allLocalKeyPointDescs[idx];
-	//		}
-	//		// unmark for next time
-	//		d_fuseGlobalKeyMarker[idx] = 0;
-	//	} // marked
-	//}
 }
 void __global__ MarkKeysToFuseToGlobalKeyCU_Kernel(unsigned int globNumResiduals, const EntryJ* d_correspondences, uint2* d_correspondenceKeyIndices,
 	int* d_fuseGlobalKeyMarker)
@@ -734,7 +727,7 @@ unsigned int SIFTImageManager::FuseToGlobalKeyCU(SIFTImageGPU& globalImage, cons
 	dim3 gridMark((m_globNumResiduals + MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X - 1) / MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X);
 	dim3 blockMark(MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X);
 
-	//if (m_timer) m_timer->startEvent(__FUNCTION__);
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 	
 	MarkKeysToFuseToGlobalKeyCU_Kernel << <gridMark, blockMark >> >(m_globNumResiduals, d_globMatches,
 		d_globMatchesKeyPointIndices, d_fuseGlobalKeyMarker);

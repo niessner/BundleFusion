@@ -4,6 +4,7 @@
 
 #include "SiftGPU/CUDATimer.h"
 #include "GlobalBundlingState.h"
+#include "mLibCuda.h"
 
 class SubmapManager {
 public:
@@ -29,6 +30,8 @@ public:
 
 		m_localTimer = NULL;
 		m_globalTimer = NULL;
+
+		d_currentLocalTransforms = NULL;
 	}
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
 		unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames = (unsigned int)-1)
@@ -36,7 +39,6 @@ public:
 		// cache
 		const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth;
 		const unsigned int downSampHeight = GlobalBundlingState::get().s_downsampledHeight;
-
 
 		const float scaleWidth = (float)downSampWidth / (float)imageManager->getIntegrationWidth();
 		const float scaleHeight = (float)downSampHeight / (float)imageManager->getIntegrationHeight();
@@ -58,6 +60,8 @@ public:
 		m_numTotalFrames = numTotalFrames;
 		m_submapSize = submapSize;
 
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currentLocalTransforms, sizeof(float4x4) * m_submapSize));
+
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
 			m_localTimer = new CUDATimer();
 			m_globalTimer = new CUDATimer();
@@ -77,6 +81,8 @@ public:
 		SAFE_DELETE(currentLocalCache);
 		SAFE_DELETE(nextLocalCache);
 		SAFE_DELETE(globalCache);
+
+		MLIB_CUDA_SAFE_FREE(d_currentLocalTransforms);
 	}
 	void evaluateTimings() {
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
@@ -86,6 +92,11 @@ public:
 			std::cout << "GLOBAL TIMINGS" << std::endl;
 			m_globalTimer->evaluate(true, true);
 		}
+	}
+
+	const float4x4* getCurrentLocalTrajectoryGPU() const {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currentLocalTransforms, localTrajectories.back().data(), sizeof(float4x4) * m_submapSize, cudaMemcpyHostToDevice));
+		return d_currentLocalTransforms;
 	}
 
 	// update complete trajectory with new global trajectory info
@@ -127,6 +138,8 @@ public:
 	}
 
 private:
+
+	float4x4* d_currentLocalTransforms; // for fuse to global
 
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;

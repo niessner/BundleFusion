@@ -111,7 +111,7 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 		std::vector<uint2> keyPointIndices;
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
-		std::cout << "(" << i << ", " << curFrame << "): ";
+		//std::cout << "(" << i << ", " << curFrame << "): ";
 		ml::Timer timer;
 		bool valid =
 			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices);
@@ -134,7 +134,7 @@ bool SIFTMatchFilter::filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoin
 	const float minSurfaceAreaPca = 0.032f;
 	float2 areas = computeSurfaceArea(keys.data(), keyPointIndices.data(), depth0, depth1, (unsigned int)keyPointIndices.size());
 
-	std::cout << "areas = " << areas.x << " " << areas.y << std::endl;
+	//std::cout << "areas = " << areas.x << " " << areas.y << std::endl;
 
 	if (areas.x < minSurfaceAreaPca && areas.y < minSurfaceAreaPca) // invalid
 		return false;

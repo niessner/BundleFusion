@@ -167,11 +167,13 @@ void printMatch(const SIFTImageManager* siftManager, const std::string& filename
 	matchImage.copyIntoImage(im1, 0, 0);
 	matchImage.copyIntoImage(im2, image1.getWidth(), 0);
 
+	float maxMatchDistance = 0.0f;
 	RGBColor lowColor = ml::RGBColor::Blue;
 	RGBColor highColor = ml::RGBColor::Red;
 	for (unsigned int i = 0; i < keyPointIndices.size(); i++) {
 		const SIFTKeyPoint& key1 = keys[keyPointIndices[i].x];
 		const SIFTKeyPoint& key2 = keys[keyPointIndices[i].y];
+		if (matchDistances[i] > maxMatchDistance) maxMatchDistance = matchDistances[i];
 
 		RGBColor c = RGBColor::interpolate(lowColor, highColor, matchDistances[i] / distMax);
 		vec3f color(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f);
@@ -181,6 +183,7 @@ void printMatch(const SIFTImageManager* siftManager, const std::string& filename
 		ImageHelper::drawCircle(matchImage, p1, ml::math::round(key2.scale), color);
 		ImageHelper::drawLine(matchImage, p0, p1, color);
 	}
+	std::cout << "(" << imageIndices << "): max match distance = " << maxMatchDistance << std::endl;
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
@@ -387,25 +390,14 @@ void processCurrentFrame()
 			// fuse to global
 			SIFTImageManager* global = g_SubmapManager.global;
 			const mat4f lastTransform = g_SubmapManager.globalTrajectory.back();
-			g_SubmapManager.currentLocal->fuseToGlobal(global, (float4x4*)currentLocalTrajectory.data(), currentLocal->getNumImages() - 1); // overlap frame
-			//SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
-			//unsigned int numGlobalKeys = g_SubmapManager.currentLocal->FuseToGlobalKeyCU(curGlobalImage, (float4x4*)currentLocalTrajectory.data(),
-			//	MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsics()), MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()));
-			//global->finalizeSIFTImageGPU(numGlobalKeys);
+			//g_SubmapManager.currentLocal->fuseToGlobal(global, (float4x4*)currentLocalTrajectory.data(), currentLocal->getNumImages() - 1); // overlap frame
+			SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
+			unsigned int numGlobalKeys = g_SubmapManager.currentLocal->FuseToGlobalKeyCU(curGlobalImage, g_SubmapManager.getCurrentLocalTrajectoryGPU(),
+				MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsics()), MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()));
+			global->finalizeSIFTImageGPU(numGlobalKeys);
 
 			//unsigned int gframe = (unsigned int)global->getNumImages() - 1;
 			//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
-			////!!!
-			//std::vector<SIFTKeyPoint> curKeys;
-			//global->getSIFTKeyPointsDEBUG(curKeys);
-			//std::sort(curKeys.begin(), curKeys.end(), [](const SIFTKeyPoint& left, const SIFTKeyPoint& right) {
-			//	if (left.pos.x < right.pos.x) return true;
-			//	else if (left.pos.x > right.pos.x) return false;
-			//	if (left.pos.y < right.pos.y) return true;
-			//	else if (left.pos.y > right.pos.y) return false;
-			//	return (left.depth < right.depth);
-			//});
-			////!!!
 			
 			// switch local submaps
 			g_SubmapManager.switchLocal();
@@ -491,11 +483,11 @@ void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, c
 		//siftManager->FilterMatchesBySurfaceAreaCU(curFrame, MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()), GlobalBundlingState::get().s_surfAreaPcaThresh);
 		//printCurrentMatches("debug/", siftManager, true, frameStart, frameSkip);
 
-		SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);
-		//const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
-		//siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
-		//	cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
-		//	GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh);
+		//SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);
+		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
+		siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
+			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
+			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh);
 
 
 		SIFTMatchFilter::filterFrames(siftManager);
