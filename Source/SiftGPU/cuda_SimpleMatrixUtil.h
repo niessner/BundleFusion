@@ -923,6 +923,10 @@ public:
 			m31*v.x + m32*v.y + m33*v.z + m34*1.0f
 			);
 	}
+
+	inline __device__ __host__ float& operator[](int i) {
+		return entries[i];
+	}
 	
 	inline __device__ __host__ float& operator()(int i, int j) {
 		return entries2[i][j];
@@ -1132,7 +1136,7 @@ public:
 		m31 = other.m31;	m32 = other.m32;	m33 = other.m33;	m34 = other.m34;
 	}
 
-	//! not tested
+	//! matrix-matrix multiply
 	inline __device__ __host__ float4x4 operator*(const float4x4 &other) {
 		float4x4 res;
 		res.m11 = m11*other.m11 + m12*other.m21 + m13*other.m31 + m14*other.m41;  

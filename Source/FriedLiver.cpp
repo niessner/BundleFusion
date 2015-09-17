@@ -227,6 +227,33 @@ int main(int argc, char** argv)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	//_CrtSetBreakAlloc(3727);
 #endif 
+	
+	////RNG::global.init(10, 10, 10, 10);
+	//srand(100);
+	//unsigned int numTests = 100;
+	//for (unsigned int t = 0; t < numTests; t++) {
+	//	float4x4 m_test;
+	//	for (unsigned int i = 0; i < 16; i++) {
+	//		float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+	//		//m_test[i] = RNG::global.rand_closed01();
+	//		m_test[i] = r;
+	//	}
+	//	mat4f m_gt = *(mat4f*)&m_test;
+	//	for (unsigned int i = 0; i < 5; i++) {
+	//		m_test = m_test * m_test;
+	//		m_gt = m_gt * m_gt;
+
+	//		std::cout << m_gt << std::endl;
+	//		std::cout << *(mat4f*)&m_test << std::endl;
+	//		std::cout << m_gt - *(mat4f*)&m_test << std::endl;
+
+	//		std::cout << std::endl;
+	//		getchar();
+	//	}
+	//}
+	//std::cout << "done!" << std::endl;
+	//getchar();
+	//exit(1);
 
 	//float2x2 m(1, 2, 3, 4);
 	//m = m * m.getTranspose();
