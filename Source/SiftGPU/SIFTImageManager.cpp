@@ -121,9 +121,6 @@ SIFTGPU_EXPORT void SIFTImageManager::saveToFile(const std::string& s)
 	CUDA_SAFE_CALL(cudaMemcpy(currFilteredMatchKeyPointIndices.data(), d_currFilteredMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyDeviceToHost));
 	CUDA_SAFE_CALL(cudaMemcpy(currFilteredTransforms.data(), d_currFilteredTransforms, sizeof(float4x4)*maxImageMatches, cudaMemcpyDeviceToHost));
 
-	std::vector<int> validImages(m_maxNumImages, 1);
-	CUDA_SAFE_CALL(cudaMemcpy(validImages.data(), d_validImages, sizeof(int) * m_maxNumImages, cudaMemcpyDeviceToHost));
-
 	std::vector<EntryJ> globMatches(m_globNumResiduals);
 	std::vector<uint2> globMatchesKeyPointIndices(m_globNumResiduals);
 	CUDA_SAFE_CALL(cudaMemcpy(globMatches.data(), d_globMatches, sizeof(EntryJ)*m_globNumResiduals, cudaMemcpyDeviceToHost));
@@ -148,7 +145,7 @@ SIFTGPU_EXPORT void SIFTImageManager::saveToFile(const std::string& s)
 	out.write((char*)currFilteredMatchKeyPointIndices.data(), sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 	out.write((char*)currFilteredTransforms.data(), sizeof(float4x4)*maxImageMatches);
 
-	out.write((char*)validImages.data(), sizeof(int)*m_maxNumImages);
+	out.write((char*)m_validImages.data(), sizeof(int)*m_maxNumImages);
 
 	out.write((char*)&m_globNumResiduals, sizeof(unsigned int));
 	if (m_globNumResiduals) {
@@ -225,9 +222,8 @@ SIFTGPU_EXPORT void SIFTImageManager::loadFromFile(const std::string& s)
 		CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredMatchKeyPointIndices, currFilteredMatchKeyPointIndices.data(), sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyHostToDevice));
 		CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredTransforms, currFilteredTransforms.data(), sizeof(float4x4)*maxImageMatches, cudaMemcpyHostToDevice));
 
-		std::vector<int> validImages(m_maxNumImages);
-		in.read((char*)validImages.data(), sizeof(int) * m_maxNumImages);
-		CUDA_SAFE_CALL(cudaMemcpy(d_validImages, validImages.data(), sizeof(int) * m_maxNumImages, cudaMemcpyHostToDevice));
+		m_validImages.resize(m_maxNumImages);
+		in.read((char*)m_validImages.data(), sizeof(int) * m_maxNumImages);
 	}
 
 	{
@@ -281,10 +277,9 @@ void SIFTImageManager::alloc()
 	CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
 	CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredTransforms, sizeof(float4x4)*maxImageMatches));
 
-	CUDA_SAFE_CALL(cudaMalloc(&d_validImages, sizeof(int) * m_maxNumImages));
-	//std::vector<int> _validImages(m_maxNumImages, 0); _validImages[0] = 1; // first is valid
-	std::vector<int> _validImages(m_maxNumImages, 1);
-	CUDA_SAFE_CALL(cudaMemcpy(d_validImages, _validImages.data(), sizeof(int) * m_maxNumImages, cudaMemcpyHostToDevice));
+	m_validImages.resize(m_maxNumImages, 0);
+	m_validImages[0] = 1; // first is valid
+	CUDA_SAFE_CALL(cudaMalloc(&d_validImages, sizeof(int) *  m_maxNumImages));
 
 	const unsigned int maxResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (m_maxNumImages*(m_maxNumImages - 1)) / 2;
 	m_globNumResiduals = 0;
@@ -324,6 +319,7 @@ void SIFTImageManager::free()
 	CUDA_SAFE_CALL(cudaFree(d_currFilteredMatchKeyPointIndices));
 	CUDA_SAFE_CALL(cudaFree(d_currFilteredTransforms));
 
+	m_validImages.clear();
 	CUDA_SAFE_CALL(cudaFree(d_validImages));
 
 	m_globNumResiduals = 0;
@@ -401,5 +397,27 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4* tr
 	cutilSafeCall(cudaMemcpy(cur.d_keyPoints, curKeys.data(), sizeof(SIFTKeyPoint) * numKeys, cudaMemcpyHostToDevice));
 	cutilSafeCall(cudaMemcpy(cur.d_keyPointDescs, curDesc.data(), sizeof(SIFTKeyPointDesc) * numKeys, cudaMemcpyHostToDevice));
 	global->finalizeSIFTImageGPU(numKeys);
+}
+
+void SIFTImageManager::filterFrames(unsigned int numCurrImagePairs)
+{
+	if (numCurrImagePairs == 0) return;
+	
+	int connected = 0;
+
+	std::vector<unsigned int> currNumFilteredMatchesPerImagePair(numCurrImagePairs);
+	cutilSafeCall(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int) * numCurrImagePairs, cudaMemcpyDeviceToHost));
+
+	for (unsigned int i = 0; i < numCurrImagePairs; i++) { // previous frames
+		if (currNumFilteredMatchesPerImagePair[i] > 0) {
+			connected = 1;
+			break;
+		}
+	}
+
+	if (!connected)
+		std::cout << "frame " << numCurrImagePairs << " not connected to previous!" << std::endl;
+
+	m_validImages[numCurrImagePairs] = connected;
 }
 

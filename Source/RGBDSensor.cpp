@@ -383,8 +383,18 @@ void RGBDSensor::saveRecordedPointCloud(const std::string& filename)
 
 void RGBDSensor::saveRecordedPointCloud(const std::string& filename, const std::vector<int>& validImages, const std::vector<mat4f>& trajectory)
 {
-	MLIB_ASSERT(m_recordedPoints.size() == validImages.size() &&
+	MLIB_ASSERT(m_recordedPoints.size() <= validImages.size() &&
 		m_recordedPoints.size() <= trajectory.size());
+	//!!!
+	std::ofstream s("invalidImages.txt");
+	s << validImages.size() << std::endl;
+	for (unsigned int i = 0; i < trajectory.size(); i++) {
+		if (validImages[i] != 1)
+			s << "\timage " << i << " = " << validImages[i] << std::endl;
+	}
+	s.close();
+	//!!!
+
 	// apply transforms
 	PointCloudf pc;
 	for (unsigned int i = 0; i < m_recordedPoints.size(); i++) {

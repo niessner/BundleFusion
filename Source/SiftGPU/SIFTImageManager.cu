@@ -628,34 +628,34 @@ void SIFTImageManager::AddCurrToResidualsCU(unsigned int numCurrImagePairs) {
 }
 
 
-#define FILTER_FRAMES_NUM_BLOCK_THREADS_X 8
-void __global__ FilterFramesCU_Kernel(
-	int* d_numFilteredMatchesPerImagePair,
-	int* d_validImages, unsigned int curImageIndex)
-{
-	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (idx < curImageIndex) {
-		if (d_numFilteredMatchesPerImagePair[idx] > 0)
-			d_validImages[curImageIndex] = 1;
-	}
-}
-
-void SIFTImageManager::FilterFramesCU(unsigned int numCurrImagePairs) {
-
-	if (numCurrImagePairs == 0) return;
-	dim3 grid((numCurrImagePairs + FILTER_FRAMES_NUM_BLOCK_THREADS_X - 1) / FILTER_FRAMES_NUM_BLOCK_THREADS_X);
-	dim3 block(FILTER_FRAMES_NUM_BLOCK_THREADS_X);
-
-	FilterFramesCU_Kernel <<< grid, block >>>(d_currNumFilteredMatchesPerImagePair, d_validImages, numCurrImagePairs);
-
-	CheckErrorCUDA(__FUNCTION__);
-
-	////debug
-	//unsigned int valid;
-	//cutilSafeCall(cudaMemcpy(&valid, d_validImages + numCurrImagePairs, sizeof(unsigned int), cudaMemcpyDeviceToHost));
-	//if (!valid) printf("frame %d not connected to previous!\n", numCurrImagePairs);
-}
+//#define FILTER_FRAMES_NUM_BLOCK_THREADS_X 8
+//void __global__ FilterFramesCU_Kernel(
+//	int* d_numFilteredMatchesPerImagePair,
+//	int* d_validImages, unsigned int curImageIndex)
+//{
+//	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//
+//	if (idx < curImageIndex) {
+//		if (d_numFilteredMatchesPerImagePair[idx] > 0)
+//			d_validImages[curImageIndex] = 1;
+//	}
+//}
+//
+//void SIFTImageManager::FilterFramesCU(unsigned int numCurrImagePairs) {
+//
+//	if (numCurrImagePairs == 0) return;
+//	dim3 grid((numCurrImagePairs + FILTER_FRAMES_NUM_BLOCK_THREADS_X - 1) / FILTER_FRAMES_NUM_BLOCK_THREADS_X);
+//	dim3 block(FILTER_FRAMES_NUM_BLOCK_THREADS_X);
+//
+//	FilterFramesCU_Kernel <<< grid, block >>>(d_currNumFilteredMatchesPerImagePair, d_validImages, numCurrImagePairs);
+//
+//	CheckErrorCUDA(__FUNCTION__);
+//
+//	////debug
+//	//unsigned int valid;
+//	//cutilSafeCall(cudaMemcpy(&valid, d_validImages + numCurrImagePairs, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+//	//if (!valid) printf("frame %d not connected to previous!\n", numCurrImagePairs);
+//}
 
 
 
@@ -714,7 +714,11 @@ void SIFTImageManager::CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesP
 
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
+	cutilSafeCall(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int) * numVars, cudaMemcpyHostToDevice));
+
 	CheckForInvalidFramesCU_Kernel << <grid, block >> >(d_varToCorrNumEntriesPerRow, d_validImages, numVars);
+	
+	cutilSafeCall(cudaMemcpy(m_validImages.data(), d_validImages, sizeof(int) * numVars, cudaMemcpyDeviceToHost));
 
 	if (m_timer) m_timer->endEvent();
 

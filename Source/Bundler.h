@@ -46,8 +46,7 @@ public:
 
 private:
 	void destroy();
-	void matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, const std::vector<int>& validImages,
-		unsigned int frameStart, unsigned int frameSkip, bool print = false);
+	void matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int frameStart, unsigned int frameSkip, bool print = false);
 
 	void solve(float4x4* transforms, SIFTImageManager* siftManager, bool isLocal);
 

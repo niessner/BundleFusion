@@ -109,9 +109,9 @@ public:
 		m_bFinalizedGPUImage = false;
 		cutilSafeCall(cudaMemset(d_globNumResiduals, 0, sizeof(int)));
 
-		// just to be safe
-		std::vector<int> validImages(m_maxNumImages, 1);
-		CUDA_SAFE_CALL(cudaMemcpy(validImages.data(), d_validImages, sizeof(int) * m_maxNumImages, cudaMemcpyDeviceToHost));
+		m_validImages.clear();
+		m_validImages.resize(m_maxNumImages, 0);
+		m_validImages[0] = 1; // first is valid
 	}
 
 	//sorts the key point matches inside image pair matches
@@ -125,7 +125,7 @@ public:
 		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh);
 
-	void FilterFramesCU(unsigned int numCurrImagePairs);
+	//void FilterFramesCU(unsigned int numCurrImagePairs);
 
 	SIFTGPU_EXPORT void AddCurrToResidualsCU(unsigned int numCurrImagePairs);
 
@@ -135,10 +135,12 @@ public:
 
 	SIFTGPU_EXPORT unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
 
-	void getValidImagesDEBUG(std::vector<int>& valid) const {
-		valid.resize(getNumImages());
-		cutilSafeCall(cudaMemcpy(valid.data(), d_validImages, sizeof(int) * valid.size(), cudaMemcpyDeviceToHost));
-	}
+	void filterFrames(unsigned int numCurrImagePairs);
+
+	//only markers for up to num images have been set properly
+	const std::vector<int>& getValidImages() const { return m_validImages; }
+	void invalidateFrame(unsigned int frame) { m_validImages[frame] = 0; }
+
 	void getSIFTKeyPointsDEBUG(std::vector<SIFTKeyPoint>& keys) const {
 		keys.resize(m_numKeyPoints);
 		cutilSafeCall(cudaMemcpy(keys.data(), d_keyPoints, sizeof(SIFTKeyPoint) * keys.size(), cudaMemcpyDeviceToHost));
@@ -222,7 +224,8 @@ private:
 	uint2*			d_currFilteredMatchKeyPointIndices;		// array of indices to d_keyPoints
 	float4x4*		d_currFilteredTransforms;				// array of transforms estimated in the first filter stage
 
-	int*			d_validImages;
+	std::vector<int> m_validImages;
+	int*			 d_validImages; // for check invalid frames kernel only (from residual invalidation) //TODO some way to not have both?
 
 	unsigned int	m_globNumResiduals;
 	int*			d_globNumResiduals;
