@@ -6,81 +6,116 @@
 
 class CUDAImageManager {
 public:
-	struct CUDARGBDInputFrame {
-		void alloc(unsigned int widthIntegration, unsigned int heightIntegration) {
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthIntegration, sizeof(float)*widthIntegration*heightIntegration));
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_colorIntegration, sizeof(uchar4)*widthIntegration*heightIntegration));
-		}
-		void free() {
-			MLIB_CUDA_SAFE_FREE(d_depthIntegration);
-			MLIB_CUDA_SAFE_FREE(d_colorIntegration);
-		}
+	//struct CUDARGBDInputFrame {
+	//public:
 
-		float*	d_depthIntegration;
-		uchar4*	d_colorIntegration;
-	};
+
+	//	void alloc(unsigned int widthIntegration, unsigned int heightIntegration) {
+	//		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthIntegration, sizeof(float)*widthIntegration*heightIntegration));
+	//		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_colorIntegration, sizeof(uchar4)*widthIntegration*heightIntegration));
+	//	}
+	//	void free() {
+	//		MLIB_CUDA_SAFE_FREE(d_depthIntegration);
+	//		MLIB_CUDA_SAFE_FREE(d_colorIntegration);
+	//	}
+
+	//	float*	d_depthIntegration;
+	//	uchar4*	d_colorIntegration;
+
+	//};
 
 	class ManagedRGBDInputFrame {
 	public:
-		static void init(unsigned int width, unsigned int height, bool isOnGPU) 
-		{
-			m_width = width;
-			m_height = height;
-			m_bIsOnGPU = isOnGPU;
+		friend class CUDAImageManager;
 
-			if (!m_bIsOnGPU) {
-				MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthIntegrationGlobal, sizeof(float)*width*height));
-				MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_colorIntegrationGlobal, sizeof(uchar4)*width*height));
+		static void globalInit(unsigned int width, unsigned int height, bool isOnGPU) 
+		{
+			globalFree();
+
+			s_width = width;
+			s_height = height;
+			s_bIsOnGPU = isOnGPU;
+
+			if (!s_bIsOnGPU) {
+				MLIB_CUDA_SAFE_CALL(cudaMalloc(&s_depthIntegrationGlobal, sizeof(float)*width*height));
+				MLIB_CUDA_SAFE_CALL(cudaMalloc(&s_colorIntegrationGlobal, sizeof(uchar4)*width*height));
 			}
 			else {
-				d_depthIntegrationGlobal = NULL;
-				d_colorIntegrationGlobal = NULL;
+				s_depthIntegrationGlobal = NULL;
+				s_colorIntegrationGlobal = NULL;
 			}
 		}
-		static void free() {
-			if (!m_bIsOnGPU) {
-				MLIB_CUDA_SAFE_FREE(d_depthIntegrationGlobal);
-				MLIB_CUDA_SAFE_FREE(d_colorIntegrationGlobal);
+		static void globalFree() 
+		{
+			if (!s_bIsOnGPU) {
+				MLIB_CUDA_SAFE_FREE(s_depthIntegrationGlobal);
+				MLIB_CUDA_SAFE_FREE(s_colorIntegrationGlobal);
 			}
 		}
 
-		ManagedRGBDInputFrame(float* depthIntegration, uchar4* colorIntegration) {
-			m_depthIntegration = depthIntegration;
-			m_colorIntegration = colorIntegration;
-		}
-		~ManagedRGBDInputFrame() {
+
+		void alloc() {
+			if (s_bIsOnGPU) {
+				MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_depthIntegration, sizeof(float)*s_width*s_height));
+				MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_colorIntegration, sizeof(uchar4)*s_width*s_height));
+			}
+			else {
+				m_depthIntegration = new float[s_width*s_height];
+				m_colorIntegration = new uchar4[s_width*s_height];
+			}
 		}
 
-		float* getDepthFrame() {
-			if (m_bIsOnGPU) {
+
+		void free() {
+			if (s_bIsOnGPU) {
+				MLIB_CUDA_SAFE_FREE(m_depthIntegration);
+				MLIB_CUDA_SAFE_FREE(m_colorIntegration);
+			}
+			else {
+				SAFE_DELETE_ARRAY(m_depthIntegration);
+				SAFE_DELETE_ARRAY(m_colorIntegration);
+			}
+		}
+
+
+		const float* getDepthFrameGPU() {	//be aware that only one depth frame is globally valid at a time
+			if (s_bIsOnGPU) {
 				return m_depthIntegration;
 			}
 			else {
-				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depthIntegrationGlobal, m_depthIntegration, sizeof(float)*m_width*m_height,cudaMemcpyHostToDevice));
-				return d_depthIntegrationGlobal;
+				if (this != s_activeDepthGPU) {
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(s_depthIntegrationGlobal, m_depthIntegration, sizeof(float)*s_width*s_height, cudaMemcpyHostToDevice));
+					s_activeDepthGPU = this;
+				}
+				return s_depthIntegrationGlobal;
 			}
 		}
-		uchar4* getColorFrame() {
-			if (m_bIsOnGPU) {
+		const uchar4* getColorFrameGPU() {	//be aware that only one depth frame is globally valid at a time
+			if (s_bIsOnGPU) {
 				return m_colorIntegration;
 			}
 			else {
-				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_colorIntegrationGlobal, m_colorIntegration, sizeof(uchar4)*m_width*m_height, cudaMemcpyHostToDevice));
-				return d_colorIntegrationGlobal;
+				if (this != s_activeColorGPU) {
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(s_colorIntegrationGlobal, m_colorIntegration, sizeof(uchar4)*s_width*s_height, cudaMemcpyHostToDevice));
+					s_activeColorGPU = this;
+				}
+				return s_colorIntegrationGlobal;
 			}
 		}
 	private:
 		float*	m_depthIntegration;	//either on the GPU or CPU
 		uchar4*	m_colorIntegration;	//either on the GPU or CPU
 
-		static bool			m_bIsOnGPU;
-		static float*		d_depthIntegrationGlobal;
-		static uchar4*		d_colorIntegrationGlobal;
-		static unsigned int m_width;
-		static unsigned int m_height;
+		static bool			s_bIsOnGPU;
+		static float*		s_depthIntegrationGlobal;
+		static uchar4*		s_colorIntegrationGlobal;
+		static unsigned int s_width;
+		static unsigned int s_height;
+		static ManagedRGBDInputFrame*	s_activeColorGPU;
+		static ManagedRGBDInputFrame*	s_activeDepthGPU;
 	};
 
-	CUDAImageManager(unsigned int widthIntegration, unsigned int heightIntegration, unsigned int widthSIFT, unsigned int heightSIFT, RGBDSensor* sensor) {
+	CUDAImageManager(unsigned int widthIntegration, unsigned int heightIntegration, unsigned int widthSIFT, unsigned int heightSIFT, RGBDSensor* sensor, bool storeFramesOnGPU = false) {
 		m_RGBDSensor = sensor;
 
 		m_widthSIFT = widthSIFT;
@@ -120,6 +155,9 @@ public:
 		m_SIFTintrinsics._m11 *= scaleHeightSIFT; m_SIFTintrinsics._m12 *= scaleHeightSIFT;
 		m_SIFTintrinsicsInv = m_RGBDSensor->getColorIntrinsicsInv();
 		m_SIFTintrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTintrinsicsInv._m11 /= scaleHeightSIFT;
+
+
+		ManagedRGBDInputFrame::globalInit(getIntegrationWidth(), getIntegrationHeight(), storeFramesOnGPU);
 	}
 
 	~CUDAImageManager() {
@@ -128,10 +166,12 @@ public:
 		MLIB_CUDA_SAFE_FREE(d_depthInput);
 		MLIB_CUDA_SAFE_FREE(d_colorInput);
 		MLIB_CUDA_SAFE_FREE(d_intensitySIFT);
+
+		ManagedRGBDInputFrame::globalFree();
 	}
 
 	void reset() {
-		for (CUDARGBDInputFrame& f : m_data) {
+		for (auto& f : m_data) {
 			f.free();
 		}
 		m_data.clear();
@@ -142,9 +182,9 @@ public:
 		if (!m_RGBDSensor->processDepth()) return false;	// Order is important!
 		if (!m_RGBDSensor->processColor()) return false;
 
-		m_data.push_back(CUDARGBDInputFrame());
-		CUDARGBDInputFrame& frame = m_data.back();
-		frame.alloc(m_widthIntegration, m_heightIntegration);	//could be done offline for a max number of frames?
+		m_data.push_back(ManagedRGBDInputFrame());
+		ManagedRGBDInputFrame& frame = m_data.back();
+		frame.alloc();
 
 		////////////////////////////////////////////////////////////////////////////////////
 		// Process Color
@@ -152,13 +192,25 @@ public:
 
 		const unsigned int bufferDimColorInput = m_RGBDSensor->getColorWidth()*m_RGBDSensor->getColorHeight();
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_colorInput, m_RGBDSensor->getColorRGBX(), sizeof(uchar4)*bufferDimColorInput, cudaMemcpyHostToDevice));
+
 		if ((m_RGBDSensor->getColorWidth() == m_widthIntegration) && (m_RGBDSensor->getColorHeight() == m_heightIntegration)) {
-			CUDAImageUtil::copy<uchar4>(frame.d_colorIntegration, d_colorInput, m_widthIntegration, m_heightIntegration);
-			//std::swap(frame.d_colorIntegration, d_colorInput);
+			if (ManagedRGBDInputFrame::s_bIsOnGPU) {
+				CUDAImageUtil::copy<uchar4>(frame.m_colorIntegration, d_colorInput, m_widthIntegration, m_heightIntegration);
+				//std::swap(frame.m_colorIntegration, d_colorInput);
+			}
+			else {
+				memcpy(frame.m_colorIntegration, m_RGBDSensor->getColorRGBX(), sizeof(uchar4)*bufferDimColorInput);
+			}
 		}
 		else {
-			CUDAImageUtil::resampleUCHAR4(frame.d_colorIntegration, m_widthIntegration, m_heightIntegration, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
-			//CUDAImageUtil::resample<uchar4>(frame.d_colorIntegration, m_widthIntegration, m_heightIntegration, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+			if (ManagedRGBDInputFrame::s_bIsOnGPU) {
+				CUDAImageUtil::resampleUCHAR4(frame.m_colorIntegration, m_widthIntegration, m_heightIntegration, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+			}
+			else {
+				CUDAImageUtil::resampleUCHAR4(frame.s_colorIntegrationGlobal, m_widthIntegration, m_heightIntegration, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_colorIntegration, frame.s_colorIntegrationGlobal, sizeof(uchar4)*bufferDimColorInput, cudaMemcpyDeviceToHost));
+				frame.s_activeColorGPU = &frame;
+			}
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////
@@ -167,13 +219,25 @@ public:
 
 		const unsigned int bufferDimDepthInput = m_RGBDSensor->getDepthWidth()*m_RGBDSensor->getDepthHeight();
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depthInput, m_RGBDSensor->getDepthFloat(), sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyHostToDevice));
+
 		if ((m_RGBDSensor->getDepthWidth() == m_widthIntegration) && (m_RGBDSensor->getDepthHeight() == m_heightIntegration)) {
-			CUDAImageUtil::copy<float>(frame.d_depthIntegration, d_depthInput, m_widthIntegration, m_heightIntegration);
-			//std::swap(frame.d_depthIntegration, d_depthInput);
+			if (ManagedRGBDInputFrame::s_bIsOnGPU) {
+				CUDAImageUtil::copy<float>(frame.m_depthIntegration, d_depthInput, m_widthIntegration, m_heightIntegration);
+				//std::swap(frame.m_depthIntegration, d_depthInput);
+			}
+			else {
+				memcpy(frame.m_depthIntegration, m_RGBDSensor->getDepthFloat(), sizeof(float)*bufferDimDepthInput);
+			}
 		}
 		else {
-			CUDAImageUtil::resampleFloat(frame.d_depthIntegration, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
-			//CUDAImageUtil::resample<float>(frame.d_depthIntegration, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
+			if (ManagedRGBDInputFrame::s_bIsOnGPU) {
+				CUDAImageUtil::resampleFloat(frame.m_depthIntegration, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
+			}
+			else {
+				CUDAImageUtil::resampleFloat(frame.s_depthIntegrationGlobal, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_depthIntegration, frame.s_depthIntegrationGlobal, sizeof(float)*bufferDimDepthInput, cudaMemcpyDeviceToHost));
+				frame.s_activeDepthGPU = &frame;
+			}
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////
@@ -191,24 +255,12 @@ public:
 		return d_intensitySIFT;
 	}
 
-	//const float* getDepthInput() const {
-	//	return d_depthInput;
-	//}
-
-	//const uchar4* getColorInput() const {
-	//	return d_colorInput;
-	//}
-
-	const float* getLastIntegrateDepth() const {
-		return m_data.back().d_depthIntegration;
+	ManagedRGBDInputFrame& getLastIntegrateFrame() {
+		return m_data.back();
 	}
 
-	const uchar4* getLastIntegrateColor() const {
-		return m_data.back().d_colorIntegration;
-	}
-
-	const uchar4* getIntegrateColor(unsigned int frame) const {
-		return m_data[frame].d_colorIntegration;
+	ManagedRGBDInputFrame& getIntegrateFrame(unsigned int frame) {
+		return m_data[frame];
 	}
 
 	// called after process
@@ -281,7 +333,8 @@ private:
 	float* d_intensitySIFT;
 
 	//! all image data on the GPU
-	std::vector<CUDARGBDInputFrame>	m_data;
+	//std::vector<CUDARGBDInputFrame>	m_data;
+	std::vector<ManagedRGBDInputFrame> m_data;
 
 	unsigned int m_currFrame;
 
