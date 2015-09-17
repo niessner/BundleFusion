@@ -5,9 +5,6 @@
 #include "FriedLiver.h"
 
 
-Bundler		g_bundler;
-
-
 
 RGBDSensor* getRGBDSensor()
 {
@@ -84,21 +81,8 @@ RGBDSensor* getRGBDSensor()
 
 
 
-void init() {	
-	if (getRGBDSensor() == NULL) throw MLIB_EXCEPTION("No RGBD sensor specified");
-
-	//init the input RGBD sensor
-	getRGBDSensor()->createFirstConnected();
-
-	g_bundler.init(getRGBDSensor());
-}
 
 
-
-//#include "SiftGPU/cuda_EigenValue.h"
-//#include "SiftGPU/cuda_SVD.h"
-
-//int WINAPI main(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 int main(int argc, char** argv)
 {
 	// Enable run-time memory check for debug builds.
@@ -106,72 +90,6 @@ int main(int argc, char** argv)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	//_CrtSetBreakAlloc(3727);
 #endif 
-	
-	////RNG::global.init(10, 10, 10, 10);
-	//srand(100);
-	//unsigned int numTests = 100;
-	//for (unsigned int t = 0; t < numTests; t++) {
-	//	float4x4 m_test;
-	//	for (unsigned int i = 0; i < 16; i++) {
-	//		float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-	//		//m_test[i] = RNG::global.rand_closed01();
-	//		m_test[i] = r;
-	//	}
-	//	mat4f m_gt = *(mat4f*)&m_test;
-	//	for (unsigned int i = 0; i < 5; i++) {
-	//		m_test = m_test * m_test;
-	//		m_gt = m_gt * m_gt;
-
-	//		std::cout << m_gt << std::endl;
-	//		std::cout << *(mat4f*)&m_test << std::endl;
-	//		std::cout << m_gt - *(mat4f*)&m_test << std::endl;
-
-	//		std::cout << std::endl;
-	//		getchar();
-	//	}
-	//}
-	//std::cout << "done!" << std::endl;
-	//getchar();
-	//exit(1);
-
-	//float2x2 m(1, 2, 3, 4);
-	//m = m * m.getTranspose();
-	//float2 evs = computeEigenValues(m);
-	//float2 ev0 = computeEigenVector(m, evs.x);
-	//float2 ev1 = computeEigenVector(m, evs.y);
-	//auto res = ((mat2f*)&m)->eigenSystem();
-	//int a = 5;
-	//getchar();
-	//exit(1);
-
-	//float3x3 m(0.038489, -0.012003, -0.004768,
-	//	-0.012003, 0.015097, 0.006327,
-	//	-0.004768, 0.006327, 0.002659);
-	//float3x3 m(1, 2, 3, 4, 5, 6, 7, 8, 9);
-	//m = m * m.getTranspose();
-	////float3 evs = computeEigenValues(m);
-	////float3 ev0 = computeEigenVector(m, evs.x);
-	////float3 ev1 = computeEigenVector(m, evs.y);
-	////float3 ev2 = computeEigenVector(m, evs.z);
-	//
-	//float3 evs, ev0, ev1, ev2;
-	//Timer t;
-	//for (unsigned int i = 0; i < 100000; i++)
-	//	MYEIGEN::eigenSystem(m, evs, ev0, ev1, ev2);
-	//t.stop();
-	//std::cout << "first " << t.getElapsedTimeMS() << std::endl;
-	//t.start();
-	//for (unsigned int i = 0; i < 100000; i++)
-	//	MYEIGEN::eigenSystem3x3(m, evs, ev0, ev1, ev2);
-	//std::cout << "second: " << t.getElapsedTimeMS() << std::endl;
-	//float3x3 re(ev0, ev1, ev2);
-	//re = re * float3x3::getDiagonalMatrix(evs.x, evs.y, evs.z) * re.getInverse();
-
-	//auto res = ((mat3f*)&m)->eigenSystem();
-	//mat3f res2 = (mat3f)res.eigenvectors * mat3f::diag(res.eigenvalues[0], res.eigenvalues[1], res.eigenvalues[2]) * ((mat3f)res.eigenvectors).getInverse();
-	//int a = 5;
-	//getchar();
-	//exit(1);
 
 	try {
 		std::string fileNameDescGlobalApp;
@@ -193,23 +111,43 @@ int main(int argc, char** argv)
 		//Read the global app state
 		ParameterFile parameterFileGlobalApp(fileNameDescGlobalApp);
 		GlobalAppState::getInstance().readMembers(parameterFileGlobalApp);
-		//GlobalAppState::getInstance().print();
 
 		//Read the global camera tracking state
 		ParameterFile parameterFileGlobalBundling(fileNameDescGlobalBundling);
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
-		//GlobalCameraTrackingState::getInstance().print();
+
 
 		TimingLog::init();
 
+		RGBDSensor* sensor = getRGBDSensor();
 
-		init();
+		//init the input RGBD sensor
+		if (sensor == NULL) throw MLIB_EXCEPTION("No RGBD sensor specified");
+		sensor->createFirstConnected();
+
+		CUDAImageManager* imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
+			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, sensor);
+
+		Bundler* bundler = new Bundler(sensor, imageManager);
+
+		startDepthSensing(bundler, getRGBDSensor(), imageManager);
 		
-		//TODO
-		while (g_bundler.process(getRGBDSensor()))
-		{
-		}
+		while (1) {
+			if (imageManager->process()) {
+				bundler->process();
+			}
+			else break;
 
+		}
+		
+		TimingLog::printTimings("timingLog.txt");
+		if (GlobalBundlingState::get().s_recordKeysPointCloud) bundler->saveKeysToPointCloud();
+
+		SAFE_DELETE(imageManager);
+		SAFE_DELETE(bundler);
+
+		std::cout << "DONE!" << std::endl;
+		getchar();
 	}
 	catch (const std::exception& e)
 	{
@@ -222,10 +160,7 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
-	TimingLog::printTimings("timingLog.txt");
-	if (GlobalBundlingState::get().s_recordKeysPointCloud) g_bundler.saveKeysToPointCloud(getRGBDSensor());
 
-	getchar();
 	return 0;
 }
 

@@ -40,7 +40,6 @@
       <Filter>Sensors</Filter>
     </ClCompile>
     <ClCompile Include="Source\GlobalAppState.cpp" />
-    <ClCompile Include="Source\GlobalCameraTrackingState.cpp" />
     <ClCompile Include="Source\CUDAImageManager.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
@@ -75,6 +74,54 @@
       <Filter>SolverBundling</Filter>
     </ClCompile>
     <ClCompile Include="Source\Bundler.cpp" />
+    <ClCompile Include="Source\DepthSensing\CUDARayCastSDF.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\CUDAScan.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\CUDASceneRepChunkGrid.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\CUDASceneRepHashSDF.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\DX11CustomRenderTarget.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\DX11PhongLighting.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\DX11QuadDrawer.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\DX11RayIntervalSplatting.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\DX11RGBDRenderer.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\DX11Utils.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\StdOutputLogger.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\CUDAHistogramHashSDF.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\CUDAImageHelper.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\CUDAMarchingCubesHashSDF.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\TimingLogDepthSensing.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DepthSensing\DepthSensing.cpp">
+      <Filter>DepthSensing</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -116,7 +163,6 @@
       <Filter>Sensors</Filter>
     </ClInclude>
     <ClInclude Include="Source\GlobalAppState.h" />
-    <ClInclude Include="Source\GlobalCameraTrackingState.h" />
     <ClInclude Include="Source\CUDAImageManager.h">
       <Filter>Sensors</Filter>
     </ClInclude>
@@ -208,6 +254,87 @@
       <Filter>SiftGPU</Filter>
     </ClInclude>
     <ClInclude Include="Source\Bundler.h" />
+    <ClInclude Include="Source\DepthSensing\CUDAMarchingCubesHashSDF.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDARayCastParams.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDARayCastSDF.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDAScan.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDASceneRepChunkGrid.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDASceneRepHashSDF.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\DepthCameraUtil.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\DX11CustomRenderTarget.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\DX11PhongLighting.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\DX11QuadDrawer.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\DX11RayIntervalSplatting.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\DX11RGBDRenderer.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\DX11Utils.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\MarchingCubesSDFUtil.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\RayCastSDFUtil.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\StdOutputLogger.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\Tables.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\Util.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\VoxelUtilHashSDF.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\BitArray.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CameraParams.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDADepthCameraParams.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDAHashParams.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDAHistogramHashSDF.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\CUDAImageHelper.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\TimingLogDepthSensing.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DepthSensing\DepthSensing.h">
+      <Filter>DepthSensing</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
@@ -221,6 +348,9 @@
     </Filter>
     <Filter Include="SolverBundling">
       <UniqueIdentifier>{a70dd124-67b4-4e19-95e2-4524ebad65c1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DepthSensing">
+      <UniqueIdentifier>{34a71b1c-31e1-49c5-b28a-0ba08ab941ea}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -238,5 +368,32 @@
     </CudaCompile>
     <CudaCompile Include="Source\SubmapManager.cu" />
     <CudaCompile Include="Source\SBA.cu" />
+    <CudaCompile Include="Source\DepthSensing\CUDAMarchingCubesSDF.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\DepthSensing\CUDARayCastSDF.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\DepthSensing\CUDASceneRepChunkGrid.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\DepthSensing\CUDASceneRepHashSDF.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\DepthSensing\ScanCS.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\DepthSensing\CameraUtil.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\DepthSensing\CUDAConstant.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\DepthSensing\CUDAHistogramHashSDF.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\DepthSensing\CUDAImageHelper.cu">
+      <Filter>DepthSensing</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

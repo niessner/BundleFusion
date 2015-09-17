@@ -44,14 +44,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <ExecutablePath>$(WindowsSDK_ExecutablePath_x86);$(WindowsSDK_ExecutablePath_x64);$(ExecutablePath)</ExecutablePath>
-    <IncludePath>$(IncludePath);$(WindowsSDK_IncludePath);$(KINECTSDK10_DIR)\inc;$(KINECTSDK20_DIR)\inc;$(OPENNI2_INCLUDE64);$(DXSDK_DIR)Include;./Source/;./Include;./Include/Intel;./Include/cutil/inc;./Include/Uplink;../../mlib/include;../../mlibExternal/include</IncludePath>
+    <IncludePath>$(IncludePath);$(WindowsSDK_IncludePath);$(KINECTSDK10_DIR)\inc;$(KINECTSDK20_DIR)\inc;$(OPENNI2_INCLUDE64);$(DXSDK_DIR)Include;./Source/;./Source/SiftGPU/;./Include;./Include/Intel;./Include/cutil/inc;./Include/Uplink;../../mlib/include;../../mlibExternal/include</IncludePath>
     <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\x64;$(KINECTSDK10_DIR)\lib\amd64;$(CUDA_LIB_PATH);$(KINECTSDK20_DIR)\lib\x64;$(OPENNI2_LIB64);Libs;../../mlibExternal/libsWindows/lib64</LibraryPath>
     <SourcePath>$(VC_SourcePath);</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <ExecutablePath>$(DXSDK_DIR)Utilities\bin\x64;$(DXSDK_DIR)Utilities\bin\x86;$(ExecutablePath)</ExecutablePath>
-    <IncludePath>$(IncludePath);$(WindowsSDK_IncludePath);$(KINECTSDK10_DIR)\inc;$(KINECTSDK20_DIR)\inc;$(OPENNI2_INCLUDE64);$(DXSDK_DIR)Include;./Source/;./Include;./Include/Intel;./Include/cutil/inc;./Include/Uplink;../../mlib/include;../../mlibExternal/include</IncludePath>
+    <IncludePath>$(IncludePath);$(WindowsSDK_IncludePath);$(KINECTSDK10_DIR)\inc;$(KINECTSDK20_DIR)\inc;$(OPENNI2_INCLUDE64);$(DXSDK_DIR)Include;./Source/;./Source/SiftGPU/;./Include;./Include/Intel;./Include/cutil/inc;./Include/Uplink;../../mlib/include;../../mlibExternal/include</IncludePath>
     <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\x64;$(KINECTSDK10_DIR)\lib\amd64;$(CUDA_LIB_PATH);$(KINECTSDK20_DIR)\lib\x64;$(OPENNI2_LIB64);Libs;../../mlibExternal/libsWindows/lib64</LibraryPath>
     <SourcePath>$(VC_SourcePath);</SourcePath>
   </PropertyGroup>
@@ -140,6 +140,33 @@
     <ClInclude Include="Source\CUDACacheUtil.h" />
     <ClInclude Include="Source\CUDAImageManager.h" />
     <ClInclude Include="Source\CUDAImageUtil.h" />
+    <ClInclude Include="Source\DepthSensing\BitArray.h" />
+    <ClInclude Include="Source\DepthSensing\CameraParams.h" />
+    <ClInclude Include="Source\DepthSensing\CUDADepthCameraParams.h" />
+    <ClInclude Include="Source\DepthSensing\CUDAHashParams.h" />
+    <ClInclude Include="Source\DepthSensing\CUDAHistogramHashSDF.h" />
+    <ClInclude Include="Source\DepthSensing\CUDAImageHelper.h" />
+    <ClInclude Include="Source\DepthSensing\CUDAMarchingCubesHashSDF.h" />
+    <ClInclude Include="Source\DepthSensing\CUDARayCastParams.h" />
+    <ClInclude Include="Source\DepthSensing\CUDARayCastSDF.h" />
+    <ClInclude Include="Source\DepthSensing\CUDAScan.h" />
+    <ClInclude Include="Source\DepthSensing\CUDASceneRepChunkGrid.h" />
+    <ClInclude Include="Source\DepthSensing\CUDASceneRepHashSDF.h" />
+    <ClInclude Include="Source\DepthSensing\DepthCameraUtil.h" />
+    <ClInclude Include="Source\DepthSensing\DepthSensing.h" />
+    <ClInclude Include="Source\DepthSensing\DX11CustomRenderTarget.h" />
+    <ClInclude Include="Source\DepthSensing\DX11PhongLighting.h" />
+    <ClInclude Include="Source\DepthSensing\DX11QuadDrawer.h" />
+    <ClInclude Include="Source\DepthSensing\DX11RayIntervalSplatting.h" />
+    <ClInclude Include="Source\DepthSensing\DX11RGBDRenderer.h" />
+    <ClInclude Include="Source\DepthSensing\DX11Utils.h" />
+    <ClInclude Include="Source\DepthSensing\MarchingCubesSDFUtil.h" />
+    <ClInclude Include="Source\DepthSensing\RayCastSDFUtil.h" />
+    <ClInclude Include="Source\DepthSensing\StdOutputLogger.h" />
+    <ClInclude Include="Source\DepthSensing\Tables.h" />
+    <ClInclude Include="Source\DepthSensing\TimingLogDepthSensing.h" />
+    <ClInclude Include="Source\DepthSensing\Util.h" />
+    <ClInclude Include="Source\DepthSensing\VoxelUtilHashSDF.h" />
     <ClInclude Include="Source\DXUT\Core\DXUT.h" />
     <ClInclude Include="Source\DXUT\Core\DXUTDevice11.h" />
     <ClInclude Include="Source\DXUT\Core\DXUTDevice9.h" />
@@ -153,7 +180,6 @@
     <ClInclude Include="Source\FriedLiver.h" />
     <ClInclude Include="Source\GlobalAppState.h" />
     <ClInclude Include="Source\GlobalBundlingState.h" />
-    <ClInclude Include="Source\GlobalCameraTrackingState.h" />
     <ClInclude Include="Source\ImageHelper.h" />
     <ClInclude Include="Source\mLib.h" />
     <ClInclude Include="Source\mLibCuda.h" />
@@ -193,6 +219,22 @@
     <ClCompile Include="Source\Bundler.cpp" />
     <ClCompile Include="Source\CUDACache.cpp" />
     <ClCompile Include="Source\CUDAImageManager.cpp" />
+    <ClCompile Include="Source\DepthSensing\CUDAHistogramHashSDF.cpp" />
+    <ClCompile Include="Source\DepthSensing\CUDAImageHelper.cpp" />
+    <ClCompile Include="Source\DepthSensing\CUDAMarchingCubesHashSDF.cpp" />
+    <ClCompile Include="Source\DepthSensing\CUDARayCastSDF.cpp" />
+    <ClCompile Include="Source\DepthSensing\CUDAScan.cpp" />
+    <ClCompile Include="Source\DepthSensing\CUDASceneRepChunkGrid.cpp" />
+    <ClCompile Include="Source\DepthSensing\CUDASceneRepHashSDF.cpp" />
+    <ClCompile Include="Source\DepthSensing\DepthSensing.cpp" />
+    <ClCompile Include="Source\DepthSensing\DX11CustomRenderTarget.cpp" />
+    <ClCompile Include="Source\DepthSensing\DX11PhongLighting.cpp" />
+    <ClCompile Include="Source\DepthSensing\DX11QuadDrawer.cpp" />
+    <ClCompile Include="Source\DepthSensing\DX11RayIntervalSplatting.cpp" />
+    <ClCompile Include="Source\DepthSensing\DX11RGBDRenderer.cpp" />
+    <ClCompile Include="Source\DepthSensing\DX11Utils.cpp" />
+    <ClCompile Include="Source\DepthSensing\StdOutputLogger.cpp" />
+    <ClCompile Include="Source\DepthSensing\TimingLogDepthSensing.cpp" />
     <ClCompile Include="Source\DXUT\Core\DXUT.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -235,7 +277,6 @@
     </ClCompile>
     <ClCompile Include="Source\FriedLiver.cpp" />
     <ClCompile Include="Source\GlobalAppState.cpp" />
-    <ClCompile Include="Source\GlobalCameraTrackingState.cpp" />
     <ClCompile Include="Source\mLib.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -258,6 +299,15 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Source\CUDAImageUtil.cu" />
+    <CudaCompile Include="Source\DepthSensing\CameraUtil.cu" />
+    <CudaCompile Include="Source\DepthSensing\CUDAConstant.cu" />
+    <CudaCompile Include="Source\DepthSensing\CUDAHistogramHashSDF.cu" />
+    <CudaCompile Include="Source\DepthSensing\CUDAImageHelper.cu" />
+    <CudaCompile Include="Source\DepthSensing\CUDAMarchingCubesSDF.cu" />
+    <CudaCompile Include="Source\DepthSensing\CUDARayCastSDF.cu" />
+    <CudaCompile Include="Source\DepthSensing\CUDASceneRepChunkGrid.cu" />
+    <CudaCompile Include="Source\DepthSensing\CUDASceneRepHashSDF.cu" />
+    <CudaCompile Include="Source\DepthSensing\ScanCS.cu" />
     <CudaCompile Include="Source\SBA.cu" />
     <CudaCompile Include="Source\SiftGPU\ProgramCU.cu" />
     <CudaCompile Include="Source\SiftGPU\SIFTImageManager.cu" />

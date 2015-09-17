@@ -127,17 +127,17 @@ public:
 
 
 	//TODO not const because direct assignment in SiftGPU
-	float* getIntensityImage() {
+	float* getIntensityImageSIFT() {
 		return d_intensitySIFT;
 	}
 
-	const float* getDepthInput() const {
-		return d_depthInput;
-	}
+	//const float* getDepthInput() const {
+	//	return d_depthInput;
+	//}
 
-	const uchar4* getColorInput() const {
-		return d_colorInput;
-	}
+	//const uchar4* getColorInput() const {
+	//	return d_colorInput;
+	//}
 
 	const float* getLastIntegrateDepth() const {
 		return m_data.back().d_depthIntegration;

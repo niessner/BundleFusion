@@ -17,16 +17,17 @@
 Timer Bundler::s_timer;
 
 
-void Bundler::init(RGBDSensor* sensor)
+Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 {
+	m_CudaImageManager = imageManager;
+	m_RGBDSensor = sensor;
+
 	// init CUDA
-	m_CudaImageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
-		GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, sensor);
-	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
-	m_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage, submapSize, m_CudaImageManager);
+	m_submapSize = GlobalBundlingState::get().s_submapSize;
+	m_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, m_submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage, m_submapSize, m_CudaImageManager);
 	//TODO fix
 	if (GlobalAppState::get().s_sensorIdx == 3) {
-		m_SubmapManager.setTotalNumFrames(((BinaryDumpReader*)sensor)->getNumTotalFrames());
+		m_SubmapManager.setTotalNumFrames(((BinaryDumpReader*)m_RGBDSensor)->getNumTotalFrames());
 	}
 	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
 
@@ -35,18 +36,15 @@ void Bundler::init(RGBDSensor* sensor)
 	m_sift->SetParams(0, GlobalBundlingState::get().s_enableDetailedTimings, 150);
 	m_sift->InitSiftGPU();
 	m_siftMatcher->InitSiftMatch();
-
-	m_submapSize = GlobalBundlingState::get().s_submapSize;
 }
 
-void Bundler::destroy()
+Bundler::~Bundler()
 {
 	SAFE_DELETE(m_sift);
 	SAFE_DELETE(m_siftMatcher);
-	SAFE_DELETE(m_CudaImageManager);
 }
 
-bool Bundler::process(RGBDSensor* sensor)
+bool Bundler::process()
 {
 	if (!m_CudaImageManager->process()) return false;
 
@@ -58,9 +56,9 @@ bool Bundler::process(RGBDSensor* sensor)
 	// run SIFT
 	SIFTImageGPU& cur = m_SubmapManager.currentLocal->createSIFTImageGPU();
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-	int success = m_sift->RunSIFT(m_CudaImageManager->getIntensityImage(), m_CudaImageManager->getDepthInput());
+	int success = m_sift->RunSIFT(m_CudaImageManager->getIntensityImageSIFT(), m_CudaImageManager->getLastIntegrateDepth());
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection on frame " + std::to_string(curFrame));
-	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, m_CudaImageManager->getDepthInput());
+	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, m_CudaImageManager->getLastIntegrateDepth());
 	m_SubmapManager.currentLocal->finalizeSIFTImageGPU(numKeypoints);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
@@ -68,7 +66,7 @@ bool Bundler::process(RGBDSensor* sensor)
 	const unsigned int curLocalFrame = m_SubmapManager.currentLocal->getNumImages() - 1;
 	m_SubmapManager.currentLocalCache->storeFrame(m_CudaImageManager->getLastIntegrateDepth(), m_CudaImageManager->getLastIntegrateColor(), m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
 	if (GlobalBundlingState::get().s_recordKeysPointCloud && curLocalFrame == 0 || m_SubmapManager.isLastLocalFrame(curFrame)) {
-		sensor->recordPointCloud();
+		m_RGBDSensor->recordPointCloud();
 	}
 	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);
 
@@ -323,12 +321,12 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 	}
 }
 
-void Bundler::saveKeysToPointCloud(RGBDSensor* sensor, const std::string& filename /*= "refined.ply"*/)
+void Bundler::saveKeysToPointCloud(const std::string& filename /*= "refined.ply"*/)
 {
 	if (GlobalBundlingState::get().s_recordKeysPointCloud) {
 		const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
 		std::vector<mat4f> globalTrajectory(m_SubmapManager.global->getNumImages());
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globalTrajectory.data(), m_SubmapManager.d_globalTrajectory, sizeof(float4x4)*globalTrajectory.size(), cudaMemcpyDeviceToHost));
-		sensor->saveRecordedPointCloud(filename, validImagesGlobal, globalTrajectory);
+		m_RGBDSensor->saveRecordedPointCloud(filename, validImagesGlobal, globalTrajectory);
 	}
 }
