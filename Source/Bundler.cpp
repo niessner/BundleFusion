@@ -208,6 +208,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 		// --- filter frames
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 		SIFTMatchFilter::filterFrames(siftManager);
+		//siftManager->FilterFramesCU(curFrame);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeFilterFrames = s_timer.getElapsedTimeMS(); }
 		if (print) printCurrentMatches("debug/filt", siftManager, true, frameStart, frameSkip);
 

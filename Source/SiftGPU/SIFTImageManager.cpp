@@ -282,6 +282,7 @@ void SIFTImageManager::alloc()
 	CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredTransforms, sizeof(float4x4)*maxImageMatches));
 
 	CUDA_SAFE_CALL(cudaMalloc(&d_validImages, sizeof(int) * m_maxNumImages));
+	//std::vector<int> _validImages(m_maxNumImages, 0); _validImages[0] = 1; // first is valid
 	std::vector<int> _validImages(m_maxNumImages, 1);
 	CUDA_SAFE_CALL(cudaMemcpy(d_validImages, _validImages.data(), sizeof(int) * m_maxNumImages, cudaMemcpyHostToDevice));
 

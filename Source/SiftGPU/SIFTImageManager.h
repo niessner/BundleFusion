@@ -125,6 +125,8 @@ public:
 		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh);
 
+	void FilterFramesCU(unsigned int numCurrImagePairs);
+
 	SIFTGPU_EXPORT void AddCurrToResidualsCU(unsigned int numCurrImagePairs);
 
 	SIFTGPU_EXPORT void InvalidateImageToImageCU(const uint2& imageToImageIdx);
