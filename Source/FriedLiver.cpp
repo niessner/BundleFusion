@@ -137,7 +137,6 @@ int main(int argc, char** argv)
 				bundler->process();
 			}
 			else break;
-
 		}
 		
 		TimingLog::printTimings("timingLog.txt");

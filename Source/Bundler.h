@@ -30,12 +30,10 @@ public:
 	};
 
 	//! returns the last frame-to-frame aligned matrix; could be invalid
-	bool getCurrentIntegrationFrame(mat4f& siftTransform, const float*& d_depth, const uchar4*& d_color) {
+	bool getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color) {
 		siftTransform.setIdentity();
 		d_depth = m_CudaImageManager->getLastIntegrateDepth();
 		d_color = m_CudaImageManager->getLastIntegrateColor();
-
-		*d_depth = 1.0f;
 		return true;
 	}
 	//! optimize current local submap (nextLocal in submapManager)
