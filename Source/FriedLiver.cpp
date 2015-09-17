@@ -417,14 +417,11 @@ void processCurrentFrame()
 		if (validImagesLocal[1]) {
 			const unsigned int curLocalIdx = g_SubmapManager.getCurrLocal(curFrame);
 			// solve local
-			//std::vector<mat4f> currentLocalTrajectory(currentLocal->getNumImages(), mat4f::identity());
 			solve(g_SubmapManager.getLocalTrajectoryGPU(curLocalIdx), g_SubmapManager.currentLocal, true);
-			//g_SubmapManager.localTrajectories.push_back(currentLocalTrajectory);
 
 			// fuse to global
 			SIFTImageManager* global = g_SubmapManager.global;
 			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
-			//g_SubmapManager.currentLocal->fuseToGlobal(global, (float4x4*)currentLocalTrajectory.data(), currentLocal->getNumImages() - 1); // overlap frame
 			SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
 			unsigned int numGlobalKeys = g_SubmapManager.currentLocal->FuseToGlobalKeyCU(curGlobalImage, g_SubmapManager.getLocalTrajectoryGPU(curLocalIdx),
 				MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsics()), MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()));
@@ -451,15 +448,10 @@ void processCurrentFrame()
 
 			// complete trajectory
 			g_SubmapManager.updateTrajectory(curFrame);
-			//const mat4f lastTransform = g_SubmapManager.globalTrajectory.back();
-			//g_SubmapManager.globalTrajectory.push_back(lastTransform * currentLocalTrajectory.back()); //initialize next one
 			g_SubmapManager.initializeNextGlobalTransform(false);
 		}
 		else {
-			//std::vector<mat4f> currentLocalTrajectory(submapSize + 1, mat4f::identity());
-			//g_SubmapManager.localTrajectories.push_back(currentLocalTrajectory);
 			g_SubmapManager.updateTrajectory(curFrame);
-			//g_SubmapManager.globalTrajectory.push_back(g_SubmapManager.globalTrajectory.back()); //initialize next one
 			g_SubmapManager.initializeNextGlobalTransform(true);
 		}
 	} // global
@@ -467,7 +459,6 @@ void processCurrentFrame()
 
 void solve(float4x4* transforms, SIFTImageManager* siftManager, bool isLocal)
 {
-	//MLIB_ASSERT(transforms.size() == siftManager->getNumImages());
 	bool useVerify = false; //TODO do we need verify?
 	g_SparseBundler.align(siftManager, transforms, GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations, useVerify, isLocal);
 	//if (useVerify) bundle->verifyTrajectory();
