@@ -75,7 +75,7 @@ public:
 				m_localFrameTimings[i].print(&out);
 			}
 
-			out << "Total Timings Per Frame:" << std::endl;
+			if (m_totalFrameTimings.size() > 0) out << "Total Timings Per Frame:" << std::endl;
 			for (unsigned int i = 0; i < m_totalFrameTimings.size(); i++) {
 				out << "[ frame " << i << " ] " << m_totalFrameTimings[i] << " ms" << std::endl;
 			}

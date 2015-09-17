@@ -2,6 +2,10 @@
 #ifndef SUBMAP_MANAGER_H
 #define SUBMAP_MAnAGER_H
 
+#include "SiftGPU/SIFTImageManager.h"
+#include "CUDAImageManager.h"
+#include "CUDACache.h"
+
 #include "SiftGPU/CUDATimer.h"
 #include "GlobalBundlingState.h"
 #include "mLibCuda.h"

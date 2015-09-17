@@ -10,6 +10,7 @@
 #define X_GLOBAL_BUNDLING_APP_STATE_FIELDS \
 	X(bool, s_enableGlobalTimings) \
 	X(bool, s_enableDetailedTimings) \
+	X(bool, s_recordKeysPointCloud) \
 	X(unsigned int, s_maxNumImages) \
 	X(unsigned int, s_submapSize) \
 	X(unsigned int, s_widthSIFT) \
