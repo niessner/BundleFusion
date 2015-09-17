@@ -74,6 +74,7 @@
     <ClCompile Include="Source\Solver\CUDASolverBundling.cpp">
       <Filter>SolverBundling</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Bundler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -206,6 +207,7 @@
     <ClInclude Include="Source\SiftGPU\cuda_SVD.h">
       <Filter>SiftGPU</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Bundler.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
