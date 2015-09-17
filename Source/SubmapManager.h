@@ -6,6 +6,17 @@
 #include "GlobalBundlingState.h"
 #include "mLibCuda.h"
 
+extern "C" void updateTrajectoryCU(
+	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
+	float4x4* d_completeTrajectory, unsigned int numCompleteTransforms,
+	float4x4* d_localTrajectories, unsigned int numLocalTransforms, unsigned int numLocalTrajectories
+	);
+
+extern "C" void initNextGlobalTransformCU(
+	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
+	float4x4* d_localTrajectories, unsigned int numLocalTransforms, unsigned int numLocalTrajectories
+	);
+
 class SubmapManager {
 public:
 	CUDACache* currentLocalCache;
@@ -16,10 +27,13 @@ public:
 	SIFTImageManager* nextLocal;
 	SIFTImageManager* global;
 
-	std::vector<mat4f> globalTrajectory;
-	std::vector<mat4f> completeTrajectory;
+	//std::vector<mat4f> globalTrajectory;
+	//std::vector<mat4f> completeTrajectory;
+	//std::vector< std::vector<mat4f> > localTrajectories;
 
-	std::vector< std::vector<mat4f> > localTrajectories;
+	float4x4* d_globalTrajectory;
+	float4x4* d_completeTrajectory;
+	float4x4* d_localTrajectories;
 
 	SubmapManager() {
 		currentLocal = NULL;
@@ -31,7 +45,11 @@ public:
 		m_localTimer = NULL;
 		m_globalTimer = NULL;
 
-		d_currentLocalTransforms = NULL;
+		//d_currentLocalTransforms = NULL;
+
+		d_globalTrajectory = NULL;
+		d_completeTrajectory = NULL;
+		d_localTrajectories = NULL;
 	}
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
 		unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames = (unsigned int)-1)
@@ -55,12 +73,8 @@ public:
 		nextLocal = new SIFTImageManager(maxNumLocalImages, maxNumKeysPerImage);
 		global = new SIFTImageManager(maxNumGlobalImages, maxNumKeysPerImage);
 
-		globalTrajectory.push_back(mat4f::identity()); // first transform is the identity
-
 		m_numTotalFrames = numTotalFrames;
-		m_submapSize = submapSize;
-
-		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currentLocalTransforms, sizeof(float4x4) * (m_submapSize + 1)));
+		m_submapSize = submapSize;		
 
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
 			m_localTimer = new CUDATimer();
@@ -69,6 +83,16 @@ public:
 			currentLocal->setTimer(m_localTimer);
 			global->setTimer(m_globalTimer);
 		}
+
+		
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globalTrajectory, sizeof(float4x4)*maxNumGlobalImages));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_completeTrajectory, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_localTrajectories, sizeof(float4x4)*maxNumLocalImages*maxNumGlobalImages));
+
+		//MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currentLocalTransforms, sizeof(float4x4) * (m_submapSize + 1)));
+		//globalTrajectory.push_back(mat4f::identity()); // first transform is the identity
+		float4x4 id;	id.setIdentity();
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory, &id, sizeof(float4x4), cudaMemcpyHostToDevice));
 	}
 	void setTotalNumFrames(unsigned int n) {
 		m_numTotalFrames = n;
@@ -82,7 +106,11 @@ public:
 		SAFE_DELETE(nextLocalCache);
 		SAFE_DELETE(globalCache);
 
-		MLIB_CUDA_SAFE_FREE(d_currentLocalTransforms);
+		//MLIB_CUDA_SAFE_FREE(d_currentLocalTransforms);
+
+		MLIB_CUDA_SAFE_FREE(d_globalTrajectory);
+		MLIB_CUDA_SAFE_FREE(d_completeTrajectory);
+		MLIB_CUDA_SAFE_FREE(d_localTrajectories);
 	}
 	void evaluateTimings() {
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
@@ -95,26 +123,41 @@ public:
 		}
 	}
 
-	const float4x4* getCurrentLocalTrajectoryGPU() const {
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currentLocalTransforms, localTrajectories.back().data(), sizeof(float4x4) * localTrajectories.back().size(), cudaMemcpyHostToDevice));
-		return d_currentLocalTransforms;
+	float4x4* getCurrentLocalTrajectoryGPU() const {
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currentLocalTransforms, localTrajectories.back().data(), sizeof(float4x4) * localTrajectories.back().size(), cudaMemcpyHostToDevice));
+		//return d_currentLocalTransforms;
+		const unsigned int numGlobalFrames = global->getNumImages();
+		return d_localTrajectories + numGlobalFrames * (m_submapSize + 1);
 	}
 
 	// update complete trajectory with new global trajectory info
-	void updateTrajectory() {
-		MLIB_ASSERT(globalTrajectory.size() > 0);
+	void updateTrajectory(unsigned int curFrame) {
+		updateTrajectoryCU(d_globalTrajectory, global->getNumImages(),
+			d_completeTrajectory, curFrame + 1,
+			d_localTrajectories, m_submapSize + 1, global->getNumImages());
+		//MLIB_ASSERT(globalTrajectory.size() > 0);
 
-		unsigned int totalNum = 0;
-		if (localTrajectories.back().size() > m_submapSize) totalNum = (unsigned int)globalTrajectory.size() * m_submapSize;
-		else totalNum = (unsigned int)(globalTrajectory.size() - 1) * m_submapSize + (unsigned int)localTrajectories.back().size();
-		completeTrajectory.resize(totalNum);
+		//unsigned int totalNum = 0;
+		//if (localTrajectories.back().size() > m_submapSize) totalNum = (unsigned int)globalTrajectory.size() * m_submapSize;
+		//else totalNum = (unsigned int)(globalTrajectory.size() - 1) * m_submapSize + (unsigned int)localTrajectories.back().size();
+		//completeTrajectory.resize(totalNum);
 
-		unsigned int idx = 0;
-		for (unsigned int i = 0; i < globalTrajectory.size(); i++) {
-			const mat4f& baseTransform = globalTrajectory[i];
-			for (unsigned int t = 0; t < std::min(m_submapSize, (unsigned int)localTrajectories[i].size()); t++) { // overlap frame
-				completeTrajectory[idx++] = baseTransform * localTrajectories[i][t];
-			}
+		//unsigned int idx = 0;
+		//for (unsigned int i = 0; i < globalTrajectory.size(); i++) {
+		//	const mat4f& baseTransform = globalTrajectory[i];
+		//	for (unsigned int t = 0; t < std::min(m_submapSize, (unsigned int)localTrajectories[i].size()); t++) { // overlap frame
+		//		completeTrajectory[idx++] = baseTransform * localTrajectories[i][t];
+		//	}
+		//}
+	}
+
+	void initializeNextGlobalTransform(bool useIdentity = false) {
+		if (useIdentity) {
+			const unsigned int numGlobalFrames = global->getNumImages();
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames + 1, d_globalTrajectory + numGlobalFrames, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+		}
+		else {
+			initNextGlobalTransformCU(d_globalTrajectory, global->getNumImages(), d_localTrajectories, m_submapSize + 1, global->getNumImages());
 		}
 	}
 
@@ -140,7 +183,7 @@ public:
 
 private:
 
-	float4x4* d_currentLocalTransforms; // for fuse to global
+	//float4x4* d_currentLocalTransforms; // for fuse to global
 
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;

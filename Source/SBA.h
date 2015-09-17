@@ -8,6 +8,8 @@
 #include "Solver/CUDASolverBundling.h"
 //#include "cuda_SimpleVectorUtil.h"
 
+
+
 struct JacobianBlock {
 	ml::vec3f data[6];
 };
@@ -36,7 +38,7 @@ public:
 		if (d_xTrans) cutilSafeCall(cudaFree(d_xTrans));
 	}
 
-	void align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal);
+	void align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal);
 
 	float getMaxResidual() const { return m_maxResidual; }
 	const std::vector<float>& getLinearConvergenceAnalysis() const { return m_solver->getLinearConvergenceAnalysis(); }
@@ -48,7 +50,7 @@ public:
 
 private:
 
-	bool alignCUDA(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify);
+	bool alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify);
 
 	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	

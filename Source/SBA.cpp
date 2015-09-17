@@ -6,8 +6,13 @@
 
 #define POSESIZE 6
 
+extern "C" void convertMatricesToPoses(float4x4* d_transforms, unsigned int numTransforms,
+	float3* d_rot, float3* d_trans);
 
-void SBA::align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal)
+extern "C" void convertPosesToMatrices(float3* d_rot, float3* d_trans, unsigned int numImages, float4x4* d_transforms);
+
+
+void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal)
 {
 	m_bVerify = false;
 
@@ -20,7 +25,7 @@ void SBA::align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transform
 	const unsigned int maxIts = 60;//GlobalAppState::get().s_maxNumResidualsRemoved; //!!!TODO PARAMS
 	unsigned int curIt = 0;
 	do {
-		removed = alignCUDA(siftManager, transforms, maxNumIters, numPCGits, useVerify);
+		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits, useVerify);
 		curIt++;
 	} while (removed && curIt < maxIts);
 
@@ -31,31 +36,33 @@ void SBA::align(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transform
 
 }
 
-bool SBA::alignCUDA(SIFTImageManager* siftManager, std::vector<ml::mat4f>& transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify)
+bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify)
 {
 	EntryJ* d_correspondences = siftManager->getGlobalCorrespondencesDEBUG();
 	unsigned int numCorrespondences = siftManager->getNumGlobalCorrespondences();
 
 	m_numCorrespondences = numCorrespondences;
 	// transforms
-	unsigned int numImages = (unsigned int)transforms.size();
-	std::vector<Pose> poses = PoseHelper::convertToPoses(transforms);
-	std::vector<ml::vec3f> rotations(numImages), translations(numImages);
-	for (unsigned int i = 0; i < numImages; i++) {
-		rotations[i] = ml::vec3f(poses[i][0], poses[i][1], poses[i][2]);
-		translations[i] = ml::vec3f(poses[i][3], poses[i][4], poses[i][5]);
-	}
-	cutilSafeCall(cudaMemcpy(d_xRot, rotations.data(), sizeof(float3) * numImages, cudaMemcpyHostToDevice));
-	cutilSafeCall(cudaMemcpy(d_xTrans, translations.data(), sizeof(float3) * numImages, cudaMemcpyHostToDevice));
+	unsigned int numImages = siftManager->getNumImages();
+	convertMatricesToPoses(d_transforms, numImages, d_xRot, d_xTrans);
+	//std::vector<Pose> poses = PoseHelper::convertToPoses(d_transforms);
+	//std::vector<ml::vec3f> rotations(numImages), translations(numImages);
+	//for (unsigned int i = 0; i < numImages; i++) {
+	//	rotations[i] = ml::vec3f(poses[i][0], poses[i][1], poses[i][2]);
+	//	translations[i] = ml::vec3f(poses[i][3], poses[i][4], poses[i][5]);
+	//}
+	//cutilSafeCall(cudaMemcpy(d_xRot, rotations.data(), sizeof(float3) * numImages, cudaMemcpyHostToDevice));
+	//cutilSafeCall(cudaMemcpy(d_xTrans, translations.data(), sizeof(float3) * numImages, cudaMemcpyHostToDevice));
 
 	m_solver->solve(d_correspondences, m_numCorrespondences, numImages, numNonLinearIterations, numLinearIterations, d_xRot, d_xTrans);
 
-	cutilSafeCall(cudaMemcpy(rotations.data(), d_xRot, sizeof(float3) * numImages, cudaMemcpyDeviceToHost));
-	cutilSafeCall(cudaMemcpy(translations.data(), d_xTrans, sizeof(float3) * numImages, cudaMemcpyDeviceToHost));
+	convertPosesToMatrices(d_xRot, d_xTrans, numImages, d_transforms);
+	//cutilSafeCall(cudaMemcpy(rotations.data(), d_xRot, sizeof(float3) * numImages, cudaMemcpyDeviceToHost));
+	//cutilSafeCall(cudaMemcpy(translations.data(), d_xTrans, sizeof(float3) * numImages, cudaMemcpyDeviceToHost));
 
-	for (unsigned int i = 0; i < numImages; i++)
-		poses[i] = Pose(rotations[i].x, rotations[i].y, rotations[i].z, translations[i].x, translations[i].y, translations[i].z);
-	transforms = PoseHelper::convertToMatrices(poses);
+	//for (unsigned int i = 0; i < numImages; i++)
+	//	poses[i] = Pose(rotations[i].x, rotations[i].y, rotations[i].z, translations[i].x, translations[i].y, translations[i].z);
+	//d_transforms = PoseHelper::convertToMatrices(poses);
 
 	bool removed = removeMaxResidualCUDA(siftManager, numImages);
 

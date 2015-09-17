@@ -122,7 +122,7 @@ void destroy() {
 //TODO fix
 void MatchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, const std::vector<int>& validImages,
 	unsigned int frameStart, unsigned int frameSkip, bool print = false);
-void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager, bool isLocal);
+void solve(float4x4* transforms, SIFTImageManager* siftManager, bool isLocal);
 void processCurrentFrame();
 void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame)
 {
@@ -324,7 +324,9 @@ int main(int argc, char** argv)
 	g_SparseBundler.evaluateSolverTimings();
 	TimingLog::printTimings("timingLog.txt");
 	std::vector<int> validImagesGlobal; g_SubmapManager.global->getValidImagesDEBUG(validImagesGlobal);
-	getRGBDSensor()->saveRecordedPointCloud("refined.ply", validImagesGlobal, g_SubmapManager.globalTrajectory);
+	std::vector<mat4f> globalTrajectory(g_SubmapManager.global->getNumImages());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(globalTrajectory.data(), g_SubmapManager.d_globalTrajectory, sizeof(float4x4)*globalTrajectory.size(), cudaMemcpyDeviceToHost));
+	getRGBDSensor()->saveRecordedPointCloud("refined.ply", validImagesGlobal, globalTrajectory);
 	destroy();
 
 	getchar();
@@ -390,13 +392,12 @@ void processCurrentFrame()
 			//const std::string curLocalOutDir = GlobalAppState::get().s_outputDirectory + std::to_string(curLocalIdx) + "/";
 			//if (!util::directoryExists(curLocalOutDir)) util::makeDirectory(curLocalOutDir);
 			const std::string curLocalOutDir = "";
-			std::vector<mat4f> currentLocalTrajectory(currentLocal->getNumImages(), mat4f::identity());
-			solve(currentLocalTrajectory, g_SubmapManager.currentLocal, true);
-			g_SubmapManager.localTrajectories.push_back(currentLocalTrajectory);
+			//std::vector<mat4f> currentLocalTrajectory(currentLocal->getNumImages(), mat4f::identity());
+			solve(g_SubmapManager.getCurrentLocalTrajectoryGPU(), g_SubmapManager.currentLocal, true);
+			//g_SubmapManager.localTrajectories.push_back(currentLocalTrajectory);
 
 			// fuse to global
 			SIFTImageManager* global = g_SubmapManager.global;
-			const mat4f lastTransform = g_SubmapManager.globalTrajectory.back();
 			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 			//g_SubmapManager.currentLocal->fuseToGlobal(global, (float4x4*)currentLocalTrajectory.data(), currentLocal->getNumImages() - 1); // overlap frame
 			SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
@@ -419,26 +420,29 @@ void processCurrentFrame()
 
 				if (validImagesGlobal.back()) {
 					// solve global
-					solve(g_SubmapManager.globalTrajectory, global, false);
+					solve(g_SubmapManager.d_globalTrajectory, global, false);
 				}
 			}
 
 			// complete trajectory
-			g_SubmapManager.updateTrajectory();
-			g_SubmapManager.globalTrajectory.push_back(lastTransform * currentLocalTrajectory.back()); //initialize next one
+			g_SubmapManager.updateTrajectory(curFrame);
+			//const mat4f lastTransform = g_SubmapManager.globalTrajectory.back();
+			//g_SubmapManager.globalTrajectory.push_back(lastTransform * currentLocalTrajectory.back()); //initialize next one
+			g_SubmapManager.initializeNextGlobalTransform(false);
 		}
-		else { //!!!TODO check if need
-			std::vector<mat4f> currentLocalTrajectory(submapSize + 1, mat4f::identity());
-			g_SubmapManager.localTrajectories.push_back(currentLocalTrajectory);
-			g_SubmapManager.updateTrajectory();
-			g_SubmapManager.globalTrajectory.push_back(g_SubmapManager.globalTrajectory.back()); //initialize next one
+		else {
+			//std::vector<mat4f> currentLocalTrajectory(submapSize + 1, mat4f::identity());
+			//g_SubmapManager.localTrajectories.push_back(currentLocalTrajectory);
+			g_SubmapManager.updateTrajectory(curFrame);
+			//g_SubmapManager.globalTrajectory.push_back(g_SubmapManager.globalTrajectory.back()); //initialize next one
+			g_SubmapManager.initializeNextGlobalTransform(true);
 		}
 	} // global
 }
 
-void solve(std::vector<mat4f>& transforms, SIFTImageManager* siftManager, bool isLocal)
+void solve(float4x4* transforms, SIFTImageManager* siftManager, bool isLocal)
 {
-	MLIB_ASSERT(transforms.size() == siftManager->getNumImages());
+	//MLIB_ASSERT(transforms.size() == siftManager->getNumImages());
 	bool useVerify = false; //TODO do we need verify?
 	g_SparseBundler.align(siftManager, transforms, GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations, useVerify, isLocal);
 	//if (useVerify) bundle->verifyTrajectory();

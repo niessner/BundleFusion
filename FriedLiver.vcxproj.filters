@@ -234,5 +234,7 @@
     <CudaCompile Include="Source\Solver\SolverBundling.cu">
       <Filter>SolverBundling</Filter>
     </CudaCompile>
+    <CudaCompile Include="Source\SubmapManager.cu" />
+    <CudaCompile Include="Source\SBA.cu" />
   </ItemGroup>
 </Project>

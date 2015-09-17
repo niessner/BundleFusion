@@ -256,9 +256,11 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Source\CUDAImageUtil.cu" />
+    <CudaCompile Include="Source\SBA.cu" />
     <CudaCompile Include="Source\SiftGPU\ProgramCU.cu" />
     <CudaCompile Include="Source\SiftGPU\SIFTImageManager.cu" />
     <CudaCompile Include="Source\Solver\SolverBundling.cu" />
+    <CudaCompile Include="Source\SubmapManager.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
