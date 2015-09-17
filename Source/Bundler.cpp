@@ -36,6 +36,9 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_sift->SetParams(0, GlobalBundlingState::get().s_enableDetailedTimings, 150);
 	m_sift->InitSiftGPU();
 	m_siftMatcher->InitSiftMatch();
+
+	m_bOptimizeLocal = false;
+	m_bOptimizeGlobal = false;
 }
 
 Bundler::~Bundler()
@@ -46,8 +49,6 @@ Bundler::~Bundler()
 
 bool Bundler::process()
 {
-	if (!m_CudaImageManager->process()) return false;
-
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
 	std::cout << "[ frame " << curFrame << " ]" << std::endl;
 		

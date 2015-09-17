@@ -21,18 +21,30 @@ public:
 	
 
 	//! takes last frame from imageManager: runs sift and sift matching (including filtering)
-	void processInput();
+	void processInput() {}
+
+	struct A {
+		const float* depth;
+		const uchar4* color;
+		mat4f transform;
+	};
 
 	//! returns the last frame-to-frame aligned matrix; could be invalid
-	mat4f getLastSIFTTransform() {
-		mat4f transform;
-		return transform;
-	}
-	bool getCurrentFrame(mat4f& siftTransform, float* d_depth, uchar4* d_color) {
+	bool getCurrentIntegrationFrame(mat4f& siftTransform, const float*& d_depth, const uchar4*& d_color) {
+		siftTransform.setIdentity();
+		d_depth = m_CudaImageManager->getLastIntegrateDepth();
+		d_color = m_CudaImageManager->getLastIntegrateColor();
 
+		*d_depth = 1.0f;
+		return true;
 	}
+	//! optimize current local submap (nextLocal in submapManager)
+	void optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations) {}
+	//! optimize global keys
+	void optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations) {}
 
-	// sensor is only for debug point cloud record
+
+
 	bool process();
 
 
@@ -67,6 +79,9 @@ private:
 	SiftMatchGPU*			m_siftMatcher;
 
 	unsigned int			m_submapSize;
+
+	bool					m_bOptimizeLocal; // ready to optimize local
+	bool					m_bOptimizeGlobal; // ready to optimize global
 
 	static Timer			s_timer;
 };

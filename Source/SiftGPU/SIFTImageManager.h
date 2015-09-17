@@ -137,6 +137,8 @@ public:
 
 	void filterFrames(unsigned int numCurrImagePairs);
 
+	float4x4 getSiftTransformCU(float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex);
+
 	//only markers for up to num images have been set properly
 	const std::vector<int>& getValidImages() const { return m_validImages; }
 	void invalidateFrame(unsigned int frame) { m_validImages[frame] = 0; }

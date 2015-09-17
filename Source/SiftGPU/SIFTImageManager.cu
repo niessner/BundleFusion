@@ -810,6 +810,44 @@ unsigned int SIFTImageManager::FuseToGlobalKeyCU(SIFTImageGPU& globalImage, cons
 
 
 
+__global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
+	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll,
+	const int* d_numFilteredMatchesPerImagePair,
+	const float4x4* d_filteredTransforms)
+{
+
+	for (int i = (int)curFrameIndex - 1; i >= 0; i--) {
+		if (d_numFilteredMatchesPerImagePair[i] > 0) {
+			float4x4 transform = d_siftTrajectory[curFrameIndexAll - (curFrameIndex - i)];
+			d_siftTrajectory[curFrameIndexAll] = transform;
+			break;
+		}
+	}
+}
+
+float4x4 SIFTImageManager::getSiftTransformCU(float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex) 
+{
+	assert(curFrameIndex > 1);
+
+	getSiftTransformCU_Kernel <<<1, 1 >>>(curFrameIndex,
+		d_siftTrajectory, curFrameIndexAll,
+		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms);
+
+	float4x4 transform;
+	cutilSafeCall(cudaMemcpy(&transform, d_siftTrajectory + curFrameIndexAll, sizeof(float4x4), cudaMemcpyDeviceToHost));
+
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+
+	return transform;
+}
+
+
+
+
+
 void __global__ TestSVDDebugCU_Kernel(float3x3* d_m, float3x3* d_u, float3x3* d_s, float3x3* d_v) {
 
 	float3x3 m = d_m[0];

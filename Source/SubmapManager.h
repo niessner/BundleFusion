@@ -34,6 +34,8 @@ public:
 	float4x4* d_completeTrajectory;
 	float4x4* d_localTrajectories;
 
+	float4x4*	 d_siftTrajectory; // frame-to-frame sift tracking for all frames in sequence
+
 	SubmapManager() {
 		currentLocal = NULL;
 		nextLocal = NULL;
@@ -47,6 +49,8 @@ public:
 		d_globalTrajectory = NULL;
 		d_completeTrajectory = NULL;
 		d_localTrajectories = NULL;
+
+		d_siftTrajectory = NULL;
 	}
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
 		unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames = (unsigned int)-1)
@@ -87,9 +91,12 @@ public:
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_localTrajectories, sizeof(float4x4)*maxNumLocalImages*maxNumGlobalImages));
 
 		float4x4 id;	id.setIdentity();
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory, &id, sizeof(float4x4), cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory, &id, sizeof(float4x4), cudaMemcpyHostToDevice)); // set first to identity
 		std::vector<mat4f> initialLocalTrajectories(maxNumLocalImages * maxNumGlobalImages, mat4f::identity());
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_localTrajectories, initialLocalTrajectories.data(), sizeof(float4x4) * initialLocalTrajectories.size(), cudaMemcpyHostToDevice));
+
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_siftTrajectory, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_siftTrajectory, &id, sizeof(float4x4), cudaMemcpyHostToDevice)); // set first to identity
 	}
 	void setTotalNumFrames(unsigned int n) {
 		m_numTotalFrames = n;
@@ -106,6 +113,8 @@ public:
 		MLIB_CUDA_SAFE_FREE(d_globalTrajectory);
 		MLIB_CUDA_SAFE_FREE(d_completeTrajectory);
 		MLIB_CUDA_SAFE_FREE(d_localTrajectories);
+
+		MLIB_CUDA_SAFE_FREE(d_siftTrajectory);
 	}
 	void evaluateTimings() {
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
