@@ -415,12 +415,10 @@ void processCurrentFrame()
 		
 		// if valid local
 		if (validImagesLocal[1]) {
+			const unsigned int curLocalIdx = g_SubmapManager.getCurrLocal(curFrame);
 			// solve local
-			//const std::string curLocalOutDir = GlobalAppState::get().s_outputDirectory + std::to_string(curLocalIdx) + "/";
-			//if (!util::directoryExists(curLocalOutDir)) util::makeDirectory(curLocalOutDir);
-			const std::string curLocalOutDir = "";
 			//std::vector<mat4f> currentLocalTrajectory(currentLocal->getNumImages(), mat4f::identity());
-			solve(g_SubmapManager.getCurrentLocalTrajectoryGPU(), g_SubmapManager.currentLocal, true);
+			solve(g_SubmapManager.getLocalTrajectoryGPU(curLocalIdx), g_SubmapManager.currentLocal, true);
 			//g_SubmapManager.localTrajectories.push_back(currentLocalTrajectory);
 
 			// fuse to global
@@ -428,7 +426,7 @@ void processCurrentFrame()
 			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 			//g_SubmapManager.currentLocal->fuseToGlobal(global, (float4x4*)currentLocalTrajectory.data(), currentLocal->getNumImages() - 1); // overlap frame
 			SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
-			unsigned int numGlobalKeys = g_SubmapManager.currentLocal->FuseToGlobalKeyCU(curGlobalImage, g_SubmapManager.getCurrentLocalTrajectoryGPU(),
+			unsigned int numGlobalKeys = g_SubmapManager.currentLocal->FuseToGlobalKeyCU(curGlobalImage, g_SubmapManager.getLocalTrajectoryGPU(curLocalIdx),
 				MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsics()), MatrixConversion::toCUDA(g_CudaImageManager->getSIFTIntrinsicsInv()));
 			global->finalizeSIFTImageGPU(numGlobalKeys);
 			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = timer.getElapsedTimeMS(); }
