@@ -186,7 +186,8 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	int* d_numFilteredMatchesPerImagePair,
 	float* d_filteredMatchDistancesGlobal,
 	uint2* d_filteredMatchKeyPointIndicesGlobal,
-	float4x4* d_filteredTransforms)
+	float4x4* d_filteredTransforms,
+	float4x4* d_filteredTransformsInv)
 {
 	const unsigned int imagePairIdx = blockIdx.x;
 	//const unsigned int imagePairIdx = 1;
@@ -224,6 +225,7 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 		//if (tidx == 0) {
 			numFilteredMatches = curr;
 			d_filteredTransforms[imagePairIdx] = trans;
+			d_filteredTransformsInv[imagePairIdx] = trans.getInverse();
 		//}
 	}
 
@@ -263,7 +265,8 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs) {
 		d_currNumFilteredMatchesPerImagePair,
 		d_currFilteredMatchDistances,
 		d_currFilteredMatchKeyPointIndices,
-		d_currFilteredTransforms);
+		d_currFilteredTransforms,
+		d_currFilteredTransformsInv);
 
 	if (m_timer) m_timer->endEvent();
 
@@ -442,7 +445,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 
 //we launch 1 thread for two array entries
 void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, unsigned int imageHeight, const float4x4 intrinsics,
-	int* d_currNumFilteredMatchesPerImagePair, const float4x4* d_currFilteredTransforms, const CUDACachedFrame* d_cachedFrames,
+	int* d_currNumFilteredMatchesPerImagePair, const float4x4* d_currFilteredTransforms, const float4x4* d_currFilteredTransformsInv, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
 {
 	const unsigned int curImageIdx = gridDim.x;
@@ -539,7 +542,7 @@ void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePai
 
 	FilterMatchesByDenseVerifyCU_Kernel << <grid, block >> >(
 		imageWidth, imageHeight, intrinsics,
-		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms, d_cachedFrames,
+		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms, d_currFilteredTransformsInv, d_cachedFrames,
 		distThresh, normalThresh, colorThresh, errThresh, corrThresh);
 
 	if (m_timer) m_timer->endEvent();
