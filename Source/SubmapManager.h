@@ -24,7 +24,7 @@ class SubmapManager {
 public:
 	CUDACache* currentLocalCache;
 	CUDACache* nextLocalCache;
-	CUDACache* globalCache; 
+	CUDACache* globalCache;
 
 	SIFTImageManager* currentLocal;
 	SIFTImageManager* nextLocal;
@@ -43,7 +43,6 @@ public:
 		m_numTotalFrames = 0;
 		m_submapSize = 0;
 
-		m_localTimer = NULL;
 		m_globalTimer = NULL;
 
 		d_globalTrajectory = NULL;
@@ -69,23 +68,20 @@ public:
 		nextLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
 		globalCache = new CUDACache(downSampWidth, downSampHeight, maxNumGlobalImages, intrinsicsDownsampled);
 
-		// sift manager
-		currentLocal = new SIFTImageManager(maxNumLocalImages, maxNumKeysPerImage);
-		nextLocal = new SIFTImageManager(maxNumLocalImages, maxNumKeysPerImage);
-		global = new SIFTImageManager(maxNumGlobalImages, maxNumKeysPerImage);
-
 		m_numTotalFrames = numTotalFrames;
-		m_submapSize = submapSize;		
+		m_submapSize = submapSize;
+
+		// sift manager
+		currentLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
+		nextLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
+		global = new SIFTImageManager(m_submapSize, maxNumGlobalImages, maxNumKeysPerImage);
 
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
-			m_localTimer = new CUDATimer();
 			m_globalTimer = new CUDATimer();
-
-			currentLocal->setTimer(m_localTimer);
 			global->setTimer(m_globalTimer);
 		}
 
-		
+
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globalTrajectory, sizeof(float4x4)*maxNumGlobalImages));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_completeTrajectory, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_localTrajectories, sizeof(float4x4)*maxNumLocalImages*maxNumGlobalImages));
@@ -118,9 +114,6 @@ public:
 	}
 	void evaluateTimings() {
 		if (GlobalBundlingState::get().s_enableDetailedTimings) {
-			std::cout << "********* LOCAL TIMINGS *********" << std::endl;
-			m_localTimer->evaluate(true, true);
-			std::cout << std::endl << std::endl;
 			std::cout << "********* GLOBAL TIMINGS *********" << std::endl;
 			m_globalTimer->evaluate(true, true);
 			std::cout << std::endl << std::endl;
@@ -150,16 +143,17 @@ public:
 	}
 
 	void switchLocal() {
-		currentLocal->reset();
 		SIFTImageManager* tmp = currentLocal;
 		currentLocal = nextLocal;
 		nextLocal = tmp;
-		currentLocal->setTimer(m_localTimer);
 
-		currentLocalCache->reset();
 		CUDACache* tmpCache = currentLocalCache;
 		currentLocalCache = nextLocalCache;
 		nextLocalCache = tmpCache;
+	}
+	void finishLocalOpt() {
+		nextLocal->reset();
+		nextLocalCache->reset();
 	}
 
 	bool isLastFrame(unsigned int curFrame) const { return (curFrame + 1) == m_numTotalFrames; }
@@ -174,7 +168,6 @@ private:
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;
 
-	CUDATimer* m_localTimer;
 	CUDATimer* m_globalTimer;
 };
 

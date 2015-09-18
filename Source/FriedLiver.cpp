@@ -134,7 +134,13 @@ int main(int argc, char** argv)
 
 		while (1) {
 			if (imageManager->process()) {
-				bundler->process();
+				//bundler->process();
+				bundler->processInput();
+
+				// these are queried
+				bundler->optimizeLocal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);
+				bundler->processGlobal();
+				bundler->optimizeGlobal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);
 			}
 			else break;
 		}
