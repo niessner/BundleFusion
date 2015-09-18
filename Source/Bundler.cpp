@@ -39,6 +39,9 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 	m_bOptimizeLocal = false;
 	m_bOptimizeGlobal = false;
+
+	m_lastFrameProcessed = 0;
+	m_bLastFrameValid = false;
 }
 
 Bundler::~Bundler()
@@ -87,7 +90,11 @@ bool Bundler::process()
 	SIFTImageManager* currentLocal = m_SubmapManager.currentLocal;
 	if (curLocalFrame > 0) {
 		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
+
+		currentLocal->computeSiftTransformCU(m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame);
 	}
+	m_lastFrameProcessed = curFrame;
+	m_bLastFrameValid = (currentLocal->getValidImages()[curFrame] != 0);
 
 	// global frame
 	if (m_SubmapManager.isLastFrame(curFrame) || m_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
@@ -153,6 +160,17 @@ bool Bundler::process()
 	} // global
 	
 	return true;
+}
+
+bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color)
+{
+	if (m_bLastFrameValid) {
+		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.d_siftTrajectory + m_lastFrameProcessed, sizeof(float4x4), cudaMemcpyDeviceToHost));
+		d_depth = m_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
+		d_color = m_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
+		return true;
+	}
+	return false;
 }
 
 void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, bool isLocal)
@@ -339,3 +357,11 @@ void Bundler::saveKeysToPointCloud(const std::string& filename /*= "refined.ply"
 		m_RGBDSensor->saveRecordedPointCloud(filename, validImagesGlobal, globalTrajectory);
 	}
 }
+
+//void Bundler::saveDEBUG()
+//{
+//	const std::vector<int> validImages(m_SubmapManager.global->getNumImages() * m_submapSize, 1);
+//	std::vector<mat4f> siftTrajectory(validImages.size());
+//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(siftTrajectory.data(), m_SubmapManager.d_siftTrajectory, sizeof(float4x4)*siftTrajectory.size(), cudaMemcpyDeviceToHost));
+//	m_RGBDSensor->saveRecordedPointCloud("test.ply", validImages, siftTrajectory);
+//}

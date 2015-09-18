@@ -143,6 +143,7 @@ int main(int argc, char** argv)
 		
 		TimingLog::printTimings("timingLog.txt");
 		if (GlobalBundlingState::get().s_recordKeysPointCloud) bundler->saveKeysToPointCloud();
+		//bundler->saveDEBUG();
 
 		SAFE_DELETE(imageManager);
 		SAFE_DELETE(bundler);

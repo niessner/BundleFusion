@@ -24,12 +24,7 @@ public:
 	void processInput() {}
 
 	//! returns the last frame-to-frame aligned matrix; could be invalid
-	bool getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color) {
-		siftTransform.setIdentity();
-		d_depth = m_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
-		d_color = m_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
-		return true;
-	}
+	bool getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color);
 	//! optimize current local submap (nextLocal in submapManager)
 	void optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations) {}
 	//! optimize global keys
@@ -51,7 +46,7 @@ public:
 		unsigned int frameStart, unsigned int frameSkip);
 	void saveKeysToPointCloud(const std::string& filename = "refined.ply");
 
-
+	//void saveDEBUG();
 
 private:
 	void matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int frameStart, unsigned int frameSkip, bool print = false);
@@ -76,6 +71,10 @@ private:
 	bool					m_bOptimizeGlobal; // ready to optimize global
 
 	static Timer			s_timer;
+
+	//TODO do we really need
+	unsigned int			m_lastFrameProcessed;
+	bool					m_bLastFrameValid;
 };
 
 
