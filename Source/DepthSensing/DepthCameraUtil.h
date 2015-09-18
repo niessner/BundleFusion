@@ -24,38 +24,35 @@ struct DepthCameraData {
 	DepthCameraData() {
 		d_depthData = NULL;
 		d_colorData = NULL;
-		//d_depthArray = NULL;
-		//d_colorArray = NULL;
 	}
 
-	__host__
-	void alloc(const DepthCameraParams& params) { //! todo resizing???
-		cutilSafeCall(cudaMalloc(&d_depthData, sizeof(float) * params.m_imageWidth * params.m_imageHeight));
-		cutilSafeCall(cudaMalloc(&d_colorData, sizeof(float4) * params.m_imageWidth * params.m_imageHeight));
-
-		//h_depthChannelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
-		//cutilSafeCall(cudaMallocArray(&d_depthArray, &h_depthChannelDesc, params.m_imageWidth, params.m_imageHeight));
-		//h_colorChannelDesc = cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
-		//cutilSafeCall(cudaMallocArray(&d_colorArray, &h_colorChannelDesc, params.m_imageWidth, params.m_imageHeight));
+	DepthCameraData(const float* depthData, const uchar4* colorData) {
+		d_depthData = depthData;
+		d_colorData = colorData;
 	}
+
+	//__host__
+	//void alloc(const DepthCameraParams& params) { //! todo resizing???
+	//	cutilSafeCall(cudaMalloc(&d_depthData, sizeof(float) * params.m_imageWidth * params.m_imageHeight));
+	//	cutilSafeCall(cudaMalloc(&d_colorData, sizeof(float4) * params.m_imageWidth * params.m_imageHeight));
+	//}
+
+	//__host__
+	//	void free() {
+	//	if (d_depthData) cutilSafeCall(cudaFree(d_depthData));
+	//	if (d_colorData) cutilSafeCall(cudaFree(d_colorData));
+
+	//	d_depthData = NULL;
+	//	d_colorData = NULL;
+	//}
+
 
 	__host__
 	void updateParams(const DepthCameraParams& params) {
 		updateConstantDepthCameraParams(params);
 	}
 
-	__host__
-	void free() {
-		if (d_depthData) cutilSafeCall(cudaFree(d_depthData));
-		if (d_colorData) cutilSafeCall(cudaFree(d_colorData));
-		//if (d_depthArray) cutilSafeCall(cudaFreeArray(d_depthArray));
-		//if (d_colorArray) cutilSafeCall(cudaFreeArray(d_colorArray));
 
-		d_depthData = NULL;
-		d_colorData = NULL;
-		//d_depthArray = NULL;
-		//d_colorArray = NULL;
-	}
 
 
 	/////////////////
@@ -146,10 +143,8 @@ struct DepthCameraData {
 		return !(pProj.x < -1.0f || pProj.x > 1.0f || pProj.y < -1.0f || pProj.y > 1.0f || pProj.z < 0.0f || pProj.z > 1.0f);  
 	}
 
-	float*		d_depthData;	//depth data of the current frame (in screen space):: TODO data allocation lives in RGBD Sensor
-	float4*		d_colorData;
-	
-	//uchar4*		d_colorData;	//color data of the current frame (in screen space):: TODO data allocation lives in RGBD Sensor
+	const float*		d_depthData;	//depth data of the current frame (in screen space):: TODO data allocation lives in RGBD Sensor
+	const uchar4*		d_colorData;	//color data of the current frame (in screen space):: TODO data allocation lives in RGBD Sensor
 
 	//// cuda arrays for texture access
 	//cudaArray*	d_depthArray;

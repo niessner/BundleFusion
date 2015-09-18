@@ -1,7 +1,6 @@
 ﻿
 #include "stdafx.h"
 
-#ifdef USE_DEPTHSENSING
 
 #include "DepthSensing.h"
 
@@ -90,15 +89,11 @@ CUDAHistrogramHashSDF*		g_historgram = NULL;
 CUDASceneRepChunkGrid*		g_chunkGrid = NULL;
 
 
+//managed externally
 CUDAImageManager*			g_CudaImageManager = NULL;
 RGBDSensor*					g_RGBDSensor = NULL;
+Bundler*					g_bundler = NULL;
 
-
-
-
-RGBDSensor* getRGBDSensor() {
-	return g_RGBDSensor;
-}
 
 void ResetDepthSensing();
 void StopScanningAndExtractIsoSurfaceMC(const std::string& filename = "./scans/scan.ply");
@@ -109,6 +104,7 @@ int startDepthSensing(Bundler* bundler, RGBDSensor* sensor, CUDAImageManager* im
 {
 	g_RGBDSensor = sensor;
 	g_CudaImageManager = imageManager;
+	g_bundler = bundler;
 
 	// Set DXUT callbacks
 	DXUTSetCallbackDeviceChanging(ModifyDeviceSettings);
@@ -239,7 +235,7 @@ void StopScanningAndExtractIsoSurfaceMC(const std::string& filename)
 
 	if (GlobalAppState::get().s_sensorIdx == 7) { //! hack for structure sensor
 		std::cout << "[marching cubes] stopped receiving frames from structure sensor" << std::endl;
-		getRGBDSensor()->stopReceivingFrames();
+		g_RGBDSensor->stopReceivingFrames();
 	}
 
 	Timer t;
@@ -368,7 +364,7 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 				if (GlobalAppState::getInstance().s_recordData) {
 					if (GlobalAppState::get().s_sensorIdx == 7) { //! hack for structure sensor
 						std::cout << "[dump frames] stopped receiving frames from structure sensor" << std::endl;
-						getRGBDSensor()->stopReceivingFrames();
+						g_RGBDSensor->stopReceivingFrames();
 					}
 					g_RGBDSensor->saveRecordedFramesToFile(GlobalAppState::getInstance().s_recordDataFile);
 				} else {
@@ -412,7 +408,7 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			if (g_chunkGrid)	g_chunkGrid->debugCheckForDuplicates();
 			break;
 		case 'D':
-			getRGBDSensor()->savePointCloud("test.ply");
+			g_RGBDSensor->savePointCloud("test.ply");
 			break;
 		case 'N':
 			StopScanningAndSaveSDFHash("test.hash");
@@ -514,7 +510,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	}
 
 	if (GlobalAppState::get().s_sensorIdx == 7) { // structure sensor
-		getRGBDSensor()->startReceivingFrames();
+		g_RGBDSensor->startReceivingFrames();
 	}
 
 	return hr;
@@ -587,12 +583,23 @@ void reconstruction()
 	//if (GlobalAppState::get().s_sensorIdx == 3) 
 	//	std::cout << "[ frame " << g_RGBDAdapter.getFrameNumber() << " ] " << g_sceneRep->getHashParams().m_numOccupiedBlocks << std::endl;
 	//
+
+	DepthCameraParams depthCameraParams;
+	depthCameraParams.fx = g_CudaImageManager->getIntrinsics()(0, 0);
+	depthCameraParams.fy = g_CudaImageManager->getIntrinsics()(1, 1);
+	depthCameraParams.mx = g_CudaImageManager->getIntrinsics()(0, 2);
+	depthCameraParams.my = g_CudaImageManager->getIntrinsics()(1, 2);
+	depthCameraParams.m_sensorDepthWorldMin = GlobalAppState::get().s_sensorDepthMin;
+	depthCameraParams.m_sensorDepthWorldMax = GlobalAppState::get().s_sensorDepthMax;
+	depthCameraParams.m_imageHeight = g_CudaImageManager->getIntegrationWidth();
+	depthCameraParams.m_imageWidth = g_CudaImageManager->getIntegrationHeight();
+
 	mat4f transformation = mat4f::identity();
+	DepthCameraData depthCameraData;
+	
+	g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
 	if (GlobalAppState::get().s_sensorIdx == 3 && GlobalAppState::get().s_binaryDumpSensorUseTrajectory) {
 		transformation = g_RGBDSensor->getRigidTransform();
-	}
-	else {
-		//TODO get SIFT transfrom from bundler
 	}
 
 	//if (g_RGBDAdapter.getFrameNumber() == 1 && GlobalAppState::get().s_binaryDumpSensorUseTrajectory) {
@@ -676,7 +683,8 @@ void reconstruction()
 
 	if (GlobalAppState::get().s_integrationEnabled) {
 		//////////// MATTHIAS TODO INTEGRATE
-		g_sceneRep->integrate(transformation, g_CudaDepthSensor.getDepthCameraData(), g_CudaDepthSensor.getDepthCameraParams(), g_chunkGrid->getBitMaskGPU());
+		DepthCameraData depth;
+		g_sceneRep->integrate(transformation, depthCameraData, depthCameraParams, g_chunkGrid->getBitMaskGPU());
 
 		//g_sceneRep->deIntegrate(transformation, g_CudaDepthSensor.getDepthCameraData(), g_CudaDepthSensor.getDepthCameraParams(), g_chunkGrid->getBitMaskGPU());
 		//g_sceneRep->debugHash();
@@ -684,7 +692,7 @@ void reconstruction()
 		//while (1);
 	} else {
 		//compactification is required for the raycast splatting
-		g_sceneRep->setLastRigidTransformAndCompactify(transformation, g_CudaDepthSensor.getDepthCameraData());
+		g_sceneRep->setLastRigidTransformAndCompactify(transformation, depthCameraData);
 	}
 
 	//{
@@ -715,7 +723,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	pd3dImmediateContext->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 	// if we have received any valid new depth data we may need to draw
-	HRESULT bGotDepth = g_CudaDepthSensor.process(pd3dImmediateContext);	//TODO process bundling
+	bool bGotDepth = g_CudaImageManager->process();
 
 	//// Filtering
 	//g_CudaDepthSensor.setFiterDepthValues(GlobalAppState::get().s_depthFilter, GlobalAppState::get().s_depthSigmaD, GlobalAppState::get().s_depthSigmaR);
@@ -736,7 +744,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	mat4f t = mat4f::identity();
 	t(1,1) *= -1.0f;	view = t * view * t;	//t is self-inverse
 
-	if (bGotDepth == S_OK) {
+	if (bGotDepth) {
 		if (GlobalAppState::getInstance().s_recordData) {
 			g_RGBDSensor->recordFrame();
 			if (!GlobalAppState::get().s_reconstructionEnabled) {
@@ -767,7 +775,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 			HRESULT hr = DXUTGetDXGISwapChain()->GetBuffer( 0, __uuidof( ID3D11Texture2D ), reinterpret_cast< void** >( &pSurface ) );
 			if (pSurface) {
 				float* tex = (float*)CreateAndCopyToDebugTexture2D(pd3dDevice, pd3dImmediateContext, pSurface, true); //!!! TODO just copy no create
-				((StructureSensor*)getRGBDSensor())->updateFeedbackImage((BYTE*)tex);
+				((StructureSensor*)g_RGBDSensor)->updateFeedbackImage((BYTE*)tex);
 				SAFE_DELETE_ARRAY(tex);
 			}
 		}
@@ -799,4 +807,3 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	DXUT_EndPerfEvent();
 }
 
-#endif
