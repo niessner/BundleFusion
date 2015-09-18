@@ -135,7 +135,7 @@ public:
 			std::cout << "invalidating " << m_imageInvalidateList.size() << " images:";
 			for (unsigned int i = 0; i < m_imageInvalidateList.size(); i++) std::cout << " " << m_imageInvalidateList[i];
 			std::cout << std::endl;
-			getchar();
+			//getchar();
 		}
 			
 		updateTrajectoryCU(d_globalTrajectory, global->getNumImages(),
