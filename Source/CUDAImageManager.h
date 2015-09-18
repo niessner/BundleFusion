@@ -208,7 +208,7 @@ public:
 			}
 			else {
 				CUDAImageUtil::resampleUCHAR4(frame.s_colorIntegrationGlobal, m_widthIntegration, m_heightIntegration, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
-				MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_colorIntegration, frame.s_colorIntegrationGlobal, sizeof(uchar4)*bufferDimColorInput, cudaMemcpyDeviceToHost));
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_colorIntegration, frame.s_colorIntegrationGlobal, sizeof(uchar4)*m_widthIntegration*m_heightIntegration, cudaMemcpyDeviceToHost));
 				frame.s_activeColorGPU = &frame;
 			}
 		}
@@ -235,7 +235,7 @@ public:
 			}
 			else {
 				CUDAImageUtil::resampleFloat(frame.s_depthIntegrationGlobal, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
-				MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_depthIntegration, frame.s_depthIntegrationGlobal, sizeof(float)*bufferDimDepthInput, cudaMemcpyDeviceToHost));
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_depthIntegration, frame.s_depthIntegrationGlobal, sizeof(float)*m_widthIntegration*m_heightIntegration, cudaMemcpyDeviceToHost));
 				frame.s_activeDepthGPU = &frame;
 			}
 		}

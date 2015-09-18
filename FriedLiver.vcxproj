@@ -199,6 +199,7 @@
     <ClInclude Include="Source\SiftGPU\GlobalUtil.h" />
     <ClInclude Include="Source\SiftGPU\MatrixConversion.h" />
     <ClInclude Include="Source\SiftGPU\ProgramCU.h" />
+    <ClInclude Include="Source\SiftGPU\SiftCameraParams.h" />
     <ClInclude Include="Source\SiftGPU\SiftGPU.h" />
     <ClInclude Include="Source\SiftGPU\SIFTImageManager.h" />
     <ClInclude Include="Source\SiftGPU\SiftMatch.h" />
@@ -309,6 +310,7 @@
     <CudaCompile Include="Source\DepthSensing\CUDASceneRepHashSDF.cu" />
     <CudaCompile Include="Source\DepthSensing\ScanCS.cu" />
     <CudaCompile Include="Source\SBA.cu" />
+    <CudaCompile Include="Source\SiftGPU\CUDASiftConstant.cu" />
     <CudaCompile Include="Source\SiftGPU\ProgramCU.cu" />
     <CudaCompile Include="Source\SiftGPU\SIFTImageManager.cu" />
     <CudaCompile Include="Source\Solver\SolverBundling.cu" />

@@ -1,5 +1,8 @@
 ﻿
 #include "stdafx.h"
+
+#ifdef USE_DEPTHSENSING
+
 #include "DepthSensing.h"
 
 
@@ -796,3 +799,4 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	DXUT_EndPerfEvent();
 }
 
+#endif

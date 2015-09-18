@@ -32,6 +32,8 @@
 #include "CUDATimer.h"
 #include "GlobalDefines.h"
 
+#include "SiftCameraParams.h"
+
 
 //----------------------------------------------------------------
 //Begin SiftGPU setting section.
@@ -109,6 +111,8 @@
 #define SIFT_NUM_KERNELS 30
 //End SiftGPU setting section.
 //----------------------------------------------------------------
+
+extern __constant__ SiftCameraParams c_siftCameraParams;
 
 
 __device__ __constant__ float d_kernel[SIFT_NUM_KERNELS][KERNEL_MAX_WIDTH];
@@ -613,8 +617,8 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 	float dog_threshold0, float dog_threshold, float edge_threshold, int subpixel_localization,
 	int4* d_featureList, int* d_featureCount, unsigned int featureOctLevelidx, float keyLocScale, float keyLocOffset, const float* d_depthData)
 {
-	const unsigned int depthWidth = 640;	//!!!TODO PARAMS
-	const unsigned int depthHeight = 480;	//!!!TODO PARAMS
+	const unsigned int depthWidth = c_siftCameraParams.m_depthWidth;
+	const unsigned int depthHeight = c_siftCameraParams.m_depthHeight;
 
 	float data[3][3], v;
 	float datap[3][3], datan[3][3];
@@ -638,8 +642,8 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 	{
 		d_key[index] = make_float4(result, dx, dy, ds);
 		// check if has valid depth
-		float dx = (keyLocScale * (float)col + keyLocOffset) * (float)depthWidth / (float)1296; //!!!TODO PARAMS
-		float dy = (keyLocScale * (float)row + keyLocOffset) * (float)depthHeight / (float)968; //!!!TODO PARAMS
+		float dx = (keyLocScale * (float)col + keyLocOffset) * (float)depthWidth / (float)c_siftCameraParams.m_intensityWidth;
+		float dy = (keyLocScale * (float)row + keyLocOffset) * (float)depthHeight / (float)c_siftCameraParams.m_intensityHeight;
 		if (dx < 0 || dx >= depthWidth || dy < 0 || dy >= depthHeight) return;
 		//float depth = bilinearInterpolationFloat(dx, dy, d_depthData, 640, 480);
 		int dxi = round(dx);
@@ -887,13 +891,13 @@ void ProgramCU::GenerateList(CuTexImage* list, CuTexImage* hist)
 
 
 //const unsigned int warpSize = 32;
-__inline__ __device__
-float warpReduceMax(float val) {
-	for (int offset = 32 / 2; offset > 0; offset /= 2) {
-		val = max(val, __shfl_down(val, offset, 32));
-	}
-	return val;
-}
+//__inline__ __device__
+//float warpReduceMax(float val) {
+//	for (int offset = 32 / 2; offset > 0; offset /= 2) {
+//		val = max(val, __shfl_down(val, offset, 32));
+//	}
+//	return val;
+//}
 
 void __global__ ComputeOrientation_Kernel(float4* d_list,
 	int list_len,
@@ -1993,17 +1997,13 @@ void __global__  CreateGlobalKeyPointList_Kernel(const float4* d_curFeatureList,
 		d_outKeypointList[idx].y = posY;	//y
 		d_outKeypointList[idx].z = keyLocScale*key.z;	//s
 
-
-		const unsigned int depthWidth = 640;	//!!!TODO PARAMS
-		const unsigned int depthHeight = 480;	//!!!TODO PARAMS
-
-		float depthX = posX * (float)depthWidth / (float)1296; //!!!TODO PARAMS
-		float depthY = posY * (float)depthHeight / (float)968; //!!!TODO PARAMS
+		float depthX = posX * (float)c_siftCameraParams.m_depthWidth / (float)c_siftCameraParams.m_intensityWidth;
+		float depthY = posY * (float)c_siftCameraParams.m_depthHeight / (float)c_siftCameraParams.m_intensityHeight;
 
 		const int iposX = round(depthX);
 		const int iposY = round(depthY);
 
-		const float depth = d_depthData[iposY * depthWidth + iposX];	//has to exist -- otherwise something is wrong
+		const float depth = d_depthData[iposY * c_siftCameraParams.m_depthWidth + iposX];	//has to exist -- otherwise something is wrong
 
 		//if (depth == MINF || depth < 0.1f || depth > 3.0f) {
 		//	printf("ERROR ERROR\n");

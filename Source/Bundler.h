@@ -23,17 +23,11 @@ public:
 	//! takes last frame from imageManager: runs sift and sift matching (including filtering)
 	void processInput() {}
 
-	struct A {
-		const float* depth;
-		const uchar4* color;
-		mat4f transform;
-	};
-
 	//! returns the last frame-to-frame aligned matrix; could be invalid
 	bool getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color) {
 		siftTransform.setIdentity();
-		d_depth = m_CudaImageManager->getLastIntegrateDepth();
-		d_color = m_CudaImageManager->getLastIntegrateColor();
+		d_depth = m_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
+		d_color = m_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
 		return true;
 	}
 	//! optimize current local submap (nextLocal in submapManager)

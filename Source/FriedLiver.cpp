@@ -130,8 +130,10 @@ int main(int argc, char** argv)
 
 		Bundler* bundler = new Bundler(sensor, imageManager);
 
-		//startDepthSensing(bundler, getRGBDSensor(), imageManager);
-		
+#ifdef USE_DEPTHSENSING
+		startDepthSensing(bundler, getRGBDSensor(), imageManager);
+#endif
+
 		while (1) {
 			if (imageManager->process()) {
 				bundler->process();

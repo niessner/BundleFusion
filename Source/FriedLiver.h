@@ -48,6 +48,9 @@
 #include "SiftGPU/CUDATimer.h"
 
 #include "Bundler.h"
-//#include "DepthSensing/DepthSensing.h"
 
+//#define USE_DEPTHSENSING
+#ifdef USE_DEPTHSENSING
+#include "DepthSensing/DepthSensing.h"
+#endif
 

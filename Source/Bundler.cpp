@@ -34,7 +34,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_sift = new SiftGPU;
 	m_siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
 	m_sift->SetParams(0, GlobalBundlingState::get().s_enableDetailedTimings, 150);
-	m_sift->InitSiftGPU();
+	m_sift->InitSiftGPU(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight(), m_CudaImageManager->getSIFTWidth(), m_CudaImageManager->getSIFTHeight());
 	m_siftMatcher->InitSiftMatch();
 
 	m_bOptimizeLocal = false;
@@ -54,18 +54,20 @@ bool Bundler::process()
 		
 	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addLocalFrameTiming();
 
+	CUDAImageManager::ManagedRGBDInputFrame& integrateFrame = m_CudaImageManager->getLastIntegrateFrame();
+
 	// run SIFT
 	SIFTImageGPU& cur = m_SubmapManager.currentLocal->createSIFTImageGPU();
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-	int success = m_sift->RunSIFT(m_CudaImageManager->getIntensityImageSIFT(), m_CudaImageManager->getLastIntegrateDepth());
+	int success = m_sift->RunSIFT(m_CudaImageManager->getIntensityImageSIFT(), integrateFrame.getDepthFrameGPU());
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection on frame " + std::to_string(curFrame));
-	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, m_CudaImageManager->getLastIntegrateDepth());
+	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, integrateFrame.getDepthFrameGPU());
 	m_SubmapManager.currentLocal->finalizeSIFTImageGPU(numKeypoints);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
 	// process cuda cache
 	const unsigned int curLocalFrame = m_SubmapManager.currentLocal->getNumImages() - 1;
-	m_SubmapManager.currentLocalCache->storeFrame(m_CudaImageManager->getLastIntegrateDepth(), m_CudaImageManager->getLastIntegrateColor(), m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
+	m_SubmapManager.currentLocalCache->storeFrame(integrateFrame.getDepthFrameGPU(), integrateFrame.getColorFrameGPU(), m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
 	if (GlobalBundlingState::get().s_recordKeysPointCloud && curLocalFrame == 0 || m_SubmapManager.isLastLocalFrame(curFrame)) {
 		m_RGBDSensor->recordPointCloud();
 	}
@@ -191,6 +193,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 	}
 
 	if (curFrame > 0) { // can have a match to another frame
+
 		// --- sort the current key point matches
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 		siftManager->SortKeyPointMatchesCU(curFrame);
@@ -235,8 +238,11 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 
 void Bundler::printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame)
 {
+	//TODO get color cpu for these functions
+	CUDAImageManager::ManagedRGBDInputFrame& integrateFrame = m_CudaImageManager->getIntegrateFrame(allFrame);
+
 	ColorImageR8G8B8A8 im(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(im.getPointer(), m_CudaImageManager->getIntegrateColor(allFrame), sizeof(uchar4) * m_CudaImageManager->getIntegrationWidth() * m_CudaImageManager->getIntegrationHeight(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(im.getPointer(), integrateFrame.getColorFrameGPU(), sizeof(uchar4) * m_CudaImageManager->getIntegrationWidth() * m_CudaImageManager->getIntegrationHeight(), cudaMemcpyDeviceToHost));
 	im.reSample(m_CudaImageManager->getSIFTWidth(), m_CudaImageManager->getSIFTHeight());
 
 	std::vector<SIFTKeyPoint> keys(siftManager->getNumKeyPointsPerImage(frame));
@@ -304,16 +310,18 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 	MLIB_ASSERT(util::directoryExists(dir));
 
 	// get images
-	unsigned int curFrame = numFrames - 1;
+	unsigned int curFrame = numFrames - 1; //TODO get color cpu for these functions
+	CUDAImageManager::ManagedRGBDInputFrame& curIntegrateFrame = m_CudaImageManager->getIntegrateFrame(curFrame * frameSkip + frameStart);
 	ColorImageR8G8B8A8 curImage(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curImage.getPointer(), m_CudaImageManager->getIntegrateColor(curFrame * frameSkip + frameStart),
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curImage.getPointer(), curIntegrateFrame.getColorFrameGPU(),
 		sizeof(uchar4) * curImage.getNumPixels(), cudaMemcpyDeviceToHost));
 	curImage.reSample(m_CudaImageManager->getSIFTWidth(), m_CudaImageManager->getSIFTHeight());
 
 	//print out images
 	for (unsigned int prev = 0; prev < curFrame; prev++) {
+		CUDAImageManager::ManagedRGBDInputFrame& prevIntegrateFrame = m_CudaImageManager->getIntegrateFrame(prev * frameSkip + frameStart);
 		ColorImageR8G8B8A8 prevImage(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevImage.getPointer(), m_CudaImageManager->getIntegrateColor(prev * frameSkip + frameStart),
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevImage.getPointer(), prevIntegrateFrame.getColorFrameGPU(),
 			sizeof(uchar4) * prevImage.getNumPixels(), cudaMemcpyDeviceToHost));
 		prevImage.reSample(m_CudaImageManager->getSIFTWidth(), m_CudaImageManager->getSIFTHeight());
 

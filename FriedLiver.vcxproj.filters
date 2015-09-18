@@ -335,6 +335,9 @@
     <ClInclude Include="Source\DepthSensing\DepthSensing.h">
       <Filter>DepthSensing</Filter>
     </ClInclude>
+    <ClInclude Include="Source\SiftGPU\SiftCameraParams.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
@@ -394,6 +397,9 @@
     </CudaCompile>
     <CudaCompile Include="Source\DepthSensing\CUDAImageHelper.cu">
       <Filter>DepthSensing</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Source\SiftGPU\CUDASiftConstant.cu">
+      <Filter>SiftGPU</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

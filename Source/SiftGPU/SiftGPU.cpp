@@ -44,6 +44,7 @@ using namespace std;
 #pragma warning (disable : 4786) 
 #pragma warning (disable : 4996) 
 
+extern "C" void updateConstantSiftCameraParams(const SiftCameraParams& params);
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -62,9 +63,15 @@ SiftGPU::~SiftGPU()
 }
 
 
-SIFTGPU_EXPORT void SiftGPU::InitSiftGPU()
+SIFTGPU_EXPORT void SiftGPU::InitSiftGPU(unsigned int depthWidth, unsigned int depthHeight, unsigned int intensityWidth, unsigned int intensityHeight)
 {
 	if (_initialized) return;
+
+	m_siftCameraParams.m_depthWidth = depthWidth;
+	m_siftCameraParams.m_depthHeight = depthHeight;
+	m_siftCameraParams.m_intensityWidth = intensityWidth;
+	m_siftCameraParams.m_intensityHeight = intensityHeight;
+	updateConstantSiftCameraParams(m_siftCameraParams);
 
 	//Parse sift parameters
 	ParseSiftParam();
@@ -87,7 +94,7 @@ SIFTGPU_EXPORT void SiftGPU::InitSiftGPU()
 SIFTGPU_EXPORT int SiftGPU::RunSIFT(float* d_colorData, const float* d_depthData)
 {
 
-	if (!_initialized) InitSiftGPU();
+	if (!_initialized) return 0;
 
 
 	if (d_colorData != NULL)

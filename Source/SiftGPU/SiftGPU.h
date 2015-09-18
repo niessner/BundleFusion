@@ -29,6 +29,7 @@
 
 #include <vector>
 #include "SIFTImageManager.h"
+#include "SiftCameraParams.h"
 
 #if  defined(_WIN32) 
 	#ifdef SIFTGPU_DLL
@@ -115,7 +116,7 @@ public:
 
 
 	//Initialize OpenGL and SIFT paremeters, and create the shaders accordingly
-	SIFTGPU_EXPORT void InitSiftGPU();
+	SIFTGPU_EXPORT void InitSiftGPU(unsigned int depthWidth, unsigned int depthHeight, unsigned int intensityWidth, unsigned int intensityHeight);
 	//get the number of SIFT features in current image
 	SIFTGPU_EXPORT  int	GetFeatureNum();
 
@@ -156,6 +157,8 @@ private:
 	SiftPyramid *  _pyramid;
 	//print out the command line options
 	static void PrintUsage();
+
+	SiftCameraParams m_siftCameraParams;
 };
 
 
