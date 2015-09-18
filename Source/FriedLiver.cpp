@@ -116,8 +116,11 @@ int main(int argc, char** argv)
 		ParameterFile parameterFileGlobalBundling(fileNameDescGlobalBundling);
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
+		size_t mem_free, mem_total;
 
 		TimingLog::init();
+		cudaMemGetInfo(&mem_free, &mem_total);	mem_free /= (1024 * 1024);	mem_total /= (1024 * 1024);
+		std::cout << "Start:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
 
 		RGBDSensor* sensor = getRGBDSensor();
 
@@ -125,11 +128,23 @@ int main(int argc, char** argv)
 		if (sensor == NULL) throw MLIB_EXCEPTION("No RGBD sensor specified");
 		sensor->createFirstConnected();
 
+
+		cudaMemGetInfo(&mem_free, &mem_total);	mem_free /= (1024 * 1024);	mem_total /= (1024 * 1024);
+		std::cout << "RGBDSensor:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
+
 		CUDAImageManager* imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, sensor);
 
+
+		cudaMemGetInfo(&mem_free, &mem_total);	mem_free /= (1024 * 1024);	mem_total /= (1024 * 1024);
+		std::cout << "ImageManager:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
+
 		Bundler* bundler = new Bundler(sensor, imageManager);
 
+		cudaMemGetInfo(&mem_free, &mem_total);	mem_free /= (1024 * 1024);	mem_total /= (1024 * 1024);
+		std::cout << "Bundler:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
+
+		//start depthSensing render loop
 		startDepthSensing(bundler, getRGBDSensor(), imageManager);
 
 		while (1) {
@@ -144,7 +159,7 @@ int main(int argc, char** argv)
 			}
 			else break;
 		}
-		
+
 		TimingLog::printTimings("timingLog.txt");
 		if (GlobalBundlingState::get().s_recordKeysPointCloud) bundler->saveKeysToPointCloud();
 		//bundler->saveDEBUG();

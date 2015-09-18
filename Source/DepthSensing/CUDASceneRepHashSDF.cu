@@ -10,7 +10,7 @@
 #define T_PER_BLOCK 8
 
 texture<float, cudaTextureType2D, cudaReadModeElementType> depthTextureRef;
-texture<float4, cudaTextureType2D, cudaReadModeElementType> colorTextureRef;
+texture<uchar4, cudaTextureType2D, cudaReadModeElementType> colorTextureRef;
 
 extern "C" void bindInputDepthColorTextures(const DepthCameraData& depthCameraData, unsigned int width, unsigned int height) 
 {
@@ -18,7 +18,7 @@ extern "C" void bindInputDepthColorTextures(const DepthCameraData& depthCameraDa
 	//cutilSafeCall(cudaBindTextureToArray(colorTextureRef, depthCameraData.d_colorArray, depthCameraData.h_colorChannelDesc));
 
 	cutilSafeCall(cudaBindTexture2D(0, depthTextureRef, depthCameraData.d_depthData, depthTextureRef.channelDesc, width, height, sizeof(float)*width));
-	cutilSafeCall(cudaBindTexture2D(0, colorTextureRef, depthCameraData.d_colorData, colorTextureRef.channelDesc, width, height, sizeof(float4)*width));
+	cutilSafeCall(cudaBindTexture2D(0, colorTextureRef, depthCameraData.d_colorData, colorTextureRef.channelDesc, width, height, sizeof(uchar4)*width));
 
 	depthTextureRef.filterMode = cudaFilterModePoint;
 	colorTextureRef.filterMode = cudaFilterModePoint;
@@ -175,6 +175,7 @@ __global__ void allocKernel(HashData hashData, DepthCameraData cameraData, const
 		//if (d == MINF || d < cameraParams.m_sensorDepthWorldMin || d > cameraParams.m_sensorDepthWorldMax)	return;
 		if (d == MINF || d == 0.0f)	return;
 
+
 		if (d >= hashParams.m_maxIntegrationDistance) return;
 
 		float t = hashData.getTruncation(d);
@@ -329,12 +330,12 @@ inline __device__ float4 bilinearFilterColor(const float2& screenPos) {
 	const float beta  = (screenPos.y - p00.y)*dir.y;
 
 	float4 s0 = make_float4(0.0f, 0.0f, 0.0f, 0.0f); float w0 = 0.0f;
-	if(p00.x >= 0 && p00.x < imageWidth && p00.y >= 0 && p00.y < imageHeight) { float4 v00 = tex2D(colorTextureRef, p00.x, p00.y); if(v00.x != MINF) { s0 += (1.0f-alpha)*v00; w0 += (1.0f-alpha); } }
-	if(p10.x >= 0 && p10.x < imageWidth && p10.y >= 0 && p10.y < imageHeight) { float4 v10 = tex2D(colorTextureRef, p10.x, p10.y); if(v10.x != MINF) { s0 +=		 alpha *v10; w0 +=		 alpha ; } }
+	if (p00.x >= 0 && p00.x < imageWidth && p00.y >= 0 && p00.y < imageHeight) { uchar4 v00_uc = tex2D(colorTextureRef, p00.x, p00.y); float4 v00 = make_float4(v00_uc.x, v00_uc.y, v00_uc.z, v00_uc.w);	if (v00.x != MINF) { s0 += (1.0f - alpha)*v00; w0 += (1.0f - alpha); } }
+	if (p10.x >= 0 && p10.x < imageWidth && p10.y >= 0 && p10.y < imageHeight) { uchar4 v10_uc = tex2D(colorTextureRef, p10.x, p10.y); float4 v10 = make_float4(v10_uc.x, v10_uc.y, v10_uc.z, v10_uc.w);    if (v10.x != MINF) { s0 += alpha *v10; w0 += alpha; } }
 
 	float4 s1 = make_float4(0.0f, 0.0f, 0.0f, 0.0f); float w1 = 0.0f;
-	if(p01.x >= 0 && p01.x < imageWidth && p01.y >= 0 && p01.y < imageHeight) { float4 v01 = tex2D(colorTextureRef, p01.x, p01.y); if(v01.x != MINF) { s1 += (1.0f-alpha)*v01; w1 += (1.0f-alpha);} }
-	if(p11.x >= 0 && p11.x < imageWidth && p11.y >= 0 && p11.y < imageHeight) { float4 v11 = tex2D(colorTextureRef, p11.x, p11.y); if(v11.x != MINF) { s1 +=		 alpha *v11; w1 +=		 alpha ;} }
+	if (p01.x >= 0 && p01.x < imageWidth && p01.y >= 0 && p01.y < imageHeight) { uchar4 v01_uc = tex2D(colorTextureRef, p01.x, p01.y); float4 v01 = make_float4(v01_uc.x, v01_uc.y, v01_uc.z, v01_uc.w);    if (v01.x != MINF) { s1 += (1.0f - alpha)*v01; w1 += (1.0f - alpha); } }
+	if (p11.x >= 0 && p11.x < imageWidth && p11.y >= 0 && p11.y < imageHeight) { uchar4 v11_uc = tex2D(colorTextureRef, p11.x, p11.y); float4 v11 = make_float4(v11_uc.x, v11_uc.y, v11_uc.z, v11_uc.w);    if (v11.x != MINF) { s1 += alpha *v11; w1 += alpha; } }
 
 	const float4 p0 = s0/w0;
 	const float4 p1 = s1/w1;
@@ -370,8 +371,9 @@ __global__ void integrateDepthMapKernel(HashData hashData, DepthCameraData camer
 		float depth = tex2D(depthTextureRef, screenPos.x, screenPos.y);
 		float4 color  = make_float4(MINF, MINF, MINF, MINF);
 		if (cameraData.d_colorData) {
-			//color = tex2D(colorTextureRef, screenPos.x, screenPos.y);
-			color = bilinearFilterColor(cameraData.cameraToKinectScreenFloat(pf));
+			uchar4 color_uc = tex2D(colorTextureRef, screenPos.x, screenPos.y);
+			color = make_float4(color_uc.x, color_uc.y, color_uc.z, color_uc.w);
+			//color = bilinearFilterColor(cameraData.cameraToKinectScreenFloat(pf));
 		}
 
 		if (color.x != MINF && depth != MINF) { // valid depth and color
@@ -398,7 +400,7 @@ __global__ void integrateDepthMapKernel(HashData hashData, DepthCameraData camer
 					curr.weight = weightUpdate;
 
 					if (cameraData.d_colorData) {
-						curr.color = make_uchar4(255*color.x, 255*color.y, 255*color.z, 255);
+						curr.color = make_uchar4(color.x, color.y, color.z, 255);
 					} else {
 						curr.color = make_uchar4(0,255,0,0);
 					}

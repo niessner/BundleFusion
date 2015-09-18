@@ -314,7 +314,7 @@ private:
 
 		//resetHashBucketMutexCUDA(m_hashData, m_hashParams);
 		//allocCUDA(m_hashData, m_hashParams, depthCameraData, depthCameraParams, d_bitMask);
-
+		 
 		unsigned int prevFree = getHeapFreeCount();
 		while (1) {
 			resetHashBucketMutexCUDA(m_hashData, m_hashParams);

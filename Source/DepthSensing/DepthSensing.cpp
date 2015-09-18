@@ -591,74 +591,27 @@ void reconstruction()
 	depthCameraParams.my = g_CudaImageManager->getIntrinsics()(1, 2);
 	depthCameraParams.m_sensorDepthWorldMin = GlobalAppState::get().s_sensorDepthMin;
 	depthCameraParams.m_sensorDepthWorldMax = GlobalAppState::get().s_sensorDepthMax;
-	depthCameraParams.m_imageHeight = g_CudaImageManager->getIntegrationWidth();
-	depthCameraParams.m_imageWidth = g_CudaImageManager->getIntegrationHeight();
+	depthCameraParams.m_imageWidth = g_CudaImageManager->getIntegrationWidth();
+	depthCameraParams.m_imageHeight = g_CudaImageManager->getIntegrationHeight();
 
 	mat4f transformation = mat4f::identity();
 	DepthCameraData depthCameraData;
 	
-	g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
+
+	bool validIntegrationFrame = g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
+	if (!validIntegrationFrame)	return;
+
 	if (GlobalAppState::get().s_sensorIdx == 3 && GlobalAppState::get().s_binaryDumpSensorUseTrajectory) {
 		transformation = g_RGBDSensor->getRigidTransform();
 	}
 
-	//if (g_RGBDAdapter.getFrameNumber() == 1 && GlobalAppState::get().s_binaryDumpSensorUseTrajectory) {
-	//	transformation = g_RGBDAdapter.getRigidTransform();
-	//	std::cout << transformation << std::endl;
-	//}
+	depthCameraData.updateParams(depthCameraParams);	//TODO only needs to be done once!
 
+	//TODO move  this somewhere?
+	if (g_CudaImageManager->getCurrFrameNumber() > 0) {
+		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), depthCameraData, g_sceneRep->getLastRigidTransform());
+	}
 
-
-	//unsigned int frameIdx = g_RGBDAdapter.getFrameNumber() - 1;
-	//if (g_RGBDAdapter.getFrameNumber() == 19) {
-	//	StopScanningAndExtractIsoSurfaceMC("./Scans/scans_prev.ply");
-	//}
-	//if (g_RGBDAdapter.getFrameNumber() > 20 && g_RGBDAdapter.getFrameNumber() < 25) {
-	//	transformation.setIdentity();
-	//}
-
-	////std::cout << "frame number " << g_RGBDAdapter.getFrameNumber() << std::endl;
-	//g_CudaImageManager->storeRGBDImage(g_CudaDepthSensor.getDepthCameraData(), g_CudaDepthSensor.getDepthCameraParams(), transformation);
-	//
-	//if (g_RGBDAdapter.getFrameNumber() == 25) {
-	//	StopScanningAndExtractIsoSurfaceMC("./Scans/scans.ply");
-
-	//	for (unsigned int i = 20; i < 25; i++) {
-	//		g_sceneRep->deIntegrate(g_CudaImageManager->getCameraToWorld(i), g_CudaImageManager->getDepthCameraData(i), g_CudaDepthSensor.getDepthCameraParams(), g_chunkGrid->getBitMaskGPU());
-	//	}
-
-	//	StopScanningAndExtractIsoSurfaceMC("./Scans/scans_deint.ply");
-	//}
-	 
-
-	//g_CudaImageManager->storeRGBDImage(g_CudaDepthSensor.getDepthCameraData(), g_CudaDepthSensor.getDepthCameraParams(), transformation);
-
- //	g_sceneRep->integrate(transformation, g_CudaDepthSensor.getDepthCameraData(), g_CudaDepthSensor.getDepthCameraParams(), g_chunkGrid->getBitMaskGPU());
- //	StopScanningAndExtractIsoSurfaceMC("./Scans/scans.ply");
- //
- //	for (unsigned int i = 0; i < 100; i++) {
- //		g_CudaDepthSensor.process(DXUTGetD3D11DeviceContext());
- //		//transformation = g_RGBDAdapter.getRigidTransform() * mat4f::rotationX(50.0f);
-	//	transformation.setIdentity();
- //		g_CudaImageManager->storeRGBDImage(g_CudaDepthSensor.getDepthCameraData(), g_CudaDepthSensor.getDepthCameraParams(), transformation);
- //
- //		g_sceneRep->integrate(transformation, g_CudaDepthSensor.getDepthCameraData(), g_CudaDepthSensor.getDepthCameraParams(), g_chunkGrid->getBitMaskGPU());
- //		//Util::writeToImage(g_CudaDepthSensor.getDepthCameraData().d_depthData, g_RGBDAdapter.getWidth(), g_RGBDAdapter.getHeight(), "Int_depth" + std::to_string(i + 1) + ".png");
-	//	//Util::writeToImage(g_CudaDepthSensor.getDepthCameraData().d_colorData, g_RGBDAdapter.getWidth(), g_RGBDAdapter.getHeight(), "Int_color" + std::to_string(i + 1) + ".png");
- //	}
-
-	//TimingLogDepthSensing::printTimings();
-
-	//for (unsigned int i = 0; i < 100; i++) {
-	//	g_sceneRep->deIntegrate(g_CudaImageManager->getCameraToWorld(i+1), g_CudaImageManager->getDepthCameraData(i+1), g_CudaDepthSensor.getDepthCameraParams(), g_chunkGrid->getBitMaskGPU());
-	//	//Util::writeToImage(g_CudaImageManager->getDepthCameraData(i + 1).d_depthData, g_RGBDAdapter.getWidth(), g_RGBDAdapter.getHeight(), "deInt_depth" + std::to_string(i + 1) + ".png");
-	//	//Util::writeToImage(g_CudaImageManager->getDepthCameraData(i + 1).d_colorData, g_RGBDAdapter.getWidth(), g_RGBDAdapter.getHeight(), "deInt_color" + std::to_string(i + 1) + ".png");
-	//}	
-
-	//StopScanningAndExtractIsoSurfaceMC("./Scans/scans_deint.ply");
-	////g_sceneRep->debugHash();
-	//std::cout << "DONE" << std::endl;
-	//while (1);
 
 	if (GlobalAppState::getInstance().s_recordData) {
 		g_RGBDSensor->recordTrajectory(transformation);
@@ -682,14 +635,7 @@ void reconstruction()
 	}
 
 	if (GlobalAppState::get().s_integrationEnabled) {
-		//////////// MATTHIAS TODO INTEGRATE
-		DepthCameraData depth;
 		g_sceneRep->integrate(transformation, depthCameraData, depthCameraParams, g_chunkGrid->getBitMaskGPU());
-
-		//g_sceneRep->deIntegrate(transformation, g_CudaDepthSensor.getDepthCameraData(), g_CudaDepthSensor.getDepthCameraParams(), g_chunkGrid->getBitMaskGPU());
-		//g_sceneRep->debugHash();
-		//std::cout << "DONE" << std::endl;
-		//while (1);
 	} else {
 		//compactification is required for the raycast splatting
 		g_sceneRep->setLastRigidTransformAndCompactify(transformation, depthCameraData);
@@ -724,12 +670,17 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	// if we have received any valid new depth data we may need to draw
 	bool bGotDepth = g_CudaImageManager->process();
+	if (bGotDepth) {
+		g_bundler->processInput();	//sift extraction and sift matching
+	}
 
-	//// Filtering
-	//g_CudaDepthSensor.setFiterDepthValues(GlobalAppState::get().s_depthFilter, GlobalAppState::get().s_depthSigmaD, GlobalAppState::get().s_depthSigmaR);
-	//g_CudaDepthSensor.setFiterIntensityValues(GlobalAppState::get().s_colorFilter, GlobalAppState::get().s_colorSigmaD, GlobalAppState::get().s_colorSigmaR);
+	///////////////////////////////////////
+	// Bundling Optimization
+	///////////////////////////////////////
+	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);
+	g_bundler->processGlobal();
+	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);
 
-	HRESULT hr = S_OK;
 
 	///////////////////////////////////////
 	// Render
@@ -740,7 +691,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 
 	mat4f view = MatrixConversion::toMlib(*g_Camera.GetViewMatrix());
-
 	mat4f t = mat4f::identity();
 	t(1,1) *= -1.0f;	view = t * view * t;	//t is self-inverse
 

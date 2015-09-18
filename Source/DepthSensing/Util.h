@@ -5,7 +5,7 @@
 
 namespace Util
 {
-	static void writeToImage(float* d_buffer, unsigned int width, unsigned int height, const std::string& filename) {
+	static void writeToImage(const float* d_buffer, unsigned int width, unsigned int height, const std::string& filename) {
 		//bool minfInvalid = false;
 
 		float* h_buffer = new float[width * height];
@@ -21,13 +21,14 @@ namespace Util
 		//else std::cout << "MINF invalid value" << std::endl;
 
 		DepthImage32 dimage(width, height, h_buffer);
+		dimage.setInvalidValue(-std::numeric_limits<float>::infinity());
 		ColorImageR32G32B32 cImage(dimage);
 		FreeImageWrapper::saveImage(filename, cImage);
 
 		SAFE_DELETE_ARRAY(h_buffer);
 	}
 
-	static void writeToImage(float4* d_buffer, float min, float max, unsigned int width, unsigned int height, const std::string& filename) {
+	static void writeToImage(const float4* d_buffer, float min, float max, unsigned int width, unsigned int height, const std::string& filename) {
 		unsigned int size = width * height;
 		float* h_buffer = new float[4 * size];
 		cudaMemcpy(h_buffer, d_buffer, 4*sizeof(float)*size, cudaMemcpyDeviceToHost);
@@ -47,7 +48,7 @@ namespace Util
 		SAFE_DELETE_ARRAY(data);
 	}
 
-	static void writeToImage(float4* d_buffer, unsigned int width, unsigned int height, const std::string& filename) {
+	static void writeToImage(const float4* d_buffer, unsigned int width, unsigned int height, const std::string& filename) {
 		unsigned int size = width * height;
 		float* h_buffer = new float[4 * size];
 		cudaMemcpy(h_buffer, d_buffer, 4*sizeof(float)*size, cudaMemcpyDeviceToHost);
@@ -115,7 +116,7 @@ namespace Util
 		SAFE_DELETE_ARRAY(h_buffer);
 	}
 
-	static void getRange(float* d_buffer, unsigned int size, float& min, float& max)
+	static void getRange(const float* d_buffer, unsigned int size, float& min, float& max)
 	{
 		min = std::numeric_limits<float>::infinity();
 		max = -std::numeric_limits<float>::infinity();
