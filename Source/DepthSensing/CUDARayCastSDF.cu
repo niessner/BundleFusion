@@ -15,7 +15,7 @@
 texture<float, cudaTextureType2D, cudaReadModeElementType> rayMinTextureRef;
 texture<float, cudaTextureType2D, cudaReadModeElementType> rayMaxTextureRef;
 
-__global__ void renderKernel(HashData hashData, RayCastData rayCastData, DepthCameraData cameraData) 
+__global__ void renderKernel(HashData hashData, RayCastData rayCastData) 
 {
 	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -28,7 +28,7 @@ __global__ void renderKernel(HashData hashData, RayCastData rayCastData, DepthCa
 		rayCastData.d_normals[y*rayCastParams.m_width+x] = make_float4(MINF,MINF,MINF,MINF);
 		rayCastData.d_colors[y*rayCastParams.m_width+x] = make_float4(MINF,MINF,MINF,MINF);
 
-		float3 camDir = normalize(cameraData.kinectProjToCamera(x, y, 1.0f));
+		float3 camDir = normalize(DepthCameraData::kinectProjToCamera(x, y, 1.0f));
 		float3 worldCamPos = rayCastParams.m_viewMatrixInverse * make_float3(0.0f, 0.0f, 0.0f);
 		float4 w = rayCastParams.m_viewMatrixInverse * make_float4(camDir, 0.0f);
 		float3 worldDir = normalize(make_float3(w.x, w.y, w.z));
@@ -50,11 +50,11 @@ __global__ void renderKernel(HashData hashData, RayCastData rayCastData, DepthCa
 		//	printf("ERROR (%d,%d): [ %f, %f ]\n", x, y, minInterval, maxInterval);
 		//}
 
-		rayCastData.traverseCoarseGridSimpleSampleAll(hashData, cameraData, worldCamPos, worldDir, camDir, make_int3(x,y,1), minInterval, maxInterval);
+		rayCastData.traverseCoarseGridSimpleSampleAll(hashData, worldCamPos, worldDir, camDir, make_int3(x,y,1), minInterval, maxInterval);
 	} 
 }
 
-extern "C" void renderCS(const HashData& hashData, const RayCastData &rayCastData, const DepthCameraData &cameraData, const RayCastParams &rayCastParams) 
+extern "C" void renderCS(const HashData& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams) 
 {
 
 	const dim3 gridSize((rayCastParams.m_width + T_PER_BLOCK - 1)/T_PER_BLOCK, (rayCastParams.m_height + T_PER_BLOCK - 1)/T_PER_BLOCK);
@@ -64,7 +64,7 @@ extern "C" void renderCS(const HashData& hashData, const RayCastData &rayCastDat
 	cudaBindTextureToArray(rayMinTextureRef, rayCastData.d_rayIntervalSplatMinArray, channelDesc);
 	cudaBindTextureToArray(rayMaxTextureRef, rayCastData.d_rayIntervalSplatMaxArray, channelDesc);
 
-	renderKernel<<<gridSize, blockSize>>>(hashData, rayCastData, cameraData);
+	renderKernel<<<gridSize, blockSize>>>(hashData, rayCastData);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
@@ -96,13 +96,13 @@ extern "C" void resetRayIntervalSplatCUDA(RayCastData& data, const RayCastParams
 #endif
 }
 
-__global__ void rayIntervalSplatKernel(HashData hashData, DepthCameraData depthCameraData, RayCastData rayCastData, DepthCameraData cameraData) 
+__global__ void rayIntervalSplatKernel(HashData hashData, RayCastData rayCastData) 
 {
 	uint idx = blockIdx.x + blockIdx.y * NUM_GROUPS_X;
 
 	const HashEntry& entry = hashData.d_hashCompactified[idx];
 	if (entry.ptr != FREE_ENTRY) {
-		if (!hashData.isSDFBlockInCameraFrustumApprox(depthCameraData, entry.pos)) return;
+		if (!hashData.isSDFBlockInCameraFrustumApprox(entry.pos)) return;
 		const RayCastParams &params = c_rayCastParams;
 		const float4x4& viewMatrix = params.m_viewMatrix;
 
@@ -112,14 +112,14 @@ __global__ void rayIntervalSplatKernel(HashData hashData, DepthCameraData depthC
 
 		float3 maxv = MINV+SDF_BLOCK_SIZE*c_hashParams.m_virtualVoxelSize;
 
-		float3 proj000 = cameraData.cameraToKinectProj(viewMatrix * make_float3(MINV.x, MINV.y, MINV.z));
-		float3 proj100 = cameraData.cameraToKinectProj(viewMatrix * make_float3(maxv.x, MINV.y, MINV.z));
-		float3 proj010 = cameraData.cameraToKinectProj(viewMatrix * make_float3(MINV.x, maxv.y, MINV.z));
-		float3 proj001 = cameraData.cameraToKinectProj(viewMatrix * make_float3(MINV.x, MINV.y, maxv.z));
-		float3 proj110 = cameraData.cameraToKinectProj(viewMatrix * make_float3(maxv.x, maxv.y, MINV.z));
-		float3 proj011 = cameraData.cameraToKinectProj(viewMatrix * make_float3(MINV.x, maxv.y, maxv.z));
-		float3 proj101 = cameraData.cameraToKinectProj(viewMatrix * make_float3(maxv.x, MINV.y, maxv.z));
-		float3 proj111 = cameraData.cameraToKinectProj(viewMatrix * make_float3(maxv.x, maxv.y, maxv.z));
+		float3 proj000 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, MINV.y, MINV.z));
+		float3 proj100 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, MINV.y, MINV.z));
+		float3 proj010 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, maxv.y, MINV.z));
+		float3 proj001 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, MINV.y, maxv.z));
+		float3 proj110 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, maxv.y, MINV.z));
+		float3 proj011 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, maxv.y, maxv.z));
+		float3 proj101 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, MINV.y, maxv.z));
+		float3 proj111 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, maxv.y, maxv.z));
 
 		// Tree Reduction Min
 		float3 min00 = fminf(proj000, proj100);
@@ -147,7 +147,7 @@ __global__ void rayIntervalSplatKernel(HashData hashData, DepthCameraData depthC
 		if(params.m_splatMinimum == 1) {
 			depth = minFinal.z;
 		}
-		float depthWorld = cameraData.kinectProjToCameraZ(depth);
+		float depthWorld = DepthCameraData::kinectProjToCameraZ(depth);
 
 		//uint addr = idx*4;
 		//rayCastData.d_vertexBuffer[addr] = make_float4(maxFinal.x, minFinal.y, depth, depthWorld);
@@ -164,13 +164,13 @@ __global__ void rayIntervalSplatKernel(HashData hashData, DepthCameraData depthC
 	}
 }
 
-extern "C" void rayIntervalSplatCUDA(const HashData& hashData, const DepthCameraData& cameraData, const RayCastData &rayCastData, const RayCastParams &rayCastParams) 
+extern "C" void rayIntervalSplatCUDA(const HashData& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams) 
 {
 
 	const dim3 gridSize(NUM_GROUPS_X, (rayCastParams.m_numOccupiedSDFBlocks + NUM_GROUPS_X - 1) / NUM_GROUPS_X, 1);
 	const dim3 blockSize(1, 1, 1);
 
-	rayIntervalSplatKernel<<<gridSize, blockSize>>>(hashData, cameraData, rayCastData, cameraData);
+	rayIntervalSplatKernel<<<gridSize, blockSize>>>(hashData, rayCastData);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());

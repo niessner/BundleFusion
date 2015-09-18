@@ -183,9 +183,9 @@ __global__ void allocKernel(HashData hashData, DepthCameraData cameraData, const
 		float maxDepth = min(hashParams.m_maxIntegrationDistance, d+t);
 		if (minDepth >= maxDepth) return;
 
-		float3 rayMin = cameraData.kinectDepthToSkeleton(x, y, minDepth);
+		float3 rayMin = DepthCameraData::kinectDepthToSkeleton(x, y, minDepth);
 		rayMin = hashParams.m_rigidTransform * rayMin;
-		float3 rayMax = cameraData.kinectDepthToSkeleton(x, y, maxDepth);
+		float3 rayMax = DepthCameraData::kinectDepthToSkeleton(x, y, maxDepth);
 		rayMax = hashParams.m_rigidTransform * rayMax;
 
 		
@@ -221,7 +221,7 @@ __global__ void allocKernel(HashData hashData, DepthCameraData cameraData, const
 		while(iter < g_MaxLoopIterCount) {
 
 			//check if it's in the frustum and not checked out
-			if (hashData.isSDFBlockInCameraFrustumApprox(cameraData, idCurrentVoxel) && !isSDFBlockStreamedOut(idCurrentVoxel, hashData, d_bitMask)) {		
+			if (hashData.isSDFBlockInCameraFrustumApprox(idCurrentVoxel) && !isSDFBlockStreamedOut(idCurrentVoxel, hashData, d_bitMask)) {		
 				hashData.allocBlock(idCurrentVoxel);
 			}
 
@@ -262,7 +262,7 @@ extern "C" void allocCUDA(HashData& hashData, const HashParams& hashParams, cons
 
 
 
-__global__ void fillDecisionArrayKernel(HashData hashData, DepthCameraData depthCameraData) 
+__global__ void fillDecisionArrayKernel(HashData hashData) 
 {
 	const HashParams& hashParams = c_hashParams;
 	const unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -270,19 +270,19 @@ __global__ void fillDecisionArrayKernel(HashData hashData, DepthCameraData depth
 	if (idx < hashParams.m_hashNumBuckets * HASH_BUCKET_SIZE) {
 		hashData.d_hashDecision[idx] = 0;
 		if (hashData.d_hash[idx].ptr != FREE_ENTRY) {
-			if (hashData.isSDFBlockInCameraFrustumApprox(depthCameraData, hashData.d_hash[idx].pos)) {
+			if (hashData.isSDFBlockInCameraFrustumApprox(hashData.d_hash[idx].pos)) {
 				hashData.d_hashDecision[idx] = 1;	//yes
 			}
 		}
 	}
 }
 
-extern "C" void fillDecisionArrayCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData)
+extern "C" void fillDecisionArrayCUDA(HashData& hashData, const HashParams& hashParams)
 {
 	const dim3 gridSize((HASH_BUCKET_SIZE * hashParams.m_hashNumBuckets + (T_PER_BLOCK*T_PER_BLOCK) - 1)/(T_PER_BLOCK*T_PER_BLOCK), 1);
 	const dim3 blockSize((T_PER_BLOCK*T_PER_BLOCK), 1);
 
-	fillDecisionArrayKernel<<<gridSize, blockSize>>>(hashData, depthCameraData);
+	fillDecisionArrayKernel<<<gridSize, blockSize>>>(hashData);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());

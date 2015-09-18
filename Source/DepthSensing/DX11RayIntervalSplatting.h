@@ -24,7 +24,7 @@ public:
 	void OnD3D11DestroyDevice();
 
 
-	HRESULT rayIntervalSplatting(ID3D11DeviceContext* context, const HashData& hashData, const DepthCameraData& depthCameraData, RayCastData& rayCastData, RayCastParams& rayCastParams, unsigned int numVertices);
+	HRESULT rayIntervalSplatting(ID3D11DeviceContext* context, const HashData& hashData, RayCastData& rayCastData, RayCastParams& rayCastParams, unsigned int numVertices);
 
 	cudaArray* mapMinToCuda() {
 		return m_customRenderTargetMin.mapToCuda();

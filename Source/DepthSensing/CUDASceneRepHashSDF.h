@@ -14,7 +14,7 @@
 extern "C" void resetCUDA(HashData& hashData, const HashParams& hashParams);
 extern "C" void resetHashBucketMutexCUDA(HashData& hashData, const HashParams& hashParams);
 extern "C" void allocCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams, const unsigned int* d_bitMask);
-extern "C" void fillDecisionArrayCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData);
+extern "C" void fillDecisionArrayCUDA(HashData& hashData, const HashParams& hashParams);
 extern "C" void compactifyHashCUDA(HashData& hashData, const HashParams& hashParams);
 extern "C" void integrateDepthMapCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams);
 extern "C" void deIntegrateDepthMapCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams);
@@ -73,12 +73,12 @@ public:
 		alloc(depthCameraData, depthCameraParams, d_bitMask);
 
 		//generate a linear hash array with only occupied entries
-		compactifyHashEntries(depthCameraData);
+		compactifyHashEntries();
 
 		//volumetrically integrate the depth data into the depth SDFBlocks
 		integrateDepthMap(depthCameraData, depthCameraParams);
 
-		garbageCollect(depthCameraData);
+		garbageCollect();
 
 		m_numIntegratedFrames++;
 	}
@@ -97,12 +97,12 @@ public:
 		m_hashData.updateParams(m_hashParams);
 
 		//generate a linear hash array with only occupied entries
-		compactifyHashEntries(depthCameraData);
+		compactifyHashEntries();
 
 		//volumetrically integrate the depth data into the depth SDFBlocks
 		deIntegrateDepthMap(depthCameraData, depthCameraParams);
 
-		garbageCollect(depthCameraData);
+		garbageCollect();
 
 		//DepthImage32 test(depthCameraParams.m_imageWidth, depthCameraParams.m_imageHeight);
 		//cudaMemcpyFromArray(test.getPointer(), depthCameraData.d_depthArray, 0, 0, sizeof(float)*depthCameraParams.m_imageWidth *depthCameraParams.m_imageHeight, cudaMemcpyDeviceToHost);
@@ -116,9 +116,9 @@ public:
 		m_hashParams.m_rigidTransformInverse = m_hashParams.m_rigidTransform.getInverse();
 	}
 
-	void setLastRigidTransformAndCompactify(const mat4f& lastRigidTransform, const DepthCameraData& depthCameraData) {
+	void setLastRigidTransformAndCompactify(const mat4f& lastRigidTransform) {
 		setLastRigidTransform(lastRigidTransform);
-		compactifyHashEntries(depthCameraData);
+		compactifyHashEntries();
 	}
 
 
@@ -335,11 +335,11 @@ private:
 	}
 
 
-	void compactifyHashEntries(const DepthCameraData& depthCameraData) {
+	void compactifyHashEntries() {
 		//Start Timing
 		if(GlobalAppState::get().s_timingsDetailledEnabled) { cutilSafeCall(cudaDeviceSynchronize()); m_timer.start(); }
 
-		fillDecisionArrayCUDA(m_hashData, m_hashParams, depthCameraData);
+		fillDecisionArrayCUDA(m_hashData, m_hashParams);
 		m_hashParams.m_numOccupiedBlocks = 
 			m_cudaScan.prefixSum(
 				m_hashParams.m_hashNumBuckets*m_hashParams.m_hashBucketSize,
@@ -376,7 +376,7 @@ private:
 		if (GlobalAppState::get().s_timingsDetailledEnabled) { cutilSafeCall(cudaDeviceSynchronize()); m_timer.stop(); TimingLogDepthSensing::totalTimeDeIntegrate += m_timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeDeIntegrate++; }
 	}
 
-	void garbageCollect(const DepthCameraData& depthCameraData) {
+	void garbageCollect() {
 		//only perform if enabled by global app state
 		if (GlobalAppState::get().s_garbageCollectionEnabled) {
 			

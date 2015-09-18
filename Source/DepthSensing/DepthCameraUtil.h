@@ -48,7 +48,7 @@ struct DepthCameraData {
 
 
 	__host__
-	void updateParams(const DepthCameraParams& params) {
+	static void updateParams(const DepthCameraParams& params) {
 		updateConstantDepthCameraParams(params);
 	}
 
@@ -59,7 +59,7 @@ struct DepthCameraData {
 	// Device part //
 	/////////////////
 
-	const DepthCameraParams& params() const {
+	static inline const DepthCameraParams& params() {
 		return c_depthCameraParams;
 	}
 
@@ -68,7 +68,7 @@ struct DepthCameraData {
 		///////////////////////////////////////////////////////////////
 
 	__device__
-	float2 cameraToKinectScreenFloat(const float3& pos) const	{
+	static inline float2 cameraToKinectScreenFloat(const float3& pos)	{
 		//return make_float2(pos.x*c_depthCameraParams.fx/pos.z + c_depthCameraParams.mx, c_depthCameraParams.my - pos.y*c_depthCameraParams.fy/pos.z);
 		return make_float2(
 			pos.x*c_depthCameraParams.fx/pos.z + c_depthCameraParams.mx,			
@@ -76,24 +76,24 @@ struct DepthCameraData {
 	}
 
 	__device__
-	int2 cameraToKinectScreenInt(const float3& pos) const	{
+	static inline int2 cameraToKinectScreenInt(const float3& pos)	{
 		float2 pImage = cameraToKinectScreenFloat(pos);
 		return make_int2(pImage + make_float2(0.5f, 0.5f));
 	}
 
 	__device__
-	uint2 cameraToKinectScreen(const float3& pos) const	{
+	static inline uint2 cameraToKinectScreen(const float3& pos)	{
 		int2 p = cameraToKinectScreenInt(pos);
 		return make_uint2(p.x, p.y);
 	}
 
 	__device__
-	float cameraToKinectProjZ(float z) const	{
+	static inline float cameraToKinectProjZ(float z)	{
 		return (z - c_depthCameraParams.m_sensorDepthWorldMin)/(c_depthCameraParams.m_sensorDepthWorldMax - c_depthCameraParams.m_sensorDepthWorldMin);
 	}
 
 	__device__
-	float3 cameraToKinectProj(const float3& pos) const	{
+	static inline float3 cameraToKinectProj(const float3& pos)	{
 		float2 proj = cameraToKinectScreenFloat(pos);
 
 		float3 pImage = make_float3(proj.x, proj.y, pos.z);
@@ -111,7 +111,7 @@ struct DepthCameraData {
 		///////////////////////////////////////////////////////////////
 
 	__device__
-	float3 kinectDepthToSkeleton(uint ux, uint uy, float depth) const	{
+	static inline float3 kinectDepthToSkeleton(uint ux, uint uy, float depth)	{
 		const float x = ((float)ux-c_depthCameraParams.mx) / c_depthCameraParams.fx;
 		const float y = ((float)uy-c_depthCameraParams.my) / c_depthCameraParams.fy;
 		//const float y = (c_depthCameraParams.my-(float)uy) / c_depthCameraParams.fy;
@@ -123,19 +123,19 @@ struct DepthCameraData {
 		///////////////////////////////////////////////////////////////
 
 	__device__
-	float kinectProjToCameraZ(float z) const	{
+	static inline float kinectProjToCameraZ(float z)	{
 		return z * (c_depthCameraParams.m_sensorDepthWorldMax - c_depthCameraParams.m_sensorDepthWorldMin) + c_depthCameraParams.m_sensorDepthWorldMin;
 	}
 
 	// z has to be in [0, 1]
 	__device__
-	float3 kinectProjToCamera(uint ux, uint uy, float z) const	{
+	static inline float3 kinectProjToCamera(uint ux, uint uy, float z)	{
 		float fSkeletonZ = kinectProjToCameraZ(z);
 		return kinectDepthToSkeleton(ux, uy, fSkeletonZ);
 	}
 	
 	__device__
-	bool isInCameraFrustumApprox(const float4x4& viewMatrixInverse, const float3& pos) const {
+	static inline bool isInCameraFrustumApprox(const float4x4& viewMatrixInverse, const float3& pos) {
 		float3 pCamera = viewMatrixInverse * pos;
 		float3 pProj = cameraToKinectProj(pCamera);
 		//pProj *= 1.5f;	//TODO THIS IS A HACK FIX IT :)

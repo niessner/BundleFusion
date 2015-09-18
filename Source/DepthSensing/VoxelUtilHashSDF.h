@@ -311,9 +311,9 @@ struct HashData {
 	}
 
 	__device__
-	bool isSDFBlockInCameraFrustumApprox(const DepthCameraData& depthCameraData, const int3& sdfBlock) {
+	bool isSDFBlockInCameraFrustumApprox(const int3& sdfBlock) {
 		float3 posWorld = virtualVoxelPosToWorld(SDFBlockToVirtualVoxelPos(sdfBlock)) + c_hashParams.m_virtualVoxelSize * 0.5f * (SDF_BLOCK_SIZE - 1.0f);
-		return depthCameraData.isInCameraFrustumApprox(c_hashParams.m_rigidTransformInverse, posWorld);
+		return DepthCameraData::isInCameraFrustumApprox(c_hashParams.m_rigidTransformInverse, posWorld);
 	}
 
 	//! computes the (local) virtual voxel pos of an index; idx in [0;511]

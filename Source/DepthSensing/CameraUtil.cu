@@ -383,7 +383,7 @@ extern "C" void setInvalidFloat4Map(float4* d_output, unsigned int width, unsign
 // Convert Depth to Camera Space Positions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__global__ void convertDepthFloatToCameraSpaceFloat4Device(float4* d_output, float* d_input, float4x4 intrinsicsInv, unsigned int width, unsigned int height, DepthCameraData depthCameraData)
+__global__ void convertDepthFloatToCameraSpaceFloat4Device(float4* d_output, float* d_input, float4x4 intrinsicsInv, unsigned int width, unsigned int height)
 {
 	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -397,17 +397,17 @@ __global__ void convertDepthFloatToCameraSpaceFloat4Device(float4* d_output, flo
 		{
 			//float4 cameraSpace(intrinsicsInv*make_float4((float)x*depth, (float)y*depth, depth, depth));
 			//d_output[y*width+x] = make_float4(cameraSpace.x, cameraSpace.y, cameraSpace.w, 1.0f);
-			d_output[y*width+x] = make_float4(depthCameraData.kinectDepthToSkeleton(x, y, depth), 1.0f);
+			d_output[y*width + x] = make_float4(DepthCameraData::kinectDepthToSkeleton(x, y, depth), 1.0f);
 		}
 	}
 }
 
-extern "C" void convertDepthFloatToCameraSpaceFloat4(float4* d_output, float* d_input, float4x4 intrinsicsInv, unsigned int width, unsigned int height, const DepthCameraData& depthCameraData)
+extern "C" void convertDepthFloatToCameraSpaceFloat4(float4* d_output, float* d_input, float4x4 intrinsicsInv, unsigned int width, unsigned int height)
 {
 	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
 
-	convertDepthFloatToCameraSpaceFloat4Device<<<gridSize, blockSize>>>(d_output, d_input, intrinsicsInv, width, height, depthCameraData);
+	convertDepthFloatToCameraSpaceFloat4Device<<<gridSize, blockSize>>>(d_output, d_input, intrinsicsInv, width, height);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());

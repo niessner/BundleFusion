@@ -10,8 +10,7 @@
 #include "DX11RayIntervalSplatting.h"
 
 extern "C" void resetRayIntervalSplatCUDA(RayCastData& data, const RayCastParams& params);
-extern "C" void rayIntervalSplatCUDA(const HashData& hashData, const DepthCameraData& cameraData,
-									 const RayCastData &rayCastData, const RayCastParams &rayCastParams);
+extern "C" void rayIntervalSplatCUDA(const HashData& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams);
 
 
 
@@ -137,7 +136,7 @@ void DX11RayIntervalSplatting::destroy()
 	m_customRenderTargetMax.OnD3D11DestroyDevice();
 }
 
-HRESULT DX11RayIntervalSplatting::rayIntervalSplatting(ID3D11DeviceContext* context, const HashData& hashData, const DepthCameraData& depthCameraData,
+HRESULT DX11RayIntervalSplatting::rayIntervalSplatting(ID3D11DeviceContext* context, const HashData& hashData,
 													   RayCastData& rayCastData, RayCastParams& rayCastParams, unsigned int numVertices)
 {
 	HRESULT hr = S_OK;
@@ -155,7 +154,7 @@ HRESULT DX11RayIntervalSplatting::rayIntervalSplatting(ID3D11DeviceContext* cont
 	//resetRayIntervalSplatCUDA(rayCastData, rayCastParams);
 	rayCastParams.m_splatMinimum = 1;
 	rayCastData.updateParams(rayCastParams);
-	rayIntervalSplatCUDA(hashData, depthCameraData, rayCastData, rayCastParams);
+	rayIntervalSplatCUDA(hashData, rayCastData, rayCastParams);
 	cutilSafeCall(cudaGraphicsUnmapResources(1, &m_dCudaVertexBufferFloat4, 0));	// Unmap DX texture
 
 	// Setup Pipeline
@@ -194,7 +193,7 @@ HRESULT DX11RayIntervalSplatting::rayIntervalSplatting(ID3D11DeviceContext* cont
 	//resetRayIntervalSplatCUDA(rayCastData, rayCastParams);
 	rayCastParams.m_splatMinimum = 0;
 	rayCastData.updateParams(rayCastParams);
-	rayIntervalSplatCUDA(hashData, depthCameraData, rayCastData, rayCastParams);
+	rayIntervalSplatCUDA(hashData, rayCastData, rayCastParams);
 	cutilSafeCall(cudaGraphicsUnmapResources(1, &m_dCudaVertexBufferFloat4, 0));	// Unmap DX texture
 
 	context->OMSetDepthStencilState(m_pDepthStencilStateSplattingMax, 0);

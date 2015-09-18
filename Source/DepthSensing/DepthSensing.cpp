@@ -88,6 +88,7 @@ CUDAMarchingCubesHashSDF*	g_marchingCubesHashSDF = NULL;
 CUDAHistrogramHashSDF*		g_historgram = NULL;
 CUDASceneRepChunkGrid*		g_chunkGrid = NULL;
 
+DepthCameraParams			g_depthCameraParams;
 
 //managed externally
 CUDAImageManager*			g_CudaImageManager = NULL;
@@ -513,6 +514,17 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 		g_RGBDSensor->startReceivingFrames();
 	}
 
+
+	g_depthCameraParams.fx = g_CudaImageManager->getIntrinsics()(0, 0);
+	g_depthCameraParams.fy = g_CudaImageManager->getIntrinsics()(1, 1);
+	g_depthCameraParams.mx = g_CudaImageManager->getIntrinsics()(0, 2);
+	g_depthCameraParams.my = g_CudaImageManager->getIntrinsics()(1, 2);
+	g_depthCameraParams.m_sensorDepthWorldMin = GlobalAppState::get().s_sensorDepthMin;
+	g_depthCameraParams.m_sensorDepthWorldMax = GlobalAppState::get().s_sensorDepthMax;
+	g_depthCameraParams.m_imageWidth = g_CudaImageManager->getIntegrationWidth();
+	g_depthCameraParams.m_imageHeight = g_CudaImageManager->getIntegrationHeight();
+	DepthCameraData::updateParams(g_depthCameraParams);
+
 	return hr;
 }
 
@@ -577,6 +589,21 @@ void CALLBACK OnD3D11ReleasingSwapChain( void* pUserContext )
 	g_DialogResourceManager.OnD3D11ReleasingSwapChain();
 }
 
+void integrate(const DepthCameraData& depthCameraData, const mat4f& transformation)
+{
+	if (GlobalAppState::get().s_streamingEnabled) {
+		vec4f posWorld = transformation*vec4f(GlobalAppState::getInstance().s_streamingPos, 1.0f); // trans laggs one frame *trans
+		vec3f p(posWorld.x, posWorld.y, posWorld.z);
+
+		g_chunkGrid->streamOutToCPUPass0GPU(p, GlobalAppState::get().s_streamingRadius, true, true);
+		g_chunkGrid->streamInToGPUPass1GPU(true);
+	}
+
+	if (GlobalAppState::get().s_integrationEnabled) {
+		g_sceneRep->integrate(transformation, depthCameraData, g_depthCameraParams, g_chunkGrid->getBitMaskGPU());
+	}
+}
+
 void reconstruction()
 {
 	//only if binary dump
@@ -584,15 +611,7 @@ void reconstruction()
 	//	std::cout << "[ frame " << g_RGBDAdapter.getFrameNumber() << " ] " << g_sceneRep->getHashParams().m_numOccupiedBlocks << std::endl;
 	//
 
-	DepthCameraParams depthCameraParams;
-	depthCameraParams.fx = g_CudaImageManager->getIntrinsics()(0, 0);
-	depthCameraParams.fy = g_CudaImageManager->getIntrinsics()(1, 1);
-	depthCameraParams.mx = g_CudaImageManager->getIntrinsics()(0, 2);
-	depthCameraParams.my = g_CudaImageManager->getIntrinsics()(1, 2);
-	depthCameraParams.m_sensorDepthWorldMin = GlobalAppState::get().s_sensorDepthMin;
-	depthCameraParams.m_sensorDepthWorldMax = GlobalAppState::get().s_sensorDepthMax;
-	depthCameraParams.m_imageWidth = g_CudaImageManager->getIntegrationWidth();
-	depthCameraParams.m_imageHeight = g_CudaImageManager->getIntegrationHeight();
+
 
 	mat4f transformation = mat4f::identity();
 	DepthCameraData depthCameraData;
@@ -605,14 +624,6 @@ void reconstruction()
 		transformation = g_RGBDSensor->getRigidTransform();
 	}
 
-	depthCameraData.updateParams(depthCameraParams);	//TODO only needs to be done once!
-
-	//TODO move  this somewhere?
-	if (g_CudaImageManager->getCurrFrameNumber() > 0) {
-		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), depthCameraData, g_sceneRep->getLastRigidTransform());
-	}
-
-
 	if (GlobalAppState::getInstance().s_recordData) {
 		g_RGBDSensor->recordTrajectory(transformation);
 	}
@@ -624,22 +635,15 @@ void reconstruction()
 		return;
 	}
 
-	if (GlobalAppState::get().s_streamingEnabled) {
-		vec4f posWorld = transformation*vec4f(GlobalAppState::getInstance().s_streamingPos, 1.0f); // trans laggs one frame *trans
-		vec3f p(posWorld.x, posWorld.y, posWorld.z);
+	integrate(depthCameraData, transformation);
 
-		g_chunkGrid->streamOutToCPUPass0GPU(p, GlobalAppState::get().s_streamingRadius, true, true);
-		g_chunkGrid->streamInToGPUPass1GPU(true);
+	//else {
+	//	//compactification is required for the ray cast splatting
+	//	g_sceneRep->setLastRigidTransformAndCompactify(transformation, depthCameraData);
+	//}
 
-		//g_chunkGrid->debugCheckForDuplicates();
-	}
-
-	if (GlobalAppState::get().s_integrationEnabled) {
-		g_sceneRep->integrate(transformation, depthCameraData, depthCameraParams, g_chunkGrid->getBitMaskGPU());
-	}
-	else {
-		//compactification is required for the raycast splatting
-		g_sceneRep->setLastRigidTransformAndCompactify(transformation, depthCameraData);
+	if (g_CudaImageManager->getCurrFrameNumber() > 0) {
+		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), g_sceneRep->getLastRigidTransform());
 	}
 }
 
@@ -701,6 +705,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 			reconstruction();
 		}
 	}
+
 
 	if(GlobalAppState::get().s_RenderMode == 1)	{
 		//default render mode (render ray casted depth)

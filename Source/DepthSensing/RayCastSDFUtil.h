@@ -195,7 +195,7 @@ struct RayCastData {
 	}
 
 	__device__
-	void traverseCoarseGridSimpleSampleAll(const HashData& hash, const DepthCameraData& cameraData, const float3& worldCamPos, const float3& worldDir, const float3& camDir, const int3& dTid, float minInterval, float maxInterval) const
+	void traverseCoarseGridSimpleSampleAll(const HashData& hash, const float3& worldCamPos, const float3& worldDir, const float3& camDir, const int3& dTid, float minInterval, float maxInterval) const
 	{
 		const RayCastParams& rayCastParams = c_rayCastParams;
 
@@ -231,7 +231,7 @@ struct RayCastData {
 							float depth = alpha / depthToRayLength; // Convert ray length to depth depthToRayLength
 
 							d_depth[dTid.y*rayCastParams.m_width+dTid.x] = depth;
-							d_depth4[dTid.y*rayCastParams.m_width+dTid.x] = make_float4(cameraData.kinectDepthToSkeleton(dTid.x, dTid.y, depth), 1.0f);
+							d_depth4[dTid.y*rayCastParams.m_width+dTid.x] = make_float4(DepthCameraData::kinectDepthToSkeleton(dTid.x, dTid.y, depth), 1.0f);
 							d_colors[dTid.y*rayCastParams.m_width+dTid.x] = make_float4(color2.x/255.f, color2.y/255.f, color2.z/255.f, 1.0f);
 
 							if(rayCastParams.m_useGradients)

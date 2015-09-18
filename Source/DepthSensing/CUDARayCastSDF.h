@@ -39,7 +39,7 @@ public:
 		return params;
 	}
 
-	void render(const HashData& hashData, const HashParams& hashParams, const DepthCameraData& cameraData, const mat4f& lastRigidTransform);
+	void render(const HashData& hashData, const HashParams& hashParams, const mat4f& lastRigidTransform);
 
 	const RayCastData& getRayCastData(void) {
 		return m_data;
@@ -50,14 +50,14 @@ public:
 
 
 	// debugging
-	void convertToCameraSpace(const DepthCameraData& cameraData);
+	void convertToCameraSpace();
 
 private:
 
 	void create(const RayCastParams& params);
 	void destroy(void);
 
-	void rayIntervalSplatting(const HashData& hashData, const HashParams& hashParams, const DepthCameraData& cameraData, const mat4f& lastRigidTransform); // rasterize
+	void rayIntervalSplatting(const HashData& hashData, const HashParams& hashParams, const mat4f& lastRigidTransform); // rasterize
 
 	RayCastParams m_params;
 	RayCastData m_data;
