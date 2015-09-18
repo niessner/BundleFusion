@@ -13,7 +13,8 @@
 extern "C" void updateTrajectoryCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
 	float4x4* d_completeTrajectory, unsigned int numCompleteTransforms,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory, unsigned int numLocalTrajectories
+	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory, unsigned int numLocalTrajectories,
+	int* d_imageInvalidateList, unsigned int numImagesToInvalidate
 	);
 
 extern "C" void initNextGlobalTransformCU(
@@ -81,6 +82,7 @@ public:
 			global->setTimer(m_globalTimer);
 		}
 
+		m_imageInvalidateList.clear();
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globalTrajectory, sizeof(float4x4)*maxNumGlobalImages));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_completeTrajectory, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
@@ -93,6 +95,8 @@ public:
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_siftTrajectory, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_siftTrajectory, &id, sizeof(float4x4), cudaMemcpyHostToDevice)); // set first to identity
+
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_imageInvalidateList, sizeof(int) * maxNumGlobalImages * maxNumLocalImages));
 	}
 	void setTotalNumFrames(unsigned int n) {
 		m_numTotalFrames = n;
@@ -126,9 +130,21 @@ public:
 
 	// update complete trajectory with new global trajectory info
 	void updateTrajectory(unsigned int curFrame) {
+		if (!m_imageInvalidateList.empty())	{
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_imageInvalidateList.data(), sizeof(int)*m_imageInvalidateList.size(), cudaMemcpyHostToDevice));
+			std::cout << "invalidating " << m_imageInvalidateList.size() << " images:";
+			for (unsigned int i = 0; i < m_imageInvalidateList.size(); i++) std::cout << " " << m_imageInvalidateList[i];
+			std::cout << std::endl;
+			getchar();
+		}
+			
 		updateTrajectoryCU(d_globalTrajectory, global->getNumImages(),
 			d_completeTrajectory, curFrame,
-			d_localTrajectories, m_submapSize + 1, global->getNumImages());
+			d_localTrajectories, m_submapSize + 1, global->getNumImages(),
+			d_imageInvalidateList, (unsigned int)m_imageInvalidateList.size());
+
+		// done invalidating
+		m_imageInvalidateList.clear();
 	}
 
 	void initializeNextGlobalTransform(bool useIdentity = false) {
@@ -139,6 +155,14 @@ public:
 		}
 		else {
 			initNextGlobalTransformCU(d_globalTrajectory, numGlobalFrames, d_localTrajectories, m_submapSize + 1);
+		}
+	}
+
+	void invalidateImages(unsigned int startFrame, unsigned int endFrame = -1) {
+		if (endFrame == -1) m_imageInvalidateList.push_back(startFrame);
+		else {
+			for (unsigned int i = startFrame; i < endFrame; i++)
+				m_imageInvalidateList.push_back(i);
 		}
 	}
 
@@ -164,6 +188,8 @@ public:
 	}
 
 private:
+	std::vector<unsigned int>	m_imageInvalidateList;
+	int*						d_imageInvalidateList; // tmp for updateTrajectory //TODO just to update trajectory on CPU
 
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;

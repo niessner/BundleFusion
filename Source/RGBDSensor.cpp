@@ -398,18 +398,63 @@ void RGBDSensor::saveRecordedPointCloud(const std::string& filename, const std::
 	// apply transforms
 	PointCloudf pc;
 	for (unsigned int i = 0; i < m_recordedPoints.size(); i++) {
-		PointCloudf& p = m_recordedPoints[i];
-		mat4f invTranspose = trajectory[i].getInverse().getTranspose();
-		for (auto& pt : p.m_points)
-			pt = trajectory[i] * pt;
-		for (auto& n : p.m_normals) {
-			n = invTranspose * n;
-			n.normalize();
-		}
+		if (validImages[i] != 0) {
+			PointCloudf& p = m_recordedPoints[i];
+			mat4f invTranspose = trajectory[i].getInverse().getTranspose();
+			for (auto& pt : p.m_points)
+				pt = trajectory[i] * pt;
+			for (auto& n : p.m_normals) {
+				n = invTranspose * n;
+				n.normalize();
+			}
 
-		pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
-		pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
-		pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
+			pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
+			pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
+			pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
+		}
+	}
+
+	PointCloudIOf::saveToFile(filename, pc);
+	std::cout << "recorded " << m_recordedPoints.size() << " frames" << std::endl;
+	m_recordedPoints.clear();
+}
+
+void RGBDSensor::saveRecordedPointCloudDEBUG(const std::string& filename, const std::vector<int>& validImages, const std::vector<mat4f>& trajectory, unsigned int submapSize)
+{
+	MLIB_ASSERT(m_recordedPoints.size() <= validImages.size() &&
+		m_recordedPoints.size() <= trajectory.size());
+	//!!!
+	std::ofstream s("invalidImages.txt");
+	s << validImages.size() << std::endl;
+	for (unsigned int i = 0; i < m_recordedPoints.size(); i++) {
+		if (validImages[i] != 1)
+			s << "\timage " << i << " = " << validImages[i] << std::endl;
+	}
+	s.close();
+	//!!!
+
+	// apply transforms
+	PointCloudf pc;
+	for (unsigned int i = 0; i < m_recordedPoints.size(); i++) {
+		if (validImages[i] != 0) {
+			if (trajectory[i*submapSize][0] == -std::numeric_limits<float>::infinity()) {
+				std::cout << "ERROR complete trajectory and valid images do not match! (" << i*submapSize << ")" << std::endl;
+				getchar();
+			}
+
+			PointCloudf& p = m_recordedPoints[i];
+			mat4f invTranspose = trajectory[i*submapSize].getInverse().getTranspose();
+			for (auto& pt : p.m_points)
+				pt = trajectory[i*submapSize] * pt;
+			for (auto& n : p.m_normals) {
+				n = invTranspose * n;
+				n.normalize();
+			}
+
+			pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
+			pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
+			pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
+		}
 	}
 
 	PointCloudIOf::saveToFile(filename, pc);

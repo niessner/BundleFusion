@@ -66,6 +66,7 @@ public:
 	void recordPointCloud(const mat4f& transform = mat4f::identity());
 	void saveRecordedPointCloud(const std::string& filename);
 	void saveRecordedPointCloud(const std::string& filename, const std::vector<int>& validImages, const std::vector<mat4f>& trajectory);
+	void saveRecordedPointCloudDEBUG(const std::string& filename, const std::vector<int>& validImages, const std::vector<mat4f>& trajectory, unsigned int submapSize);
 
 	//! saves all previously recorded frames to file
 	void saveRecordedFramesToFile(const std::string& filename);

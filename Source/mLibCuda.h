@@ -11,3 +11,4 @@
 #define MLIB_CUDA_CHECK_ERR(msg) {  cudaError_t err = cudaGetLastError();	if (err != cudaSuccess) { throw MLIB_EXCEPTION(cudaGetErrorString( err )); } }
 
 
+#define MINF __int_as_float(0xff800000)

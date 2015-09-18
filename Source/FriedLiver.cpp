@@ -145,7 +145,7 @@ int main(int argc, char** argv)
 		std::cout << "Bundler:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
 
 		//start depthSensing render loop
-		startDepthSensing(bundler, getRGBDSensor(), imageManager);
+		//startDepthSensing(bundler, getRGBDSensor(), imageManager);
 
 		while (1) {
 			if (imageManager->process()) {

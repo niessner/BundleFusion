@@ -18,10 +18,25 @@ __global__ void updateTrajectoryCU_Kernel(float4x4* d_globalTrajectory, unsigned
 	}
 }
 
+__global__ void invalidateImagesInTrajectoryCU_Kernel(float4x4* d_completeTrajectory, unsigned int numCompleteTransforms,
+	int* d_imageInvalidateList, unsigned int numImagesToInvalidate)
+{
+	const unsigned int idx = threadIdx.x;
+
+	if (idx < numImagesToInvalidate) {
+		const unsigned int imIdx = d_imageInvalidateList[idx];
+		if (imIdx >= numCompleteTransforms) printf("ERROR trying to invalidate image not in complete trajectory");
+		else {
+			d_completeTrajectory[imIdx].setValue(MINF);
+		}
+	}
+}
+
 extern "C" void updateTrajectoryCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
 	float4x4* d_completeTrajectory, unsigned int numCompleteTransforms,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory, unsigned int numLocalTrajectories) 
+	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory, unsigned int numLocalTrajectories,
+	int* d_imageInvalidateList, unsigned int numImagesToInvalidate) 
 {
 	const unsigned int N = numCompleteTransforms;
 
@@ -34,6 +49,16 @@ extern "C" void updateTrajectoryCU(
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
+
+	if (numImagesToInvalidate == 0) return;
+	invalidateImagesInTrajectoryCU_Kernel << <1, numImagesToInvalidate >> >(
+		d_completeTrajectory, numCompleteTransforms, d_imageInvalidateList, numImagesToInvalidate);
+
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+
 }
 
 

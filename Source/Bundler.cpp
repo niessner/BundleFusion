@@ -164,6 +164,11 @@ void Bundler::processGlobal()
 		global->finalizeSIFTImageGPU(numGlobalKeys);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
+		const std::vector<int>& validImagesLocal = m_SubmapManager.nextLocal->getValidImages();
+		for (unsigned int i = 0; i < std::min(m_submapSize, m_SubmapManager.nextLocal->getNumImages()); i++) {
+			if (validImagesLocal[i] == 0)
+				m_SubmapManager.invalidateImages((global->getNumImages() - 1) * m_submapSize + i);
+		}
 		m_SubmapManager.initializeNextGlobalTransform(false);
 		// done with local data!
 		m_SubmapManager.finishLocalOpt();
@@ -199,6 +204,14 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 
 	const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
 	unsigned int numFrames = (numGlobalFrames > 0) ? ((numGlobalFrames - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames) : m_currentState.m_lastNumLocalFrames;
+
+	// may invalidate already invalidated images
+	const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
+	for (unsigned int i = 0; i < numGlobalFrames; i++) {
+		if (validImagesGlobal[i] == 0)
+			m_SubmapManager.invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
+	}
+
 	m_SubmapManager.updateTrajectory(numFrames);
 }
 
@@ -383,7 +396,15 @@ void Bundler::saveKeysToPointCloud(const std::string& filename /*= "refined.ply"
 		const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
 		std::vector<mat4f> globalTrajectory(m_SubmapManager.global->getNumImages());
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globalTrajectory.data(), m_SubmapManager.d_globalTrajectory, sizeof(float4x4)*globalTrajectory.size(), cudaMemcpyDeviceToHost));
+		
 		m_RGBDSensor->saveRecordedPointCloud(filename, validImagesGlobal, globalTrajectory);
+		//!!!
+		//unsigned int numFrames = (m_SubmapManager.global->getNumImages() > 0) ? (m_SubmapManager.global->getNumImages() - 1)*m_submapSize + m_currentState.m_lastNumLocalFrames : m_currentState.m_lastNumLocalFrames;
+		//std::cout << "found " << numFrames << " total frames" << std::endl;
+		//std::vector<mat4f> completeTrajectory(numFrames);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(completeTrajectory.data(), m_SubmapManager.d_completeTrajectory, sizeof(float4x4)*completeTrajectory.size(), cudaMemcpyDeviceToHost));
+		//m_RGBDSensor->saveRecordedPointCloudDEBUG(filename, validImagesGlobal, completeTrajectory, m_submapSize);
+		//!!!
 	}
 }
 
