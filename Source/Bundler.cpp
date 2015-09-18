@@ -14,6 +14,8 @@
 #include "Bundler.h"
 
 
+extern "C" void updateConstantSiftCameraParams(const SiftCameraParams& params);
+
 Timer Bundler::s_timer;
 
 
@@ -31,13 +33,24 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	}
 	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
 
+	m_trajectoryManager = new TrajectoryManager(GlobalBundlingState::get().s_maxNumImages * m_submapSize);
+
+	// init sift camera constant params
+	m_siftCameraParams.m_depthWidth = m_CudaImageManager->getIntegrationWidth();
+	m_siftCameraParams.m_depthHeight = m_CudaImageManager->getIntegrationHeight();
+	m_siftCameraParams.m_intensityWidth = m_CudaImageManager->getSIFTWidth();
+	m_siftCameraParams.m_intensityHeight = m_CudaImageManager->getSIFTHeight();
+	m_siftCameraParams.m_siftIntrinsics = MatrixConversion::toCUDA(m_CudaImageManager->getSIFTIntrinsics());
+	m_siftCameraParams.m_siftIntrinsicsInv = MatrixConversion::toCUDA(m_CudaImageManager->getSIFTIntrinsicsInv());
+	m_siftCameraParams.m_downSampIntrinsics = MatrixConversion::toCUDA(m_SubmapManager.currentLocalCache->getIntrinsics());
+	m_siftCameraParams.m_downSampIntrinsicsInv = MatrixConversion::toCUDA(m_SubmapManager.currentLocalCache->getIntrinsicsInv());
+	updateConstantSiftCameraParams(m_siftCameraParams);
+
 	m_sift = new SiftGPU;
 	m_siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
 	m_sift->SetParams(0, GlobalBundlingState::get().s_enableDetailedTimings, 150);
 	m_sift->InitSiftGPU(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight(), m_CudaImageManager->getSIFTWidth(), m_CudaImageManager->getSIFTHeight());
 	m_siftMatcher->InitSiftMatch();
-
-	m_trajectoryManager = new TrajectoryManager(GlobalBundlingState::get().s_maxNumImages * m_submapSize);
 }
 
 Bundler::~Bundler()

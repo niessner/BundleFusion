@@ -145,12 +145,15 @@ int main(int argc, char** argv)
 		std::cout << "Bundler:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
 
 		//start depthSensing render loop
-		startDepthSensing(bundler, getRGBDSensor(), imageManager);
+		//startDepthSensing(bundler, getRGBDSensor(), imageManager);
 
 		while (1) {
 			if (imageManager->process()) {
 				//bundler->process();
 				bundler->processInput();
+
+				mat4f transformation; const float* d_depthData; const uchar4* d_colorData;
+				bundler->getCurrentIntegrationFrame(transformation, d_depthData, d_colorData);
 
 				// these are queried
 				bundler->optimizeLocal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);

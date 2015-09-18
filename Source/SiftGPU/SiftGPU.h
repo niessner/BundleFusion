@@ -29,7 +29,6 @@
 
 #include <vector>
 #include "SIFTImageManager.h"
-#include "SiftCameraParams.h"
 
 #if  defined(_WIN32) 
 	#ifdef SIFTGPU_DLL
@@ -158,7 +157,6 @@ private:
 	//print out the command line options
 	static void PrintUsage();
 
-	SiftCameraParams m_siftCameraParams;
 };
 
 

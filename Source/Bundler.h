@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SiftGPU/SiftCameraParams.h"
 #include "SubmapManager.h"
 #include "SBA.h"
 
@@ -101,6 +102,7 @@ private:
 
 	static Timer			s_timer;
 
+	SiftCameraParams		m_siftCameraParams;
 
 	// state of processing/optimization
 	BundlerState			m_currentState;

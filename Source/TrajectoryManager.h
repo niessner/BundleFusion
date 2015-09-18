@@ -89,7 +89,7 @@ public:
 		std::sort(m_framesSort.begin(), m_framesSort.end(), s);
 		//m_framesSort.sort(s);
 
-		while (m_toReIntegrateList.size() < (size_t)m_topNActive) {
+		while (m_toReIntegrateList.size() < (size_t)m_topNActive && m_framesSort.front()->dist > m_minPoseDist) {
 			if (m_framesSort.front()->type == TrajectoryFrame::Integrated) {
 				m_framesSort.front()->type = TrajectoryFrame::ReIntegration;
 				m_toReIntegrateList.push_back(m_framesSort.front());
