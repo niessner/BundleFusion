@@ -596,7 +596,7 @@ void reconstruction()
 
 	mat4f transformation = mat4f::identity();
 	DepthCameraData depthCameraData;
-	
+
 
 	bool validIntegrationFrame = g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
 	if (!validIntegrationFrame)	return;
@@ -636,16 +636,11 @@ void reconstruction()
 
 	if (GlobalAppState::get().s_integrationEnabled) {
 		g_sceneRep->integrate(transformation, depthCameraData, depthCameraParams, g_chunkGrid->getBitMaskGPU());
-	} else {
+	}
+	else {
 		//compactification is required for the raycast splatting
 		g_sceneRep->setLastRigidTransformAndCompactify(transformation, depthCameraData);
 	}
-
-	//{
-	//	Util::saveScreenshot(g_rayCast->getRayCastData().d_depth, g_rayCast->getRayCastParams().m_width, g_rayCast->getRayCastParams().m_height, "ray/raycast_" + std::to_string(g_RGBDAdapter.getFrameNumber()) + ".png");
-	//	g_sceneRep->debug("ray/hash_", g_RGBDAdapter.getFrameNumber());
-	//}
-
 }
 
 //--------------------------------------------------------------------------------------

@@ -36,12 +36,15 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_sift->SetParams(0, GlobalBundlingState::get().s_enableDetailedTimings, 150);
 	m_sift->InitSiftGPU(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight(), m_CudaImageManager->getSIFTWidth(), m_CudaImageManager->getSIFTHeight());
 	m_siftMatcher->InitSiftMatch();
+
+	m_trajectoryManager = new TrajectoryManager(GlobalBundlingState::get().s_maxNumImages * m_submapSize);
 }
 
 Bundler::~Bundler()
 {
 	SAFE_DELETE(m_sift);
 	SAFE_DELETE(m_siftMatcher);
+	SAFE_DELETE(m_trajectoryManager);
 }
 
 void Bundler::processInput()
@@ -133,9 +136,14 @@ bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_
 		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.d_siftTrajectory + m_currentState.m_lastFrameProcessed, sizeof(float4x4), cudaMemcpyDeviceToHost));
 		d_depth = m_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
 		d_color = m_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
+
+		m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, siftTransform, m_currentState.m_lastFrameProcessed);
 		return true;
 	}
-	return false;
+	else {
+		m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::NotIntegrated_NoTransform, mat4f::zero(), m_currentState.m_lastFrameProcessed);
+		return false;
+	}
 }
 
 void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations)
@@ -208,11 +216,13 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 	// may invalidate already invalidated images
 	const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
 	for (unsigned int i = 0; i < numGlobalFrames; i++) {
-		if (validImagesGlobal[i] == 0)
+		if (validImagesGlobal[i] == 0) {
 			m_SubmapManager.invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
+		}
 	}
 
 	m_SubmapManager.updateTrajectory(numFrames);
+	m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
 }
 
 void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal)

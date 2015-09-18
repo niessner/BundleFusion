@@ -5,6 +5,7 @@
 
 #include "RGBDSensor.h"
 #include "BinaryDumpReader.h"
+#include "TrajectoryManager.h"
 
 class CUDAImageManager;
 class SIFTImageManager;
@@ -74,6 +75,10 @@ public:
 
 	//void saveDEBUG();
 
+	TrajectoryManager* getTrajectoryManager() {
+		return m_trajectoryManager;
+	}
+
 private:
 	void matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int frameStart, unsigned int frameSkip, bool print = false);
 
@@ -90,6 +95,7 @@ private:
 
 	SiftGPU*				m_sift;
 	SiftMatchGPU*			m_siftMatcher;
+	TrajectoryManager*		m_trajectoryManager;
 
 	unsigned int			m_submapSize;
 

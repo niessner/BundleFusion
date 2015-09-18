@@ -11,7 +11,8 @@ public:
 			Integrated = 0,
 			NotIntegrated_NoTransform = 1,
 			NotIntegrated_WithTransform = 2,
-			Invalid = 3
+			Invalid = 3,
+			ReIntegration = 4
 		};
 
 		TYPE type;
@@ -27,6 +28,12 @@ public:
 		for (unsigned int i = 0; i < numMaxImage; i++) {
 			m_frames.push_back(TrajectoryFrame { TrajectoryFrame::NotIntegrated_NoTransform, i, mat4f::zero(), m_optmizedTransforms[i] });
 		}
+
+		//TODO move this to some sort of parameter file
+		m_topNActive = 10;
+		m_minPoseDist = 0.02f*0.02f;
+		m_featureRescaleRotToTrans = 2.0f;
+
 	}
 
 
@@ -37,6 +44,9 @@ public:
 		m_frames[idx].integratedTransform = transform;
 		m_frames[idx].optimizedTransform = transform;
 		m_frames[idx].poseIntegrated = PoseHelper::MatrixToPose(transform);
+		m_frames[idx].poseIntegrated[0] *= m_featureRescaleRotToTrans;
+		m_frames[idx].poseIntegrated[1] *= m_featureRescaleRotToTrans;
+		m_frames[idx].poseIntegrated[2] *= m_featureRescaleRotToTrans;
 		m_framesSort.push_back(&m_frames[idx]);
 	}
 
@@ -50,45 +60,107 @@ public:
 		for (unsigned int i = 0; i < numFrames; i++) {
 			TrajectoryFrame& f = m_frames[i];
 			if (f.optimizedTransform[0] == -std::numeric_limits<float>::infinity()) {
-				f.type = TrajectoryFrame::Invalid;
+				//f.type = TrajectoryFrame::Invalid;
+				invalidateFrame(i);	//adding it to the deIntragte list
 			}
 			else {
 				//has a valid transform now
-				if (f.type == TrajectoryFrame::NotIntegrated_NoTransform)	f.type = TrajectoryFrame::NotIntegrated_WithTransform; //TODO can just add to the integrate list
+				if (f.type == TrajectoryFrame::NotIntegrated_NoTransform)	{
+					//adding it to the integrate list
+					f.type = TrajectoryFrame::NotIntegrated_WithTransform;
+					m_toIntegrateList.push_back(&f);
+				}
 
 				vec6f poseOptimized = PoseHelper::MatrixToPose(f.optimizedTransform);
-				//TODO think about some scaling here
+				poseOptimized[0] *= m_featureRescaleRotToTrans;
+				poseOptimized[1] *= m_featureRescaleRotToTrans;
+				poseOptimized[2] *= m_featureRescaleRotToTrans;
 				f.dist = (f.poseIntegrated - poseOptimized) | (f.poseIntegrated - poseOptimized);
 			}			
 		}
 
 		//TODO could remove Invalids from m_framesSort();
-
+		//TODO only generate a topN list
 		auto s = [](const TrajectoryFrame *left, const TrajectoryFrame *right) {
-			if (left->type == TrajectoryFrame::NotIntegrated_WithTransform)	return true;		//prioritize not integrated, but with transform
-			if (right->type == TrajectoryFrame::NotIntegrated_WithTransform)	return false;	//prioritize not integrated, but with transform
-			if (left->type == TrajectoryFrame::Invalid || left->type == TrajectoryFrame::NotIntegrated_NoTransform) return false;		//penalize invalids
-			if (right->type == TrajectoryFrame::Invalid || right->type == TrajectoryFrame::NotIntegrated_NoTransform) return true;		//penalize invalids
-			
+			if (left->type == TrajectoryFrame::Integrated && right->type != TrajectoryFrame::Integrated)	return true;
+			if (left->type != TrajectoryFrame::Integrated && right->type == TrajectoryFrame::Integrated)	return false;
 			return left->dist > right->dist;
 		};
-		m_framesSort.sort(s);
-	}
+		std::sort(m_framesSort.begin(), m_framesSort.end(), s);
+		//m_framesSort.sort(s);
 
-	void invalidateFrame(unsigned int idx) {
-		assert(m_frames[idx].type != TrajectoryFrame::Invalid);
-		TrajectoryFrame::TYPE typeBefore = m_frames[idx].type;
-		m_frames[idx].type = TrajectoryFrame::Invalid;
-
-		if (typeBefore == TrajectoryFrame::Integrated) {
-			m_toDeIntegrateList.push_back(&m_frames[idx]);
+		while (m_toReIntegrateList.size() < (size_t)m_topNActive) {
+			if (m_framesSort.front()->type == TrajectoryFrame::Integrated) {
+				m_framesSort.front()->type = TrajectoryFrame::ReIntegration;
+				m_toReIntegrateList.push_back(m_framesSort.front());
+			}
+			else {
+				break;
+			}
 		}
 	}
+
+
+	void confirmIntegration(unsigned int frameIdx) {
+		m_frames[frameIdx].type = TrajectoryFrame::Integrated;
+	}
+
+	bool getTopFromReIntegrateList(mat4f& trans, unsigned int& frameIdx) {
+		if (m_toReIntegrateList.empty())	return false;
+		assert(m_toDeIntegrateList.front()->type == TrajectoryFrame::ReIntegration);
+
+		trans = m_toReIntegrateList.front()->optimizedTransform;
+		frameIdx = m_toReIntegrateList.front()->frameIdx;
+		m_toReIntegrateList.front()->integratedTransform = trans;
+		m_toReIntegrateList.pop_front();
+		return true;
+	}
+
+
+	bool getTopFromIntegrateList(mat4f& trans, unsigned int& frameIdx) {
+		if (m_toIntegrateList.empty())	return false;
+		assert(m_toDeIntegrateList.front()->type == TrajectoryFrame::NotIntegrated_WithTransform);
+
+		trans = m_toIntegrateList.front()->optimizedTransform;
+		frameIdx = m_toIntegrateList.front()->frameIdx;
+		m_toIntegrateList.front()->integratedTransform = trans;
+		m_toIntegrateList.pop_front();
+		return true;
+	}
+
+	bool getTopFromDeIntegrateList(mat4f& trans, unsigned int& frameIdx) {
+		if (m_toDeIntegrateList.empty())	return false;
+		assert(m_toDeIntegrateList.front()->type == TrajectoryFrame::Invalid);
+
+		trans = m_toDeIntegrateList.front()->optimizedTransform;
+		frameIdx = m_toDeIntegrateList.front()->frameIdx;
+		m_toDeIntegrateList.pop_front();
+		return true;
+	}
+
+
+
 private:
+	void invalidateFrame(unsigned int frameIdx) {
+		assert(m_frames[frameIdx].type != TrajectoryFrame::Invalid);
+		TrajectoryFrame::TYPE typeBefore = m_frames[frameIdx].type;
+		m_frames[frameIdx].type = TrajectoryFrame::Invalid;
+
+		if (typeBefore == TrajectoryFrame::Integrated) {
+			m_toDeIntegrateList.push_back(&m_frames[frameIdx]);
+		}
+	}
+
 	std::vector<mat4f> m_optmizedTransforms;
-	std::vector<TrajectoryFrame> m_frames;
-	std::list<TrajectoryFrame*>  m_framesSort;
+	std::vector<TrajectoryFrame>	m_frames;
+	std::vector<TrajectoryFrame*>	m_framesSort;
 
 	std::list<TrajectoryFrame*> m_toDeIntegrateList;
 	std::list<TrajectoryFrame*> m_toIntegrateList;
+	std::list<TrajectoryFrame*> m_toReIntegrateList;
+
+
+	unsigned int	m_topNActive;				//only keep up to N
+	float			m_minPoseDist;				//only change if value is larger than this
+	float			m_featureRescaleRotToTrans;	//multiply the angle in the distance metric by this factor
 };
