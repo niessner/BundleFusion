@@ -214,6 +214,7 @@
     <ClInclude Include="Source\stdafx.h" />
     <ClInclude Include="Source\SubmapManager.h" />
     <ClInclude Include="Source\TimingLog.h" />
+    <ClInclude Include="Source\TrajectoryManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\BinaryDumpReader.cpp" />
@@ -297,6 +298,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\TimingLog.cpp" />
+    <ClCompile Include="Source\TrajectoryManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Source\CUDAImageUtil.cu" />
