@@ -77,10 +77,10 @@ public:
 		nextLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
 		global = new SIFTImageManager(m_submapSize, maxNumGlobalImages, maxNumKeysPerImage);
 
-		if (GlobalBundlingState::get().s_enableDetailedTimings) {
-			m_globalTimer = new CUDATimer();
-			global->setTimer(m_globalTimer);
-		}
+		//if (GlobalBundlingState::get().s_enableDetailedTimings) {
+		//	m_globalTimer = new CUDATimer();
+		//	global->setTimer(m_globalTimer);
+		//}
 
 		m_imageInvalidateList.clear();
 
@@ -202,7 +202,8 @@ private:
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;
 
-	CUDATimer* m_globalTimer;
+	// debug only
+	//CUDATimer* m_globalTimer;
 };
 
 #endif

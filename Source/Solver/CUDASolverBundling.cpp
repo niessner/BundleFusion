@@ -35,8 +35,8 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	cutilSafeCall(cudaMalloc(&m_solverState.d_Jp, sizeof(float3)*numberOfResiduums));
 	cutilSafeCall(cudaMalloc(&m_solverState.d_Ap_XRot, sizeof(float3)*numberOfVariables));
 	cutilSafeCall(cudaMalloc(&m_solverState.d_Ap_XTrans, sizeof(float3)*numberOfVariables));
-	cutilSafeCall(cudaMalloc(&m_solverState.d_scanAlpha, sizeof(float)));
-	cutilSafeCall(cudaMalloc(&m_solverState.d_scanBeta, sizeof(float)));
+	cutilSafeCall(cudaMalloc(&m_solverState.d_scanAlpha, sizeof(float) * 2));
+	//cutilSafeCall(cudaMalloc(&m_solverState.d_scanBeta, sizeof(float)));
 	cutilSafeCall(cudaMalloc(&m_solverState.d_rDotzOld, sizeof(float) *numberOfVariables));
 	cutilSafeCall(cudaMalloc(&m_solverState.d_precondionerRot, sizeof(float3)*numberOfVariables));
 	cutilSafeCall(cudaMalloc(&m_solverState.d_precondionerTrans, sizeof(float3)*numberOfVariables));
@@ -70,7 +70,7 @@ CUDASolverBundling::~CUDASolverBundling()
 	cutilSafeCall(cudaFree(m_solverState.d_Ap_XRot));
 	cutilSafeCall(cudaFree(m_solverState.d_Ap_XTrans));
 	cutilSafeCall(cudaFree(m_solverState.d_scanAlpha));
-	cutilSafeCall(cudaFree(m_solverState.d_scanBeta));
+	//cutilSafeCall(cudaFree(m_solverState.d_scanBeta));
 	cutilSafeCall(cudaFree(m_solverState.d_rDotzOld));
 	cutilSafeCall(cudaFree(m_solverState.d_precondionerRot));
 	cutilSafeCall(cudaFree(m_solverState.d_precondionerTrans));
@@ -148,6 +148,7 @@ void CUDASolverBundling::computeMaxResidual(SolverInput& solverInput, SolverPara
 bool CUDASolverBundling::getMaxResidual(EntryJ* d_correspondences, ml::vec2ui& imageIndices, float& maxRes)
 {
 	const float MAX_RESIDUAL = 0.05f; // nonsquared residual
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	maxRes = m_solverState.h_maxResidual[0];
 
@@ -156,6 +157,8 @@ bool CUDASolverBundling::getMaxResidual(EntryJ* d_correspondences, ml::vec2ui& i
 	unsigned int imIdx = m_solverState.h_maxResidualIndex[0] / 3;
 	cutilSafeCall(cudaMemcpy(&h_corr, d_correspondences + imIdx, sizeof(EntryJ), cudaMemcpyDeviceToHost));
 	imageIndices = ml::vec2ui(h_corr.imgIdx_i, h_corr.imgIdx_j);
+
+	if (m_timer) m_timer->endEvent();
 
 	if (m_solverState.h_maxResidual[0] > MAX_RESIDUAL) { // remove!
 		

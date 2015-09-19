@@ -35,10 +35,14 @@ class CUDASolverBundling
 
 		void evaluateTimings() {
 			if (m_timer) {
-				std::cout << "********* SOLVER TIMINGS *********" << std::endl;
-				m_timer->evaluate(true, true);
+				//std::cout << "********* SOLVER TIMINGS *********" << std::endl;
+				m_timer->evaluate(true);
 				std::cout << std::endl << std::endl;
 			}
+		}
+
+		void resetTimer() {
+			if (m_timer) m_timer->reset();
 		}
 
 	private:

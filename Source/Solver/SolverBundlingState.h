@@ -43,7 +43,7 @@ struct SolverState
 	float3*	d_Ap_XTrans;				// Cache values for next kernel call after A = J^T x J x p
 
 	float*	d_scanAlpha;				// Tmp memory for alpha scan
-	float*	d_scanBeta;					// Tmp memory for beta scan
+	//float*	d_scanBeta;					// Tmp memory for beta scan
 
 	float*	d_rDotzOld;					// Old nominator (denominator) of alpha (beta)
 	

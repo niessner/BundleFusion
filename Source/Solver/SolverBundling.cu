@@ -180,10 +180,10 @@ extern "C" int countHighResiduals(SolverInput& input, SolverState& state, Solver
 	if (timer) timer->startEvent(__FUNCTION__);
 
 	const unsigned int N = input.numberOfCorrespondences * 3; // Number of correspondences (*3 per xyz)
-	int count = 0;
-	cutilSafeCall(cudaMemcpy(state.d_countHighResidual, &count, sizeof(int), cudaMemcpyHostToDevice));
+	cutilSafeCall(cudaMemset(state.d_countHighResidual, 0, sizeof(int)));
 	CountHighResidualsDevice<<<(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(input, state, parameters);
 	
+	int count;
 	cutilSafeCall(cudaMemcpy(&count, state.d_countHighResidual, sizeof(int), cudaMemcpyDeviceToHost));
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
@@ -253,10 +253,9 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 		while (1);
 	}
 
-	if (timer) timer->startEvent(__FUNCTION__);
+	if (timer) timer->startEvent("Init1");
 
-	float init = 0.0f;
-	cutilSafeCall(cudaMemcpy(state.d_scanAlpha, &init, sizeof(float), cudaMemcpyHostToDevice));
+	cutilSafeCall(cudaMemset(state.d_scanAlpha, 0, sizeof(float)));
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
@@ -267,13 +266,15 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif		
+	if (timer) timer->endEvent();
 
+	if (timer) timer->startEvent("Init2");
 	PCGInit_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(N, state);
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
-
+		
 	if (timer) timer->endEvent();
 }
 
@@ -398,7 +399,7 @@ __global__ void PCGStep_Kernel2(SolverInput input, SolverState state)
 	b = warpReduce(b);
 	if (threadIdx.x % WARP_SIZE == 0)
 	{
-		atomicAdd(state.d_scanBeta, b);
+		atomicAdd(&state.d_scanAlpha[1], b);
 	}
 }
 
@@ -410,7 +411,7 @@ __global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 
 	if (x > 0 && x < N)
 	{
-		const float rDotzNew = state.d_scanBeta[0];								// get new nominator
+		const float rDotzNew = state.d_scanAlpha[1];								// get new nominator
 		const float rDotzOld = state.d_rDotzOld[x];								// get old denominator
 
 		float beta = 0.0f;
@@ -444,13 +445,13 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 		std::cout << "Too many variables for this block size. Maximum number of variables for two kernel scan: " << THREADS_PER_BLOCK*THREADS_PER_BLOCK << std::endl;
 		while (1);
 	}
-	float init = 0.0f;
-	cutilSafeCall(cudaMemcpy(&state.d_scanAlpha[0], &init, sizeof(float), cudaMemcpyHostToDevice));
-	cutilSafeCall(cudaMemcpy(&state.d_scanBeta[0], &init, sizeof(float), cudaMemcpyHostToDevice));
+
+	//if (timer) timer->startEvent("PCGIteration::applyJ");
+	cutilSafeCall(cudaMemset(state.d_scanAlpha, 0, sizeof(float)*2));
+	//cutilSafeCall(cudaMemset(state.d_scanBeta, 0, sizeof(float)));
 
 	const unsigned int Ncorr = input.numberOfCorrespondences;
 	const int blocksPerGridCorr = (Ncorr + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-	//if (timer) timer->startEvent("PCGIteration::applyJ");
 	PCGStep_Kernel0 << <blocksPerGridCorr, THREADS_PER_BLOCK >> >(input, state, parameters);
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
@@ -458,13 +459,15 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	#endif
 	//if (timer) timer->endEvent();
 
-	//if (timer) timer->startEvent("PCGIteration::applyJT");
+	//if (timer) timer->startEvent("PCGIteration::applyJTa");
 	PCGStep_Kernel1a << < N, THREADS_PER_BLOCK_JT >> >(input, state, parameters);
 	#ifdef _DEBUG
 			cutilSafeCall(cudaDeviceSynchronize());
 			cutilCheckMsg(__FUNCTION__);
 	#endif
+	//if (timer) timer->endEvent();
 
+	//if (timer) timer->startEvent("PCGIteration::applyJTb");
 	PCGStep_Kernel1b << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state, parameters);
 	#ifdef _DEBUG
 				cutilSafeCall(cudaDeviceSynchronize());
@@ -472,12 +475,15 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	#endif
 	//if (timer) timer->endEvent();
 
+	//if (timer) timer->startEvent("PCGIteration::2");
 	PCGStep_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 	#ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
+	//if (timer) timer->endEvent();
 	
+	//if (timer) timer->startEvent("PCGIteration::3");
 	if (lastIteration) {
 		PCGStep_Kernel3<true> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 	}
@@ -489,6 +495,8 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 	#endif
+
+	//if (timer) timer->endEvent();
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -522,9 +530,6 @@ void ApplyLinearUpdate(SolverInput& input, SolverState& state, SolverParameters&
 
 extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, SolverParameters& parameters, float* convergenceAnalysis, CUDATimer *timer)
 {
-	//printf("#nonlinear iterations = %d\n", parameters.nNonLinearIterations);
-	//printf("#linear iterations = %d\n", parameters.nLinIterations);
-
 	if (convergenceAnalysis) {
 		float initialResidual = EvalResidual(input, state, parameters, timer);
 		//printf("initial = %f\n", initialResidual);

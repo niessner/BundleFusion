@@ -23,8 +23,12 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 	m_maxResidual = -1.0f;
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
+
+	unsigned int numImages = siftManager->getNumImages();
+	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans);
+
 	bool removed = false;
-	const unsigned int maxIts = 60;//GlobalAppState::get().s_maxNumResidualsRemoved; //!!!TODO PARAMS
+	const unsigned int maxIts = 10;//GlobalAppState::get().s_maxNumResidualsRemoved; //!!!TODO PARAMS
 	unsigned int curIt = 0;
 	do {
 		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits, useVerify);
@@ -33,26 +37,26 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 			m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
 		}
 		curIt++;
+
+		removed = false;//!!!DEBUG
+
 	} while (removed && curIt < maxIts);
+
+	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
 	
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve = s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve = curIt * maxNumIters; }
 	//std::cout << "[ align Time:] " << s_timer.getElapsedTimeMS() << " ms" << std::endl;
-
 }
 
 bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify)
 {
 	EntryJ* d_correspondences = siftManager->getGlobalCorrespondencesDEBUG();
-	unsigned int numCorrespondences = siftManager->getNumGlobalCorrespondences();
+	m_numCorrespondences = siftManager->getNumGlobalCorrespondences();
 
-	m_numCorrespondences = numCorrespondences;
 	// transforms
 	unsigned int numImages = siftManager->getNumImages();
-	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans);
 
 	m_solver->solve(d_correspondences, m_numCorrespondences, numImages, numNonLinearIterations, numLinearIterations, d_xRot, d_xTrans);
-
-	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
 
 	bool removed = removeMaxResidualCUDA(siftManager, numImages);
 
