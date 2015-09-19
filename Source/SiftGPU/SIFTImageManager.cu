@@ -827,7 +827,7 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 				transform = d_completeTrajectory[idxPrevSiftKnown] * d_filteredTransformsInv[i];
 			}
 			else {
-				const float4x4 offset = d_siftTrajectory[idxPrevSiftKnown] * d_siftTrajectory[lastValidCompleteTransform].getInverse();
+				const float4x4 offset = d_siftTrajectory[lastValidCompleteTransform].getInverse() * d_siftTrajectory[idxPrevSiftKnown];
 				transform = d_completeTrajectory[lastValidCompleteTransform] * offset * d_filteredTransformsInv[i];
 			}
 

@@ -96,7 +96,7 @@ public:
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_siftTrajectory, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_siftTrajectory, &id, sizeof(float4x4), cudaMemcpyHostToDevice)); // set first to identity
 
-		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currIntegrateTransform, sizeof(float4x4)));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currIntegrateTransform, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_imageInvalidateList, sizeof(int) * maxNumGlobalImages * maxNumLocalImages));
 	}
@@ -191,7 +191,7 @@ public:
 		return curLocalIdx;
 	}
 
-	float4x4* getCurrIntegrateTransform() { return d_currIntegrateTransform; }
+	float4x4* getCurrIntegrateTransform(unsigned int frameIdx) { return d_currIntegrateTransform + frameIdx; }
 
 private:
 	std::vector<unsigned int>	m_imageInvalidateList;

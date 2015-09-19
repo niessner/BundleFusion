@@ -84,6 +84,7 @@ public:
 
 	void saveCompleteTrajectory(const std::string& filename) const;
 	void saveSiftTrajectory(const std::string& filename) const;
+	void saveIntegrateTrajectory(const std::string& filename);
 
 	TrajectoryManager* getTrajectoryManager() {
 		return m_trajectoryManager;

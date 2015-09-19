@@ -167,6 +167,7 @@ int main(int argc, char** argv)
 		if (GlobalBundlingState::get().s_recordSolverConvergence) bundler->saveConvergence("convergence.txt");
 		bundler->saveCompleteTrajectory("trajectory.bin");
 		bundler->saveCompleteTrajectory("siftTrajectory.bin");
+		bundler->saveIntegrateTrajectory("intTrajectory.bin");
 		if (GlobalBundlingState::get().s_recordKeysPointCloud) bundler->saveKeysToPointCloud();
 		//bundler->saveDEBUG();
 

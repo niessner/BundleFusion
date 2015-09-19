@@ -102,7 +102,7 @@ void Bundler::processInput()
 		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
 
 		currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, m_currentState.m_lastValidCompleteTransform,
-			m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame, m_SubmapManager.getCurrIntegrateTransform());
+			m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame, m_SubmapManager.getCurrIntegrateTransform(curFrame));
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
 	m_currentState.m_bLastFrameValid = (currentLocal->getValidImages()[curLocalFrame] != 0);
@@ -150,7 +150,7 @@ void Bundler::processInput()
 bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color)
 {
 	if (m_currentState.m_bLastFrameValid) {
-		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(), sizeof(float4x4), cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(m_currentState.m_lastFrameProcessed), sizeof(float4x4), cudaMemcpyDeviceToHost));
 		d_depth = m_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
 		d_color = m_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
 
@@ -457,6 +457,16 @@ void Bundler::saveSiftTrajectory(const std::string& filename) const
 	s.closeStream();
 }
 
+void Bundler::saveIntegrateTrajectory(const std::string& filename)
+{
+	std::vector<mat4f> integrateTrajectory(m_currentState.m_numCompleteTransforms);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(integrateTrajectory.data(), m_SubmapManager.getCurrIntegrateTransform(0), sizeof(mat4f)*integrateTrajectory.size(), cudaMemcpyDeviceToHost));
+
+	BinaryDataStreamFile s(filename, true);
+	s << integrateTrajectory;
+	s.closeStream();
+}
+
 //void Bundler::saveDEBUG()
 //{
 //	const std::vector<int> validImages(m_SubmapManager.global->getNumImages() * m_submapSize, 1);
@@ -465,115 +475,3 @@ void Bundler::saveSiftTrajectory(const std::string& filename) const
 //	m_RGBDSensor->saveRecordedPointCloud("test.ply", validImages, siftTrajectory);
 //}
 
-
-//bool Bundler::process()
-//{
-//	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
-//	std::cout << "[ frame " << curFrame << " ]" << std::endl;
-//
-//	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addLocalFrameTiming();
-//
-//	CUDAImageManager::ManagedRGBDInputFrame& integrateFrame = m_CudaImageManager->getLastIntegrateFrame();
-//
-//	// run SIFT
-//	SIFTImageGPU& cur = m_SubmapManager.currentLocal->createSIFTImageGPU();
-//	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-//	int success = m_sift->RunSIFT(m_CudaImageManager->getIntensityImageSIFT(), integrateFrame.getDepthFrameGPU());
-//	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection on frame " + std::to_string(curFrame));
-//	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, integrateFrame.getDepthFrameGPU());
-//	m_SubmapManager.currentLocal->finalizeSIFTImageGPU(numKeypoints);
-//	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
-//
-//	// process cuda cache
-//	const unsigned int curLocalFrame = m_SubmapManager.currentLocal->getNumImages() - 1;
-//	m_SubmapManager.currentLocalCache->storeFrame(integrateFrame.getDepthFrameGPU(), integrateFrame.getColorFrameGPU(), m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
-//	if (GlobalBundlingState::get().s_recordKeysPointCloud && curLocalFrame == 0 || m_SubmapManager.isLastLocalFrame(curFrame)) {
-//		m_RGBDSensor->recordPointCloud();
-//	}
-//	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);
-//
-//	// local submaps
-//	if (m_SubmapManager.isLastLocalFrame(curFrame)) {
-//		SIFTImageGPU& curNext = m_SubmapManager.nextLocal->createSIFTImageGPU();
-//		cutilSafeCall(cudaMemcpy(curNext.d_keyPoints, cur.d_keyPoints, sizeof(SIFTKeyPoint) * numKeypoints, cudaMemcpyDeviceToDevice));
-//		cutilSafeCall(cudaMemcpy(curNext.d_keyPointDescs, cur.d_keyPointDescs, sizeof(SIFTKeyPointDesc) * numKeypoints, cudaMemcpyDeviceToDevice));
-//		m_SubmapManager.nextLocal->finalizeSIFTImageGPU(numKeypoints);
-//
-//		m_SubmapManager.nextLocalCache->copyCacheFrameFrom(m_SubmapManager.currentLocalCache, curLocalFrame);
-//	}
-//
-//	// match with every other local
-//	SIFTImageManager* currentLocal = m_SubmapManager.currentLocal;
-//	if (curLocalFrame > 0) {
-//		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
-//
-//		currentLocal->computeSiftTransformCU(m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame);
-//	}
-//	m_lastFrameProcessed = curFrame;
-//	m_bLastFrameValid = (currentLocal->getValidImages()[curFrame] != 0);
-//
-//	// global frame
-//	if (m_SubmapManager.isLastFrame(curFrame) || m_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
-//		if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
-//
-//		// cache
-//		m_SubmapManager.globalCache->copyCacheFrameFrom(m_SubmapManager.currentLocalCache, 0);
-//
-//		// if valid local
-//		const std::vector<int>& validImagesLocal = currentLocal->getValidImages();
-//		if (validImagesLocal[1]) {
-//			const unsigned int curLocalIdx = m_SubmapManager.getCurrLocal(curFrame);
-//			// solve local
-//			solve(m_SubmapManager.getLocalTrajectoryGPU(curLocalIdx), m_SubmapManager.currentLocal, true);
-//
-//			// fuse to global
-//			SIFTImageManager* global = m_SubmapManager.global;
-//			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-//			SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
-//			unsigned int numGlobalKeys = m_SubmapManager.currentLocal->FuseToGlobalKeyCU(curGlobalImage, m_SubmapManager.getLocalTrajectoryGPU(curLocalIdx),
-//				MatrixConversion::toCUDA(m_CudaImageManager->getSIFTIntrinsics()), MatrixConversion::toCUDA(m_CudaImageManager->getSIFTIntrinsicsInv()));
-//			global->finalizeSIFTImageGPU(numGlobalKeys);
-//			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = s_timer.getElapsedTimeMS(); }
-//
-//			//unsigned int gframe = (unsigned int)global->getNumImages() - 1;
-//			//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
-//
-//			// switch local submaps
-//			m_SubmapManager.switchLocal();
-//
-//			// match with every other global
-//			if (global->getNumImages() > 1) {
-//				matchAndFilter(global, m_SubmapManager.globalCache, 0, m_submapSize);
-//				//printCurrentMatches("output/matches/", binaryDumpReader, global, true, 0, submapSize);
-//
-//				if (global->getValidImages()[global->getNumImages() - 1]) {
-//					// solve global
-//					solve(m_SubmapManager.d_globalTrajectory, global, false);
-//				}
-//				else {
-//					std::cout << "WARNING: last image not valid! no new global images for solve" << std::endl;
-//					std::cout << "cur frame = " << curFrame << ", #global images = " << global->getNumImages() << std::endl;
-//					//getchar();
-//				}
-//			}
-//
-//			// complete trajectory
-//			m_SubmapManager.updateTrajectory(curFrame);
-//			m_SubmapManager.initializeNextGlobalTransform(false);
-//		}
-//		else {
-//			std::cout << "WARNING: invalid local submap " << curFrame << " (" << m_SubmapManager.global->getNumImages() << ", " << m_SubmapManager.currentLocal->getNumImages() << ")" << std::endl;
-//			//getchar();
-//			//add invalidated (fake) global frame
-//			SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
-//			m_SubmapManager.global->finalizeSIFTImageGPU(0);
-//			m_SubmapManager.switchLocal();
-//			m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
-//
-//			m_SubmapManager.updateTrajectory(curFrame);
-//			m_SubmapManager.initializeNextGlobalTransform(true);
-//		}
-//	} // global
-//
-//	return true;
-//}
