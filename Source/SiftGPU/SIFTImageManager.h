@@ -127,7 +127,7 @@ public:
 
 	//void FilterFramesCU(unsigned int numCurrImagePairs);
 
-	SIFTGPU_EXPORT void AddCurrToResidualsCU(unsigned int numCurrImagePairs);
+	SIFTGPU_EXPORT void AddCurrToResidualsCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv);
 
 	SIFTGPU_EXPORT void InvalidateImageToImageCU(const uint2& imageToImageIdx);
 

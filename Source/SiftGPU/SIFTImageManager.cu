@@ -558,7 +558,8 @@ void __global__ AddCurrToResidualsCU_Kernel(
 	const int* d_currNumFilteredMatchesPerImagePair,
 	const uint2* d_currFilteredMatchKeyPointIndices,
 	const SIFTKeyPoint* d_keyPoints,
-	const unsigned int maxKeyPointsPerImage
+	const unsigned int maxKeyPointsPerImage,
+	const float4x4 colorIntrinsicsInv
 	)
 {
 	const unsigned int tidx = threadIdx.x;
@@ -582,14 +583,6 @@ void __global__ AddCurrToResidualsCU_Kernel(
 
 		const SIFTKeyPoint& k_i = d_keyPoints[currFilteredMachtKeyPointIndices.x];
 		const SIFTKeyPoint& k_j = d_keyPoints[currFilteredMachtKeyPointIndices.y];
-		
-		//!!!TODO PARAMS
-		const float _colorIntrinsicsInverse[16] = {
-			0.000847232877f, 0.0f, -0.549854159f, 0.0f,
-			0.0f, 0.000850733835f, -0.411329806f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f };
-		float4x4 colorIntrinsicsInv(_colorIntrinsicsInverse);
 
 		EntryJ e;
 		const unsigned int imageIdx0 = blockIdx.x;
@@ -604,7 +597,7 @@ void __global__ AddCurrToResidualsCU_Kernel(
 	}
 }
 
-void SIFTImageManager::AddCurrToResidualsCU(unsigned int numCurrImagePairs) {
+void SIFTImageManager::AddCurrToResidualsCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv) {
 	if (numCurrImagePairs == 0) return;
 
 	dim3 grid(numCurrImagePairs);
@@ -620,7 +613,8 @@ void SIFTImageManager::AddCurrToResidualsCU(unsigned int numCurrImagePairs) {
 		d_currNumFilteredMatchesPerImagePair,
 		d_currFilteredMatchKeyPointIndices,
 		d_keyPoints,
-		m_maxKeyPointsPerImage
+		m_maxKeyPointsPerImage,
+		colorIntrinsicsInv
 		);
 
 	cutilSafeCall(cudaMemcpy(&m_globNumResiduals, d_globNumResiduals, sizeof(unsigned int), cudaMemcpyDeviceToHost));

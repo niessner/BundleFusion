@@ -676,9 +676,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Bundling Optimization
 	///////////////////////////////////////
-	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);
+	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
 	g_bundler->processGlobal();
-	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);
+	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 
 
 	///////////////////////////////////////

@@ -340,6 +340,9 @@
       <Filter>SiftGPU</Filter>
     </ClInclude>
     <ClInclude Include="Source\TrajectoryManager.h" />
+    <ClInclude Include="Source\SiftGPU\SiftCameraUtil.h">
+      <Filter>SiftGPU</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

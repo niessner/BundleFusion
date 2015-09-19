@@ -522,14 +522,14 @@ void ApplyLinearUpdate(SolverInput& input, SolverState& state, SolverParameters&
 
 extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, SolverParameters& parameters, float* convergenceAnalysis, CUDATimer *timer)
 {
-	printf("#nonlinear iterations = %d\n", parameters.nNonLinearIterations);
-	printf("#linear iterations = %d\n", parameters.nLinIterations);
+	//printf("#nonlinear iterations = %d\n", parameters.nNonLinearIterations);
+	//printf("#linear iterations = %d\n", parameters.nLinIterations);
 
-	float initialResidual = EvalResidual(input, state, parameters, timer);
-	//convergenceAnalysis->addSample(residual);
-	printf("initial = %f\n", initialResidual);
-	convergenceAnalysis[0] = initialResidual; // initial residual
-
+	if (convergenceAnalysis) {
+		float initialResidual = EvalResidual(input, state, parameters, timer);
+		//printf("initial = %f\n", initialResidual);
+		convergenceAnalysis[0] = initialResidual; // initial residual
+	}
 	//unsigned int idx = 0;
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
@@ -549,9 +549,11 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 
 		//ApplyLinearUpdate(input, state, parameters);	//this should be also done in the last PCGIteration
 
-		float residual = EvalResidual(input, state, parameters, timer);
-		convergenceAnalysis[nIter + 1] = residual;
-		printf("[niter %d] %f\n", nIter, residual);
+		if (convergenceAnalysis) {
+			float residual = EvalResidual(input, state, parameters, timer);
+			convergenceAnalysis[nIter + 1] = residual;
+			//printf("[niter %d] %f\n", nIter, residual);
+		}
 	}
 }
 

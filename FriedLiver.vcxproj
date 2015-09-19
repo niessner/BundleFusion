@@ -200,6 +200,7 @@
     <ClInclude Include="Source\SiftGPU\MatrixConversion.h" />
     <ClInclude Include="Source\SiftGPU\ProgramCU.h" />
     <ClInclude Include="Source\SiftGPU\SiftCameraParams.h" />
+    <ClInclude Include="Source\SiftGPU\SiftCameraUtil.h" />
     <ClInclude Include="Source\SiftGPU\SiftGPU.h" />
     <ClInclude Include="Source\SiftGPU\SIFTImageManager.h" />
     <ClInclude Include="Source\SiftGPU\SiftMatch.h" />

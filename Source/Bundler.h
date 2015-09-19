@@ -43,7 +43,7 @@ public:
 
 	Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager);
 	~Bundler();
-	
+
 
 	//! takes last frame from imageManager: runs sift and sift matching (including filtering)
 	void processInput();
@@ -67,6 +67,9 @@ public:
 		m_SubmapManager.evaluateTimings();
 		m_SparseBundler.evaluateSolverTimings();
 	}
+	void saveConvergence(const std::string& filename) {
+		m_SparseBundler.printConvergence(filename);
+	}
 
 	//! debug vis functions
 	void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame);
@@ -83,7 +86,7 @@ public:
 private:
 	void matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int frameStart, unsigned int frameSkip, bool print = false);
 
-	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal);
+	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence);
 
 	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered);

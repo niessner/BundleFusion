@@ -17,8 +17,10 @@
 	X(unsigned int, s_heightSIFT) \
 	X(unsigned int, s_maxNumKeysPerImage) \
 	X(unsigned int, s_maxNumCorrPerImage) \
-	X(unsigned int, s_numNonLinIterations) \
-	X(unsigned int, s_numLinIterations) \
+	X(unsigned int, s_numLocalNonLinIterations) \
+	X(unsigned int, s_numLocalLinIterations) \
+	X(unsigned int, s_numGlobalNonLinIterations) \
+	X(unsigned int, s_numGlobalLinIterations) \
 	X(unsigned int, s_downsampledWidth) \
 	X(unsigned int, s_downsampledHeight) \
 	X(float, s_verifySiftErrThresh) \
@@ -26,7 +28,8 @@
 	X(float, s_projCorrDistThres) \
 	X(float, s_projCorrNormalThres) \
 	X(float, s_projCorrColorThresh) \
-	X(float, s_surfAreaPcaThresh)
+	X(float, s_surfAreaPcaThresh) \
+	X(bool, s_recordSolverConvergence)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;

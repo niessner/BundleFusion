@@ -11,26 +11,32 @@ extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned 
 
 extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms);
 
+Timer SBA::s_timer;
 
-void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal)
+void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence /*= false*/)
 {
+	if (recordConvergence) m_recordedConvergence.push_back(std::vector<float>());
+
 	m_bVerify = false;
 
-	std::cout << "[ align ]" << std::endl;
+	//std::cout << "[ align ]" << std::endl;
 	m_maxResidual = -1.0f;
 
-	ml::Timer timer;
-	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 	bool removed = false;
 	const unsigned int maxIts = 60;//GlobalAppState::get().s_maxNumResidualsRemoved; //!!!TODO PARAMS
 	unsigned int curIt = 0;
 	do {
 		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits, useVerify);
+		if (recordConvergence) {
+			const std::vector<float>& conv = m_solver->getConvergenceAnalysis();
+			m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
+		}
 		curIt++;
 	} while (removed && curIt < maxIts);
 	
-	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve = timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve = curIt * maxNumIters; }
-	std::cout << "[ align Time:] " << timer.getElapsedTimeMS() << " ms" << std::endl;
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve = s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve = curIt * maxNumIters; }
+	//std::cout << "[ align Time:] " << s_timer.getElapsedTimeMS() << " ms" << std::endl;
 
 }
 
@@ -68,4 +74,19 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 	}
 	else std::cout << "\thighest residual " << m_maxResidual << " from images (" << imageIndices << ")" << std::endl;
 	return false;
+}
+
+void SBA::printConvergence(const std::string& filename)
+{
+	if (m_recordedConvergence.empty()) return;
+	std::ofstream s(filename);
+	s << m_recordedConvergence.size() << " optimizations" << std::endl;
+	s << std::endl;
+	for (unsigned int i = 0; i < m_recordedConvergence.size(); i++) {
+		s << "[ opt# " << i << " ]" << std::endl;
+		for (unsigned int k = 0; k < m_recordedConvergence[i].size(); k++)
+			s << "\titer " << k << ": " << m_recordedConvergence[i][k] << std::endl;
+		s << std::endl;
+	}
+	s.close();
 }

@@ -61,5 +61,6 @@ class CUDASolverBundling
 		float m_verifyOptDistThresh;
 		float m_verifyOptPercentThresh;
 
+		bool		m_bRecordConvergence;
 		CUDATimer *m_timer;
 };

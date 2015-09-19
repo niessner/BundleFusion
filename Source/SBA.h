@@ -6,7 +6,6 @@
 #include "PoseHelper.h"
 
 #include "Solver/CUDASolverBundling.h"
-//#include "cuda_SimpleVectorUtil.h"
 
 
 
@@ -22,13 +21,12 @@ public:
 		d_xTrans = NULL;
 		m_solver = NULL;
 	}
-	//!!!TODO PARAMS
 	void init(unsigned int maxImages, unsigned int maxNumCorrPerImage) {
-		unsigned int maxNumImages = maxImages;//GlobalAppState::get().s_maxNumImages;
+		unsigned int maxNumImages = maxImages;
 		cutilSafeCall(cudaMalloc(&d_xRot, sizeof(EntryJ)*maxNumImages));
 		cutilSafeCall(cudaMalloc(&d_xTrans, sizeof(EntryJ)*maxNumImages));
 
-		m_solver = new CUDASolverBundling(maxImages, maxNumCorrPerImage);//GlobalAppState::get().s_maxNumImages, GlobalAppState::get().s_maxNumCorrPerImage);
+		m_solver = new CUDASolverBundling(maxImages, maxNumCorrPerImage);
 		m_bVerify = false;
 	}
 	~SBA() {
@@ -38,7 +36,7 @@ public:
 		if (d_xTrans) cutilSafeCall(cudaFree(d_xTrans));
 	}
 
-	void align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal);
+	void align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence = false);
 
 	float getMaxResidual() const { return m_maxResidual; }
 	const std::vector<float>& getLinearConvergenceAnalysis() const { return m_solver->getLinearConvergenceAnalysis(); }
@@ -47,6 +45,7 @@ public:
 	void evaluateSolverTimings() {
 		m_solver->evaluateTimings();
 	}
+	void printConvergence(const std::string& filename);
 
 private:
 
@@ -64,5 +63,8 @@ private:
 	float m_maxResidual; //!!!todo why is this here...
 	bool m_bVerify;
 
+	std::vector< std::vector<float> > m_recordedConvergence;
+
+	static Timer s_timer;
 };
 

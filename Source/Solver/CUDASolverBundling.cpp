@@ -14,6 +14,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 {
 	m_timer = NULL;
 	if (GlobalBundlingState::get().s_enableDetailedTimings) m_timer = new CUDATimer();
+	m_bRecordConvergence = GlobalBundlingState::get().s_recordSolverConvergence;
 
 	//!!!TODO PARAMS
 	m_verifyOptDistThresh = 0.02f;//GlobalAppState::get().s_verifyOptDistThresh;
@@ -87,7 +88,11 @@ CUDASolverBundling::~CUDASolverBundling()
 
 void CUDASolverBundling::solve(EntryJ* d_targetCorrespondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages, unsigned int nNonLinearIterations, unsigned int nLinearIterations, float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns)
 {
-	m_convergence.resize(nNonLinearIterations + 1, -1.0f);
+	float* convergence = NULL;
+	if (m_bRecordConvergence) {
+		m_convergence.resize(nNonLinearIterations + 1, -1.0f);
+		convergence = m_convergence.data();
+	}
 
 	m_solverState.d_xRot = d_rotationAnglesUnknowns;
 	m_solverState.d_xTrans = d_translationUnknowns;
@@ -109,7 +114,7 @@ void CUDASolverBundling::solve(EntryJ* d_targetCorrespondences, unsigned int num
 	solverInput.maxCorrPerImage = m_maxCorrPerImage;
 
 	buildVariablesToCorrespondencesTable(d_targetCorrespondences, numberOfCorrespondences);
-	solveBundlingStub(solverInput, m_solverState, parameters, m_convergence.data(), m_timer);
+	solveBundlingStub(solverInput, m_solverState, parameters, convergence, m_timer);
 
 	computeMaxResidual(solverInput, parameters);
 }

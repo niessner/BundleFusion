@@ -145,7 +145,7 @@ int main(int argc, char** argv)
 		std::cout << "Bundler:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
 
 		//start depthSensing render loop
-		//startDepthSensing(bundler, getRGBDSensor(), imageManager);
+		startDepthSensing(bundler, getRGBDSensor(), imageManager);
 
 		while (1) {
 			if (imageManager->process()) {
@@ -156,14 +156,15 @@ int main(int argc, char** argv)
 				bundler->getCurrentIntegrationFrame(transformation, d_depthData, d_colorData);
 
 				// these are queried
-				bundler->optimizeLocal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);
+				bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
 				bundler->processGlobal();
-				bundler->optimizeGlobal(GlobalBundlingState::get().s_numNonLinIterations, GlobalBundlingState::get().s_numLinIterations);
+				bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 			}
 			else break;
 		}
 
 		TimingLog::printTimings("timingLog.txt");
+		if (GlobalBundlingState::get().s_recordSolverConvergence) bundler->saveConvergence("convergence.txt");
 		if (GlobalBundlingState::get().s_recordKeysPointCloud) bundler->saveKeysToPointCloud();
 		//bundler->saveDEBUG();
 

@@ -167,7 +167,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 	m_currentState.m_localToSolve = -1; 
 	m_currentState.m_lastNumLocalFrames = m_SubmapManager.nextLocal->getNumImages();
 
-	solve(m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx), m_SubmapManager.nextLocal, numNonLinIterations, numLinIterations, true);
+	solve(m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx), m_SubmapManager.nextLocal, numNonLinIterations, numLinIterations, true, false);
 	// still need this for global key fuse
 
 	m_currentState.m_lastLocalSolved = currLocalIdx;
@@ -221,7 +221,7 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 
 	//solve!
 	m_currentState.m_bOptimizeGlobal = false;
-	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false);
+	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence);
 
 	const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
 	unsigned int numFrames = (numGlobalFrames > 0) ? ((numGlobalFrames - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames) : m_currentState.m_lastNumLocalFrames;
@@ -238,10 +238,10 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 	m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
 }
 
-void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal)
+void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence)
 {
 	bool useVerify = false; //TODO do we need verify?
-	m_SparseBundler.align(siftManager, transforms, numNonLinIters, numLinIters, useVerify, isLocal);
+	m_SparseBundler.align(siftManager, transforms, numNonLinIters, numLinIters, useVerify, isLocal, recordConvergence);
 	//if (useVerify) bundle->verifyTrajectory();
 }
 
@@ -314,7 +314,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 
 		// --- add to global correspondences
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-		siftManager->AddCurrToResidualsCU(curFrame);
+		siftManager->AddCurrToResidualsCU(curFrame, MatrixConversion::toCUDA(m_CudaImageManager->getSIFTIntrinsicsInv()));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeAddCurrResiduals = s_timer.getElapsedTimeMS(); }
 	}
 }
