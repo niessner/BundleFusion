@@ -102,7 +102,7 @@ void Bundler::processInput()
 		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
 
 		currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, m_currentState.m_lastValidCompleteTransform,
-			m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame);
+			m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame, m_SubmapManager.getCurrIntegrateTransform());
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
 	m_currentState.m_bLastFrameValid = (currentLocal->getValidImages()[curLocalFrame] != 0);
@@ -150,7 +150,7 @@ void Bundler::processInput()
 bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color)
 {
 	if (m_currentState.m_bLastFrameValid) {
-		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.d_siftTrajectory + m_currentState.m_lastFrameProcessed, sizeof(float4x4), cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(), sizeof(float4x4), cudaMemcpyDeviceToHost));
 		d_depth = m_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
 		d_color = m_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
 

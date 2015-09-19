@@ -811,7 +811,7 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 	const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform,
 	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll,
 	const int* d_numFilteredMatchesPerImagePair,
-	const float4x4* d_filteredTransforms)
+	const float4x4* d_filteredTransforms, float4x4* d_currIntegrateTrans)
 {
 
 	for (int i = (int)curFrameIndex - 1; i >= 0; i--) {
@@ -845,21 +845,23 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 			//printf("\n\ntransform:\n");
 			//transform.print();
 
-			d_siftTrajectory[curFrameIndexAll] = transform;
+			d_currIntegrateTrans[0] = transform;
+			d_siftTrajectory[curFrameIndexAll] = d_siftTrajectory[idxPrevSiftKnown] * d_filteredTransforms[i].getInverse();
 			break;
 		}
 	}
 }
 
 void SIFTImageManager::computeSiftTransformCU(const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform,
-	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex) 
+	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans) 
 {
 	if (curFrameIndex == 0) return;
 
 	getSiftTransformCU_Kernel <<<1, 1 >>>(curFrameIndex,
 		d_completeTrajectory, lastValidCompleteTransform,
 		d_siftTrajectory, curFrameIndexAll,
-		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms);
+		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms,
+		d_currIntegrateTrans);
 
 
 #ifdef _DEBUG
