@@ -89,6 +89,7 @@ CUDAHistrogramHashSDF*		g_historgram = NULL;
 CUDASceneRepChunkGrid*		g_chunkGrid = NULL;
 
 DepthCameraParams			g_depthCameraParams;
+mat4f						g_lastRigidTransform = mat4f::identity();
 
 //managed externally
 CUDAImageManager*			g_CudaImageManager = NULL;
@@ -249,12 +250,12 @@ void StopScanningAndExtractIsoSurfaceMC(const std::string& filename)
 		g_marchingCubesHashSDF->extractIsoSurface(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), g_rayCast->getRayCastData());
 		//g_chunkGrid->startMultiThreading();
 	} else {
-		vec4f posWorld = vec4f(g_sceneRep->getLastRigidTransform()*GlobalAppState::get().s_streamingPos, 1.0f); // trans lags one frame
+		vec4f posWorld = vec4f(g_lastRigidTransform*GlobalAppState::get().s_streamingPos, 1.0f); // trans lags one frame
 		vec3f p(posWorld.x, posWorld.y, posWorld.z);
 		g_marchingCubesHashSDF->extractIsoSurface(*g_chunkGrid, g_rayCast->getRayCastData(), p, GlobalAppState::getInstance().s_streamingRadius);
 	}
 
-	const mat4f& rigidTransform = mat4f::identity();//g_sceneRep->getLastRigidTransform();
+	const mat4f& rigidTransform = mat4f::identity();//g_lastRigidTransform
 	g_marchingCubesHashSDF->saveMesh(filename, &rigidTransform);
 
 	std::cout << "Mesh generation time " << t.getElapsedTime() << " seconds" << std::endl;
@@ -277,7 +278,7 @@ void StopScanningAndSaveSDFHash(const std::string& filename = "test.hash") {
 
 	Timer t;
 
-	vec4f posWorld = vec4f(g_sceneRep->getLastRigidTransform()*GlobalAppState::get().s_streamingPos, 1.0f); // trans lags one frame
+	vec4f posWorld = vec4f(g_lastRigidTransform*GlobalAppState::get().s_streamingPos, 1.0f); // trans lags one frame
 	vec3f p(posWorld.x, posWorld.y, posWorld.z);
 
 	g_chunkGrid->saveToFile(filename, g_rayCast->getRayCastData(), p, GlobalAppState::getInstance().s_streamingRadius);
@@ -295,7 +296,7 @@ void StopScanningAndLoadSDFHash(const std::string& filename = "test.hash") {
 
 	Timer t;
 
-	vec4f posWorld = vec4f(g_sceneRep->getLastRigidTransform()*GlobalAppState::get().s_streamingPos, 1.0f); // trans lags one frame
+	vec4f posWorld = vec4f(g_lastRigidTransform*GlobalAppState::get().s_streamingPos, 1.0f); // trans lags one frame
 	vec3f p(posWorld.x, posWorld.y, posWorld.z);
 
 	ResetDepthSensing();
@@ -629,7 +630,7 @@ void deIntegrate(const DepthCameraData& depthCameraData, const mat4f& transforma
 
 
 
-void visualizeFrame(bool bGotDepth, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform)
+void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform)
 {
 	// If the settings dialog is being shown, then render it instead of rendering the app's scene
 	//if(g_D3DSettingsDlg.IsActive())
@@ -721,8 +722,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Reconstruction of current frame
 	///////////////////////////////////////
-	static mat4f transformation = mat4f::zero();	// this needs to be valid even bGotDepth is false (that's why it's static)
 	if (bGotDepth) {
+		mat4f transformation = mat4f::zero();
 		DepthCameraData depthCameraData;
 		bool validTransform = g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
 
@@ -741,6 +742,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		if (validTransform && GlobalAppState::get().s_reconstructionEnabled) {
 			integrate(depthCameraData, transformation);
 		}
+
+			g_lastRigidTransform = transformation;
 	}
 
 	//std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
@@ -749,7 +752,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// Render with view of current frame
 	///////////////////////////////////////
 
-	visualizeFrame(bGotDepth, pd3dImmediateContext, pd3dDevice, transformation);
+	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform);
 
 	///////////////////////////////////////
 	// Bundling Optimization

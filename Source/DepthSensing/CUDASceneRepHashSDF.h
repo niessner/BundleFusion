@@ -66,9 +66,6 @@ public:
 
 		setLastRigidTransform(lastRigidTransform);
 
-		//make the rigid transform available on the GPU
-		m_hashData.updateParams(m_hashParams);
-
 		//allocate all hash blocks which are corresponding to depth map entries
 		alloc(depthCameraData, depthCameraParams, d_bitMask);
 
@@ -114,6 +111,9 @@ public:
 	void setLastRigidTransform(const mat4f& lastRigidTransform) {
 		m_hashParams.m_rigidTransform = MatrixConversion::toCUDA(lastRigidTransform);
 		m_hashParams.m_rigidTransformInverse = m_hashParams.m_rigidTransform.getInverse();
+
+		//make the rigid transform available on the GPU
+		m_hashData.updateParams(m_hashParams);
 	}
 
 	void setLastRigidTransformAndCompactify(const mat4f& lastRigidTransform) {
