@@ -19,15 +19,18 @@ public:
 		unsigned int frameIdx;
 		mat4f integratedTransform;		//camera-to-world transform
 		mat4f& optimizedTransform;		//bundling optimized (ref to global array)
-		vec6f poseIntegrated;
 		float dist;	//distance between optimized and integrated transform
 	};
 
 	TrajectoryManager(unsigned int numMaxImage) {
 		m_optmizedTransforms.resize(numMaxImage);
+		m_frames.reserve(numMaxImage);
+		m_framesSort.reserve(numMaxImage);
 		for (unsigned int i = 0; i < numMaxImage; i++) {
-			m_frames.push_back(TrajectoryFrame { TrajectoryFrame::NotIntegrated_NoTransform, i, mat4f::zero(), m_optmizedTransforms[i] });
+			m_frames.push_back(TrajectoryFrame { TrajectoryFrame::NotIntegrated_NoTransform, (unsigned int)-1, mat4f::zero(), m_optmizedTransforms[i] });
 		}
+		m_numAddedFrames = 0;
+		m_numOptimizedFrames = 0;
 
 		//TODO move this to some sort of parameter file
 		m_topNActive = 10;
@@ -43,19 +46,21 @@ public:
 		m_frames[idx].frameIdx = idx;
 		m_frames[idx].integratedTransform = transform;
 		m_frames[idx].optimizedTransform = transform;
-		m_frames[idx].poseIntegrated = PoseHelper::MatrixToPose(transform);
-		m_frames[idx].poseIntegrated[0] *= m_featureRescaleRotToTrans;
-		m_frames[idx].poseIntegrated[1] *= m_featureRescaleRotToTrans;
-		m_frames[idx].poseIntegrated[2] *= m_featureRescaleRotToTrans;
 		m_framesSort.push_back(&m_frames[idx]);
+		m_numAddedFrames++;
 	}
 
 
 	//! called by Bundler; whenever the optimization finishes
 	void updateOptimizedTransform(float4x4* d_trajectory, unsigned int numFrames) {
-		if (m_frames.size() < numFrames) throw MLIB_EXCEPTION("We need equal or more frames on the CPU");
-
+		m_numOptimizedFrames = numFrames;
+		numFrames = std::min(numFrames, m_numAddedFrames);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_optmizedTransforms.data(), d_trajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
+	}
+
+	void generateUpdateLists()
+	{
+		unsigned int numFrames = std::min(m_numOptimizedFrames, m_numAddedFrames);
 
 		for (unsigned int i = 0; i < numFrames; i++) {
 			TrajectoryFrame& f = m_frames[i];
@@ -75,8 +80,13 @@ public:
 				poseOptimized[0] *= m_featureRescaleRotToTrans;
 				poseOptimized[1] *= m_featureRescaleRotToTrans;
 				poseOptimized[2] *= m_featureRescaleRotToTrans;
-				f.dist = (f.poseIntegrated - poseOptimized) | (f.poseIntegrated - poseOptimized);
-			}			
+
+				vec6f poseIntegrated = PoseHelper::MatrixToPose(f.integratedTransform);
+				poseIntegrated[0] *= m_featureRescaleRotToTrans;
+				poseIntegrated[1] *= m_featureRescaleRotToTrans;
+				poseIntegrated[2] *= m_featureRescaleRotToTrans;
+				f.dist = (poseIntegrated - poseOptimized) | (poseIntegrated - poseOptimized);
+			}
 		}
 
 		//TODO could remove Invalids from m_framesSort();
@@ -89,10 +99,18 @@ public:
 		std::sort(m_framesSort.begin(), m_framesSort.end(), s);
 		//m_framesSort.sort(s);
 
-		while (m_toReIntegrateList.size() < (size_t)m_topNActive && m_framesSort.front()->dist > m_minPoseDist) {
-			if (m_framesSort.front()->type == TrajectoryFrame::Integrated) {
-				m_framesSort.front()->type = TrajectoryFrame::ReIntegration;
-				m_toReIntegrateList.push_back(m_framesSort.front());
+		for (unsigned int i = 0; i < numFrames; i++) {
+			const auto *f = m_framesSort[i];
+			std::cout << "[" << f->frameIdx << "]" << " " << f->dist;
+			std::cout << "\t type: " << f->type;
+			std::cout << std::endl;
+		}
+
+		for (unsigned int i = (unsigned int)m_toReIntegrateList.size(); i < m_topNActive; i++) {
+			auto* f = m_framesSort[i];
+			if (f->dist > m_minPoseDist && f->type == TrajectoryFrame::Integrated) {
+				f->type = TrajectoryFrame::ReIntegration;
+				m_toReIntegrateList.push_back(f);
 			}
 			else {
 				break;
@@ -105,13 +123,14 @@ public:
 		m_frames[frameIdx].type = TrajectoryFrame::Integrated;
 	}
 
-	bool getTopFromReIntegrateList(mat4f& trans, unsigned int& frameIdx) {
+	bool getTopFromReIntegrateList(mat4f& oldTransform, mat4f& newTransform, unsigned int& frameIdx) {
 		if (m_toReIntegrateList.empty())	return false;
-		assert(m_toDeIntegrateList.front()->type == TrajectoryFrame::ReIntegration);
+		assert(m_toReIntegrateList.front()->type == TrajectoryFrame::ReIntegration);
 
-		trans = m_toReIntegrateList.front()->optimizedTransform;
+		newTransform = m_toReIntegrateList.front()->optimizedTransform;
 		frameIdx = m_toReIntegrateList.front()->frameIdx;
-		m_toReIntegrateList.front()->integratedTransform = trans;
+		oldTransform = m_toReIntegrateList.front()->integratedTransform;
+		m_toReIntegrateList.front()->integratedTransform = newTransform;
 		m_toReIntegrateList.pop_front();
 		return true;
 	}
@@ -119,7 +138,7 @@ public:
 
 	bool getTopFromIntegrateList(mat4f& trans, unsigned int& frameIdx) {
 		if (m_toIntegrateList.empty())	return false;
-		assert(m_toDeIntegrateList.front()->type == TrajectoryFrame::NotIntegrated_WithTransform);
+		assert(m_toIntegrateList.front()->type == TrajectoryFrame::NotIntegrated_WithTransform);
 
 		trans = m_toIntegrateList.front()->optimizedTransform;
 		frameIdx = m_toIntegrateList.front()->frameIdx;
@@ -154,6 +173,8 @@ private:
 	std::vector<mat4f> m_optmizedTransforms;
 	std::vector<TrajectoryFrame>	m_frames;
 	std::vector<TrajectoryFrame*>	m_framesSort;
+	unsigned int m_numAddedFrames;
+	unsigned int m_numOptimizedFrames;
 
 	std::list<TrajectoryFrame*> m_toDeIntegrateList;
 	std::list<TrajectoryFrame*> m_toIntegrateList;

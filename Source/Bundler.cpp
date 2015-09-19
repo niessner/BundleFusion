@@ -165,7 +165,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 
 	const unsigned int currLocalIdx = m_currentState.m_localToSolve;
 	m_currentState.m_localToSolve = -1; 
-	m_currentState.m_lastNumLocalFrames = m_SubmapManager.nextLocal->getNumImages();
+	m_currentState.m_lastNumLocalFrames = std::min(m_submapSize, m_SubmapManager.nextLocal->getNumImages());
 
 	solve(m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx), m_SubmapManager.nextLocal, numNonLinIterations, numLinIterations, true, false);
 	// still need this for global key fuse

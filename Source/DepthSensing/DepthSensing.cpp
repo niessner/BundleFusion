@@ -589,6 +589,7 @@ void CALLBACK OnD3D11ReleasingSwapChain( void* pUserContext )
 	g_DialogResourceManager.OnD3D11ReleasingSwapChain();
 }
 
+
 void integrate(const DepthCameraData& depthCameraData, const mat4f& transformation)
 {
 	if (GlobalAppState::get().s_streamingEnabled) {
@@ -601,57 +602,33 @@ void integrate(const DepthCameraData& depthCameraData, const mat4f& transformati
 
 	if (GlobalAppState::get().s_integrationEnabled) {
 		g_sceneRep->integrate(transformation, depthCameraData, g_depthCameraParams, g_chunkGrid->getBitMaskGPU());
+	} else {
+		//compactification is required for the ray cast splatting
+		g_sceneRep->setLastRigidTransformAndCompactify(transformation);	//TODO check this
 	}
 }
-
-void reconstruction()
+void deIntegrate(const DepthCameraData& depthCameraData, const mat4f& transformation)
 {
-	//only if binary dump
-	//if (GlobalAppState::get().s_sensorIdx == 3) 
-	//	std::cout << "[ frame " << g_RGBDAdapter.getFrameNumber() << " ] " << g_sceneRep->getHashParams().m_numOccupiedBlocks << std::endl;
-	//
+	if (GlobalAppState::get().s_streamingEnabled) {
+		vec4f posWorld = transformation*vec4f(GlobalAppState::getInstance().s_streamingPos, 1.0f); // trans laggs one frame *trans
+		vec3f p(posWorld.x, posWorld.y, posWorld.z);
 
-
-
-	mat4f transformation = mat4f::identity();
-	DepthCameraData depthCameraData;
-
-
-	bool validIntegrationFrame = g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
-	if (!validIntegrationFrame)	return;
-
-	if (GlobalAppState::get().s_sensorIdx == 3 && GlobalAppState::get().s_binaryDumpSensorUseTrajectory) {
-		transformation = g_RGBDSensor->getRigidTransform();
+		g_chunkGrid->streamOutToCPUPass0GPU(p, GlobalAppState::get().s_streamingRadius, true, true);
+		g_chunkGrid->streamInToGPUPass1GPU(true);
 	}
 
-	if (GlobalAppState::getInstance().s_recordData) {
-		g_RGBDSensor->recordTrajectory(transformation);
+	if (GlobalAppState::get().s_integrationEnabled) {
+		g_sceneRep->deIntegrate(transformation, depthCameraData, g_depthCameraParams, g_chunkGrid->getBitMaskGPU());
 	}
-
-
-	if (transformation(0, 0) == -std::numeric_limits<float>::infinity()) {
-		std::cout << "!!! TRACKING LOST !!!" << std::endl;
-		GlobalAppState::get().s_reconstructionEnabled = false;
-		return;
-	}
-
-	integrate(depthCameraData, transformation);
-
-	//else {
-	//	//compactification is required for the ray cast splatting
-	//	g_sceneRep->setLastRigidTransformAndCompactify(transformation, depthCameraData);
-	//}
-
-	if (g_CudaImageManager->getCurrFrameNumber() > 0) {
-		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), g_sceneRep->getLastRigidTransform());
+	else {
+		//compactification is required for the ray cast splatting
+		g_sceneRep->setLastRigidTransformAndCompactify(transformation);	//TODO check this
 	}
 }
 
-//--------------------------------------------------------------------------------------
-// Render the scene using the D3D11 device
-//--------------------------------------------------------------------------------------
 
-void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext )
+
+void visualizeFrame(bool bGotDepth, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice)
 {
 	// If the settings dialog is being shown, then render it instead of rendering the app's scene
 	//if(g_D3DSettingsDlg.IsActive())
@@ -660,6 +637,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//	return;
 	//}
 
+
 	// Clear the back buffer
 	static float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	ID3D11RenderTargetView* pRTV = DXUTGetD3D11RenderTargetView();
@@ -667,47 +645,14 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	pd3dImmediateContext->ClearRenderTargetView(pRTV, ClearColor);
 	pd3dImmediateContext->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-	// if we have received any valid new depth data we may need to draw
-	bool bGotDepth = g_CudaImageManager->process();
-	if (bGotDepth) {
-		g_bundler->processInput();	//sift extraction and sift matching
-	}
-
-	///////////////////////////////////////
-	// Bundling Optimization
-	///////////////////////////////////////
-	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-	g_bundler->processGlobal();
-	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
-
-
-	///////////////////////////////////////
-	// Render
-	///////////////////////////////////////
-
-	//Start Timing
-	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
-
-
 	mat4f view = MatrixConversion::toMlib(*g_Camera.GetViewMatrix());
 	mat4f t = mat4f::identity();
-	t(1,1) *= -1.0f;	view = t * view * t;	//t is self-inverse
+	t(1, 1) *= -1.0f;	view = t * view * t;	//t is self-inverse
 
-	if (bGotDepth) {
-		if (GlobalAppState::getInstance().s_recordData) {
-			g_RGBDSensor->recordFrame();
-			if (!GlobalAppState::get().s_reconstructionEnabled) {
-				g_RGBDSensor->recordTrajectory(mat4f::zero());
-			}
-		}
-
-		if (GlobalAppState::get().s_reconstructionEnabled) {
-			reconstruction();
-		}
+	if (g_CudaImageManager->getCurrFrameNumber() > 0) {
+		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), g_sceneRep->getLastRigidTransform());
 	}
-
-
-	if(GlobalAppState::get().s_RenderMode == 1)	{
+	if (GlobalAppState::get().s_RenderMode == 1)	{
 		//default render mode (render ray casted depth)
 		const mat4f& renderIntrinsics = g_CudaImageManager->getIntrinsics();
 
@@ -717,12 +662,12 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		g_RGBDRenderer.RenderDepthMap(pd3dImmediateContext, g_rayCast->getRayCastData().d_depth, g_rayCast->getRayCastData().d_colors, g_rayCast->getRayCastParams().m_width, g_rayCast->getRayCastParams().m_height, MatrixConversion::toMlib(g_rayCast->getRayCastParams().m_intrinsicsInverse), view, renderIntrinsics, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(), GlobalAppState::get().s_renderingDepthDiscontinuityThresOffset, GlobalAppState::get().s_renderingDepthDiscontinuityThresLin);
 		g_CustomRenderTarget.Unbind(pd3dImmediateContext);
 
-		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), GlobalAppState::get().s_useColorForRendering, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight());		
+		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), GlobalAppState::get().s_useColorForRendering, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight());
 		DX11QuadDrawer::RenderQuad(pd3dImmediateContext, DX11PhongLighting::GetColorsSRV(), 1.0f);
 #ifdef STRUCTURE_SENSOR
 		if (GlobalAppState::get().s_sensorIdx == 7) {
 			ID3D11Texture2D* pSurface;
-			HRESULT hr = DXUTGetDXGISwapChain()->GetBuffer( 0, __uuidof( ID3D11Texture2D ), reinterpret_cast< void** >( &pSurface ) );
+			HRESULT hr = DXUTGetDXGISwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pSurface));
 			if (pSurface) {
 				float* tex = (float*)CreateAndCopyToDebugTexture2D(pd3dDevice, pd3dImmediateContext, pSurface, true); //!!! TODO just copy no create
 				((StructureSensor*)g_RGBDSensor)->updateFeedbackImage((BYTE*)tex);
@@ -742,9 +687,120 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), !GlobalAppState::get().s_useColorForRendering, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight());
 		DX11QuadDrawer::RenderQuad(pd3dImmediateContext, DX11PhongLighting::GetColorsSRV(), 1.0f);
-	} else {
+	}
+	else {
 		std::cout << "Unknown render mode " << GlobalAppState::get().s_RenderMode << std::endl;
 	}
+}
+
+
+
+//--------------------------------------------------------------------------------------
+// Render the scene using the D3D11 device
+//--------------------------------------------------------------------------------------
+
+void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext )
+{
+
+
+	// if we have received any valid new depth data we may need to draw
+	bool bGotDepth = g_CudaImageManager->process();
+	if (bGotDepth) {
+		g_bundler->processInput();	//sift extraction and sift matching
+	}
+
+ 
+
+	//Start Timing
+	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
+
+
+	///////////////////////////////////////
+	// Reconstruction of current frame
+	///////////////////////////////////////
+
+	if (bGotDepth) {
+		mat4f transformation = mat4f::zero();	DepthCameraData depthCameraData;
+		bool validTransform = g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
+
+		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
+			//overwrite transform and use given trajectory in this case
+			transformation = g_RGBDSensor->getRigidTransform();
+			validTransform = true;
+		}
+
+		if (GlobalAppState::getInstance().s_recordData) {
+			g_RGBDSensor->recordFrame();
+			g_RGBDSensor->recordTrajectory(transformation);
+
+		}
+
+		if (validTransform && GlobalAppState::get().s_reconstructionEnabled) {
+			integrate(depthCameraData, transformation);
+		}
+	}
+
+	///////////////////////////////////////
+	// Render with view of current frame
+	///////////////////////////////////////
+
+	visualizeFrame(bGotDepth, pd3dImmediateContext, pd3dDevice);
+
+	///////////////////////////////////////
+	// Bundling Optimization
+	///////////////////////////////////////
+	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+	g_bundler->processGlobal();
+	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+
+
+	///////////////////////////////////////
+	// Fix old frames
+	///////////////////////////////////////
+	{
+		const unsigned int maxPerFrameFixes = 10;
+		TrajectoryManager* tm = g_bundler->getTrajectoryManager();
+		unsigned int fixes = 0;
+		for (; fixes < maxPerFrameFixes; fixes++) {
+
+			mat4f newTransform = mat4f::zero();	
+			mat4f oldTransform = mat4f::zero();
+			unsigned int frameIdx = (unsigned int)-1;
+
+			if (tm->getTopFromDeIntegrateList(oldTransform, frameIdx)) {
+				auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);	
+				DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+				deIntegrate(depthCameraData, oldTransform);
+				continue;
+			}
+			else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
+				auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
+				DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+				integrate(depthCameraData, newTransform);
+				tm->confirmIntegration(frameIdx);
+				continue;
+			}
+			else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
+				auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
+				DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+				deIntegrate(depthCameraData, oldTransform);
+				integrate(depthCameraData, newTransform);
+				tm->confirmIntegration(frameIdx);
+				fixes++;	//(we've done two operations in this case)
+				continue;
+			}
+			else {
+				break; //no more work to do
+			}
+		}
+		if (fixes < maxPerFrameFixes) {
+			tm->generateUpdateLists();
+		}
+
+	}
+
+
+
 
 	// Stop Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLogDepthSensing::totalTimeRender += GlobalAppState::get().s_Timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeRender++; }
