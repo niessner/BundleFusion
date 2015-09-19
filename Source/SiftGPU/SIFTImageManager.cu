@@ -820,18 +820,18 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 			const unsigned int idxPrevSiftKnown = curFrameIndexAll - (curFrameIndex - i);
 			d_siftTrajectory[curFrameIndexAll] = d_siftTrajectory[idxPrevSiftKnown] * d_filteredTransformsInv[i];
 
-			//if (lastValidCompleteTransform == 0) {
-			//	transform = d_siftTrajectory[curFrameIndexAll];
-			//}
-			//else if (idxPrevSiftKnown < lastValidCompleteTransform) {
-			//	transform = d_completeTrajectory[idxPrevSiftKnown] * d_filteredTransformsInv[i];
-			//}
-			//else {
-			//	const float4x4 offset = d_siftTrajectory[lastValidCompleteTransform].getInverse() * d_siftTrajectory[idxPrevSiftKnown];
-			//	transform = d_completeTrajectory[lastValidCompleteTransform] * offset * d_filteredTransformsInv[i];
-			//}
+			if (lastValidCompleteTransform == 0) {
+				transform = d_siftTrajectory[curFrameIndexAll];
+			}
+			else if (idxPrevSiftKnown < lastValidCompleteTransform) {
+				transform = d_completeTrajectory[idxPrevSiftKnown] * d_filteredTransformsInv[i];
+			}
+			else {
+				const float4x4 offset = d_siftTrajectory[lastValidCompleteTransform].getInverse() * d_siftTrajectory[idxPrevSiftKnown];
+				transform = d_completeTrajectory[lastValidCompleteTransform] * offset * d_filteredTransformsInv[i];
+			}
 
-			d_currIntegrateTrans[0] = d_siftTrajectory[curFrameIndexAll];// transform;
+			d_currIntegrateTrans[0] = transform;
 			break;
 		}
 	}

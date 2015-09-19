@@ -61,7 +61,7 @@ SiftGPU::~SiftGPU()
 }
 
 
-SIFTGPU_EXPORT void SiftGPU::InitSiftGPU(unsigned int depthWidth, unsigned int depthHeight, unsigned int intensityWidth, unsigned int intensityHeight)
+void SiftGPU::InitSiftGPU(unsigned int depthWidth, unsigned int depthHeight, unsigned int intensityWidth, unsigned int intensityHeight)
 {
 	if (_initialized) return;
 
@@ -83,7 +83,7 @@ SIFTGPU_EXPORT void SiftGPU::InitSiftGPU(unsigned int depthWidth, unsigned int d
 	_initialized = 1;
 }
 
-SIFTGPU_EXPORT int SiftGPU::RunSIFT(float* d_colorData, const float* d_depthData)
+int SiftGPU::RunSIFT(float* d_colorData, const float* d_depthData)
 {
 
 	if (!_initialized) return 0;
@@ -221,7 +221,7 @@ void SiftGPU::PrintUsage()
 		<< "\n";
 }
 
-SIFTGPU_EXPORT void SiftGPU::SetParams(int cudaDeviceIndex, bool enableTiming, unsigned int featureCountThreshold)
+void SiftGPU::SetParams(int cudaDeviceIndex, bool enableTiming, unsigned int featureCountThreshold)
 {
 	// use cuda 
 	GlobalUtil::_DeviceIndex = cudaDeviceIndex;
@@ -314,7 +314,7 @@ int SiftGPU::AllocatePyramid(int width, int height)
 }
 
 
-SIFTGPU_EXPORT	void SiftGPU::EvaluateTimings()
+void SiftGPU::EvaluateTimings()
 {
 	_pyramid->EvaluateTimings();
 }

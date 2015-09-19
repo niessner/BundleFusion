@@ -65,27 +65,27 @@ class SIFTImageManager {
 public:
 	friend class SIFTMatchFilter;
 
-	SIFTGPU_EXPORT SIFTImageManager(unsigned int submapSize, 
+	SIFTImageManager(unsigned int submapSize, 
 		unsigned int maxImages = 500,
 		unsigned int maxKeyPointsPerImage = 4096);
 
-	SIFTGPU_EXPORT ~SIFTImageManager();
+	~SIFTImageManager();
 
 
-	SIFTGPU_EXPORT SIFTImageGPU& getImageGPU(unsigned int imageIdx);
+	SIFTImageGPU& getImageGPU(unsigned int imageIdx);
 
-	SIFTGPU_EXPORT const SIFTImageGPU& getImageGPU(unsigned int imageIdx) const;
+	const SIFTImageGPU& getImageGPU(unsigned int imageIdx) const;
 
-	SIFTGPU_EXPORT unsigned int getNumImages() const;
+	unsigned int getNumImages() const;
 
-	SIFTGPU_EXPORT unsigned int getNumKeyPointsPerImage(unsigned int imageIdx) const;
+	unsigned int getNumKeyPointsPerImage(unsigned int imageIdx) const;
 
-	SIFTGPU_EXPORT SIFTImageGPU& createSIFTImageGPU();
+	SIFTImageGPU& createSIFTImageGPU();
 
-	SIFTGPU_EXPORT void finalizeSIFTImageGPU(unsigned int numKeyPoints);
+	void finalizeSIFTImageGPU(unsigned int numKeyPoints);
 
 	// ------- image-image matching (API for the Sift matcher)
-	SIFTGPU_EXPORT ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, uint2& keyPointOffset);
+	ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, uint2& keyPointOffset);
 
 	//void resetImagePairMatches(unsigned int numImageMatches = (unsigned int)-1) {
 
@@ -100,7 +100,7 @@ public:
 	//	CUDA_SAFE_CALL(cudaMemset(d_currFilteredMatchDistances, 0, sizeof(float)*numImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
 	//	CUDA_SAFE_CALL(cudaMemset(d_currFilteredMatchKeyPointIndices, -1, sizeof(uint2)*numImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
 	//}
-	SIFTGPU_EXPORT void reset() {
+	void reset() {
 		m_SIFTImagesGPU.clear();
 		m_numKeyPointsPerImage.clear();
 		m_numKeyPointsPerImagePrefixSum.clear();
@@ -115,25 +115,25 @@ public:
 	}
 
 	//sorts the key point matches inside image pair matches
-	SIFTGPU_EXPORT void SortKeyPointMatchesCU(unsigned int numCurrImagePairs);
+	void SortKeyPointMatchesCU(unsigned int numCurrImagePairs);
 
-	SIFTGPU_EXPORT void FilterKeyPointMatchesCU(unsigned int numCurrImagePairs);
+	void FilterKeyPointMatchesCU(unsigned int numCurrImagePairs);
 
-	SIFTGPU_EXPORT void FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv, float areaThresh);
+	void FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv, float areaThresh);
 
-	SIFTGPU_EXPORT void FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
+	void FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
 		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh);
 
 	//void FilterFramesCU(unsigned int numCurrImagePairs);
 
-	SIFTGPU_EXPORT void AddCurrToResidualsCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv);
+	void AddCurrToResidualsCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv);
 
-	SIFTGPU_EXPORT void InvalidateImageToImageCU(const uint2& imageToImageIdx);
+	void InvalidateImageToImageCU(const uint2& imageToImageIdx);
 
-	SIFTGPU_EXPORT void CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesPerRow, unsigned int numVars);
+	void CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesPerRow, unsigned int numVars);
 
-	SIFTGPU_EXPORT unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
+	unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
 
 	void filterFrames(unsigned int numCurrImagePairs);
 
@@ -181,13 +181,13 @@ public:
 
 
 	//!!!TODO where to put transforms
-	SIFTGPU_EXPORT void fuseToGlobal(SIFTImageManager* global, const float4x4* transforms, unsigned int numTransforms) const;
+	void fuseToGlobal(SIFTImageManager* global, const float4x4* transforms, unsigned int numTransforms) const;
 
-	SIFTGPU_EXPORT static void TestSVDDebugCU(const float3x3& m);
+	static void TestSVDDebugCU(const float3x3& m);
 
-	SIFTGPU_EXPORT void saveToFile(const std::string& s);
+	void saveToFile(const std::string& s);
 
-	SIFTGPU_EXPORT void loadFromFile(const std::string& s);
+	void loadFromFile(const std::string& s);
 
 	void evaluateTimings() {
 		if (m_timer) m_timer->evaluate(true);

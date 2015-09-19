@@ -30,27 +30,6 @@
 #include <vector>
 #include "SIFTImageManager.h"
 
-#if  defined(_WIN32) 
-	#ifdef SIFTGPU_DLL
-		#ifdef DLL_EXPORT
-			#define SIFTGPU_EXPORT __declspec(dllexport)
-		#else
-			#define SIFTGPU_EXPORT __declspec(dllimport)
-		#endif
-	#else
-		#define SIFTGPU_EXPORT
-	#endif
-
-    #define SIFTGPU_EXPORT_EXTERN SIFTGPU_EXPORT
-
-	#if _MSC_VER > 1000
-		#pragma once
-	#endif
-#else
-	#define SIFTGPU_EXPORT
-    #define SIFTGPU_EXPORT_EXTERN extern "C"
-#endif
-
 ///////////////////////////////////////////////////////////////////
 //clss SiftParam
 //description: SIFT parameters
@@ -59,8 +38,8 @@ class GlobalUtil;
 class SiftParam
 {
 public:
-	SIFTGPU_EXPORT SiftParam();
-	SIFTGPU_EXPORT ~SiftParam() {
+	SiftParam();
+	~SiftParam() {
 		SAFE_DELETE_ARRAY(_sigma);
 	}
 
@@ -109,39 +88,39 @@ public:
 	}SiftKeypoint;
 public:
 	//constructor, the parameter np is ignored..
-	SIFTGPU_EXPORT SiftGPU();
+	SiftGPU();
 	//destructor
-	SIFTGPU_EXPORT ~SiftGPU();
+	~SiftGPU();
 
 
 	//Initialize OpenGL and SIFT paremeters, and create the shaders accordingly
-	SIFTGPU_EXPORT void InitSiftGPU(unsigned int depthWidth, unsigned int depthHeight, unsigned int intensityWidth, unsigned int intensityHeight);
+	void InitSiftGPU(unsigned int depthWidth, unsigned int depthHeight, unsigned int intensityWidth, unsigned int intensityHeight);
 	//get the number of SIFT features in current image
-	SIFTGPU_EXPORT  int	GetFeatureNum();
+	 int	GetFeatureNum();
 
 
 	//get sift keypoints & descriptors (compute into provided d_keypoints, d_descriptors)
-	SIFTGPU_EXPORT  unsigned int GetKeyPointsAndDescriptorsCUDA(SIFTImageGPU& siftImage, const float* d_depthData);
+	 unsigned int GetKeyPointsAndDescriptorsCUDA(SIFTImageGPU& siftImage, const float* d_depthData);
 	//get sift keypoints (compute into provided d_keypoints)
-	SIFTGPU_EXPORT  void GetKeyPointsCUDA(SiftKeypoint* d_keypoints, float* d_depthData);
+	 void GetKeyPointsCUDA(SiftKeypoint* d_keypoints, float* d_depthData);
 	//get sift descriptors (compute into provided d_descriptors)
-	SIFTGPU_EXPORT  void GetDescriptorsCUDA(unsigned char* d_descriptors);
+	 void GetDescriptorsCUDA(unsigned char* d_descriptors);
 
 	//Copy the SIFT result to two vectors
-	//SIFTGPU_EXPORT  void CopyFeatureVectorToCPU(SiftKeypoint * keys, float * descriptors);
+	// void CopyFeatureVectorToCPU(SiftKeypoint * keys, float * descriptors);
 	//parse SiftGPU parameters
-	SIFTGPU_EXPORT  void SetParams(int cudaDeviceIndex, bool enableTiming, unsigned int featureCountThreshold);
+	 void SetParams(int cudaDeviceIndex, bool enableTiming, unsigned int featureCountThreshold);
 
-	SIFTGPU_EXPORT int RunSIFT(float* d_colorData, const float* d_depthData);
+	int RunSIFT(float* d_colorData, const float* d_depthData);
 	//set the active pyramid...dropped function
-    SIFTGPU_EXPORT  void SetActivePyramid(int index) {}
+     void SetActivePyramid(int index) {}
 	//allocate pyramid for a given size of image
-	SIFTGPU_EXPORT  int AllocatePyramid(int width, int height);
+	 int AllocatePyramid(int width, int height);
 	//none of the texture in processing can be larger
 	//automatic down-sample is used if necessary. 
-	SIFTGPU_EXPORT  void SetMaxDimension(int sz);
+	void SetMaxDimension(int sz);
 
-	SIFTGPU_EXPORT	void EvaluateTimings();
+	void EvaluateTimings();
 private:
 	//when more than one images are specified
 	//_current indicates the active one

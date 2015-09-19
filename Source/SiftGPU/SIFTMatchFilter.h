@@ -8,16 +8,16 @@
 class SIFTMatchFilter
 {
 public:
-	SIFTGPU_EXPORT SIFTMatchFilter() {}
-	SIFTGPU_EXPORT ~SIFTMatchFilter() {}
+	SIFTMatchFilter() {}
+	~SIFTMatchFilter() {}
 
-	SIFTGPU_EXPORT static void filterKeyPointMatches(SIFTImageManager* siftManager);
+	static void filterKeyPointMatches(SIFTImageManager* siftManager);
 
-	SIFTGPU_EXPORT static void filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames);
+	static void filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames);
 
-	SIFTGPU_EXPORT static void filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames);
+	static void filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames);
 
-	SIFTGPU_EXPORT static void filterFrames(SIFTImageManager* siftManager);
+	static void filterFrames(SIFTImageManager* siftManager);
 private:
 
 	static unsigned int filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform);

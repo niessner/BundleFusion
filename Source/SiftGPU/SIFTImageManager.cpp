@@ -2,7 +2,7 @@
 #include "SIFTImageManager.h"
 #include "../GlobalBundlingState.h"
 
-SIFTGPU_EXPORT SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
+SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
 {
 	m_maxNumImages = maxImages;
 	m_maxKeyPointsPerImage = maxKeyPointsPerImage;
@@ -12,34 +12,34 @@ SIFTGPU_EXPORT SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsig
 	m_timer = NULL;
 }
 
-SIFTGPU_EXPORT SIFTImageManager::~SIFTImageManager()
+SIFTImageManager::~SIFTImageManager()
 {
 	free();
 }
 
-SIFTGPU_EXPORT SIFTImageGPU& SIFTImageManager::getImageGPU(unsigned int imageIdx)
+SIFTImageGPU& SIFTImageManager::getImageGPU(unsigned int imageIdx)
 {
 	assert(m_bFinalizedGPUImage);
 	return m_SIFTImagesGPU[imageIdx];
 }
 
-SIFTGPU_EXPORT const SIFTImageGPU& SIFTImageManager::getImageGPU(unsigned int imageIdx) const
+const SIFTImageGPU& SIFTImageManager::getImageGPU(unsigned int imageIdx) const
 {
 	assert(m_bFinalizedGPUImage);
 	return m_SIFTImagesGPU[imageIdx];
 }
 
-SIFTGPU_EXPORT unsigned int SIFTImageManager::getNumImages() const
+unsigned int SIFTImageManager::getNumImages() const
 {
 	return (unsigned int)m_SIFTImagesGPU.size();
 }
 
-SIFTGPU_EXPORT unsigned int SIFTImageManager::getNumKeyPointsPerImage(unsigned int imageIdx) const
+unsigned int SIFTImageManager::getNumKeyPointsPerImage(unsigned int imageIdx) const
 {
 	return m_numKeyPointsPerImage[imageIdx];
 }
 
-SIFTGPU_EXPORT SIFTImageGPU& SIFTImageManager::createSIFTImageGPU()
+SIFTImageGPU& SIFTImageManager::createSIFTImageGPU()
 {
 	assert(m_SIFTImagesGPU.size() == 0 || m_bFinalizedGPUImage);
 	assert(m_SIFTImagesGPU.size() < m_maxNumImages);
@@ -57,7 +57,7 @@ SIFTGPU_EXPORT SIFTImageGPU& SIFTImageManager::createSIFTImageGPU()
 	return imageGPU;
 }
 
-SIFTGPU_EXPORT void SIFTImageManager::finalizeSIFTImageGPU(unsigned int numKeyPoints)
+void SIFTImageManager::finalizeSIFTImageGPU(unsigned int numKeyPoints)
 {
 	assert(numKeyPoints < m_maxKeyPointsPerImage);
 	assert(!m_bFinalizedGPUImage);
@@ -71,7 +71,7 @@ SIFTGPU_EXPORT void SIFTImageManager::finalizeSIFTImageGPU(unsigned int numKeyPo
 	assert(getNumImages() == m_numKeyPointsPerImagePrefixSum.size());
 }
 
-SIFTGPU_EXPORT ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, uint2& keyPointOffset)
+ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, uint2& keyPointOffset)
 {
 	assert(prevImageIdx < m_maxNumImages);
 	assert(getNumImages() > 0);
@@ -84,7 +84,7 @@ SIFTGPU_EXPORT ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int 
 
 
 
-SIFTGPU_EXPORT void SIFTImageManager::saveToFile(const std::string& s)
+void SIFTImageManager::saveToFile(const std::string& s)
 {
 	std::ofstream out(s, std::ios::binary);
 	if (!out.is_open()) {
@@ -161,7 +161,7 @@ SIFTGPU_EXPORT void SIFTImageManager::saveToFile(const std::string& s)
 	out.close();
 }
 
-SIFTGPU_EXPORT void SIFTImageManager::loadFromFile(const std::string& s)
+void SIFTImageManager::loadFromFile(const std::string& s)
 {
 	free();
 	alloc();
