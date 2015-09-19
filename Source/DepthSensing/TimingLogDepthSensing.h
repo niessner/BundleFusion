@@ -31,7 +31,7 @@ class TimingLogDepthSensing
 				//if(countTimeEstimateLighting != 0)	std::cout << "Total Time Estimate Lighting: "	<< totalTimeEstimateLighting/countTimeEstimateLighting	<< std::endl;
 				//if(countTimeRemapDepth != 0)		std::cout << "Total Time Remap Depth: "			<< totalTimeRemapDepth/countTimeRemapDepth				<< std::endl;
 				//if(countTimeSegment != 0)			std::cout << "Total Time Segment Depth: "		<< totalTimeSegment/countTimeSegment					<< std::endl;
-				//if(countTimeRender != 0)			std::cout << "Total Time Render: "	 			<< totalTimeRender/countTimeRender						<< std::endl;
+				if(countTimeRenderMain != 0)			std::cout << "Total Time Render: "	 			<< totalTimeRenderMain/countTimeRenderMain						<< std::endl;
 				if(countTimeRayIntervalSplatting != 0) std::cout << "Total Time RayIntervalSplatting: "	<< totalTimeRayIntervalSplatting/countTimeRayIntervalSplatting << std::endl;
 				//if(countTimeRayIntervalSplattingCUDA != 0) std::cout << "Total Time RayIntervalSplatting (CUDA): "	<< totalTimeRayIntervalSplattingCUDA/countTimeRayIntervalSplattingCUDA << std::endl;
 				//if(countTimeRayIntervalSplattingDX11 != 0) std::cout << "Total Time RayIntervalSplatting (DX11): "	<< totalTimeRayIntervalSplattingDX11/countTimeRayIntervalSplattingDX11 << std::endl;
@@ -82,8 +82,8 @@ class TimingLogDepthSensing
 			totalTimeHoleFilling = 0.0;
 			countTimeHoleFilling = 0;
 
-			totalTimeRender = 0.0;
-			countTimeRender = 0;
+			totalTimeRenderMain = 0.0;
+			countTimeRenderMain = 0;
 
 			totalTimeOptimizer = 0.0;
 			countTimeOptimizer = 0;
@@ -153,8 +153,8 @@ class TimingLogDepthSensing
 		static double totalTimeHoleFilling;
 		static unsigned int countTimeHoleFilling;
 
-		static double totalTimeRender;
-		static unsigned int countTimeRender;
+		static double totalTimeRenderMain;
+		static unsigned int countTimeRenderMain;
 
 		static double totalTimeOptimizer;
 		static unsigned int countTimeOptimizer;

@@ -6,8 +6,8 @@
 double TimingLogDepthSensing::totalTimeHoleFilling = 0.0;
 unsigned int TimingLogDepthSensing::countTimeHoleFilling = 0;
 
-double TimingLogDepthSensing::totalTimeRender = 0.0;
-unsigned int TimingLogDepthSensing::countTimeRender = 0;
+double TimingLogDepthSensing::totalTimeRenderMain = 0.0;
+unsigned int TimingLogDepthSensing::countTimeRenderMain = 0;
 
 double TimingLogDepthSensing::totalTimeOptimizer = 0.0;
 unsigned int TimingLogDepthSensing::countTimeOptimizer = 0;
