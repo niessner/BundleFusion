@@ -38,7 +38,7 @@ typedef signed char schar;
 
 #define HANDLE_COLLISIONS
 #define SDF_BLOCK_SIZE 8
-#define HASH_BUCKET_SIZE 10
+#define HASH_BUCKET_SIZE 4
 
 #ifndef MINF
 #define MINF __int_as_float(0xff800000)
@@ -114,6 +114,7 @@ struct HashData {
 		d_hashDecision = NULL;
 		d_hashDecisionPrefix = NULL;
 		d_hashCompactified = NULL;
+		d_hashCompactifiedCounter = NULL;
 		d_SDFBlocks = NULL;
 		d_hashBucketMutex = NULL;
 		m_bIsOnGPU = false;
@@ -129,6 +130,7 @@ struct HashData {
 			cutilSafeCall(cudaMalloc(&d_hashDecision, sizeof(int)* params.m_hashNumBuckets * params.m_hashBucketSize));
 			cutilSafeCall(cudaMalloc(&d_hashDecisionPrefix, sizeof(int)* params.m_hashNumBuckets * params.m_hashBucketSize));
 			cutilSafeCall(cudaMalloc(&d_hashCompactified, sizeof(HashEntry)* params.m_hashNumBuckets * params.m_hashBucketSize));
+			cutilSafeCall(cudaMalloc(&d_hashCompactifiedCounter, sizeof(int)));
 			cutilSafeCall(cudaMalloc(&d_SDFBlocks, sizeof(Voxel) * params.m_numSDFBlocks * params.m_SDFBlockSize*params.m_SDFBlockSize*params.m_SDFBlockSize));
 			cutilSafeCall(cudaMalloc(&d_hashBucketMutex, sizeof(int)* params.m_hashNumBuckets));
 		} else {
@@ -137,6 +139,7 @@ struct HashData {
 			d_hash = new HashEntry[params.m_hashNumBuckets * params.m_hashBucketSize];
 			d_hashDecision = new int[params.m_hashNumBuckets * params.m_hashBucketSize];
 			d_hashDecisionPrefix = new int[params.m_hashNumBuckets * params.m_hashBucketSize];
+			d_hashCompactifiedCounter = new int[1];
 			d_hashCompactified = new HashEntry[params.m_hashNumBuckets * params.m_hashBucketSize];
 			d_SDFBlocks = new Voxel[params.m_numSDFBlocks * params.m_SDFBlockSize*params.m_SDFBlockSize*params.m_SDFBlockSize];
 			d_hashBucketMutex = new int[params.m_hashNumBuckets];
@@ -161,6 +164,7 @@ struct HashData {
 			cutilSafeCall(cudaFree(d_hashDecision));
 			cutilSafeCall(cudaFree(d_hashDecisionPrefix));
 			cutilSafeCall(cudaFree(d_hashCompactified));
+			cutilSafeCall(cudaFree(d_hashCompactifiedCounter));
 			cutilSafeCall(cudaFree(d_SDFBlocks));
 			cutilSafeCall(cudaFree(d_hashBucketMutex));
 		} else {
@@ -170,6 +174,7 @@ struct HashData {
 			if (d_hashDecision) delete[] d_hashDecision;
 			if (d_hashDecisionPrefix) delete[] d_hashDecisionPrefix;
 			if (d_hashCompactified) delete[] d_hashCompactified;
+			if (d_hashCompactifiedCounter) delete[] d_hashCompactifiedCounter;
 			if (d_SDFBlocks) delete[] d_SDFBlocks;
 			if (d_hashBucketMutex) delete[] d_hashBucketMutex;
 		}
@@ -180,6 +185,7 @@ struct HashData {
 		d_hashDecision = NULL;
 		d_hashDecisionPrefix = NULL;
 		d_hashCompactified = NULL;
+		d_hashCompactifiedCounter = NULL;
 		d_SDFBlocks = NULL;
 		d_hashBucketMutex = NULL;
 	}
@@ -818,14 +824,15 @@ struct HashData {
 
 #endif	//CUDACC
 
-	uint*			d_heap;					//heap that manages free memory
-	uint*			d_heapCounter;			//single element; used as an atomic counter (points to the next free block)
-	int*			d_hashDecision;			//
-	int*			d_hashDecisionPrefix;	//
-	HashEntry*		d_hash;					//hash that stores pointers to sdf blocks
-	HashEntry*		d_hashCompactified;		//same as before except that only valid pointers are there
-	Voxel*			d_SDFBlocks;			//sub-blocks that contain 8x8x8 voxels (linearized); are allocated by heap
-	int*			d_hashBucketMutex;		//binary flag per hash bucket; used for allocation to atomically lock a bucket
+	uint*		d_heap;						//heap that manages free memory
+	uint*		d_heapCounter;				//single element; used as an atomic counter (points to the next free block)
+	int*		d_hashDecision;				//
+	int*		d_hashDecisionPrefix;		//
+	HashEntry*	d_hash;						//hash that stores pointers to sdf blocks
+	HashEntry*	d_hashCompactified;			//same as before except that only valid pointers are there
+	int*		d_hashCompactifiedCounter;	//atomic counter to add compactified entries atomically 
+	Voxel*		d_SDFBlocks;				//sub-blocks that contain 8x8x8 voxels (linearized); are allocated by heap
+	int*		d_hashBucketMutex;			//binary flag per hash bucket; used for allocation to atomically lock a bucket
 
-	bool			m_bIsOnGPU;				//the class be be used on both cpu and gpu
+	bool		m_bIsOnGPU;					//the class be be used on both cpu and gpu
 };

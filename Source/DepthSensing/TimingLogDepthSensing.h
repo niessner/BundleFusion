@@ -31,7 +31,7 @@ class TimingLogDepthSensing
 				//if(countTimeEstimateLighting != 0)	std::cout << "Total Time Estimate Lighting: "	<< totalTimeEstimateLighting/countTimeEstimateLighting	<< std::endl;
 				//if(countTimeRemapDepth != 0)		std::cout << "Total Time Remap Depth: "			<< totalTimeRemapDepth/countTimeRemapDepth				<< std::endl;
 				//if(countTimeSegment != 0)			std::cout << "Total Time Segment Depth: "		<< totalTimeSegment/countTimeSegment					<< std::endl;
-				if(countTimeRenderMain != 0)			std::cout << "Total Time Render: "	 			<< totalTimeRenderMain/countTimeRenderMain						<< std::endl;
+				if(countTimeRenderMain != 0)			std::cout << "Total Time RenderMain: "	 			<< totalTimeRenderMain/countTimeRenderMain		<< std::endl;
 				if(countTimeRayIntervalSplatting != 0) std::cout << "Total Time RayIntervalSplatting: "	<< totalTimeRayIntervalSplatting/countTimeRayIntervalSplatting << std::endl;
 				//if(countTimeRayIntervalSplattingCUDA != 0) std::cout << "Total Time RayIntervalSplatting (CUDA): "	<< totalTimeRayIntervalSplattingCUDA/countTimeRayIntervalSplattingCUDA << std::endl;
 				//if(countTimeRayIntervalSplattingDX11 != 0) std::cout << "Total Time RayIntervalSplatting (DX11): "	<< totalTimeRayIntervalSplattingDX11/countTimeRayIntervalSplattingDX11 << std::endl;

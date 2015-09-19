@@ -7,6 +7,7 @@
 #include "VoxelUtilHashSDF.h"
 #include "DepthCameraUtil.h"
 #include "CUDAScan.h"
+#include "CUDATimer.h"
 
 #include "GlobalAppState.h"
 #include "TimingLogDepthSensing.h"
@@ -16,6 +17,7 @@ extern "C" void resetHashBucketMutexCUDA(HashData& hashData, const HashParams& h
 extern "C" void allocCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams, const unsigned int* d_bitMask);
 extern "C" void fillDecisionArrayCUDA(HashData& hashData, const HashParams& hashParams);
 extern "C" void compactifyHashCUDA(HashData& hashData, const HashParams& hashParams);
+extern "C" unsigned int compactifyHashAllInOneCUDA(HashData& hashData, const HashParams& hashParams);
 extern "C" void integrateDepthMapCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams);
 extern "C" void deIntegrateDepthMapCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams);
 extern "C" void bindInputDepthColorTextures(const DepthCameraData& depthCameraData, unsigned int width, unsigned int height);
@@ -84,9 +86,9 @@ public:
 
 		bindDepthCameraTextures(depthCameraData, depthCameraParams);
 
-		//if (GlobalAppState::get().s_streamingEnabled == true) {
-		//	MLIB_WARNING("s_streamingEnabled is no compatible with deintegration");
-		//}
+		if (GlobalAppState::get().s_streamingEnabled == true) {
+			MLIB_WARNING("s_streamingEnabled is no compatible with deintegration");
+		}
 
 		setLastRigidTransform(lastRigidTransform);
 
@@ -350,18 +352,35 @@ private:
 
 	void compactifyHashEntries() {
 		//Start Timing
-		if(GlobalAppState::get().s_timingsDetailledEnabled) { cutilSafeCall(cudaDeviceSynchronize()); m_timer.start(); }
+		if (GlobalAppState::get().s_timingsDetailledEnabled) { cutilSafeCall(cudaDeviceSynchronize()); m_timer.start(); }
 
-		fillDecisionArrayCUDA(m_hashData, m_hashParams);
-		m_hashParams.m_numOccupiedBlocks = 
-			m_cudaScan.prefixSum(
-				m_hashParams.m_hashNumBuckets*m_hashParams.m_hashBucketSize,
-				m_hashData.d_hashDecision,
-				m_hashData.d_hashDecisionPrefix);
+		//CUDATimer t;
+		
+		////t.startEvent("fillDecisionArray");
+		//fillDecisionArrayCUDA(m_hashData, m_hashParams);
+		////t.endEvent();
 
+		////t.startEvent("prefixSum");
+		//m_hashParams.m_numOccupiedBlocks = 
+		//	m_cudaScan.prefixSum(
+		//		m_hashParams.m_hashNumBuckets*m_hashParams.m_hashBucketSize,
+		//		m_hashData.d_hashDecision,
+		//		m_hashData.d_hashDecisionPrefix);
+		////t.endEvent();
+
+		////t.startEvent("compactifyHash");
+		//m_hashData.updateParams(m_hashParams);	//make sure numOccupiedBlocks is updated on the GPU
+		//compactifyHashCUDA(m_hashData, m_hashParams);
+		////t.endEvent();
+
+		 
+
+		//t.startEvent("compactifyAllInOne");
+		m_hashParams.m_numOccupiedBlocks = compactifyHashAllInOneCUDA(m_hashData, m_hashParams);
 		m_hashData.updateParams(m_hashParams);	//make sure numOccupiedBlocks is updated on the GPU
+		//t.endEvent();
+		//t.evaluate();
 
-		compactifyHashCUDA(m_hashData, m_hashParams);
 
 		// Stop Timing
 		if (GlobalAppState::get().s_timingsDetailledEnabled) { cutilSafeCall(cudaDeviceSynchronize()); m_timer.stop(); TimingLogDepthSensing::totalTimeCompactifyHash += m_timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeCompactifyHash++; }
@@ -395,6 +414,7 @@ private:
 	HashData		m_hashData;
 
 	CUDAScan		m_cudaScan;
+
 	unsigned int	m_numIntegratedFrames;	//used for garbage collect
 
 	static Timer m_timer;

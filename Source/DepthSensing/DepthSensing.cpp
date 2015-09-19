@@ -705,9 +705,14 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 
 void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext )
 {
+	CUDATimer timer;
 	//Start Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
 
+	///////////////////////////////////////
+	// Process Input
+	///////////////////////////////////////
+	timer.startEvent("processInput");
 
 	// if we have received any valid new depth data we may need to draw
 	bool bGotDepth = g_CudaImageManager->process();
@@ -715,11 +720,14 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		g_bundler->processInput();	//sift extraction and sift matching
 	}
 
- 
+	timer.endEvent(); 
+	
 
 	///////////////////////////////////////
 	// Reconstruction of current frame
 	///////////////////////////////////////
+	timer.startEvent("reconstruct curr frame");
+
 	if (bGotDepth) {
 		mat4f transformation = mat4f::zero();
 		DepthCameraData depthCameraData;
@@ -741,32 +749,45 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 			integrate(depthCameraData, transformation);
 		}
 
-			g_lastRigidTransform = transformation;
+		
+		g_lastRigidTransform = transformation;
 	}
+	timer.endEvent();
+
 
 	///////////////////////////////////////
 	// Render with view of current frame
 	///////////////////////////////////////
-
+	timer.startEvent("visualize");
 	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform);
+	timer.endEvent();
+
 
 	///////////////////////////////////////
 	// Bundling Optimization
 	///////////////////////////////////////
+	timer.startEvent("bunling");
 	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
 	g_bundler->processGlobal();
 	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
-
+	timer.endEvent();
 	
 
 	///////////////////////////////////////
 	// Fix old frames
 	///////////////////////////////////////
+	timer.startEvent("reintegration");
 	{
-		const unsigned int maxPerFrameFixes = 10;
+		const unsigned int maxPerFrameFixes = 30;
 		TrajectoryManager* tm = g_bundler->getTrajectoryManager();
-		unsigned int fixes = 0;
-		for (; fixes < maxPerFrameFixes; fixes++) {
+
+		if (tm->getNumActiveOperations() < maxPerFrameFixes) {
+			Timer t;
+			tm->generateUpdateLists();
+			std::cout << "generateUpdateList " << t.getElapsedTimeMS() << " [ms] " << std::endl;
+		}
+
+		for (unsigned int fixes = 0; fixes < maxPerFrameFixes; fixes++) {
 
 			mat4f newTransform = mat4f::zero();	
 			mat4f oldTransform = mat4f::zero();
@@ -797,77 +818,30 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 				deIntegrate(depthCameraData, oldTransform);
 				integrate(depthCameraData, newTransform);
 				tm->confirmIntegration(frameIdx);
-				fixes++;	//(we've done two operations in this case)
 				continue;
 			}
 			else {
 				break; //no more work to do
 			}
 		}
-		if (fixes < maxPerFrameFixes) {
-			tm->generateUpdateLists();
-		}
-
-		std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
 		g_sceneRep->garbageCollect();
 	}
+	timer.endEvent();
 
-
-	//if (!bGotDepth) {
-	//	//g_sceneRep->reset();
-	//	//for (unsigned int i = 0; i < g_bundler->getTrajectoryManager()->getNumAddedFrames(); i++) {
-	//	//	const auto &tf = g_bundler->getTrajectoryManager()->getFrames()[i];
-	//	//	if (tf.type == TrajectoryManager::TrajectoryFrame::Integrated) {
-	//	//		auto& f = g_CudaImageManager->getIntegrateFrame(tf.frameIdx);
-	//	//		DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-	//	//		std::cout << "deintegrating " << i;
-	//	//		deIntegrate(depthCameraData, tf.integratedTransform);
-	//	//		std::cout << " done!" << std::endl;
-	//	//	}
-	//	//}
-	//	//std::cout << "<<NUM INTEGRATED FRAMES>> " << g_sceneRep->getNumIntegratedFrames() << std::endl; 
-	//	//StopScanningAndExtractIsoSurfaceMC("./scans/empty.ply");
-
-	//	//for (unsigned int i = 0; i < g_bundler->getTrajectoryManager()->getNumOptimizedFrames(); i++) {
-	//	//	const auto &tf = g_bundler->getTrajectoryManager()->getFrames()[i];
-	//	//	auto& f = g_CudaImageManager->getIntegrateFrame(tf.frameIdx);
-	//	//	DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-	//	//	std::cout << "integrating " << i;
-	//	//	integrate(depthCameraData, tf.optimizedTransform);
-	//	//	std::cout << " done!" << std::endl;
-	//	//}
-
-	//	for (unsigned int i = 0; i < g_bundler->getTrajectoryManager()->getNumAddedFrames(); i++) {
-	//		const auto &tf = g_bundler->getTrajectoryManager()->getFrames()[i];
-	//		auto& f = g_CudaImageManager->getIntegrateFrame(tf.frameIdx);
-	//		if (tf.type == TrajectoryManager::TrajectoryFrame::Integrated) {
-	//			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-
-	//			std::cout << "deintegrating " << i;
-	//			deIntegrate(depthCameraData, tf.integratedTransform);
-	//			std::cout << " done!" << std::endl;
-
-	//			std::cout << "integrating " << i;
-	//			integrate(depthCameraData, tf.optimizedTransform);
-	//			std::cout << " done!" << std::endl;
-	//		}
-	//	}
-	//	std::cout << "<<NUM INTEGRATED FRAMES>> " << g_sceneRep->getNumIntegratedFrames() << std::endl << std::endl; 
-	//	//StopScanningAndExtractIsoSurfaceMC("./scans/empty.ply");
-
-	//	StopScanningAndExtractIsoSurfaceMC();
-	//	std::cout << " DONE DONE DONE " << std::endl;
-	//	while (1);
-
-	//}
+	timer.evaluate();
 
 	// Stop Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLogDepthSensing::totalTimeRenderMain += GlobalAppState::get().s_Timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeRenderMain++; }
-
+	std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
+	std::cout << "Total Frame Process Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] " << std::endl;
 
 	TimingLogDepthSensing::printTimings();
 	if (g_renderText) RenderText();
 
+	if (g_CudaImageManager->getCurrFrameNumber() == 30) {
+		std::cout << "DONE DONE DONE" << std::endl;
+		getchar();
+	}
 
 	DXUT_EndPerfEvent();
 }

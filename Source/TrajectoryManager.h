@@ -33,11 +33,10 @@ public:
 		m_numOptimizedFrames = 0;
 
 		//TODO move this to some sort of parameter file
-		m_topNActive = 10;
+		m_topNActive = 30;
 		m_minPoseDist = 0.02f*0.02f;
 		m_minPoseDist = 0.00f;
 		m_featureRescaleRotToTrans = 2.0f;
-
 	}
 
 
@@ -117,6 +116,7 @@ public:
 				break;
 			}
 		}
+
 	}
 
 
@@ -167,6 +167,13 @@ public:
 	}
 	unsigned int getNumAddedFrames() const {
 		return m_numAddedFrames;
+	}
+
+	unsigned int getNumActiveOperations() const {
+		return
+			(unsigned int)m_toDeIntegrateList.size() +
+			(unsigned int)m_toIntegrateList.size() +
+			(unsigned int)m_toReIntegrateList.size();
 	}
 private:
 	void invalidateFrame(unsigned int frameIdx) {
