@@ -101,8 +101,7 @@ void Bundler::processInput()
 	if (curLocalFrame > 0) {
 		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
 
-		unsigned int numCompleteFrames = (m_SubmapManager.global->getNumImages() > 0) ? (m_SubmapManager.global->getNumImages() - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames : m_currentState.m_lastNumLocalFrames;
-		currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, numCompleteFrames,
+		currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, m_currentState.m_lastValidCompleteTransform,
 			m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame);
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
@@ -130,6 +129,8 @@ void Bundler::processInput()
 			m_currentState.m_localToSolve = -1; // no need to solve local
 			m_currentState.m_lastLocalSolved = curLocalIdx; // already "solved"
 			m_currentState.m_bOptimizeGlobal = false;
+			m_currentState.m_lastNumLocalFrames = std::min(m_submapSize, m_SubmapManager.currentLocal->getNumImages());
+			m_currentState.m_numCompleteTransforms = curFrame;
 
 			//add invalidated (fake) global frame
 			std::cout << "WARNING: invalid local submap " << curFrame << " (" << m_SubmapManager.global->getNumImages() << ", " << m_SubmapManager.currentLocal->getNumImages() << ")" << std::endl;
@@ -137,6 +138,7 @@ void Bundler::processInput()
 			SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
 			m_SubmapManager.global->finalizeSIFTImageGPU(0);
 			m_SubmapManager.switchLocal();
+			m_SubmapManager.finishLocalOpt();
 			m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
 
 			m_SubmapManager.updateTrajectory(curFrame);
@@ -238,6 +240,8 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 
 	m_SubmapManager.updateTrajectory(numFrames);
 	m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
+	m_currentState.m_numCompleteTransforms = numFrames;
+	m_currentState.m_lastValidCompleteTransform = numFrames - 1;
 }
 
 void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence)
@@ -321,7 +325,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 	}
 }
 
-void Bundler::printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame)
+void Bundler::printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame) const
 {
 	//TODO get color cpu for these functions
 	CUDAImageManager::ManagedRGBDInputFrame& integrateFrame = m_CudaImageManager->getIntegrateFrame(allFrame);
@@ -344,7 +348,7 @@ void Bundler::printKey(const std::string& filename, unsigned int allFrame, const
 	FreeImageWrapper::saveImage(filename, im);
 }
 
-void Bundler::printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered)
+void Bundler::printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const
 {
 	// get data
 	std::vector<SIFTKeyPoint> keys;
@@ -386,7 +390,7 @@ void Bundler::printMatch(const SIFTImageManager* siftManager, const std::string&
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
-void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, bool filtered, unsigned int frameStart, unsigned int frameSkip)
+void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, bool filtered, unsigned int frameStart, unsigned int frameSkip) const
 {
 	const unsigned int numFrames = siftManager->getNumImages();
 	if (numFrames <= 1) return;
@@ -415,7 +419,7 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 	}
 }
 
-void Bundler::saveKeysToPointCloud(const std::string& filename /*= "refined.ply"*/)
+void Bundler::saveKeysToPointCloud(const std::string& filename /*= "refined.ply"*/) const
 {
 	if (GlobalBundlingState::get().s_recordKeysPointCloud) {
 		const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
@@ -431,6 +435,26 @@ void Bundler::saveKeysToPointCloud(const std::string& filename /*= "refined.ply"
 		//m_RGBDSensor->saveRecordedPointCloudDEBUG(filename, validImagesGlobal, completeTrajectory, m_submapSize);
 		//!!!
 	}
+}
+
+void Bundler::saveCompleteTrajectory(const std::string& filename) const
+{
+	std::vector<mat4f> completeTrajectory(m_currentState.m_numCompleteTransforms);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(completeTrajectory.data(), m_SubmapManager.d_completeTrajectory, sizeof(mat4f)*completeTrajectory.size(), cudaMemcpyDeviceToHost));
+
+	BinaryDataStreamFile s(filename, true);
+	s << completeTrajectory;
+	s.closeStream();
+}
+
+void Bundler::saveSiftTrajectory(const std::string& filename) const
+{
+	std::vector<mat4f> siftTrjectory(m_currentState.m_numCompleteTransforms);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(siftTrjectory.data(), m_SubmapManager.d_siftTrajectory, sizeof(mat4f)*siftTrjectory.size(), cudaMemcpyDeviceToHost));
+
+	BinaryDataStreamFile s(filename, true);
+	s << siftTrjectory;
+	s.closeStream();
 }
 
 //void Bundler::saveDEBUG()

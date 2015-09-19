@@ -28,6 +28,8 @@ public:
 		bool					m_bLastFrameValid;
 
 		unsigned int			m_lastNumLocalFrames;
+		unsigned int			m_numCompleteTransforms;
+		unsigned int			m_lastValidCompleteTransform;
 
 		BundlerState() {
 			m_localToSolve = -1;
@@ -37,6 +39,8 @@ public:
 			m_lastFrameProcessed = 0;
 			m_bLastFrameValid = false;
 			m_lastNumLocalFrames = 0;
+			m_numCompleteTransforms = 0;
+			m_lastValidCompleteTransform = 0;
 		}
 	};
 
@@ -72,12 +76,14 @@ public:
 	}
 
 	//! debug vis functions
-	void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame);
+	void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame) const;
 	void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, bool filtered,
-		unsigned int frameStart, unsigned int frameSkip);
-	void saveKeysToPointCloud(const std::string& filename = "refined.ply");
-
+		unsigned int frameStart, unsigned int frameSkip) const;
+	void saveKeysToPointCloud(const std::string& filename = "refined.ply") const;
 	//void saveDEBUG();
+
+	void saveCompleteTrajectory(const std::string& filename) const;
+	void saveSiftTrajectory(const std::string& filename) const;
 
 	TrajectoryManager* getTrajectoryManager() {
 		return m_trajectoryManager;
@@ -89,7 +95,7 @@ private:
 	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence);
 
 	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
-		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered);
+		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const;
 
 	CUDAImageManager*		m_CudaImageManager;		//managed outside
 	RGBDSensor*				m_RGBDSensor;			//managed outside
