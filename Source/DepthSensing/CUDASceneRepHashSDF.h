@@ -75,7 +75,7 @@ public:
 		//volumetrically integrate the depth data into the depth SDFBlocks
 		integrateDepthMap(depthCameraData, depthCameraParams);
 
-		garbageCollect();
+		//garbageCollect();
 
 		m_numIntegratedFrames++;
 	}
@@ -84,14 +84,11 @@ public:
 
 		bindDepthCameraTextures(depthCameraData, depthCameraParams);
 
-		if (GlobalAppState::get().s_streamingEnabled == true) {
-			MLIB_WARNING("s_streamingEnabled is no compatible with deintegration");
-		}
+		//if (GlobalAppState::get().s_streamingEnabled == true) {
+		//	MLIB_WARNING("s_streamingEnabled is no compatible with deintegration");
+		//}
 
 		setLastRigidTransform(lastRigidTransform);
-
-		//make the rigid transform available on the GPU
-		m_hashData.updateParams(m_hashParams);
 
 		//generate a linear hash array with only occupied entries
 		compactifyHashEntries();
@@ -99,13 +96,29 @@ public:
 		//volumetrically integrate the depth data into the depth SDFBlocks
 		deIntegrateDepthMap(depthCameraData, depthCameraParams);
 
-		garbageCollect();
+		//garbageCollect();
 
 		//DepthImage32 test(depthCameraParams.m_imageWidth, depthCameraParams.m_imageHeight);
 		//cudaMemcpyFromArray(test.getPointer(), depthCameraData.d_depthArray, 0, 0, sizeof(float)*depthCameraParams.m_imageWidth *depthCameraParams.m_imageHeight, cudaMemcpyDeviceToHost);
 		//FreeImageWrapper::saveImage("test_deint_depth" + std::to_string(m_numIntegratedFrames) + " .png", ColorImageR32G32B32(test), true);
 
 		m_numIntegratedFrames--;
+	}
+
+	void garbageCollect() {
+		//only perform if enabled by global app state
+		if (GlobalAppState::get().s_garbageCollectionEnabled) {
+
+			//if (m_numIntegratedFrames > 0 && m_numIntegratedFrames % GlobalAppState::get().s_garbageCollectionStarve == 0) {
+			//	starveVoxelsKernelCUDA(m_hashData, m_hashParams);
+
+			//	MLIB_WARNING("starving voxel weights is incompatible with bundling");
+			//}
+
+			garbageCollectIdentifyCUDA(m_hashData, m_hashParams);
+			resetHashBucketMutexCUDA(m_hashData, m_hashParams);	//needed if linked lists are enabled -> for memeory deletion
+			garbageCollectFreeCUDA(m_hashData, m_hashParams);
+		}
 	}
 
 	void setLastRigidTransform(const mat4f& lastRigidTransform) {
@@ -374,22 +387,6 @@ private:
 
 		// Stop Timing
 		if (GlobalAppState::get().s_timingsDetailledEnabled) { cutilSafeCall(cudaDeviceSynchronize()); m_timer.stop(); TimingLogDepthSensing::totalTimeDeIntegrate += m_timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeDeIntegrate++; }
-	}
-
-	void garbageCollect() {
-		//only perform if enabled by global app state
-		if (GlobalAppState::get().s_garbageCollectionEnabled) {
-			
-			if (m_numIntegratedFrames > 0 && m_numIntegratedFrames % GlobalAppState::get().s_garbageCollectionStarve == 0) {
-				starveVoxelsKernelCUDA(m_hashData, m_hashParams);
-
-				MLIB_WARNING("starving voxel weights is incompatible with bundling");
-			}
-
-			garbageCollectIdentifyCUDA(m_hashData, m_hashParams);
-			resetHashBucketMutexCUDA(m_hashData, m_hashParams);	//needed if linked lists are enabled -> for memeory deletion
-			garbageCollectFreeCUDA(m_hashData, m_hashParams);
-		} 
 	}
 
 

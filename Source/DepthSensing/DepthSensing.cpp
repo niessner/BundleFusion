@@ -746,8 +746,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 			g_lastRigidTransform = transformation;
 	}
 
-	//std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
-
 	///////////////////////////////////////
 	// Render with view of current frame
 	///////////////////////////////////////
@@ -812,6 +810,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 			tm->generateUpdateLists();
 		}
 
+		std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
+		g_sceneRep->garbageCollect();
 	}
 
 

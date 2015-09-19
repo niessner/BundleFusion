@@ -100,12 +100,12 @@ public:
 		std::sort(m_framesSort.begin(), m_framesSort.begin() + numFrames, s);
 		//m_framesSort.sort(s);
 
-		for (unsigned int i = 0; i < std::min(5u, numFrames); i++) {
-			const auto *f = m_framesSort[i];
-			std::cout << "[" << f->frameIdx << "]" << " " << f->dist;
-			std::cout << "\t type: " << f->type;
-			std::cout << std::endl;
-		}
+		//for (unsigned int i = 0; i < std::min(5u, numFrames); i++) {
+		//	const auto *f = m_framesSort[i];
+		//	std::cout << "[" << f->frameIdx << "]" << " " << f->dist;
+		//	std::cout << "\t type: " << f->type;
+		//	std::cout << std::endl;
+		//}
 
 		for (unsigned int i = (unsigned int)m_toReIntegrateList.size(); i < m_topNActive; i++) {
 			auto* f = m_framesSort[i];

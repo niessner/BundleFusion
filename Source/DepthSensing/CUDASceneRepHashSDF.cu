@@ -506,7 +506,7 @@ extern "C" void starveVoxelsKernelCUDA(HashData& hashData, const HashParams& has
 }
 
 
-__shared__ float	shared_MinSDF[SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE / 2];
+//__shared__ float	shared_MinSDF[SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE / 2];
 __shared__ uint		shared_MaxWeight[SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE / 2];
 
 
@@ -528,17 +528,17 @@ __global__ void garbageCollectIdentifyKernel(HashData hashData) {
 	Voxel v0 = hashData.d_SDFBlocks[idx0];
 	Voxel v1 = hashData.d_SDFBlocks[idx1];
 
-	if (v0.weight == 0)	v0.sdf = PINF;
-	if (v1.weight == 0)	v1.sdf = PINF;
+	//if (v0.weight == 0)	v0.sdf = PINF;
+	//if (v1.weight == 0)	v1.sdf = PINF;
 
-	shared_MinSDF[threadIdx.x] = min(fabsf(v0.sdf), fabsf(v1.sdf));	//init shared memory
+	//shared_MinSDF[threadIdx.x] = min(fabsf(v0.sdf), fabsf(v1.sdf));	//init shared memory
 	shared_MaxWeight[threadIdx.x] = max(v0.weight, v1.weight);
 		
 #pragma unroll 1
 	for (uint stride = 2; stride <= blockDim.x; stride <<= 1) {
 		__syncthreads();
 		if ((threadIdx.x  & (stride-1)) == (stride-1)) {
-			shared_MinSDF[threadIdx.x] = min(shared_MinSDF[threadIdx.x-stride/2], shared_MinSDF[threadIdx.x]);
+			//shared_MinSDF[threadIdx.x] = min(shared_MinSDF[threadIdx.x-stride/2], shared_MinSDF[threadIdx.x]);
 			shared_MaxWeight[threadIdx.x] = max(shared_MaxWeight[threadIdx.x-stride/2], shared_MaxWeight[threadIdx.x]);
 		}
 	}
@@ -546,12 +546,12 @@ __global__ void garbageCollectIdentifyKernel(HashData hashData) {
 	__syncthreads();
 
 	if (threadIdx.x == blockDim.x - 1) {
-		float minSDF = shared_MinSDF[threadIdx.x];
+		//float minSDF = shared_MinSDF[threadIdx.x];
 		uint maxWeight = shared_MaxWeight[threadIdx.x];
 
-		float t = hashData.getTruncation(c_depthCameraParams.m_sensorDepthWorldMax);	//MATTHIAS TODO check whether this is a reasonable metric
-
-		if (minSDF >= t || maxWeight == 0) {
+		//float t = hashData.getTruncation(c_depthCameraParams.m_sensorDepthWorldMax);
+		//if (minSDF >= t || maxWeight == 0) {
+		if (maxWeight == 0) {
 			hashData.d_hashDecision[hashIdx] = 1;
 		} else {
 			hashData.d_hashDecision[hashIdx] = 0; 
