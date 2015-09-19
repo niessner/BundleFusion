@@ -808,6 +808,7 @@ unsigned int SIFTImageManager::FuseToGlobalKeyCU(SIFTImageGPU& globalImage, cons
 
 
 __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
+	const float4x4* d_completeTrajectory, unsigned int numCompleteTransforms,
 	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll,
 	const int* d_numFilteredMatchesPerImagePair,
 	const float4x4* d_filteredTransforms)
@@ -815,18 +816,32 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 
 	for (int i = (int)curFrameIndex - 1; i >= 0; i--) {
 		if (d_numFilteredMatchesPerImagePair[i] > 0) {
-			float4x4 transform = d_siftTrajectory[curFrameIndexAll - (curFrameIndex - i)] * d_filteredTransforms[i].getInverse();
+			float4x4 transform;
+			const unsigned int idxPrevSiftKnown = curFrameIndexAll - (curFrameIndex - i);
+			if (numCompleteTransforms == 0) {
+				transform = d_siftTrajectory[idxPrevSiftKnown] * d_filteredTransforms[i].getInverse();
+			}
+			else if (idxPrevSiftKnown < numCompleteTransforms) {
+				transform = d_completeTrajectory[idxPrevSiftKnown] * d_filteredTransforms[i].getInverse();
+			}
+			else {
+				const float4x4 offset = d_siftTrajectory[idxPrevSiftKnown] * d_siftTrajectory[numCompleteTransforms - 1].getInverse();
+				transform = d_completeTrajectory[numCompleteTransforms - 1] * offset * d_filteredTransforms[i].getInverse();
+			}
+
 			d_siftTrajectory[curFrameIndexAll] = transform;
 			break;
 		}
 	}
 }
 
-void SIFTImageManager::computeSiftTransformCU(float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex) 
+void SIFTImageManager::computeSiftTransformCU(const float4x4* d_completeTrajectory, unsigned int numCompleteTransforms,
+	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex) 
 {
 	if (curFrameIndex == 0) return;
 
 	getSiftTransformCU_Kernel <<<1, 1 >>>(curFrameIndex,
+		d_completeTrajectory, numCompleteTransforms,
 		d_siftTrajectory, curFrameIndexAll,
 		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms);
 

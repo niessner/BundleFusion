@@ -1137,7 +1137,7 @@ public:
 	}
 
 	//! matrix-matrix multiply
-	inline __device__ __host__ float4x4 operator*(const float4x4 &other) {
+	inline __device__ __host__ float4x4 operator*(const float4x4 &other) const {
 		float4x4 res;
 		res.m11 = m11*other.m11 + m12*other.m21 + m13*other.m31 + m14*other.m41;  
 		res.m12 = m11*other.m12 + m12*other.m22 + m13*other.m32 + m14*other.m42;  

@@ -101,7 +101,9 @@ void Bundler::processInput()
 	if (curLocalFrame > 0) {
 		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
 
-		currentLocal->computeSiftTransformCU(m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame);
+		unsigned int numCompleteFrames = (m_SubmapManager.global->getNumImages() > 0) ? (m_SubmapManager.global->getNumImages() - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames : m_currentState.m_lastNumLocalFrames;
+		currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, numCompleteFrames,
+			m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame);
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
 	m_currentState.m_bLastFrameValid = (currentLocal->getValidImages()[curLocalFrame] != 0);
