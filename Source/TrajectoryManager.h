@@ -35,6 +35,7 @@ public:
 		//TODO move this to some sort of parameter file
 		m_topNActive = 10;
 		m_minPoseDist = 0.02f*0.02f;
+		m_minPoseDist = 0.00f;
 		m_featureRescaleRotToTrans = 2.0f;
 
 	}
@@ -99,7 +100,7 @@ public:
 		std::sort(m_framesSort.begin(), m_framesSort.end(), s);
 		//m_framesSort.sort(s);
 
-		for (unsigned int i = 0; i < numFrames; i++) {
+		for (unsigned int i = 0; i < std::min(5u, numFrames); i++) {
 			const auto *f = m_framesSort[i];
 			std::cout << "[" << f->frameIdx << "]" << " " << f->dist;
 			std::cout << "\t type: " << f->type;
