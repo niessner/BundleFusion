@@ -44,7 +44,7 @@ public:
 		m_numTotalFrames = 0;
 		m_submapSize = 0;
 
-		m_globalTimer = NULL;
+		//m_globalTimer = NULL;
 
 		d_globalTrajectory = NULL;
 		d_completeTrajectory = NULL;
@@ -120,13 +120,13 @@ public:
 		MLIB_CUDA_SAFE_FREE(d_siftTrajectory);
 		MLIB_CUDA_SAFE_FREE(d_currIntegrateTransform);
 	}
-	void evaluateTimings() {
-		if (GlobalBundlingState::get().s_enableDetailedTimings) {
-			std::cout << "********* GLOBAL TIMINGS *********" << std::endl;
-			m_globalTimer->evaluate(true, true);
-			std::cout << std::endl << std::endl;
-		}
-	}
+	//void evaluateTimings() {
+	//	if (GlobalBundlingState::get().s_enableDetailedTimings) {
+	//		std::cout << "********* GLOBAL TIMINGS *********" << std::endl;
+	//		m_globalTimer->evaluate(true, true);
+	//		std::cout << std::endl << std::endl;
+	//	}
+	//}
 
 	float4x4* getLocalTrajectoryGPU(unsigned int localIdx) const {
 		return d_localTrajectories + localIdx * (m_submapSize + 1);

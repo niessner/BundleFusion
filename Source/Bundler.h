@@ -67,10 +67,10 @@ public:
 	//bool process();
 
 
-	void evaluateTimings() {
-		m_SubmapManager.evaluateTimings();
-		m_SparseBundler.evaluateSolverTimings();
-	}
+	//void evaluateTimings() {
+	//	m_SubmapManager.evaluateTimings();
+	//	m_SparseBundler.evaluateSolverTimings();
+	//}
 	void saveConvergence(const std::string& filename) {
 		m_SparseBundler.printConvergence(filename);
 	}
