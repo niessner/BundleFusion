@@ -159,7 +159,15 @@ public:
 	}
 
 
-
+	const std::vector<TrajectoryFrame>& getFrames() const {
+		return m_frames;
+	}
+	unsigned int getNumOptimizedFrames() const {
+		return m_numOptimizedFrames;
+	}
+	unsigned int getNumAddedFrames() const {
+		return m_numAddedFrames;
+	}
 private:
 	void invalidateFrame(unsigned int frameIdx) {
 		assert(m_frames[frameIdx].type != TrajectoryFrame::Invalid);

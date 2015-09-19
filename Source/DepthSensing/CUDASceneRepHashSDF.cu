@@ -270,7 +270,8 @@ __global__ void fillDecisionArrayKernel(HashData hashData)
 	if (idx < hashParams.m_hashNumBuckets * HASH_BUCKET_SIZE) {
 		hashData.d_hashDecision[idx] = 0;
 		if (hashData.d_hash[idx].ptr != FREE_ENTRY) {
-			if (hashData.isSDFBlockInCameraFrustumApprox(hashData.d_hash[idx].pos)) {
+			if (hashData.isSDFBlockInCameraFrustumApprox(hashData.d_hash[idx].pos)) 
+			{
 				hashData.d_hashDecision[idx] = 1;	//yes
 			}
 		}
@@ -384,7 +385,8 @@ __global__ void integrateDepthMapKernel(HashData hashData, DepthCameraData camer
 
 				float sdf = depth - pf.z;
 				float truncation = hashData.getTruncation(depth);
-				if (sdf > -truncation) // && depthZeroOne >= 0.0f && depthZeroOne <= 1.0f) //check if in truncation range should already be made in depth map computation
+				//if (sdf > -truncation) 
+				if (abs(sdf) < truncation)
 				{
 					if (sdf >= 0.0f) {
 						sdf = fminf(truncation, sdf);

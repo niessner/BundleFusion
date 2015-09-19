@@ -602,10 +602,11 @@ void integrate(const DepthCameraData& depthCameraData, const mat4f& transformati
 
 	if (GlobalAppState::get().s_integrationEnabled) {
 		g_sceneRep->integrate(transformation, depthCameraData, g_depthCameraParams, g_chunkGrid->getBitMaskGPU());
-	} else {
-		//compactification is required for the ray cast splatting
-		g_sceneRep->setLastRigidTransformAndCompactify(transformation);	//TODO check this
-	}
+	} 
+	//else {
+	//	//compactification is required for the ray cast splatting
+	//	g_sceneRep->setLastRigidTransformAndCompactify(transformation);	//TODO check this
+	//}
 }
 void deIntegrate(const DepthCameraData& depthCameraData, const mat4f& transformation)
 {
@@ -620,15 +621,15 @@ void deIntegrate(const DepthCameraData& depthCameraData, const mat4f& transforma
 	if (GlobalAppState::get().s_integrationEnabled) {
 		g_sceneRep->deIntegrate(transformation, depthCameraData, g_depthCameraParams, g_chunkGrid->getBitMaskGPU());
 	}
-	else {
-		//compactification is required for the ray cast splatting
-		g_sceneRep->setLastRigidTransformAndCompactify(transformation);	//TODO check this
-	}
+	//else {
+	//	//compactification is required for the ray cast splatting
+	//	g_sceneRep->setLastRigidTransformAndCompactify(transformation);	//TODO check this
+	//}
 }
 
 
 
-void visualizeFrame(bool bGotDepth, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice)
+void visualizeFrame(bool bGotDepth, ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform)
 {
 	// If the settings dialog is being shown, then render it instead of rendering the app's scene
 	//if(g_D3DSettingsDlg.IsActive())
@@ -650,7 +651,8 @@ void visualizeFrame(bool bGotDepth, ID3D11DeviceContext* pd3dImmediateContext, I
 	t(1, 1) *= -1.0f;	view = t * view * t;	//t is self-inverse
 
 	if (g_CudaImageManager->getCurrFrameNumber() > 0) {
-		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), g_sceneRep->getLastRigidTransform());
+		g_sceneRep->setLastRigidTransformAndCompactify(transform);	//TODO check that
+		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), transform);
 	}
 	if (GlobalAppState::get().s_RenderMode == 1)	{
 		//default render mode (render ray casted depth)
@@ -699,6 +701,7 @@ void visualizeFrame(bool bGotDepth, ID3D11DeviceContext* pd3dImmediateContext, I
 // Render the scene using the D3D11 device
 //--------------------------------------------------------------------------------------
 
+
 void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext )
 {
 
@@ -718,9 +721,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Reconstruction of current frame
 	///////////////////////////////////////
-
+	static mat4f transformation = mat4f::zero();	// this needs to be valid even bGotDepth is false (that's why it's static)
 	if (bGotDepth) {
-		mat4f transformation = mat4f::zero();	DepthCameraData depthCameraData;
+		DepthCameraData depthCameraData;
 		bool validTransform = g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
@@ -740,11 +743,13 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		}
 	}
 
+	//std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
+
 	///////////////////////////////////////
 	// Render with view of current frame
 	///////////////////////////////////////
 
-	visualizeFrame(bGotDepth, pd3dImmediateContext, pd3dDevice);
+	visualizeFrame(bGotDepth, pd3dImmediateContext, pd3dDevice, transformation);
 
 	///////////////////////////////////////
 	// Bundling Optimization
@@ -753,6 +758,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	g_bundler->processGlobal();
 	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 
+	
 
 	///////////////////////////////////////
 	// Fix old frames
@@ -771,6 +777,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 				auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);	
 				DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 				deIntegrate(depthCameraData, oldTransform);
+
+				std::cout << "ERROR DEINTEGRATE" << std::endl;
+				while (1);
 				continue;
 			}
 			else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
@@ -778,6 +787,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 				DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 				integrate(depthCameraData, newTransform);
 				tm->confirmIntegration(frameIdx);
+
+				std::cout << "ERROR INTEGRATE" << std::endl;
+				while (1);
 				continue;
 			}
 			else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
@@ -800,13 +812,59 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	}
 
 
+	//if (!bGotDepth) {
+	//	//g_sceneRep->reset();
+	//	//for (unsigned int i = 0; i < g_bundler->getTrajectoryManager()->getNumAddedFrames(); i++) {
+	//	//	const auto &tf = g_bundler->getTrajectoryManager()->getFrames()[i];
+	//	//	if (tf.type == TrajectoryManager::TrajectoryFrame::Integrated) {
+	//	//		auto& f = g_CudaImageManager->getIntegrateFrame(tf.frameIdx);
+	//	//		DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+	//	//		std::cout << "deintegrating " << i;
+	//	//		deIntegrate(depthCameraData, tf.integratedTransform);
+	//	//		std::cout << " done!" << std::endl;
+	//	//	}
+	//	//}
+	//	//std::cout << "<<NUM INTEGRATED FRAMES>> " << g_sceneRep->getNumIntegratedFrames() << std::endl; 
+	//	//StopScanningAndExtractIsoSurfaceMC("./scans/empty.ply");
 
+	//	//for (unsigned int i = 0; i < g_bundler->getTrajectoryManager()->getNumOptimizedFrames(); i++) {
+	//	//	const auto &tf = g_bundler->getTrajectoryManager()->getFrames()[i];
+	//	//	auto& f = g_CudaImageManager->getIntegrateFrame(tf.frameIdx);
+	//	//	DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+	//	//	std::cout << "integrating " << i;
+	//	//	integrate(depthCameraData, tf.optimizedTransform);
+	//	//	std::cout << " done!" << std::endl;
+	//	//}
+
+	//	for (unsigned int i = 0; i < g_bundler->getTrajectoryManager()->getNumAddedFrames(); i++) {
+	//		const auto &tf = g_bundler->getTrajectoryManager()->getFrames()[i];
+	//		auto& f = g_CudaImageManager->getIntegrateFrame(tf.frameIdx);
+	//		if (tf.type == TrajectoryManager::TrajectoryFrame::Integrated) {
+	//			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+
+	//			std::cout << "deintegrating " << i;
+	//			deIntegrate(depthCameraData, tf.integratedTransform);
+	//			std::cout << " done!" << std::endl;
+
+	//			std::cout << "integrating " << i;
+	//			integrate(depthCameraData, tf.optimizedTransform);
+	//			std::cout << " done!" << std::endl;
+	//		}
+	//	}
+	//	std::cout << "<<NUM INTEGRATED FRAMES>> " << g_sceneRep->getNumIntegratedFrames() << std::endl << std::endl; 
+	//	//StopScanningAndExtractIsoSurfaceMC("./scans/empty.ply");
+
+	//	StopScanningAndExtractIsoSurfaceMC();
+	//	std::cout << " DONE DONE DONE " << std::endl;
+	//	while (1);
+
+	//}
 
 	// Stop Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLogDepthSensing::totalTimeRender += GlobalAppState::get().s_Timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeRender++; }
 
 
-	TimingLogDepthSensing::printTimings();
+	//TimingLogDepthSensing::printTimings();
 	if (g_renderText) RenderText();
 
 
