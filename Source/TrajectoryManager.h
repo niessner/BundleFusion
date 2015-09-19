@@ -97,7 +97,7 @@ public:
 			if (left->type != TrajectoryFrame::Integrated && right->type == TrajectoryFrame::Integrated)	return false;
 			return left->dist > right->dist;
 		};
-		std::sort(m_framesSort.begin(), m_framesSort.end(), s);
+		std::sort(m_framesSort.begin(), m_framesSort.begin() + numFrames, s);
 		//m_framesSort.sort(s);
 
 		for (unsigned int i = 0; i < std::min(5u, numFrames); i++) {
