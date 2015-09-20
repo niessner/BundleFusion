@@ -65,6 +65,7 @@ Bundler::~Bundler()
 
 void Bundler::processInput()
 {
+	std::cout << __FUNCTION__ << std::endl;
 
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
 	std::cout << "[ frame " << curFrame << " ]" << std::endl;
@@ -122,6 +123,7 @@ void Bundler::processInput()
 		const unsigned int curLocalIdx = m_SubmapManager.getCurrLocal(curFrame);
 		if (validImagesLocal[1]) {
 			// ready to solve local
+			MLIB_ASSERT(m_currentState.m_localToSolve == -1);
 			m_currentState.m_localToSolve = curLocalIdx;
 
 			// switch local submaps
@@ -151,18 +153,16 @@ void Bundler::processInput()
 	} // global
 }
 
-bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color)
+bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx)
 {
 	if (m_currentState.m_bLastFrameValid) {
 		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(m_currentState.m_lastFrameProcessed), sizeof(float4x4), cudaMemcpyDeviceToHost));	//TODO MT needs to be copied from the other GPU...
-		d_depth = m_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
-		d_color = m_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
-
-		m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, siftTransform, m_currentState.m_lastFrameProcessed);
+		frameIdx = m_currentState.m_lastFrameProcessed;
+		//m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, siftTransform, m_currentState.m_lastFrameProcessed);
 		return true;
 	}
 	else {
-		m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::NotIntegrated_NoTransform, mat4f::zero(), m_currentState.m_lastFrameProcessed);
+		//m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::NotIntegrated_NoTransform, mat4f::zero(), m_currentState.m_lastFrameProcessed);
 		return false;
 	}
 }
@@ -170,6 +170,7 @@ bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_
 void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
 	if (m_currentState.m_localToSolve == -1) return; // nothing to solve
+	std::cout << __FUNCTION__ << std::endl;
 
 	const unsigned int currLocalIdx = m_currentState.m_localToSolve;
 	m_currentState.m_localToSolve = -1; 

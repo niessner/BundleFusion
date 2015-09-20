@@ -117,9 +117,11 @@ public:
 			//	MLIB_WARNING("starving voxel weights is incompatible with bundling");
 			//}
 
-			garbageCollectIdentifyCUDA(m_hashData, m_hashParams);
-			resetHashBucketMutexCUDA(m_hashData, m_hashParams);	//needed if linked lists are enabled -> for memeory deletion
-			garbageCollectFreeCUDA(m_hashData, m_hashParams);
+			if (m_hashParams.m_numOccupiedBlocks > 0) {
+				garbageCollectIdentifyCUDA(m_hashData, m_hashParams);
+				resetHashBucketMutexCUDA(m_hashData, m_hashParams);	//needed if linked lists are enabled -> for memeory deletion
+				garbageCollectFreeCUDA(m_hashData, m_hashParams);
+			}
 		}
 	}
 

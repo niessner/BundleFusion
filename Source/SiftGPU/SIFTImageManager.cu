@@ -842,11 +842,6 @@ void SIFTImageManager::computeSiftTransformCU(const float4x4* d_completeTrajecto
 {
 	if (curFrameIndex == 0) return;
 
-#ifdef _DEBUG
-	cutilSafeCall(cudaDeviceSynchronize());
-	cutilCheckMsg(__FUNCTION__);
-#endif
-
 	getSiftTransformCU_Kernel <<<1, 1 >>>(curFrameIndex,
 		d_completeTrajectory, lastValidCompleteTransform,
 		d_siftTrajectory, curFrameIndexAll,

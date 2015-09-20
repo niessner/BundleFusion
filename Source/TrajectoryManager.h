@@ -52,12 +52,12 @@ public:
 
 
 	//! called by Bundler; whenever the optimization finishes
-	void updateOptimizedTransform(float4x4* d_trajectory, unsigned int numFrames) {
-		
+	void updateOptimizedTransform(float4x4* d_trajectory, unsigned int numFrames) {		
 		m_mutexUpdateTransforms.lock();
 
 		m_numOptimizedFrames = numFrames;
 		numFrames = std::min(numFrames, m_numAddedFrames);
+		std::cout << __FUNCTION__ << " " << numFrames << std::endl;
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_optmizedTransforms.data(), d_trajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
 
 		m_mutexUpdateTransforms.unlock();
@@ -65,9 +65,13 @@ public:
 
 	void generateUpdateLists()
 	{
+
 		m_mutexUpdateTransforms.lock();
 
 		unsigned int numFrames = std::min(m_numOptimizedFrames, m_numAddedFrames);
+
+		std::cout << __FUNCTION__ << " : " << numFrames << std::endl;
+
 
 		for (unsigned int i = 0; i < numFrames; i++) {
 			TrajectoryFrame& f = m_frames[i];
@@ -113,7 +117,7 @@ public:
 		//	std::cout << std::endl;
 		//}
 
-		for (unsigned int i = (unsigned int)m_toReIntegrateList.size(); i < m_topNActive; i++) {
+		for (unsigned int i = (unsigned int)m_toReIntegrateList.size(); i < m_topNActive && i < numFrames; i++) {
 			auto* f = m_framesSort[i];
 			if (f->dist > m_minPoseDist && f->type == TrajectoryFrame::Integrated) {
 				f->type = TrajectoryFrame::ReIntegration;

@@ -53,7 +53,7 @@ public:
 	void processInput();
 
 	//! returns the last frame-to-frame aligned matrix; could be invalid
-	bool getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color);
+	bool getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx);
 	//! optimize current local submap (nextLocal in submapManager)
 	void optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations);
 	//! optimize global keys

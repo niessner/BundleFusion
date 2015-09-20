@@ -179,7 +179,8 @@ public:
 		m_data.clear();
 	}
 
-	bool process() {		
+	bool process() {	
+		std::cout << __FUNCTION__ << std::endl;
 
 		if (!m_RGBDSensor->processDepth()) return false;	// Order is important!
 		if (!m_RGBDSensor->processColor()) return false;
@@ -320,10 +321,12 @@ public:
 		return m_bHasBundlingFrameRdy;
 	}
 
+	//! must be called by depth sensing to signal bundling that a frame is ready
 	void setBundlingFrameRdy() {
 		m_bHasBundlingFrameRdy = true;
 	}
 
+	//! must be called by bundling to signal depth sensing it can read it a new frame
 	void confirmRdyBundlingFrame() {
 		m_bHasBundlingFrameRdy = false;
 	}

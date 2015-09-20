@@ -89,19 +89,24 @@ void bundlingThreadFunc() {
 	
 	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
 	while (1) {
-		while (!g_imageManager->hasBundlingFrameRdy());	//wait for a new frame
-		while (g_bundler->hasProcssedInputFrame());		//wait until depth sensing has confirmed the last one
+		while (!g_imageManager->hasBundlingFrameRdy());	//wait for a new input frame (LOCK IMAGE MANAGER)
 		{
-			g_bundler->processInput();				//perform sift and whatever
-			g_bundler->setProcessedInputFrame();	//let depth sensing know we have a frame
+			while (g_bundler->hasProcssedInputFrame());		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
+			{
+				if (g_bundler->getExitBundlingThread()) break;
+				g_bundler->processInput();						//perform sift and whatever
+			}
+			g_bundler->setProcessedInputFrame();			//let depth sensing know we have a frame (UNLOCK BUNDLING)
 		}
+		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
 
 		/////////////////////////////////////////
 		//// Bundling Optimization
 		/////////////////////////////////////////
-		//g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-		//g_bundler->processGlobal();
-		//g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+		//std::cout << "Optimize" << std::endl;
+		g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+		g_bundler->processGlobal();
+		g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 
 		if (g_bundler->getExitBundlingThread()) break;
 	}
@@ -171,8 +176,8 @@ int main(int argc, char** argv)
 				//bundler->process();
 				g_bundler->processInput();
 
-				mat4f transformation; const float* d_depthData; const uchar4* d_colorData;
-				g_bundler->getCurrentIntegrationFrame(transformation, d_depthData, d_colorData);
+				//fake call to fix indexing
+				g_bundler->getTrajectoryManager()->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, mat4f::identity(), 0);
 
 				// these are queried
 				g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
@@ -191,6 +196,10 @@ int main(int argc, char** argv)
 		//bundler->saveDEBUG();
 
 		g_bundler->exitBundlingThread();
+		//release all bundling locks
+		g_imageManager->setBundlingFrameRdy();
+		g_bundler->confirmProcessedInputFrame();
+		while (g_bundler);	//wait until this is deleted
 		SAFE_DELETE(g_imageManager);
 		
 
