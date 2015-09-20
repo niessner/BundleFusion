@@ -11,7 +11,8 @@ public:
 		free(); 
 	}
 
-	void storeFrame(const float* d_depth, const uchar4* d_color, unsigned int inputWidth, unsigned int inputHeight);
+	void storeFrame(const float* d_depth, unsigned int inputDepthWidth, unsigned int inputDepthHeight,
+		const uchar4* d_color, unsigned int inputColorWidth, unsigned int inputColorHeight);
 
 	void reset() {
 		m_currentFrame = 0;

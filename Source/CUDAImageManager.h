@@ -119,8 +119,8 @@ public:
 	CUDAImageManager(unsigned int widthIntegration, unsigned int heightIntegration, unsigned int widthSIFT, unsigned int heightSIFT, RGBDSensor* sensor, bool storeFramesOnGPU = false) {
 		m_RGBDSensor = sensor;
 
-		m_widthSIFT = widthSIFT;
-		m_heightSIFT = heightSIFT;
+		//m_widthSIFT = widthSIFT;
+		//m_heightSIFT = heightSIFT;
 		m_widthIntegration = widthIntegration;
 		m_heightIntegration = heightIntegration;
 
@@ -129,7 +129,7 @@ public:
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthInput, sizeof(float)*bufferDimDepthInput));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_colorInput, sizeof(uchar4)*bufferDimColorInput));
-		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
+		//MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
 
 		m_currFrame = 0;
 
@@ -149,13 +149,13 @@ public:
 		m_extrinsics = m_RGBDSensor->getDepthExtrinsics();
 		m_extrinsicsInv = m_RGBDSensor->getDepthExtrinsicsInv();
 
-		const float scaleWidthSIFT = (float)m_widthSIFT / (float)m_RGBDSensor->getColorWidth();
-		const float scaleHeightSIFT = (float)m_heightSIFT / (float)m_RGBDSensor->getColorHeight();
-		m_SIFTintrinsics = m_RGBDSensor->getColorIntrinsics();
-		m_SIFTintrinsics._m00 *= scaleWidthSIFT;  m_SIFTintrinsics._m02 *= scaleWidthSIFT;
-		m_SIFTintrinsics._m11 *= scaleHeightSIFT; m_SIFTintrinsics._m12 *= scaleHeightSIFT;
-		m_SIFTintrinsicsInv = m_RGBDSensor->getColorIntrinsicsInv();
-		m_SIFTintrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTintrinsicsInv._m11 /= scaleHeightSIFT;
+		//const float scaleWidthSIFT = (float)m_widthSIFT / (float)m_RGBDSensor->getColorWidth();
+		//const float scaleHeightSIFT = (float)m_heightSIFT / (float)m_RGBDSensor->getColorHeight();
+		//m_SIFTintrinsics = m_RGBDSensor->getColorIntrinsics();
+		//m_SIFTintrinsics._m00 *= scaleWidthSIFT;  m_SIFTintrinsics._m02 *= scaleWidthSIFT;
+		//m_SIFTintrinsics._m11 *= scaleHeightSIFT; m_SIFTintrinsics._m12 *= scaleHeightSIFT;
+		//m_SIFTintrinsicsInv = m_RGBDSensor->getColorIntrinsicsInv();
+		//m_SIFTintrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTintrinsicsInv._m11 /= scaleHeightSIFT;
 
 
 		ManagedRGBDInputFrame::globalInit(getIntegrationWidth(), getIntegrationHeight(), storeFramesOnGPU);
@@ -167,7 +167,7 @@ public:
 
 		MLIB_CUDA_SAFE_FREE(d_depthInput);
 		MLIB_CUDA_SAFE_FREE(d_colorInput);
-		MLIB_CUDA_SAFE_FREE(d_intensitySIFT);
+		//MLIB_CUDA_SAFE_FREE(d_intensitySIFT);
 
 		ManagedRGBDInputFrame::globalFree();
 	}
@@ -243,25 +243,25 @@ public:
 			}
 		}
 
-		////////////////////////////////////////////////////////////////////////////////////
-		// SIFT Intensity Image
-		////////////////////////////////////////////////////////////////////////////////////
-		CUDAImageUtil::resampleToIntensity(d_intensitySIFT, m_widthSIFT, m_heightSIFT, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+		//////////////////////////////////////////////////////////////////////////////////////
+		//// SIFT Intensity Image
+		//////////////////////////////////////////////////////////////////////////////////////
+		//CUDAImageUtil::resampleToIntensity(d_intensitySIFT, m_widthSIFT, m_heightSIFT, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
 
 		m_currFrame++;
 		return true;
 	}
 
-	void copyToBundling() {
-		//TODO MT we need intensity at SIFT resolution
-		//TODO MT we depth and color at integration res
+	void copyToBundling(float* d_depth, uchar4* d_color) {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, d_depthInput, sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyDeviceToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, d_colorInput, sizeof(uchar4)*m_RGBDSensor->getColorWidth()*m_RGBDSensor->getColorHeight(), cudaMemcpyDeviceToDevice));
 	}
 
 
 	//TODO not const because direct assignment in SiftGPU
-	float* getIntensityImageSIFT() {
-		return d_intensitySIFT;
-	}
+	//float* getIntensityImageSIFT() {
+	//	return d_intensitySIFT;
+	//}
 
 	ManagedRGBDInputFrame& getLastIntegrateFrame() {
 		return m_data.back();
@@ -283,12 +283,12 @@ public:
 	unsigned int getIntegrationHeight() const {
 		return m_heightIntegration;
 	}
-	unsigned int getSIFTWidth() const {
-		return m_widthSIFT;
-	}
-	unsigned int getSIFTHeight() const {
-		return m_heightSIFT;
-	}
+	//unsigned int getSIFTWidth() const {
+	//	return m_widthSIFT;
+	//}
+	//unsigned int getSIFTHeight() const {
+	//	return m_heightSIFT;
+	//}
 
 
 
@@ -308,13 +308,13 @@ public:
 		return m_extrinsicsInv;
 	}
 
-	const mat4f& getSIFTIntrinsics() const	{
-		return m_SIFTintrinsics;
-	}
+	//const mat4f& getSIFTIntrinsics() const	{
+	//	return m_SIFTintrinsics;
+	//}
 
-	const mat4f& getSIFTIntrinsicsInv() const {
-		return m_SIFTintrinsicsInv;
-	}
+	//const mat4f& getSIFTIntrinsicsInv() const {
+	//	return m_SIFTintrinsicsInv;
+	//}
 
 
 	bool hasBundlingFrameRdy() const {
@@ -341,10 +341,10 @@ private:
 	mat4f m_extrinsicsInv;
 
 	//! resolution for sift key point detection
-	unsigned int m_widthSIFT;
-	unsigned int m_heightSIFT;
-	mat4f m_SIFTintrinsics;
-	mat4f m_SIFTintrinsicsInv;
+	//unsigned int m_widthSIFT;
+	//unsigned int m_heightSIFT;
+	//mat4f m_SIFTintrinsics;
+	//mat4f m_SIFTintrinsicsInv;
 
 	//! resolution for integration both depth and color data
 	unsigned int m_widthIntegration;
@@ -354,7 +354,7 @@ private:
 	float*	d_depthInput;
 	uchar4*	d_colorInput;
 
-	float* d_intensitySIFT;
+	//float* d_intensitySIFT;
 
 	//! all image data on the GPU
 	//std::vector<CUDARGBDInputFrame>	m_data;

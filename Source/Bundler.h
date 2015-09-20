@@ -120,6 +120,9 @@ private:
 	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const;
 
+	void initCurrFrameBuffers();
+	void getCurrentFrame();
+
 	CUDAImageManager*		m_CudaImageManager;		//managed outside
 	RGBDSensor*				m_RGBDSensor;			//managed outside
 
@@ -131,6 +134,16 @@ private:
 	TrajectoryManager*		m_trajectoryManager;
 
 	unsigned int			m_submapSize;
+
+	//tmp buffers from cuda image manager
+	unsigned int			m_inputDepthWidth, m_inputDepthHeight;
+	unsigned int			m_inputColorWidth, m_inputColorHeight;
+	unsigned int			m_widthSIFT, m_heightSIFT;
+	float*					d_inputDepth;
+	uchar4*					d_inputColor;
+	float*					d_intensitySIFT;
+	mat4f					m_SIFTIntrinsics;
+	mat4f					m_SIFTIntrinsicsInv;
 
 	static Timer			s_timer;
 
