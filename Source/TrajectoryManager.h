@@ -140,11 +140,13 @@ public:
 		if (m_toReIntegrateList.empty())	return false;
 		assert(m_toReIntegrateList.front()->type == TrajectoryFrame::ReIntegration);
 
+		m_mutexUpdateTransforms.lock();
 		newTransform = m_toReIntegrateList.front()->optimizedTransform;
 		frameIdx = m_toReIntegrateList.front()->frameIdx;
 		oldTransform = m_toReIntegrateList.front()->integratedTransform;
 		m_toReIntegrateList.front()->integratedTransform = newTransform;
 		m_toReIntegrateList.pop_front();
+		m_mutexUpdateTransforms.unlock();
 		return true;
 	}
 
@@ -153,20 +155,24 @@ public:
 		if (m_toIntegrateList.empty())	return false;
 		assert(m_toIntegrateList.front()->type == TrajectoryFrame::NotIntegrated_WithTransform);
 
+		m_mutexUpdateTransforms.lock();
 		trans = m_toIntegrateList.front()->optimizedTransform;
 		frameIdx = m_toIntegrateList.front()->frameIdx;
 		m_toIntegrateList.front()->integratedTransform = trans;
 		m_toIntegrateList.pop_front();
+		m_mutexUpdateTransforms.unlock();
 		return true;
 	}
 
 	bool getTopFromDeIntegrateList(mat4f& trans, unsigned int& frameIdx) {
 		if (m_toDeIntegrateList.empty())	return false;
 		assert(m_toDeIntegrateList.front()->type == TrajectoryFrame::Invalid);
-
+		
+		m_mutexUpdateTransforms.lock();
 		trans = m_toDeIntegrateList.front()->optimizedTransform;
 		frameIdx = m_toDeIntegrateList.front()->frameIdx;
 		m_toDeIntegrateList.pop_front();
+		m_mutexUpdateTransforms.unlock();
 		return true;
 	}
 
