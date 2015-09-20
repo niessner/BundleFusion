@@ -199,21 +199,21 @@ int main(int argc, char** argv)
 		//start depthSensing render loop
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
-		while (1) {
-			if (g_imageManager->process()) {
-				//bundler->process();
-				g_bundler->processInput();
+		//while (1) {
+		//	if (g_imageManager->process()) {
+		//		//bundler->process();
+		//		g_bundler->processInput();
 
-				//fake call to fix indexing
-				g_bundler->getTrajectoryManager()->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, mat4f::identity(), 0);
+		//		//fake call to fix indexing
+		//		g_bundler->getTrajectoryManager()->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, mat4f::identity(), 0);
 
-				// these are queried
-				g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-				g_bundler->processGlobal();
-				g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
-			}
-			else break;
-		}
+		//		// these are queried
+		//		g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+		//		g_bundler->processGlobal();
+		//		g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+		//	}
+		//	else break;
+		//}
 
 		TimingLog::printTimings("timingLog.txt");
 		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
@@ -226,8 +226,8 @@ int main(int argc, char** argv)
 		g_bundler->exitBundlingThread();
 		//release all bundling locks
 		g_imageManager->setBundlingFrameRdy();
-		g_bundler->confirmProcessedInputFrame();
-		while (g_bundler) Sleep(0);	//wait until this is deleted
+		while (!g_bundler->hasProcssedInputFrame()) Sleep(0);	//wait bundler is done with it's current processing	
+		while (g_bundler) Sleep(0);								//wait until this is deleted
 		SAFE_DELETE(g_imageManager);
 		
 
