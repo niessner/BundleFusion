@@ -81,7 +81,7 @@ void Bundler::processInput()
 	// process cuda cache
 	const unsigned int curLocalFrame = m_SubmapManager.currentLocal->getNumImages() - 1;
 	m_SubmapManager.currentLocalCache->storeFrame(integrateFrame.getDepthFrameGPU(), integrateFrame.getColorFrameGPU(), m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
-	if (GlobalBundlingState::get().s_recordKeysPointCloud && curLocalFrame == 0 || m_SubmapManager.isLastLocalFrame(curFrame)) {
+	if (GlobalBundlingState::get().s_recordKeysPointCloud && (curLocalFrame == 0 || m_SubmapManager.isLastLocalFrame(curFrame))) {
 		m_RGBDSensor->recordPointCloud();
 	}
 	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);

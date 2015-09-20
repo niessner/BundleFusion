@@ -705,29 +705,37 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 
 void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext )
 {
-	CUDATimer timer;
+	Timer t;
+	double timeProcessInput = 0.0f;
+	double timeReconstruct = 0.0f;
+	double timeVisualize = 0.0f;
+	double timeBundlingLocal = 0.0f;
+	double timeBundlingGlobal = 0.0f;
+	double timeReintegrate = 0.0f;
+
+	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
+
 	//Start Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
 
 	///////////////////////////////////////
 	// Process Input
 	///////////////////////////////////////
-	timer.startEvent("processInput");
-
+	t.start();
 	// if we have received any valid new depth data we may need to draw
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
-		g_bundler->processInput();	//sift extraction and sift matching
+		g_bundler->processInput();	//sift extraction, sift matching, and key point filtering
 	}
-
-	timer.endEvent(); 
+	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
+	timeProcessInput = t.getElapsedTimeMS();
 	
 
 	///////////////////////////////////////
 	// Reconstruction of current frame
 	///////////////////////////////////////
-	timer.startEvent("reconstruct curr frame");
-
+	
+	t.start();
 	if (bGotDepth) {
 		mat4f transformation = mat4f::zero();
 		DepthCameraData depthCameraData;
@@ -752,33 +760,40 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		
 		g_lastRigidTransform = transformation;
 	}
-	timer.endEvent();
+	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
+	timeReconstruct = t.getElapsedTimeMS();
 
 
 	///////////////////////////////////////
 	// Render with view of current frame
 	///////////////////////////////////////
-	timer.startEvent("visualize");
+	t.start();
 	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform);
-	timer.endEvent();
+	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
+	timeVisualize = t.getElapsedTimeMS();
 
 
 	///////////////////////////////////////
 	// Bundling Optimization
 	///////////////////////////////////////
-	timer.startEvent("bunling");
+	t.start();
 	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
 	g_bundler->processGlobal();
+	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
+	timeBundlingLocal = t.getElapsedTimeMS();
+
+	t.start();
 	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
-	timer.endEvent();
+	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
+	timeBundlingGlobal = t.getElapsedTimeMS();
 	
 
 	///////////////////////////////////////
 	// Fix old frames
 	///////////////////////////////////////
-	timer.startEvent("reintegration");
+	t.start();
 	{
-		const unsigned int maxPerFrameFixes = 30;
+		const unsigned int maxPerFrameFixes = 10;
 		TrajectoryManager* tm = g_bundler->getTrajectoryManager();
 
 		if (tm->getNumActiveOperations() < maxPerFrameFixes) {
@@ -826,22 +841,32 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		}
 		g_sceneRep->garbageCollect();
 	}
-	timer.endEvent();
+	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
+	timeReintegrate = t.getElapsedTimeMS();
 
-	timer.evaluate();
+	std::cout << "<<< Total Frame Process Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
+
+	std::cout << VAR_NAME(timeProcessInput) << " : " << timeProcessInput << " [ms]" << std::endl;
+	std::cout << VAR_NAME(timeReconstruct) << " : " << timeReconstruct << " [ms]" << std::endl;
+	std::cout << VAR_NAME(timeVisualize) << " : " << timeVisualize << " [ms]" << std::endl;
+	std::cout << VAR_NAME(timeBundlingLocal) << " : " << timeBundlingLocal << " [ms]" << std::endl;
+	std::cout << VAR_NAME(timeBundlingGlobal) << " : " << timeBundlingGlobal << " [ms]" << std::endl;
+	std::cout << VAR_NAME(timeReintegrate) << " : " << timeReintegrate << " [ms]" << std::endl;
+
+	std::cout << std::endl;
 
 	// Stop Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLogDepthSensing::totalTimeRenderMain += GlobalAppState::get().s_Timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeRenderMain++; }
 	std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
-	std::cout << "Total Frame Process Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] " << std::endl;
 
-	TimingLogDepthSensing::printTimings();
+	//TimingLogDepthSensing::printTimings();
+
 	if (g_renderText) RenderText();
 
-	if (g_CudaImageManager->getCurrFrameNumber() == 30) {
-		std::cout << "DONE DONE DONE" << std::endl;
-		getchar();
-	}
+	//if (g_CudaImageManager->getCurrFrameNumber() == 30) {
+	//	std::cout << "DONE DONE DONE" << std::endl;
+	//	getchar();
+	//}
 
 	DXUT_EndPerfEvent();
 }
