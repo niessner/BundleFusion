@@ -10,7 +10,7 @@ public:
 	class GPU {
 	public:
 
-		GPU(int deviceIdx) : m_deviceIndex(deviceIdx) {}
+		GPU(int deviceIdx, bool isEmulated = false) : m_deviceIndex(deviceIdx), m_bIsEmulated(isEmulated) {}
 
 		void set() const {
 			MLIB_CUDA_SAFE_CALL(cudaSetDevice(m_deviceIndex));
@@ -51,7 +51,11 @@ public:
 		std::string getName() const {
 			cudaDeviceProp prop;
 			cudaGetDeviceProperties(&prop, m_deviceIndex);
-			return std::string(prop.name);
+			std::string res(prop.name);
+			if (m_bIsEmulated) {
+				res = res + " (emulated) ";
+			}
+			return res;
 		}
 
 		unsigned int getDeviceIdx() const {
@@ -59,6 +63,7 @@ public:
 		}
 	private:
 		int m_deviceIndex;
+		bool m_bIsEmulated;
 	};
 
 
@@ -67,7 +72,7 @@ public:
 	void printList() {
 		std::cout << "GPUs found:\n";
 		for (auto& g : m_gpus) {
-			std::cout << "\t" << g.getDeviceIdx() << ": " << g.getName() << std::endl;
+			std::cout << "\tdeviceId: " << g.getDeviceIdx() << ": " << g.getName() << std::endl;
 		}
 	}
 
@@ -101,13 +106,19 @@ private:
 		m_bIsInit = false;
 	}
 
-	void init()
+	void init(unsigned int minDevices = 2, unsigned int maxPhysicalDevices = 2)
 	{
-		int numDevices;
-		cudaGetDeviceCount(&numDevices);
+		unsigned int numDevices;
+		cudaGetDeviceCount((int*)&numDevices);
 		assert(numDevices > 0);
-		for (int i = 0; i < numDevices; i++) {
+		numDevices = std::min(maxPhysicalDevices, numDevices);	//if we want to artificially reduces the number of GPUs
+		for (unsigned int i = 0; i < numDevices; i++) {
 			m_gpus.push_back(GPU(i));
+		}
+		assert(m_gpus.size() > 0);
+		const GPU& last = m_gpus.back();
+		for (unsigned int i = numDevices; i < minDevices; i++) {	//fill up with emulated devices
+			m_gpus.push_back(GPU(last.getDeviceIdx(), true));
 		}
 		printList();
 		m_bIsInit = true;

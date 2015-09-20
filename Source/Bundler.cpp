@@ -179,7 +179,6 @@ bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& fra
 void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
 	if (m_currentState.m_localToSolve == -1) return; // nothing to solve
-	std::cout << __FUNCTION__ << std::endl;
 
 	const unsigned int currLocalIdx = m_currentState.m_localToSolve;
 	m_currentState.m_localToSolve = -1; 
