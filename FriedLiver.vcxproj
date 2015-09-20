@@ -167,6 +167,7 @@
     <ClInclude Include="Source\DepthSensing\TimingLogDepthSensing.h" />
     <ClInclude Include="Source\DepthSensing\Util.h" />
     <ClInclude Include="Source\DepthSensing\VoxelUtilHashSDF.h" />
+    <ClInclude Include="Source\DualGPU.h" />
     <ClInclude Include="Source\DXUT\Core\DXUT.h" />
     <ClInclude Include="Source\DXUT\Core\DXUTDevice11.h" />
     <ClInclude Include="Source\DXUT\Core\DXUTDevice9.h" />
@@ -238,6 +239,7 @@
     <ClCompile Include="Source\DepthSensing\DX11Utils.cpp" />
     <ClCompile Include="Source\DepthSensing\StdOutputLogger.cpp" />
     <ClCompile Include="Source\DepthSensing\TimingLogDepthSensing.cpp" />
+    <ClCompile Include="Source\DualGPU.cpp" />
     <ClCompile Include="Source\DXUT\Core\DXUT.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>

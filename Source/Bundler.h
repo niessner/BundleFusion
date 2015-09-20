@@ -90,7 +90,29 @@ public:
 		return m_trajectoryManager;
 	}
 
+	bool hasProcssedInputFrame() const {
+		return m_bHasProcessedInputFrame;
+	}
+
+	void setProcessedInputFrame() {
+		m_bHasProcessedInputFrame = true;
+	}
+
+	void confirmProcessedInputFrame() {
+		m_bHasProcessedInputFrame = false;
+	}
+
+	void exitBundlingThread() {
+		m_bExitBundlingThread = true;
+	}
+	bool getExitBundlingThread() const {
+		return m_bExitBundlingThread;
+	}
+
 private:
+	bool m_bHasProcessedInputFrame;
+	bool m_bExitBundlingThread;
+
 	void matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int frameStart, unsigned int frameSkip, bool print = false);
 
 	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence);

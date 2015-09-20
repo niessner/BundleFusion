@@ -82,8 +82,8 @@ CModelViewerCamera          g_Camera;               // A model viewing camera
 DX11RGBDRenderer			g_RGBDRenderer;
 DX11CustomRenderTarget		g_CustomRenderTarget;
 
-CUDASceneRepHashSDF*		g_sceneRep			= NULL;
-CUDARayCastSDF*				g_rayCast			= NULL;
+CUDASceneRepHashSDF*		g_sceneRep = NULL;
+CUDARayCastSDF*				g_rayCast = NULL;
 CUDAMarchingCubesHashSDF*	g_marchingCubesHashSDF = NULL;
 CUDAHistrogramHashSDF*		g_historgram = NULL;
 CUDASceneRepChunkGrid*		g_chunkGrid = NULL;
@@ -93,8 +93,10 @@ mat4f						g_lastRigidTransform = mat4f::identity();
 
 //managed externally
 CUDAImageManager*			g_CudaImageManager = NULL;
-RGBDSensor*					g_RGBDSensor = NULL;
-Bundler*					g_bundler = NULL;
+RGBDSensor*					g_depthSensingRGBDSensor = NULL;
+Bundler*					g_depthSensingBundler = NULL;
+
+
 
 
 void ResetDepthSensing();
@@ -104,9 +106,9 @@ void StopScanningAndExtractIsoSurfaceMC(const std::string& filename = "./scans/s
 
 int startDepthSensing(Bundler* bundler, RGBDSensor* sensor, CUDAImageManager* imageManager)
 {
-	g_RGBDSensor = sensor;
+	g_depthSensingRGBDSensor = sensor;
 	g_CudaImageManager = imageManager;
-	g_bundler = bundler;
+	g_depthSensingBundler = bundler;
 
 	// Set DXUT callbacks
 	DXUTSetCallbackDeviceChanging(ModifyDeviceSettings);
@@ -237,7 +239,7 @@ void StopScanningAndExtractIsoSurfaceMC(const std::string& filename)
 
 	if (GlobalAppState::get().s_sensorIdx == 7) { //! hack for structure sensor
 		std::cout << "[marching cubes] stopped receiving frames from structure sensor" << std::endl;
-		g_RGBDSensor->stopReceivingFrames();
+		g_depthSensingRGBDSensor->stopReceivingFrames();
 	}
 
 	Timer t;
@@ -366,9 +368,9 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 				if (GlobalAppState::getInstance().s_recordData) {
 					if (GlobalAppState::get().s_sensorIdx == 7) { //! hack for structure sensor
 						std::cout << "[dump frames] stopped receiving frames from structure sensor" << std::endl;
-						g_RGBDSensor->stopReceivingFrames();
+						g_depthSensingRGBDSensor->stopReceivingFrames();
 					}
-					g_RGBDSensor->saveRecordedFramesToFile(GlobalAppState::getInstance().s_recordDataFile);
+					g_depthSensingRGBDSensor->saveRecordedFramesToFile(GlobalAppState::getInstance().s_recordDataFile);
 				} else {
 					std::cout << "Cannot save recording: enable \"s_recordData\" in parameter file" << std::endl;
 				}
@@ -410,7 +412,7 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			if (g_chunkGrid)	g_chunkGrid->debugCheckForDuplicates();
 			break;
 		case 'D':
-			g_RGBDSensor->savePointCloud("test.ply");
+			g_depthSensingRGBDSensor->savePointCloud("test.ply");
 			break;
 		case 'N':
 			StopScanningAndSaveSDFHash("test.hash");
@@ -512,7 +514,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	}
 
 	if (GlobalAppState::get().s_sensorIdx == 7) { // structure sensor
-		g_RGBDSensor->startReceivingFrames();
+		g_depthSensingRGBDSensor->startReceivingFrames();
 	}
 
 
@@ -673,7 +675,7 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 			HRESULT hr = DXUTGetDXGISwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pSurface));
 			if (pSurface) {
 				float* tex = (float*)CreateAndCopyToDebugTexture2D(pd3dDevice, pd3dImmediateContext, pSurface, true); //!!! TODO just copy no create
-				((StructureSensor*)g_RGBDSensor)->updateFeedbackImage((BYTE*)tex);
+				((StructureSensor*)g_depthSensingRGBDSensor)->updateFeedbackImage((BYTE*)tex);
 				SAFE_DELETE_ARRAY(tex);
 			}
 		}
@@ -698,6 +700,57 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 
 
 
+void reintegrate()
+{
+	const unsigned int maxPerFrameFixes = 10;
+	TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
+
+	if (tm->getNumActiveOperations() < maxPerFrameFixes) {
+		//Timer t;
+		tm->generateUpdateLists();
+		//std::cout << "generateUpdateList " << t.getElapsedTimeMS() << " [ms] " << std::endl;
+	}
+
+	for (unsigned int fixes = 0; fixes < maxPerFrameFixes; fixes++) {
+
+		mat4f newTransform = mat4f::zero();
+		mat4f oldTransform = mat4f::zero();
+		unsigned int frameIdx = (unsigned int)-1;
+
+		if (tm->getTopFromDeIntegrateList(oldTransform, frameIdx)) {
+			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
+			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+			deIntegrate(depthCameraData, oldTransform);
+
+			std::cout << "ERROR DEINTEGRATE" << std::endl;
+			while (1);
+			continue;
+		}
+		else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
+			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
+			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+			integrate(depthCameraData, newTransform);
+			tm->confirmIntegration(frameIdx);
+
+			std::cout << "ERROR INTEGRATE" << std::endl;
+			while (1);
+			continue;
+		}
+		else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
+			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
+			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+			deIntegrate(depthCameraData, oldTransform);
+			integrate(depthCameraData, newTransform);
+			tm->confirmIntegration(frameIdx);
+			continue;
+		}
+		else {
+			break; //no more work to do
+		}
+	}
+	g_sceneRep->garbageCollect();
+}
+
 //--------------------------------------------------------------------------------------
 // Render the scene using the D3D11 device
 //--------------------------------------------------------------------------------------
@@ -706,11 +759,8 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext )
 {
 	Timer t;
-	double timeProcessInput = 0.0f;
 	double timeReconstruct = 0.0f;
 	double timeVisualize = 0.0f;
-	double timeBundlingLocal = 0.0f;
-	double timeBundlingGlobal = 0.0f;
 	double timeReintegrate = 0.0f;
 
 	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
@@ -718,17 +768,31 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//Start Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
 
+
 	///////////////////////////////////////
-	// Process Input
+	// Read Input
 	///////////////////////////////////////
-	t.start();
-	// if we have received any valid new depth data we may need to draw
+	while (g_CudaImageManager->hasBundlingFrameRdy());				//previous frame was not processed by bundling yet
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
-		g_bundler->processInput();	//sift extraction, sift matching, and key point filtering
+		g_CudaImageManager->setBundlingFrameRdy();					//ready for bundling thread
+		//g_depthSensingBundler->processInput();	//sift extraction, sift matching, and key point filtering
+		//g_depthSensingBundler->setProcessedInputFrame();
 	}
-	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
-	timeProcessInput = t.getElapsedTimeMS();
+
+	///////////////////////////////////////
+	// Fix old frames
+	///////////////////////////////////////
+	//t.start();
+	//reintegrate();
+	//GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
+	//timeReintegrate = t.getElapsedTimeMS();
+
+
+	//wait until the bundling thread is done with: sift extraction, sift matching, and key point filtering
+	if (bGotDepth) {
+		while (!g_depthSensingBundler->hasProcssedInputFrame());
+	}
 	
 
 	///////////////////////////////////////
@@ -739,17 +803,19 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	if (bGotDepth) {
 		mat4f transformation = mat4f::zero();
 		DepthCameraData depthCameraData;
-		bool validTransform = g_bundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
+		bool validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, depthCameraData.d_depthData, depthCameraData.d_colorData);
+		
+		g_depthSensingBundler->confirmProcessedInputFrame();
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
 			//overwrite transform and use given trajectory in this case
-			transformation = g_RGBDSensor->getRigidTransform();
+			transformation = g_depthSensingRGBDSensor->getRigidTransform();
 			validTransform = true;
 		}
 
 		if (GlobalAppState::getInstance().s_recordData) {
-			g_RGBDSensor->recordFrame();
-			g_RGBDSensor->recordTrajectory(transformation);
+			g_depthSensingRGBDSensor->recordFrame();
+			g_depthSensingRGBDSensor->recordTrajectory(transformation);
 
 		}
 
@@ -776,81 +842,17 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Bundling Optimization
 	///////////////////////////////////////
-	t.start();
-	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-	g_bundler->processGlobal();
-	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
-	timeBundlingLocal = t.getElapsedTimeMS();
-
-	t.start();
-	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
-	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
-	timeBundlingGlobal = t.getElapsedTimeMS();
+	g_depthSensingBundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+	g_depthSensingBundler->processGlobal();
+	g_depthSensingBundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 	
 
-	///////////////////////////////////////
-	// Fix old frames
-	///////////////////////////////////////
-	t.start();
-	{
-		const unsigned int maxPerFrameFixes = 10;
-		TrajectoryManager* tm = g_bundler->getTrajectoryManager();
 
-		if (tm->getNumActiveOperations() < maxPerFrameFixes) {
-			Timer t;
-			tm->generateUpdateLists();
-			std::cout << "generateUpdateList " << t.getElapsedTimeMS() << " [ms] " << std::endl;
-		}
-
-		for (unsigned int fixes = 0; fixes < maxPerFrameFixes; fixes++) {
-
-			mat4f newTransform = mat4f::zero();	
-			mat4f oldTransform = mat4f::zero();
-			unsigned int frameIdx = (unsigned int)-1;
-
-			if (tm->getTopFromDeIntegrateList(oldTransform, frameIdx)) {
-				auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);	
-				DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-				deIntegrate(depthCameraData, oldTransform);
-
-				std::cout << "ERROR DEINTEGRATE" << std::endl;
-				while (1);
-				continue;
-			}
-			else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
-				auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
-				DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-				integrate(depthCameraData, newTransform);
-				tm->confirmIntegration(frameIdx);
-
-				std::cout << "ERROR INTEGRATE" << std::endl;
-				while (1);
-				continue;
-			}
-			else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
-				auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
-				DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-				deIntegrate(depthCameraData, oldTransform);
-				integrate(depthCameraData, newTransform);
-				tm->confirmIntegration(frameIdx);
-				continue;
-			}
-			else {
-				break; //no more work to do
-			}
-		}
-		g_sceneRep->garbageCollect();
-	}
-	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
-	timeReintegrate = t.getElapsedTimeMS();
 
 	std::cout << "<<< Total Frame Process Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
 
-	std::cout << VAR_NAME(timeProcessInput) << " : " << timeProcessInput << " [ms]" << std::endl;
 	std::cout << VAR_NAME(timeReconstruct) << " : " << timeReconstruct << " [ms]" << std::endl;
 	std::cout << VAR_NAME(timeVisualize) << " : " << timeVisualize << " [ms]" << std::endl;
-	std::cout << VAR_NAME(timeBundlingLocal) << " : " << timeBundlingLocal << " [ms]" << std::endl;
-	std::cout << VAR_NAME(timeBundlingGlobal) << " : " << timeBundlingGlobal << " [ms]" << std::endl;
 	std::cout << VAR_NAME(timeReintegrate) << " : " << timeReintegrate << " [ms]" << std::endl;
 
 	std::cout << std::endl;

@@ -53,13 +53,20 @@ public:
 
 	//! called by Bundler; whenever the optimization finishes
 	void updateOptimizedTransform(float4x4* d_trajectory, unsigned int numFrames) {
+		
+		m_mutexUpdateTransforms.lock();
+
 		m_numOptimizedFrames = numFrames;
 		numFrames = std::min(numFrames, m_numAddedFrames);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_optmizedTransforms.data(), d_trajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
+
+		m_mutexUpdateTransforms.unlock();
 	}
 
 	void generateUpdateLists()
 	{
+		m_mutexUpdateTransforms.lock();
+
 		unsigned int numFrames = std::min(m_numOptimizedFrames, m_numAddedFrames);
 
 		for (unsigned int i = 0; i < numFrames; i++) {
@@ -117,6 +124,7 @@ public:
 			}
 		}
 
+		m_mutexUpdateTransforms.unlock();
 	}
 
 
@@ -185,6 +193,8 @@ private:
 			m_toDeIntegrateList.push_back(&m_frames[frameIdx]);
 		}
 	}
+
+	std::mutex m_mutexUpdateTransforms;
 
 	std::vector<mat4f> m_optmizedTransforms;
 	std::vector<TrajectoryFrame>	m_frames;

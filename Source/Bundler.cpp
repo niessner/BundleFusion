@@ -51,6 +51,9 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_sift->SetParams(0, GlobalBundlingState::get().s_enableDetailedTimings, 150);
 	m_sift->InitSiftGPU(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight(), m_CudaImageManager->getSIFTWidth(), m_CudaImageManager->getSIFTHeight());
 	m_siftMatcher->InitSiftMatch();
+
+	m_bHasProcessedInputFrame = false;
+	m_bExitBundlingThread = false;
 }
 
 Bundler::~Bundler()
@@ -62,6 +65,7 @@ Bundler::~Bundler()
 
 void Bundler::processInput()
 {
+
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
 	std::cout << "[ frame " << curFrame << " ]" << std::endl;
 
@@ -150,7 +154,7 @@ void Bundler::processInput()
 bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, const float* & d_depth, const uchar4* & d_color)
 {
 	if (m_currentState.m_bLastFrameValid) {
-		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(m_currentState.m_lastFrameProcessed), sizeof(float4x4), cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(m_currentState.m_lastFrameProcessed), sizeof(float4x4), cudaMemcpyDeviceToHost));	//TODO MT needs to be copied from the other GPU...
 		d_depth = m_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
 		d_color = m_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
 

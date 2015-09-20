@@ -103,6 +103,7 @@ public:
 			}
 		}
 	private:
+
 		float*	m_depthIntegration;	//either on the GPU or CPU
 		uchar4*	m_colorIntegration;	//either on the GPU or CPU
 
@@ -158,6 +159,7 @@ public:
 
 
 		ManagedRGBDInputFrame::globalInit(getIntegrationWidth(), getIntegrationHeight(), storeFramesOnGPU);
+		m_bHasBundlingFrameRdy = false;
 	}
 
 	~CUDAImageManager() {
@@ -177,7 +179,7 @@ public:
 		m_data.clear();
 	}
 
-	bool process() {
+	bool process() {		
 
 		if (!m_RGBDSensor->processDepth()) return false;	// Order is important!
 		if (!m_RGBDSensor->processColor()) return false;
@@ -249,6 +251,11 @@ public:
 		return true;
 	}
 
+	void copyToBundling() {
+		//TODO MT we need intensity at SIFT resolution
+		//TODO MT we depth and color at integration res
+	}
+
 
 	//TODO not const because direct assignment in SiftGPU
 	float* getIntensityImageSIFT() {
@@ -308,7 +315,21 @@ public:
 		return m_SIFTintrinsicsInv;
 	}
 
+
+	bool hasBundlingFrameRdy() const {
+		return m_bHasBundlingFrameRdy;
+	}
+
+	void setBundlingFrameRdy() {
+		m_bHasBundlingFrameRdy = true;
+	}
+
+	void confirmRdyBundlingFrame() {
+		m_bHasBundlingFrameRdy = false;
+	}
 private:
+	bool m_bHasBundlingFrameRdy;
+
 	RGBDSensor* m_RGBDSensor;	
 
 	mat4f m_intrinsics;

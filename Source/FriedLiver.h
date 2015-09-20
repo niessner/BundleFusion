@@ -47,6 +47,7 @@
 #include "SiftGPU/MatrixConversion.h"
 #include "SiftGPU/CUDATimer.h"
 
+#include "DualGPU.h"
 #include "Bundler.h"
 #include "DepthSensing/DepthSensing.h"
 

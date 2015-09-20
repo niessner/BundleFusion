@@ -123,6 +123,7 @@
       <Filter>DepthSensing</Filter>
     </ClCompile>
     <ClCompile Include="Source\TrajectoryManager.cpp" />
+    <ClCompile Include="Source\DualGPU.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -343,6 +344,7 @@
     <ClInclude Include="Source\SiftGPU\SiftCameraUtil.h">
       <Filter>SiftGPU</Filter>
     </ClInclude>
+    <ClInclude Include="Source\DualGPU.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

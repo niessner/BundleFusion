@@ -79,9 +79,35 @@ RGBDSensor* getRGBDSensor()
 	return NULL;
 }
 
+RGBDSensor* g_RGBDSensor = NULL;
+CUDAImageManager* g_imageManager = NULL;
+Bundler* g_bundler = NULL;
 
+void bundlingThreadFunc() {
+	assert(g_RGBDSensor && g_imageManager);
+	//DualGPU::get().setDevice(DualGPU::DEVICE_RECONSTRUCTION);
+	
+	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
+	while (1) {
+		while (!g_imageManager->hasBundlingFrameRdy());	//wait for a new frame
+		while (g_bundler->hasProcssedInputFrame());		//wait until depth sensing has confirmed the last one
+		{
+			g_bundler->processInput();				//perform sift and whatever
+			g_bundler->setProcessedInputFrame();	//let depth sensing know we have a frame
+		}
 
+		/////////////////////////////////////////
+		//// Bundling Optimization
+		/////////////////////////////////////////
+		//g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+		//g_bundler->processGlobal();
+		//g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 
+		if (g_bundler->getExitBundlingThread()) break;
+	}
+
+	SAFE_DELETE(g_bundler);
+}
 
 int main(int argc, char** argv)
 {
@@ -90,6 +116,7 @@ int main(int argc, char** argv)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	//_CrtSetBreakAlloc(3727);
 #endif 
+
 
 	try {
 		std::string fileNameDescGlobalApp;
@@ -108,6 +135,8 @@ int main(int argc, char** argv)
 		std::cout << VAR_NAME(fileNameDescGlobalBundling) << " = " << fileNameDescGlobalBundling << std::endl;
 		std::cout << std::endl;
 
+
+
 		//Read the global app state
 		ParameterFile parameterFileGlobalApp(fileNameDescGlobalApp);
 		GlobalAppState::getInstance().readMembers(parameterFileGlobalApp);
@@ -116,63 +145,54 @@ int main(int argc, char** argv)
 		ParameterFile parameterFileGlobalBundling(fileNameDescGlobalBundling);
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
-		size_t mem_free, mem_total;
+		//DualGPU& dualGPU = DualGPU::get();	//needs to be called to initialize devices
+		//dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
 
-		TimingLog::init();
-		cudaMemGetInfo(&mem_free, &mem_total);	mem_free /= (1024 * 1024);	mem_total /= (1024 * 1024);
-		std::cout << "Start:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
-
-		RGBDSensor* sensor = getRGBDSensor();
+		g_RGBDSensor = getRGBDSensor();
 
 		//init the input RGBD sensor
-		if (sensor == NULL) throw MLIB_EXCEPTION("No RGBD sensor specified");
-		sensor->createFirstConnected();
+		if (g_RGBDSensor == NULL) throw MLIB_EXCEPTION("No RGBD sensor specified");
+		g_RGBDSensor->createFirstConnected();
 
+		
+		g_imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
+			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, g_RGBDSensor, false);
 
-		cudaMemGetInfo(&mem_free, &mem_total);	mem_free /= (1024 * 1024);	mem_total /= (1024 * 1024);
-		std::cout << "RGBDSensor:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
+		std::thread(bundlingThreadFunc).detach();
 
-		CUDAImageManager* imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
-			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, sensor);
+		while (!g_bundler);	//waiting until bundler is initialized
 
-
-		cudaMemGetInfo(&mem_free, &mem_total);	mem_free /= (1024 * 1024);	mem_total /= (1024 * 1024);
-		std::cout << "ImageManager:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
-
-		Bundler* bundler = new Bundler(sensor, imageManager);
-
-		cudaMemGetInfo(&mem_free, &mem_total);	mem_free /= (1024 * 1024);	mem_total /= (1024 * 1024);
-		std::cout << "Bundler:\t mem_free: " << mem_free << " [MB]" << std::endl;		std::cout << "mem_total: " << mem_total << " [MB]" << std::endl;
-
+	
 		//start depthSensing render loop
-		startDepthSensing(bundler, getRGBDSensor(), imageManager);
+		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
 		while (1) {
-			if (imageManager->process()) {
+			if (g_imageManager->process()) {
 				//bundler->process();
-				bundler->processInput();
+				g_bundler->processInput();
 
 				mat4f transformation; const float* d_depthData; const uchar4* d_colorData;
-				bundler->getCurrentIntegrationFrame(transformation, d_depthData, d_colorData);
+				g_bundler->getCurrentIntegrationFrame(transformation, d_depthData, d_colorData);
 
 				// these are queried
-				bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-				bundler->processGlobal();
-				bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+				g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+				g_bundler->processGlobal();
+				g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 			}
 			else break;
 		}
 
 		TimingLog::printTimings("timingLog.txt");
-		if (GlobalBundlingState::get().s_recordSolverConvergence) bundler->saveConvergence("convergence.txt");
-		bundler->saveCompleteTrajectory("trajectory.bin");
-		bundler->saveCompleteTrajectory("siftTrajectory.bin");
-		bundler->saveIntegrateTrajectory("intTrajectory.bin");
-		if (GlobalBundlingState::get().s_recordKeysPointCloud) bundler->saveKeysToPointCloud();
+		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
+		g_bundler->saveCompleteTrajectory("trajectory.bin");
+		g_bundler->saveCompleteTrajectory("siftTrajectory.bin");
+		g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
+		if (GlobalBundlingState::get().s_recordKeysPointCloud) g_bundler->saveKeysToPointCloud();
 		//bundler->saveDEBUG();
 
-		SAFE_DELETE(imageManager);
-		SAFE_DELETE(bundler);
+		g_bundler->exitBundlingThread();
+		SAFE_DELETE(g_imageManager);
+		
 
 		std::cout << "DONE!" << std::endl;
 		getchar();
