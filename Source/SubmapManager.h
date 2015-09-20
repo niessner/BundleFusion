@@ -98,6 +98,8 @@ public:
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currIntegrateTransform, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currIntegrateTransform, &id, sizeof(float4x4), cudaMemcpyHostToDevice)); // set first to identity
+		m_currIntegrateTransform.resize(maxNumGlobalImages*m_submapSize);
+		m_currIntegrateTransform[0].setIdentity();
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_imageInvalidateList, sizeof(int) * maxNumGlobalImages * maxNumLocalImages));
 	}
@@ -192,13 +194,25 @@ public:
 		return curLocalIdx;
 	}
 
-	float4x4* getCurrIntegrateTransform(unsigned int frameIdx) { return d_currIntegrateTransform + frameIdx; }
+	//float4x4* getCurrIntegrateTransform(unsigned int frameIdx) { return d_currIntegrateTransform + frameIdx; }
+
+	void computeCurrentSiftTransform(unsigned int frameIdx, unsigned int localFrameIdx, unsigned int lastValidCompleteTransform) {
+		const std::vector<int>& validImages = currentLocal->getValidImages();
+		if (validImages[localFrameIdx] == 0) m_currIntegrateTransform[frameIdx].setZero(-std::numeric_limits<float>::infinity()); //TODO should probably sync with gpu version for debug purposes
+		if (frameIdx > 0) {
+			currentLocal->computeSiftTransformCU(d_completeTrajectory, lastValidCompleteTransform, d_siftTrajectory, frameIdx, localFrameIdx, d_currIntegrateTransform + frameIdx);
+			cutilSafeCall(cudaMemcpy(&m_currIntegrateTransform[frameIdx], d_currIntegrateTransform + frameIdx, sizeof(float4x4), cudaMemcpyDeviceToHost));
+		}
+	}
+	const mat4f& getCurrentIntegrateTransform(unsigned int frameIdx) const { return m_currIntegrateTransform[frameIdx]; }
+	const std::vector<mat4f>& getAllIntegrateTransforms() const { return m_currIntegrateTransform; }
 
 private:
 	std::vector<unsigned int>	m_imageInvalidateList;
 	int*						d_imageInvalidateList; // tmp for updateTrajectory //TODO just to update trajectory on CPU
 
 	float4x4*					d_currIntegrateTransform;
+	std::vector<mat4f>			m_currIntegrateTransform;
 
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;

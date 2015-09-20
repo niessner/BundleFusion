@@ -114,8 +114,9 @@ void Bundler::processInput()
 	if (curLocalFrame > 0) {
 		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
 
-		currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, m_currentState.m_lastValidCompleteTransform,
-			m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame, m_SubmapManager.getCurrIntegrateTransform(curFrame));
+		//currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, m_currentState.m_lastValidCompleteTransform,
+		//	m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame, m_SubmapManager.getCurrIntegrateTransform(curFrame));
+		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
 	m_currentState.m_bLastFrameValid = (currentLocal->getValidImages()[curLocalFrame] != 0);
@@ -164,7 +165,8 @@ void Bundler::processInput()
 bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx)
 {
 	if (m_currentState.m_bLastFrameValid) {
-		cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(m_currentState.m_lastFrameProcessed), sizeof(float4x4), cudaMemcpyDeviceToHost));	//TODO MT needs to be copied from the other GPU...
+		//cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(m_currentState.m_lastFrameProcessed), sizeof(float4x4), cudaMemcpyDeviceToHost));	//TODO MT needs to be copied from the other GPU...
+		siftTransform = m_SubmapManager.getCurrentIntegrateTransform(m_currentState.m_lastFrameProcessed);
 		frameIdx = m_currentState.m_lastFrameProcessed;
 		//m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, siftTransform, m_currentState.m_lastFrameProcessed);
 		return true;
@@ -472,9 +474,7 @@ void Bundler::saveSiftTrajectory(const std::string& filename) const
 
 void Bundler::saveIntegrateTrajectory(const std::string& filename)
 {
-	std::vector<mat4f> integrateTrajectory(m_currentState.m_numCompleteTransforms);
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(integrateTrajectory.data(), m_SubmapManager.getCurrIntegrateTransform(0), sizeof(mat4f)*integrateTrajectory.size(), cudaMemcpyDeviceToHost));
-
+	const std::vector<mat4f>& integrateTrajectory = m_SubmapManager.getAllIntegrateTransforms();
 	BinaryDataStreamFile s(filename, true);
 	s << integrateTrajectory;
 	s.closeStream();
