@@ -180,7 +180,6 @@ public:
 	}
 
 	bool process() {	
-		std::cout << __FUNCTION__ << std::endl;
 
 		if (!m_RGBDSensor->processDepth()) return false;	// Order is important!
 		if (!m_RGBDSensor->processColor()) return false;

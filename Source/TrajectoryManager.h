@@ -57,7 +57,6 @@ public:
 
 		m_numOptimizedFrames = numFrames;
 		numFrames = std::min(numFrames, m_numAddedFrames);
-		std::cout << __FUNCTION__ << " " << numFrames << std::endl;
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_optmizedTransforms.data(), d_trajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
 
 		m_mutexUpdateTransforms.unlock();
@@ -69,9 +68,6 @@ public:
 		m_mutexUpdateTransforms.lock();
 
 		unsigned int numFrames = std::min(m_numOptimizedFrames, m_numAddedFrames);
-
-		std::cout << __FUNCTION__ << " : " << numFrames << std::endl;
-
 
 		for (unsigned int i = 0; i < numFrames; i++) {
 			TrajectoryFrame& f = m_frames[i];

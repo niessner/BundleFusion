@@ -711,7 +711,6 @@ void reintegrate()
 		//std::cout << "generateUpdateList " << t.getElapsedTimeMS() << " [ms] " << std::endl;
 	}
 
-	std::cout << __FUNCTION__ << " " << tm->getNumActiveOperations() << std::endl;
 	for (unsigned int fixes = 0; fixes < maxPerFrameFixes; fixes++) {
 
 		mat4f newTransform = mat4f::zero();
