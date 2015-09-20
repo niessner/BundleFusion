@@ -29,7 +29,8 @@
 	X(float, s_projCorrNormalThres) \
 	X(float, s_projCorrColorThresh) \
 	X(float, s_surfAreaPcaThresh) \
-	X(bool, s_recordSolverConvergence)
+	X(bool, s_recordSolverConvergence) \
+	X(bool, s_erodeSIFTdepth)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;

@@ -18,6 +18,53 @@ class SiftMatchGPU;
 class Bundler
 {
 public:
+	struct BundlerInputData {
+		unsigned int			m_inputDepthWidth, m_inputDepthHeight;
+		unsigned int			m_inputColorWidth, m_inputColorHeight;
+		unsigned int			m_widthSIFT, m_heightSIFT;
+		float*					d_inputDepth;
+		uchar4*					d_inputColor;
+		float*					d_intensitySIFT;
+		mat4f					m_SIFTIntrinsics;
+		mat4f					m_SIFTIntrinsicsInv;
+		float*					d_depthErodeHelper;
+
+		BundlerInputData() {
+			m_inputDepthWidth = 0;	m_inputDepthHeight = 0;
+			m_inputColorWidth = 0;	m_inputColorHeight = 0;
+			m_widthSIFT = 0;		m_heightSIFT = 0;
+			d_inputDepth = NULL;
+			d_inputColor = NULL;
+			d_intensitySIFT = NULL;
+			d_depthErodeHelper = NULL;
+		}
+		void alloc(const RGBDSensor* sensor) {
+			m_inputDepthWidth = sensor->getDepthWidth();
+			m_inputDepthHeight = sensor->getDepthHeight();
+			m_inputColorWidth = sensor->getColorWidth();
+			m_inputColorHeight = sensor->getColorHeight();
+			m_widthSIFT = GlobalBundlingState::get().s_widthSIFT;
+			m_heightSIFT = GlobalBundlingState::get().s_heightSIFT;
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepth, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthErodeHelper, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputColor, sizeof(uchar4)*m_inputColorWidth*m_inputColorHeight));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
+
+			const float scaleWidthSIFT = (float)m_widthSIFT / (float)m_inputColorWidth;
+			const float scaleHeightSIFT = (float)m_heightSIFT / (float)m_inputColorHeight;
+			m_SIFTIntrinsics = sensor->getColorIntrinsics();
+			m_SIFTIntrinsics._m00 *= scaleWidthSIFT;  m_SIFTIntrinsics._m02 *= scaleWidthSIFT;
+			m_SIFTIntrinsics._m11 *= scaleHeightSIFT; m_SIFTIntrinsics._m12 *= scaleHeightSIFT;
+			m_SIFTIntrinsicsInv = sensor->getColorIntrinsicsInv();
+			m_SIFTIntrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTIntrinsicsInv._m11 /= scaleHeightSIFT;
+		}
+		~BundlerInputData() {
+			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepth));
+			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputColor));
+			MLIB_CUDA_SAFE_CALL(cudaFree(d_intensitySIFT));
+			MLIB_CUDA_SAFE_CALL(cudaFree(d_depthErodeHelper));
+		}
+	};
 	struct BundlerState {
 		int						m_localToSolve;		// index of local submap to solve (-1) if none
 		int						m_lastLocalSolved; // to check if can fuse to global
@@ -120,7 +167,6 @@ private:
 	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const;
 
-	void initCurrFrameBuffers();
 	void getCurrentFrame();
 
 	CUDAImageManager*		m_CudaImageManager;		//managed outside
@@ -136,14 +182,7 @@ private:
 	unsigned int			m_submapSize;
 
 	//tmp buffers from cuda image manager
-	unsigned int			m_inputDepthWidth, m_inputDepthHeight;
-	unsigned int			m_inputColorWidth, m_inputColorHeight;
-	unsigned int			m_widthSIFT, m_heightSIFT;
-	float*					d_inputDepth;
-	uchar4*					d_inputColor;
-	float*					d_intensitySIFT;
-	mat4f					m_SIFTIntrinsics;
-	mat4f					m_SIFTIntrinsicsInv;
+	BundlerInputData		m_bundlerInputData;
 
 	static Timer			s_timer;
 

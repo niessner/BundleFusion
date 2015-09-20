@@ -26,7 +26,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_RGBDSensor = sensor;
 
 	// init CUDA
-	initCurrFrameBuffers();
+	m_bundlerInputData.alloc(m_RGBDSensor);
 
 	m_submapSize = GlobalBundlingState::get().s_submapSize;
 	m_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, m_submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage, m_submapSize, m_CudaImageManager);
@@ -39,12 +39,12 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_trajectoryManager = new TrajectoryManager(GlobalBundlingState::get().s_maxNumImages * m_submapSize);
 
 	// init sift camera constant params
-	m_siftCameraParams.m_depthWidth = m_inputDepthWidth;
-	m_siftCameraParams.m_depthHeight = m_inputDepthHeight;
-	m_siftCameraParams.m_intensityWidth = m_widthSIFT;
-	m_siftCameraParams.m_intensityHeight = m_heightSIFT;
-	m_siftCameraParams.m_siftIntrinsics = MatrixConversion::toCUDA(m_SIFTIntrinsics);
-	m_siftCameraParams.m_siftIntrinsicsInv = MatrixConversion::toCUDA(m_SIFTIntrinsicsInv);
+	m_siftCameraParams.m_depthWidth = m_bundlerInputData.m_inputDepthWidth;
+	m_siftCameraParams.m_depthHeight = m_bundlerInputData.m_inputDepthHeight;
+	m_siftCameraParams.m_intensityWidth = m_bundlerInputData.m_widthSIFT;
+	m_siftCameraParams.m_intensityHeight = m_bundlerInputData.m_heightSIFT;
+	m_siftCameraParams.m_siftIntrinsics = MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics);
+	m_siftCameraParams.m_siftIntrinsicsInv = MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv);
 	m_siftCameraParams.m_downSampIntrinsics = MatrixConversion::toCUDA(m_SubmapManager.currentLocalCache->getIntrinsics());
 	m_siftCameraParams.m_downSampIntrinsicsInv = MatrixConversion::toCUDA(m_SubmapManager.currentLocalCache->getIntrinsicsInv());
 	updateConstantSiftCameraParams(m_siftCameraParams);
@@ -52,7 +52,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_sift = new SiftGPU;
 	m_siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
 	m_sift->SetParams(0, GlobalBundlingState::get().s_enableDetailedTimings, 150);
-	m_sift->InitSiftGPU(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight(), m_widthSIFT, m_heightSIFT);
+	m_sift->InitSiftGPU(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight(), m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
 	m_siftMatcher->InitSiftMatch();
 
 	m_bHasProcessedInputFrame = false;
@@ -61,10 +61,6 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 Bundler::~Bundler()
 {
-	MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepth));
-	MLIB_CUDA_SAFE_CALL(cudaFree(d_inputColor));
-	MLIB_CUDA_SAFE_CALL(cudaFree(d_intensitySIFT));
-
 	SAFE_DELETE(m_sift);
 	SAFE_DELETE(m_siftMatcher);
 	SAFE_DELETE(m_trajectoryManager);
@@ -84,15 +80,16 @@ void Bundler::processInput()
 	// run SIFT
 	SIFTImageGPU& cur = m_SubmapManager.currentLocal->createSIFTImageGPU();
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-	int success = m_sift->RunSIFT(d_intensitySIFT, d_inputDepth);
+	int success = m_sift->RunSIFT(m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepth);
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection on frame " + std::to_string(curFrame));
-	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, d_inputDepth);
+	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, m_bundlerInputData.d_inputDepth);
 	m_SubmapManager.currentLocal->finalizeSIFTImageGPU(numKeypoints);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
 	// process cuda cache
 	const unsigned int curLocalFrame = m_SubmapManager.currentLocal->getNumImages() - 1;
-	m_SubmapManager.currentLocalCache->storeFrame(d_inputDepth, m_inputDepthWidth, m_inputDepthHeight, d_inputColor, m_inputColorWidth, m_inputColorHeight);
+	m_SubmapManager.currentLocalCache->storeFrame(m_bundlerInputData.d_inputDepth, m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight,
+		m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
 	if (GlobalBundlingState::get().s_recordKeysPointCloud && (curLocalFrame == 0 || m_SubmapManager.isLastLocalFrame(curFrame))) {
 		m_RGBDSensor->recordPointCloud();
 	}
@@ -198,7 +195,7 @@ void Bundler::processGlobal()
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 		SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
 		unsigned int numGlobalKeys = m_SubmapManager.nextLocal->FuseToGlobalKeyCU(curGlobalImage, m_SubmapManager.getLocalTrajectoryGPU(m_currentState.m_lastLocalSolved),
-			MatrixConversion::toCUDA(m_SIFTIntrinsics), MatrixConversion::toCUDA(m_SIFTIntrinsicsInv));
+			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 		global->finalizeSIFTImageGPU(numGlobalKeys);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
@@ -310,7 +307,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 		//const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
 		//SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
-		siftManager->FilterMatchesBySurfaceAreaCU(curFrame, MatrixConversion::toCUDA(m_SIFTIntrinsicsInv), GlobalBundlingState::get().s_surfAreaPcaThresh);
+		siftManager->FilterMatchesBySurfaceAreaCU(curFrame, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv), GlobalBundlingState::get().s_surfAreaPcaThresh);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterSurfaceArea = s_timer.getElapsedTimeMS(); }
 
 		// --- dense verify filter
@@ -333,7 +330,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 
 		// --- add to global correspondences
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-		siftManager->AddCurrToResidualsCU(curFrame, MatrixConversion::toCUDA(m_SIFTIntrinsicsInv));
+		siftManager->AddCurrToResidualsCU(curFrame, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeAddCurrResiduals = s_timer.getElapsedTimeMS(); }
 	}
 }
@@ -345,7 +342,7 @@ void Bundler::printKey(const std::string& filename, unsigned int allFrame, const
 
 	ColorImageR8G8B8A8 im(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(im.getPointer(), integrateFrame.getColorFrameGPU(), sizeof(uchar4) * m_CudaImageManager->getIntegrationWidth() * m_CudaImageManager->getIntegrationHeight(), cudaMemcpyDeviceToHost));
-	im.reSample(m_widthSIFT, m_heightSIFT);
+	im.reSample(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
 
 	std::vector<SIFTKeyPoint> keys(siftManager->getNumKeyPointsPerImage(frame));
 	const SIFTImageGPU& cur = siftManager->getImageGPU(frame);
@@ -417,7 +414,7 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 	ColorImageR8G8B8A8 curImage(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curImage.getPointer(), curIntegrateFrame.getColorFrameGPU(),
 		sizeof(uchar4) * curImage.getNumPixels(), cudaMemcpyDeviceToHost));
-	curImage.reSample(m_widthSIFT, m_heightSIFT);
+	curImage.reSample(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
 
 	//print out images
 	for (unsigned int prev = 0; prev < curFrame; prev++) {
@@ -425,7 +422,7 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 		ColorImageR8G8B8A8 prevImage(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevImage.getPointer(), prevIntegrateFrame.getColorFrameGPU(),
 			sizeof(uchar4) * prevImage.getNumPixels(), cudaMemcpyDeviceToHost));
-		prevImage.reSample(m_widthSIFT, m_heightSIFT);
+		prevImage.reSample(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
 			prevImage, curImage, 0.7f, filtered);
@@ -478,31 +475,27 @@ void Bundler::saveIntegrateTrajectory(const std::string& filename)
 	s.closeStream();
 }
 
-void Bundler::initCurrFrameBuffers()
-{
-	m_inputDepthWidth = m_RGBDSensor->getDepthWidth();
-	m_inputDepthHeight = m_RGBDSensor->getDepthHeight();
-	m_inputColorWidth = m_RGBDSensor->getColorWidth();
-	m_inputColorHeight = m_RGBDSensor->getColorHeight();
-	m_widthSIFT = GlobalBundlingState::get().s_widthSIFT;
-	m_heightSIFT = GlobalBundlingState::get().s_heightSIFT;
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepth, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputColor, sizeof(uchar4)*m_inputColorWidth*m_inputColorHeight));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
-
-	const float scaleWidthSIFT = (float)m_widthSIFT / (float)m_inputColorWidth;
-	const float scaleHeightSIFT = (float)m_heightSIFT / (float)m_inputColorHeight;
-	m_SIFTIntrinsics = m_RGBDSensor->getColorIntrinsics();
-	m_SIFTIntrinsics._m00 *= scaleWidthSIFT;  m_SIFTIntrinsics._m02 *= scaleWidthSIFT;
-	m_SIFTIntrinsics._m11 *= scaleHeightSIFT; m_SIFTIntrinsics._m12 *= scaleHeightSIFT;
-	m_SIFTIntrinsicsInv = m_RGBDSensor->getColorIntrinsicsInv();
-	m_SIFTIntrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTIntrinsicsInv._m11 /= scaleHeightSIFT;
-}
-
 void Bundler::getCurrentFrame()
 {
-	m_CudaImageManager->copyToBundling(d_inputDepth, d_inputColor);
-	CUDAImageUtil::resampleToIntensity(d_intensitySIFT, m_widthSIFT, m_heightSIFT, d_inputColor, m_inputColorWidth, m_inputColorHeight);
+	m_CudaImageManager->copyToBundling(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_inputColor);
+	CUDAImageUtil::resampleToIntensity(m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT,
+		m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
+
+	if (GlobalBundlingState::get().s_erodeSIFTdepth) {
+		unsigned int numIter = 2;
+
+		numIter = 2 * ((numIter + 1) / 2);
+		for (unsigned int i = 0; i < numIter; i++) {
+			if (i % 2 == 0) {
+				CUDAImageUtil::erodeDepthMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth, 3,
+					m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, 0.05f, 0.3f);
+			}
+			else {
+				CUDAImageUtil::erodeDepthMap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper, 3,
+					m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, 0.05f, 0.3f);
+			}
+		}
+	}
 }
 
 //void Bundler::saveDEBUG()

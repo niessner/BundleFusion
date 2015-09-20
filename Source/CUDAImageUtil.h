@@ -18,6 +18,8 @@ public:
 	static void computeNormals(float4* d_output, float4* d_input, unsigned int width, unsigned int height);
 
 	static void jointBilateralFilterFloatMap(uchar4* d_output, uchar4* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height);
+
+	static void erodeDepthMap(float* d_output, float* d_input, int structureSize, unsigned int width, unsigned int height, float dThresh, float fracReq);
 };
 
 //TODO 
