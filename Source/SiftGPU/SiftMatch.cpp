@@ -62,10 +62,10 @@ SiftMatchGPU::~SiftMatchGPU()
 
 void SiftMatchGPU::InitSiftMatch()
 {
-	if (!CheckCudaDevice(GlobalUtil::_DeviceIndex)) {
-		std::cout << "ERROR checking cuda device" << std::endl;
-		return;
-	}
+	//if (!CheckCudaDevice(GlobalUtil::_DeviceIndex)) {
+	//	std::cout << "ERROR checking cuda device" << std::endl;
+	//	return;
+	//}
 
 	if (_initialized) return;
 	_initialized = 1;
@@ -83,10 +83,10 @@ void SiftMatchGPU::InitSiftMatch()
 //	return p;
 //}
 
-int  SiftMatchGPU::CheckCudaDevice(int device)
-{
-	return ProgramCU::CheckCudaDevice(device);
-}
+//int  SiftMatchGPU::CheckCudaDevice(int device)
+//{
+//	return ProgramCU::CheckCudaDevice(device);
+//}
 
 void SiftMatchGPU::SetDescriptors(int index, int num, unsigned char* d_descriptors, int id)
 {

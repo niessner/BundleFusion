@@ -59,7 +59,7 @@ public:
 		SetFeautreLocation(index, (const float*) keys, 2);
 	}
 
-	static int  CheckCudaDevice(int device);
+	//static int  CheckCudaDevice(int device);
 
 	//overload the new operator, the same reason as SiftGPU above
 	//void* operator new (size_t size);

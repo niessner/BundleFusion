@@ -641,10 +641,10 @@ void SiftPyramid::FitPyramid(int w, int h)
 	}
 }
 
-int SiftPyramid::CheckCudaDevice(int device)
-{
-	return ProgramCU::CheckCudaDevice(device);
-}
+//int SiftPyramid::CheckCudaDevice(int device)
+//{
+//	return ProgramCU::CheckCudaDevice(device);
+//}
 
 void SiftPyramid::EvaluateTimings()
 {
