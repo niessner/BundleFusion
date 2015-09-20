@@ -72,7 +72,6 @@ Bundler::~Bundler()
 
 void Bundler::processInput()
 {
-	std::cout << __FUNCTION__ << std::endl;
 
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
 	std::cout << "[ frame " << curFrame << " ]" << std::endl;

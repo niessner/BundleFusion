@@ -227,7 +227,7 @@ int main(int argc, char** argv)
 		//release all bundling locks
 		g_imageManager->setBundlingFrameRdy();
 		g_bundler->confirmProcessedInputFrame();
-		while (g_bundler);	//wait until this is deleted
+		while (g_bundler) Sleep(0);	//wait until this is deleted
 		SAFE_DELETE(g_imageManager);
 		
 
