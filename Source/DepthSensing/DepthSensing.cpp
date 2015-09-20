@@ -771,13 +771,15 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Read Input
 	///////////////////////////////////////
-	while (g_CudaImageManager->hasBundlingFrameRdy());				//previous frame was not processed by bundling yet
+	while (g_CudaImageManager->hasBundlingFrameRdy()) Sleep(0);		//previous frame was not processed by bundling yet
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
 		g_CudaImageManager->setBundlingFrameRdy();					//ready for bundling thread
 		//g_depthSensingBundler->processInput();	//sift extraction, sift matching, and key point filtering
 		//g_depthSensingBundler->setProcessedInputFrame();
 	}
+
+
 
 	///////////////////////////////////////
 	// Fix old frames
@@ -786,14 +788,14 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	reintegrate();
 	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
 	timeReintegrate = t.getElapsedTimeMS();
+
+
 	
 	//wait until the bundling thread is done with: sift extraction, sift matching, and key point filtering
 	if (bGotDepth) {
-		while (!g_depthSensingBundler->hasProcssedInputFrame());
+		while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
 	}	
-
-
-
+	
 
 
 	///////////////////////////////////////

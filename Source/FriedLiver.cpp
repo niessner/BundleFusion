@@ -5,7 +5,6 @@
 #include "FriedLiver.h"
 
 
-
 RGBDSensor* getRGBDSensor()
 {
 	if (GlobalAppState::get().s_sensorIdx == 0) {
@@ -85,13 +84,12 @@ Bundler* g_bundler = NULL;
 
 void bundlingThreadFunc() {
 	assert(g_RGBDSensor && g_imageManager);
-	//DualGPU::get().setDevice(DualGPU::DEVICE_RECONSTRUCTION);
-	
+	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
 	while (1) {
-		while (!g_imageManager->hasBundlingFrameRdy());	//wait for a new input frame (LOCK IMAGE MANAGER)
+		while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
 		{
-			while (g_bundler->hasProcssedInputFrame());		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
+			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
 			{
 				if (g_bundler->getExitBundlingThread()) break;
 				g_bundler->processInput();						//perform sift and whatever
@@ -122,7 +120,6 @@ int main(int argc, char** argv)
 	//_CrtSetBreakAlloc(3727);
 #endif 
 
-
 	try {
 		std::string fileNameDescGlobalApp;
 		std::string fileNameDescGlobalBundling;
@@ -150,8 +147,36 @@ int main(int argc, char** argv)
 		ParameterFile parameterFileGlobalBundling(fileNameDescGlobalBundling);
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
-		//DualGPU& dualGPU = DualGPU::get();	//needs to be called to initialize devices
-		//dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
+
+		DualGPU& dualGPU = DualGPU::get();	//needs to be called to initialize devices
+		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
+
+		//{
+		//	int* d_tmp_gpu0;
+		//	int* d_tmp_gpu1;
+		//	const DualGPU::GPU& gpu0 = dualGPU.getDevice(DualGPU::DEVICE_RECONSTRUCTION);
+		//	const DualGPU::GPU& gpu1 = dualGPU.getDevice(DualGPU::DEVICE_BUNDLING);
+
+		//	unsigned int size = 1024 * 1024 * 100;
+		//	gpu0.set();
+		//	std::cout << "mem used before " << gpu0.getUsedMemoryMB() << std::endl;
+		//	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_tmp_gpu0, sizeof(int)*size));
+		//	std::cout << "mem used after " << gpu0.getUsedMemoryMB() << std::endl;
+
+		//	gpu1.set();
+		//	std::cout << "mem used before " << gpu1.getUsedMemoryMB() << std::endl;
+		//	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_tmp_gpu1, sizeof(int)*size));
+		//	std::cout << "mem used after " << gpu1.getUsedMemoryMB() << std::endl;
+
+		//	int input = 5; int res = 0;
+		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_tmp_gpu0, &input, sizeof(int), cudaMemcpyHostToDevice));
+		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_tmp_gpu1, d_tmp_gpu0, sizeof(int), cudaMemcpyDeviceToDevice));
+		//	//dualGPU.setDevice(DualGPU::DEVICE_BUNDLING);
+		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(&res, d_tmp_gpu1, sizeof(int), cudaMemcpyDeviceToHost));
+
+		//	int a = 5;
+		//}
+
 
 		g_RGBDSensor = getRGBDSensor();
 
@@ -165,8 +190,11 @@ int main(int argc, char** argv)
 
 		std::thread(bundlingThreadFunc).detach();
 
-		while (!g_bundler);	//waiting until bundler is initialized
+		//waiting until bundler is initialized
+		while (!g_bundler)	Sleep(0);
 
+
+		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
 	
 		//start depthSensing render loop
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
