@@ -139,9 +139,9 @@ public:
 	void updateTrajectory(unsigned int curFrame) {
 		if (!m_imageInvalidateList.empty())	{
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_imageInvalidateList.data(), sizeof(int)*m_imageInvalidateList.size(), cudaMemcpyHostToDevice));
-			std::cout << "invalidating " << m_imageInvalidateList.size() << " images:";
-			for (unsigned int i = 0; i < m_imageInvalidateList.size(); i++) std::cout << " " << m_imageInvalidateList[i];
-			std::cout << std::endl;
+			std::cout << "invalidating " << m_imageInvalidateList.size() << " images" << std::endl;;
+			//for (unsigned int i = 0; i < m_imageInvalidateList.size(); i++) std::cout << " " << m_imageInvalidateList[i];
+			//std::cout << std::endl;
 			//getchar();
 		}
 			

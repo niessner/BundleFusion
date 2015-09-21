@@ -49,7 +49,7 @@ public:
 
 private:
 
-	bool alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify);
+	bool alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations);
 
 	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	

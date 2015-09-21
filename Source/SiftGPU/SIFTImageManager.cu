@@ -428,7 +428,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 				bool b = ((tgtDepth != MINF && projInputDepth < tgtDepth) && d > distThresh); // bad matches that are known
 				if ((dNormal >= normalThresh && d <= distThresh /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
 
-					const float cameraToKinectProjZ = (pTransInput.z - 0.1f) / (3.0f - 0.1f); //TODO PARAMS HERE
+					const float cameraToKinectProjZ = (pTransInput.z - 0.1f) / (5.0f - 0.1f); //TODO PARAMS HERE
 					const float weight = max(0.0f, 0.5f*((1.0f - d / distThresh) + (1.0f - cameraToKinectProjZ))); // for weighted ICP;
 
 					out.x = length(pTransInput - pTarget);	//residual
@@ -940,4 +940,122 @@ void SIFTImageManager::TestSVDDebugCU(const float3x3& m) {
 
 	CheckErrorCUDA(__FUNCTION__);
 
+}
+
+
+//we launch 1 thread for two array entries
+void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_trajectory,
+		unsigned int imageWidth, unsigned int imageHeight,
+		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
+		int* d_validOpt)
+{
+	const unsigned int img0 = blockIdx.x / numImages;
+	const unsigned int img1 = blockIdx.x % numImages;
+
+	if (img0 >= img1) return;
+	//if (d_validOpt[0] == 0) return; //TODO 
+
+	const float*  d_inputDepth = d_cachedFrames[img0].d_depthDownsampled;
+	const float4* d_inputCamPos = d_cachedFrames[img0].d_cameraposDownsampled;
+	const float4* d_inputNormal = d_cachedFrames[img0].d_normalsDownsampled;
+	const uchar4* d_inputColor = d_cachedFrames[img0].d_colorDownsampled;
+	
+	const float*  d_modelDepth = d_cachedFrames[img1].d_depthDownsampled;
+	const float4* d_modelCamPos = d_cachedFrames[img1].d_cameraposDownsampled;
+	const float4* d_modelNormal = d_cachedFrames[img1].d_normalsDownsampled;
+	const uchar4* d_modelColor = d_cachedFrames[img1].d_colorDownsampled;
+
+	const float4x4 transform = d_trajectory[img1].getInverse() * d_trajectory[img0];
+
+	float local_sumResidual = 0.0f;
+	float local_sumWeight = 0.0f;
+	float local_numCorr = 0.0f;
+
+	for (unsigned int i = 0; i < FILTER_DENSE_VERIFY_THREAD_SPLIT; i++) {
+		const unsigned int idxX = threadIdx.x;
+		const unsigned int idxY = threadIdx.y*FILTER_DENSE_VERIFY_THREAD_SPLIT + i;
+		if (idxY < imageHeight) {
+			const unsigned int idx = idxY * imageWidth + idxX;
+
+			float3 inputToModel = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform, intrinsics,
+				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor,
+				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor);
+			float3 modelToInput = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform.getInverse(), intrinsics,
+				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor,
+				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor);
+
+			local_sumResidual += inputToModel.x + modelToInput.x;	//residual
+			local_sumWeight += inputToModel.y + modelToInput.y;		//corr weight
+			local_numCorr += inputToModel.z + modelToInput.z;		//corr number
+		}
+	}
+
+	__shared__ float sumResidual;
+	__shared__ float sumWeight;
+	__shared__ float numCorr;
+
+	if (threadIdx.x == 0 && threadIdx.y == 0) {
+		sumResidual = 0.0f;
+		sumWeight = 0.0f;
+		numCorr = 0;
+	} 
+	__syncthreads();
+
+	//atomicAdd(&sumResidual, local_sumResidual);
+	//atomicAdd(&sumWeight, local_sumWeight);
+	//atomicAdd(&numCorr, local_numCorr);
+
+	local_sumResidual = warpReduceSum(local_sumResidual);
+	local_sumWeight = warpReduceSum(local_sumWeight);
+	local_numCorr = warpReduceSum(local_numCorr);
+
+	if (threadIdx.x % warpSize == 0) {
+		atomicAdd(&sumResidual, local_sumResidual);
+		atomicAdd(&sumWeight, local_sumWeight);
+		atomicAdd(&numCorr, local_numCorr);
+	}
+
+	__syncthreads();
+
+	//write results back
+	if (threadIdx.x == 0 && threadIdx.y == 0) {
+		float err = sumResidual / sumWeight;
+		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
+		//printf("VERIFY LOCAL SUBMAP[%d-%d]: %f %f\n", img0, img1, err, corr);
+
+		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
+			d_validOpt[0] = 0;
+		}
+	}
+}
+
+int SIFTImageManager::VerifyTrajectoryCU(unsigned int numImages, float4x4* d_trajectory,
+		unsigned int imageWidth, unsigned int imageHeight,
+		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
+{
+	if (numImages < 2) return 0;
+	const unsigned int numPairs = (numImages * (numImages - 1)) / 2;
+	
+	dim3 grid(numPairs);
+	dim3 block(imageWidth, (imageHeight + FILTER_DENSE_VERIFY_THREAD_SPLIT - 1) / FILTER_DENSE_VERIFY_THREAD_SPLIT);
+
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
+
+	int valid = 1;
+	cutilSafeCall(cudaMemcpy(d_validOpt, &valid, sizeof(int), cudaMemcpyHostToDevice));
+
+	VerifyTrajectoryCU_Kernel << <grid, block >> >(
+		numImages, d_trajectory, imageWidth, imageHeight, intrinsics,
+		d_cachedFrames, distThresh, normalThresh, colorThresh, errThresh, corrThresh,
+		d_validOpt);
+
+	cutilSafeCall(cudaMemcpy(&valid, d_validOpt, sizeof(int), cudaMemcpyDeviceToHost));
+
+	if (m_timer) m_timer->endEvent();
+
+	CheckErrorCUDA(__FUNCTION__);
+
+	return valid;
 }

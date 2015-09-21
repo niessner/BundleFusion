@@ -78,6 +78,8 @@ public:
 		unsigned int			m_numCompleteTransforms;
 		unsigned int			m_lastValidCompleteTransform;
 
+		bool					m_bProcessGlobal;
+
 		BundlerState() {
 			m_localToSolve = -1;
 			m_bOptimizeGlobal = false;
@@ -88,6 +90,7 @@ public:
 			m_lastNumLocalFrames = 0;
 			m_numCompleteTransforms = 0;
 			m_lastValidCompleteTransform = 0;
+			m_bProcessGlobal = false;
 		}
 	};
 

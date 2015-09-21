@@ -30,7 +30,9 @@
 	X(float, s_projCorrColorThresh) \
 	X(float, s_surfAreaPcaThresh) \
 	X(bool, s_recordSolverConvergence) \
-	X(bool, s_erodeSIFTdepth)
+	X(bool, s_erodeSIFTdepth) \
+	X(float, s_verifyOptErrThresh) \
+	X(float, s_verifyOptCorrThresh)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;

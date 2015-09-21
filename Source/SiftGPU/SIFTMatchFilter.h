@@ -50,7 +50,7 @@ private:
 	static float cameraToDepthZ(const float4& pos);
 	static inline float cameraToKinectProjZ(float z) {
 		//!!!TODO PARAMS depthmin depthmax
-		return (z - 0.1f) / (3.0f - 0.1f);
+		return (z - 0.1f) / (5.0f - 0.1f);
 	}
 
 

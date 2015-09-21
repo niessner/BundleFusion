@@ -738,8 +738,8 @@ void reintegrate()
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 			deIntegrate(depthCameraData, oldTransform);
 
-			std::cout << "ERROR DEINTEGRATE" << std::endl;
-			while (1);
+			//std::cout << "ERROR DEINTEGRATE" << std::endl;
+			//while (1);
 			continue;
 		}
 		else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
@@ -748,8 +748,8 @@ void reintegrate()
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
 
-			std::cout << "ERROR INTEGRATE" << std::endl;
-			while (1);
+			//std::cout << "ERROR INTEGRATE" << std::endl;
+			//while (1);
 			continue;
 		}
 		else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {

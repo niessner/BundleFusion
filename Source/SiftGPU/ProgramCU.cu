@@ -650,7 +650,7 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 		int dyi = round(dy);
 		float depth = d_depthData[dyi * depthWidth + dxi];
 
-		if (depth == MINF || depth < 0.1f || depth > 3.0f) return;
+		if (depth == MINF || depth < 0.1f || depth > 5.0f) return;
 
 		data[1][1] = v = tex1Dfetch(texC, idx[1]);
 		if (fabs(v) <= dog_threshold0) return; // if pixel value less than dog thresh

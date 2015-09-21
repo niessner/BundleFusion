@@ -31,7 +31,7 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 	const unsigned int maxIts = 10;//GlobalAppState::get().s_maxNumResidualsRemoved; //!!!TODO PARAMS
 	unsigned int curIt = 0;
 	do {
-		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits, useVerify);
+		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits);
 		if (recordConvergence) {
 			const std::vector<float>& conv = m_solver->getConvergenceAnalysis();
 			m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
@@ -42,13 +42,15 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 
 	} while (removed && curIt < maxIts);
 
+	if (useVerify) m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesDEBUG(), siftManager->getNumGlobalCorrespondences());
+
 	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
 	
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve = s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve = curIt * maxNumIters; }
 	//std::cout << "[ align Time:] " << s_timer.getElapsedTimeMS() << " ms" << std::endl;
 }
 
-bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool useVerify)
+bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations)
 {
 	EntryJ* d_correspondences = siftManager->getGlobalCorrespondencesDEBUG();
 	m_numCorrespondences = siftManager->getNumGlobalCorrespondences();
@@ -59,8 +61,6 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsig
 	m_solver->solve(d_correspondences, m_numCorrespondences, numImages, numNonLinearIterations, numLinearIterations, d_xRot, d_xTrans);
 
 	bool removed = removeMaxResidualCUDA(siftManager, numImages);
-
-	if (!removed && useVerify) m_bVerify = m_solver->useVerification(d_correspondences, m_numCorrespondences);
 
 	return removed;
 }

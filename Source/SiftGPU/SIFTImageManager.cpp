@@ -128,6 +128,9 @@ void SIFTImageManager::saveToFile(const std::string& s)
 	CUDA_SAFE_CALL(cudaMemcpy(globMatches.data(), d_globMatches, sizeof(EntryJ)*m_globNumResiduals, cudaMemcpyDeviceToHost));
 	CUDA_SAFE_CALL(cudaMemcpy(globMatchesKeyPointIndices.data(), d_globMatchesKeyPointIndices, sizeof(uint2)*m_globNumResiduals, cudaMemcpyDeviceToHost));
 
+	int validOpt;
+	CUDA_SAFE_CALL(cudaMemcpy(&validOpt, d_validOpt, sizeof(int), cudaMemcpyDeviceToHost));
+
 	const unsigned int numImages = getNumImages();
 	out.write((char*)&numImages, sizeof(unsigned int));
 	out.write((char*)&m_numKeyPoints, sizeof(unsigned int));
@@ -155,6 +158,7 @@ void SIFTImageManager::saveToFile(const std::string& s)
 		out.write((char*)globMatches.data(), sizeof(EntryJ)*m_globNumResiduals);
 		out.write((char*)globMatchesKeyPointIndices.data(), sizeof(uint2)*m_globNumResiduals);
 	}
+	out.write((char*)&validOpt, sizeof(unsigned int));
 
 	out.write((char*)&m_submapSize, sizeof(unsigned int));
 
@@ -243,6 +247,10 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 			CUDA_SAFE_CALL(cudaMemcpy(d_globMatches, globMatches.data(), sizeof(EntryJ)*m_globNumResiduals, cudaMemcpyHostToDevice));
 			CUDA_SAFE_CALL(cudaMemcpy(d_globMatchesKeyPointIndices, globMatchesKeyPointIndices.data(), sizeof(uint2)*m_globNumResiduals, cudaMemcpyHostToDevice));
 		}
+
+		int validOpt;
+		in.read((char*)&validOpt, sizeof(unsigned int));
+		CUDA_SAFE_CALL(cudaMemcpy(d_validOpt, &validOpt, sizeof(int), cudaMemcpyHostToDevice));
 	}
 	{
 		in.read((char*)&m_submapSize, sizeof(unsigned int));
@@ -295,6 +303,8 @@ void SIFTImageManager::alloc()
 	CUDA_SAFE_CALL(cudaMalloc(&d_globMatches, sizeof(EntryJ)*maxResiduals));
 	CUDA_SAFE_CALL(cudaMalloc(&d_globMatchesKeyPointIndices, sizeof(uint2)*maxResiduals));
 
+	CUDA_SAFE_CALL(cudaMalloc(&d_validOpt, sizeof(int)));
+
 	CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyCount, sizeof(int)));
 	CUDA_SAFE_CALL(cudaMemset(d_fuseGlobalKeyCount, 0, sizeof(int)));
 	CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyMarker, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
@@ -334,6 +344,8 @@ void SIFTImageManager::free()
 	CUDA_SAFE_CALL(cudaFree(d_globNumResiduals));
 	CUDA_SAFE_CALL(cudaFree(d_globMatches));
 	CUDA_SAFE_CALL(cudaFree(d_globMatchesKeyPointIndices));
+
+	CUDA_SAFE_CALL(cudaFree(d_validOpt));
 
 	CUDA_SAFE_CALL(cudaFree(d_fuseGlobalKeyCount));
 	CUDA_SAFE_CALL(cudaFree(d_fuseGlobalKeyMarker));
@@ -428,4 +440,5 @@ void SIFTImageManager::filterFrames(unsigned int numCurrImagePairs)
 
 	m_validImages[numCurrImagePairs] = connected;
 }
+
 

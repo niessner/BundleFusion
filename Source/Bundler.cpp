@@ -184,11 +184,49 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 	solve(m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx), m_SubmapManager.nextLocal, numNonLinIterations, numLinIterations, true, false);
 	// still need this for global key fuse
 
+	// verify
+	if (m_SparseBundler.useVerification()) {
+		SIFTImageManager* siftManager = m_SubmapManager.nextLocal;
+		const CUDACachedFrame* cachedFramesCUDA = m_SubmapManager.nextLocalCache->getCacheFramesGPU();
+		int valid = siftManager->VerifyTrajectoryCU(siftManager->getNumImages(), m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx),
+			m_SubmapManager.nextLocalCache->getWidth(), m_SubmapManager.nextLocalCache->getHeight(),
+			MatrixConversion::toCUDA(m_SubmapManager.nextLocalCache->getIntrinsics()),
+			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
+			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifyOptErrThresh, GlobalBundlingState::get().s_verifyOptCorrThresh);
+
+		if (valid == 0) {
+			std::cout << "WARNING: invalid local submap from verify " << currLocalIdx << " (" << m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames << ")" << std::endl;
+			//getchar();
+
+			m_SubmapManager.invalidateImages(m_submapSize * currLocalIdx, m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames);
+			m_currentState.m_bProcessGlobal = false;
+
+			m_currentState.m_bOptimizeGlobal = false;
+			m_currentState.m_numCompleteTransforms = m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames;
+
+			//add invalidated (fake) global frame
+			SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
+			m_SubmapManager.global->finalizeSIFTImageGPU(0);
+			m_SubmapManager.finishLocalOpt();
+			m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
+
+			m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
+			m_SubmapManager.initializeNextGlobalTransform(true);
+		}
+		else
+			m_currentState.m_bProcessGlobal = true;
+	}
+	else
+		m_currentState.m_bProcessGlobal = true;
+
 	m_currentState.m_lastLocalSolved = currLocalIdx;
 }
 
 void Bundler::processGlobal()
 {
+	if (!m_currentState.m_bProcessGlobal) return;
+	m_currentState.m_bProcessGlobal = false;
+
 	SIFTImageManager* global = m_SubmapManager.global;
 	if ((int)global->getNumImages() <= m_currentState.m_lastLocalSolved) {
 		// fuse to global
@@ -235,6 +273,9 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 
 	//solve!
 	m_currentState.m_bOptimizeGlobal = false;
+	if (m_SubmapManager.isLastFrame(m_currentState.m_lastFrameProcessed)) {
+		numNonLinIterations = numNonLinIterations * 4;
+	}
 	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence);
 
 	const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
@@ -256,9 +297,8 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 
 void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence)
 {
-	bool useVerify = false; //TODO do we need verify?
+	bool useVerify = isLocal; 
 	m_SparseBundler.align(siftManager, transforms, numNonLinIters, numLinIters, useVerify, isLocal, recordConvergence);
-	//if (useVerify) bundle->verifyTrajectory();
 }
 
 void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, 

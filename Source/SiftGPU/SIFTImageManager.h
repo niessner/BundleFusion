@@ -125,6 +125,11 @@ public:
 		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh);
 
+	int VerifyTrajectoryCU(unsigned int numImages, float4x4* d_trajectory,
+		unsigned int imageWidth, unsigned int imageHeight,
+		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh);
+
 	//void FilterFramesCU(unsigned int numCurrImagePairs);
 
 	void AddCurrToResidualsCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv);
@@ -234,7 +239,7 @@ private:
 	int*			d_globNumResiduals;
 	EntryJ*			d_globMatches;
 	uint2*			d_globMatchesKeyPointIndices;
-
+	int*			d_validOpt;
 
 	unsigned int m_maxNumImages;			//max number of images maintained by the manager
 	unsigned int m_maxKeyPointsPerImage;	//max number of SIFT key point that can be detected per image
