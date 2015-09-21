@@ -3,6 +3,9 @@
 
 #include "DX11QuadDrawer.h"
 
+extern "C" void convertColorRawToFloat4(float4* d_output, BYTE* d_input, unsigned int width, unsigned int height);
+
+
 //--------------------------------------------------------------------------------------
 // Constant buffers
 //--------------------------------------------------------------------------------------
@@ -259,6 +262,19 @@ void DX11QuadDrawer::OnD3D11DestroyDevice()
 	cutilSafeCall(cudaGraphicsUnregisterResource(s_dCuda2));
 }
 
+HRESULT DX11QuadDrawer::RenderQuadDynamicUCHAR4(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dDeviceContext, const uchar4* d_data, unsigned int width, unsigned int height, float scale /*= 1.0f*/, D3DXVECTOR2 Pow2Ratios /*= D3DXVECTOR2(1.0f, 1.0f)*/, ID3D11PixelShader* pixelShader /*= NULL*/)
+{
+	//TODO this function is not very efficient...
+	float4* d_dataFloat4;
+	cutilSafeCall(cudaMalloc(&d_dataFloat4, sizeof(float4)*width*height));
+	convertColorRawToFloat4(d_dataFloat4, (BYTE*)d_data, width, height);
+	HRESULT hr = RenderQuadDynamic(pd3dDevice, pd3dDeviceContext, (float*)d_dataFloat4, 4, width, height, scale, Pow2Ratios);
+
+	cutilSafeCall(cudaFree(d_dataFloat4));
+
+	return hr;
+}
+
 HRESULT DX11QuadDrawer::RenderQuadDynamic(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dDeviceContext, float* d_data, unsigned int nChannels, unsigned int width, unsigned int height, float scale /*= 1.0f */, D3DXVECTOR2 Pow2Ratios /*= D3DXVECTOR2(1.0f, 1.0f)*/, ID3D11PixelShader* pixelShader /*= NULL*/)
 {
 	HRESULT hr = S_OK;
@@ -350,7 +366,7 @@ void DX11QuadDrawer::RenderQuad(ID3D11DeviceContext* pd3dDeviceContext, ID3D11Sh
 
 	if (!pixelShader) {
 		D3D11_SHADER_RESOURCE_VIEW_DESC desSRV;
-		srv->GetDesc( &desSRV);
+		srv->GetDesc( &desSRV );
 	
 		//RGBA
 		if (desSRV.Format == DXGI_FORMAT_R8G8B8A8_UNORM || 

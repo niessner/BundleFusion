@@ -27,6 +27,7 @@ public:
 	static HRESULT OnD3D11CreateDevice(ID3D11Device* pd3dDevice);
 	static void OnD3D11DestroyDevice();
 
+	static HRESULT RenderQuadDynamicUCHAR4(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dDeviceContext, const uchar4* d_data, unsigned int width, unsigned int height, float scale = 1.0f, D3DXVECTOR2 Pow2Ratios = D3DXVECTOR2(1.0f, 1.0f), ID3D11PixelShader* pixelShader = NULL);
 	static HRESULT RenderQuadDynamic(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dDeviceContext, float* d_data, unsigned int nChannels, unsigned int width, unsigned int height, float scale = 1.0f, D3DXVECTOR2 Pow2Ratios = D3DXVECTOR2(1.0f, 1.0f), ID3D11PixelShader* pixelShader = NULL);
 	
 	static void RenderQuad(ID3D11DeviceContext* pd3dDeviceContext, float* d_data, unsigned int nChannels, unsigned int width, unsigned int height, float scale = 1.0f , D3DXVECTOR2 Pow2Ratios = D3DXVECTOR2(1.0f, 1.0f), ID3D11PixelShader* pixelShader = NULL );

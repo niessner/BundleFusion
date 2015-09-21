@@ -681,7 +681,7 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 		g_RGBDRenderer.RenderDepthMap(pd3dImmediateContext, g_rayCast->getRayCastData().d_depth, g_rayCast->getRayCastData().d_colors, g_rayCast->getRayCastParams().m_width, g_rayCast->getRayCastParams().m_height, MatrixConversion::toMlib(g_rayCast->getRayCastParams().m_intrinsicsInverse), view, renderIntrinsics, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(), GlobalAppState::get().s_renderingDepthDiscontinuityThresOffset, GlobalAppState::get().s_renderingDepthDiscontinuityThresLin);
 		g_CustomRenderTarget.Unbind(pd3dImmediateContext);
 
-		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), GlobalAppState::get().s_useColorForRendering, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight());
+		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), false, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight());
 		DX11QuadDrawer::RenderQuad(pd3dImmediateContext, DX11PhongLighting::GetColorsSRV(), 1.0f);
 #ifdef STRUCTURE_SENSOR
 		if (GlobalAppState::get().s_sensorIdx == 7) {
@@ -704,8 +704,13 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 		g_RGBDRenderer.RenderDepthMap(pd3dImmediateContext, g_rayCast->getRayCastData().d_depth, g_rayCast->getRayCastData().d_colors, g_rayCast->getRayCastParams().m_width, g_rayCast->getRayCastParams().m_height, MatrixConversion::toMlib(g_rayCast->getRayCastParams().m_intrinsicsInverse), view, renderIntrinsics, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(), GlobalAppState::get().s_renderingDepthDiscontinuityThresOffset, GlobalAppState::get().s_renderingDepthDiscontinuityThresLin);
 		g_CustomRenderTarget.Unbind(pd3dImmediateContext);
 
-		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), !GlobalAppState::get().s_useColorForRendering, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight());
+		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), true, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight());
 		DX11QuadDrawer::RenderQuad(pd3dImmediateContext, DX11PhongLighting::GetColorsSRV(), 1.0f);
+	}
+	else if (GlobalAppState::get().s_RenderMode == 3) {
+		//color input
+		const uchar4* d_color = g_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
+		DX11QuadDrawer::RenderQuadDynamicUCHAR4(DXUTGetD3D11Device(), pd3dImmediateContext, d_color, g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
 	}
 	else {
 		std::cout << "Unknown render mode " << GlobalAppState::get().s_RenderMode << std::endl;

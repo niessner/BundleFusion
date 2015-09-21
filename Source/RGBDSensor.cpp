@@ -266,6 +266,11 @@ void RGBDSensor::saveRecordedFramesToFile( const std::string& filename )
 	std::cout << cs << std::endl;
 	std::cout << "dumping recorded frames... ";
 
+	std::string folder = util::directoryFromPath(filename);
+	if (!util::directoryExists(folder)) {
+		util::makeDirectory(folder);
+	}
+
 	std::string actualFilename = filename;
 	while (util::fileExists(actualFilename)) {
 		std::string path = util::directoryFromPath(actualFilename);
@@ -279,6 +284,7 @@ void RGBDSensor::saveRecordedFramesToFile( const std::string& filename )
 		}
 		actualFilename = path + base + std::to_string(num+1) + "." + ext;
 	}
+
 	BinaryDataStreamFile outStream(actualFilename, true);
 	//BinaryDataStreamZLibFile outStream(filename, true);
 	outStream << cs;

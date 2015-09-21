@@ -61,12 +61,7 @@ float4 QuadFloatPS( VS_OUTPUT Input ) : SV_TARGET
 float4 QuadRGBAPS( VS_OUTPUT Input ) : SV_TARGET
 {
 	float4 res = inputTexture2.Sample(g_PointSampler, Input.vTexcoord);
-	
 	res.xyz *= g_Scale;
-	// I changes this, hope it is only used for the normals
-	//res.xyz += 1.0f;
-	//res.xyz /= 2.0f;
-
 	return res;
 }
 

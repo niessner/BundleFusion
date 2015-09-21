@@ -68,7 +68,6 @@
 	X(bool, s_timingsDetailledEnabled) \
 	X(bool, s_timingsTotalEnabled) \
 	X(unsigned int, s_RenderMode) \
-	X(bool, s_useColorForRendering) \
 	X(bool, s_playData) \
 	X(float, s_renderingDepthDiscontinuityThresLin) \
 	X(float, s_remappingDepthDiscontinuityThresLin) \
