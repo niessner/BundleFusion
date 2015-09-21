@@ -34,6 +34,7 @@
 #endif
 
 #ifdef STRUCTURE_SENSOR
+#pragma comment (lib, "Ws2_32.lib")
 #pragma comment(lib, "gdiplus.lib")
 #endif
 

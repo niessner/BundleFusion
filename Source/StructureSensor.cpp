@@ -10,7 +10,7 @@
 bool StructureSensor::processDepth()
 {
 	std::pair<float*,UCHAR*> frames = m_server.process(m_oldDepth, m_oldColor);
-	if (frames.first == NULL || frames.second == NULL) return S_FALSE;
+	if (frames.first == NULL || frames.second == NULL) return false;
 
 	// depth
 	memcpy(m_depthFloat[m_currentRingBufIdx], frames.first, sizeof(float)*getDepthWidth()*getDepthHeight());
@@ -21,7 +21,7 @@ bool StructureSensor::processDepth()
 	m_oldDepth = frames.first;
 	m_oldColor = frames.second;
 
-	return S_OK;
+	return true;
 }
 
 

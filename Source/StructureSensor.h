@@ -1,12 +1,13 @@
 #pragma once
 
-
 #include "GlobalAppState.h"
 
 #ifdef STRUCTURE_SENSOR
 
 #undef UNICODE
+
 #define WIN32_LEAN_AND_MEAN
+
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -42,10 +43,10 @@ struct ExampleServerSession : uplink::DesktopServerSession
 
 		case uplink::MessageKind_CameraFrame:
 			{
-				//std::cout << "RGBD" << std::endl;
 				//s_timer.frame();
 				const uplink::CameraFrame& cameraFrame = message.as<uplink::CameraFrame>();
 				static unsigned long long count = 0;
+				//std::cout << "RGBD " << count << std::endl;
 
 				UCHAR* colorBuffer = NULL;
 				if (!cameraFrame.colorImage.isEmpty())

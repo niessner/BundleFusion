@@ -71,9 +71,6 @@ unsigned int depthWidth, unsigned int depthHeight, unsigned int colorWidth, unsi
 	//m_calibrationColor.fx *= scaleFactor;	m_calibrationColor.cx *= scaleFactor;
 	//m_calibrationColor.fy *= scaleFactor;	m_calibrationColor.cy *= scaleFactor;
 
-	std::cout << "calibration depth: " << m_calibrationDepth.fx << ", " << m_calibrationDepth.fy << ", " << m_calibrationDepth.cx << ", " << m_calibrationDepth.cy << std::endl;
-	std::cout << "calibration color: " << m_calibrationColor.fx << ", " << m_calibrationColor.fy << ", " << m_calibrationColor.cx << ", " << m_calibrationColor.cy << std::endl;
-
 	{ // initialize
 		m_depthWidth = depthWidth;
 		m_depthHeight = depthHeight;

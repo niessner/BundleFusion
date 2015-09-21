@@ -33,7 +33,7 @@ public:
 		//std::cout << "[get]: " << m_depthFilledList.size() << ", " << m_depthEmptyList.size() << std::endl;
 		if (m_depthFilledList.empty() && !m_bIsReceiving) return std::pair<float*, uint8*>(NULL, NULL);
 		while (m_depthFilledList.empty()) {
-			std::cerr << "waiting for frames" << std::endl;
+			//std::cerr << "waiting for frames" << std::endl;
 			sleep(0.01f);
 		}
 		//std::cout << "[get]: " << m_depthFilledList.size() << ", " << m_depthEmptyList.size() << std::endl;
@@ -56,7 +56,7 @@ public:
 		if (!m_bIsReceiving || recColor == NULL) return;
 		//std::cout << "[receive]: " << m_depthFilledList.size() << ", " << m_depthEmptyList.size() << std::endl;
 		while (m_depthEmptyList.empty()) {
-			std::cout << "list full -- frame lost" << std::endl;
+			//std::cout << "list full -- frame lost" << std::endl;
 			return;
 		}
 
