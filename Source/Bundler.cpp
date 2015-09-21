@@ -174,7 +174,10 @@ bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& fra
 
 void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
-	if (m_currentState.m_localToSolve == -1) return; // nothing to solve
+	if (m_currentState.m_localToSolve == -1) {
+		assert(false);
+		return; // nothing to solve
+	}
 
 	const unsigned int currLocalIdx = m_currentState.m_localToSolve;
 	m_currentState.m_localToSolve = -1; 
@@ -183,7 +186,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 	SIFTImageManager* siftManager = m_SubmapManager.nextLocal;
 	CUDACache* cudaCache = m_SubmapManager.nextLocalCache;
 	m_currentState.m_lastNumLocalFrames = std::min(m_submapSize, siftManager->getNumImages());
-	solve(m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx), siftManager, numNonLinIterations, numLinIterations, true, false);
+	solve(m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx), siftManager, numNonLinIterations, numLinIterations, true, false, true, true);
 	// still need this for global key fuse
 
 	// verify
@@ -224,9 +227,13 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 	m_currentState.m_lastLocalSolved = currLocalIdx;
 }
 
+
 void Bundler::processGlobal()
 {
-	if (!m_currentState.m_bProcessGlobal) return;
+	if (!m_currentState.m_bProcessGlobal) {
+		assert(false);
+		return;
+	}
 	m_currentState.m_bProcessGlobal = false;
 
 	SIFTImageManager* global = m_SubmapManager.global;
@@ -254,7 +261,7 @@ void Bundler::processGlobal()
 
 		//unsigned int gframe = (unsigned int)global->getNumImages() - 1;
 		//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
-
+		 
 		// match with every other global
 		if (global->getNumImages() > 1) {
 			matchAndFilter(global, m_SubmapManager.globalCache, 0, m_submapSize);
@@ -273,38 +280,51 @@ void Bundler::processGlobal()
 	}
 }
 
-void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations)
+
+
+void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart /*= true*/, bool isEnd /*= true*/)
 {
-	if (!m_currentState.m_bOptimizeGlobal) return; // nothing to solve
+	if (!m_currentState.m_bOptimizeGlobal) {
+		if (m_SubmapManager.global->getNumImages() > 1) {
+			assert(false);
+		}
+		return; // nothing to solve
+	}
 
 	//solve!
-	m_currentState.m_bOptimizeGlobal = false;
 	//if (m_SubmapManager.isLastFrame(m_currentState.m_lastFrameProcessed)) {
 	//	numNonLinIterations = numNonLinIterations * 4;
 	//}
-	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence);
+	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd);
 
-	const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
-	unsigned int numFrames = (numGlobalFrames > 0) ? ((numGlobalFrames - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames) : m_currentState.m_lastNumLocalFrames;
+	if (isEnd) {
 
-	// may invalidate already invalidated images
-	const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
-	for (unsigned int i = 0; i < numGlobalFrames; i++) {
-		if (validImagesGlobal[i] == 0) {
-			m_SubmapManager.invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
+		const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
+		unsigned int numFrames = (numGlobalFrames > 0) ? ((numGlobalFrames - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames) : m_currentState.m_lastNumLocalFrames;
+
+		// may invalidate already invalidated images
+		const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
+		for (unsigned int i = 0; i < numGlobalFrames; i++) {
+			if (validImagesGlobal[i] == 0) {
+				m_SubmapManager.invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
+			}
 		}
-	}
 
-	m_SubmapManager.updateTrajectory(numFrames);
-	m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
-	m_currentState.m_numCompleteTransforms = numFrames;
-	m_currentState.m_lastValidCompleteTransform = numFrames - 1;
+
+		m_SubmapManager.updateTrajectory(numFrames);
+		m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
+		m_currentState.m_numCompleteTransforms = numFrames;
+		m_currentState.m_lastValidCompleteTransform = numFrames - 1;
+
+
+		m_currentState.m_bOptimizeGlobal = false;
+	}
 }
 
-void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence)
+void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd)
 {
 	bool useVerify = isLocal; 
-	m_SparseBundler.align(siftManager, transforms, numNonLinIters, numLinIters, useVerify, isLocal, recordConvergence);
+	m_SparseBundler.align(siftManager, transforms, numNonLinIters, numLinIters, useVerify, isLocal, recordConvergence, isStart, isEnd);
 }
 
 void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, 

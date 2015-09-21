@@ -86,7 +86,7 @@ CUDASolverBundling::~CUDASolverBundling()
 	cutilSafeCall(cudaFree(m_solverState.d_countHighResidual));
 }
 
-void CUDASolverBundling::solve(EntryJ* d_targetCorrespondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages, unsigned int nNonLinearIterations, unsigned int nLinearIterations, float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns)
+void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages, unsigned int nNonLinearIterations, unsigned int nLinearIterations, float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns, bool rebuildJT, bool findMaxResidual)
 {
 	float* convergence = NULL;
 	if (m_bRecordConvergence) {
@@ -104,7 +104,7 @@ void CUDASolverBundling::solve(EntryJ* d_targetCorrespondences, unsigned int num
 	parameters.verifyOptPercentThresh = m_verifyOptPercentThresh;
 
 	SolverInput solverInput;
-	solverInput.d_correspondences = d_targetCorrespondences;
+	solverInput.d_correspondences = d_correspondences;
 	solverInput.d_variablesToCorrespondences = d_variablesToCorrespondences;
 	solverInput.d_numEntriesPerRow = d_numEntriesPerRow;
 	solverInput.numberOfImages = numberOfImages;
@@ -113,10 +113,14 @@ void CUDASolverBundling::solve(EntryJ* d_targetCorrespondences, unsigned int num
 	solverInput.maxNumberOfImages = m_maxNumberOfImages;
 	solverInput.maxCorrPerImage = m_maxCorrPerImage;
 
-	buildVariablesToCorrespondencesTable(d_targetCorrespondences, numberOfCorrespondences);
+	if (rebuildJT) {
+		buildVariablesToCorrespondencesTable(d_correspondences, numberOfCorrespondences);
+	}
 	solveBundlingStub(solverInput, m_solverState, parameters, convergence, m_timer);
 
-	computeMaxResidual(solverInput, parameters);
+	if (findMaxResidual) {
+		computeMaxResidual(solverInput, parameters);
+	}
 }
 
 void CUDASolverBundling::buildVariablesToCorrespondencesTable(EntryJ* d_correspondences, unsigned int numberOfCorrespondences)

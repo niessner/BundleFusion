@@ -107,7 +107,7 @@ public:
 	//! optimize current local submap (nextLocal in submapManager)
 	void optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations);
 	//! optimize global keys
-	void optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations);
+	void optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart = true, bool isEnd = true);
 
 	//! global key fuse and sift matching/filtering
 	void processGlobal();
@@ -159,13 +159,21 @@ public:
 		return m_bExitBundlingThread;
 	}
 
+	unsigned int getNumProcessedFrames() const {
+		return m_currentState.m_lastFrameProcessed;
+	}
+
+	unsigned int getSubMapSize() const {
+		return m_submapSize;
+	}
+
 private:
 	bool m_bHasProcessedInputFrame;
 	bool m_bExitBundlingThread;
 
 	void matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int frameStart, unsigned int frameSkip, bool print = false);
 
-	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence);
+	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd);
 
 	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const;

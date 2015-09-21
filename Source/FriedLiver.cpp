@@ -102,23 +102,17 @@ void bundlingThreadFunc() {
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
 
-	std::thread tOpt;
+	//std::thread tOpt;
 
 	while (1) {
-		//if (g_imageManager->getCurrFrameNumber() % 10 == 1) {
-		//	if (tOpt.joinable()) {
-		//		tOpt.join();
-		//	}
-		//}
-
 		while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
 		{
 			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
 			{
 				if (g_bundler->getExitBundlingThread()) {
-					if (tOpt.joinable()) {
-						tOpt.join();
-					}
+					//if (tOpt.joinable()) {
+					//	tOpt.join();
+					//}
 					break;
 				}
 				g_bundler->processInput();						//perform sift and whatever
@@ -127,13 +121,40 @@ void bundlingThreadFunc() {
 		}
 		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
 
-		bundlingOptimization();
+		//bundlingOptimization();
 		//if (g_imageManager->getCurrFrameNumber() % 10 == 0) {
 		//	if (tOpt.joinable()) {
 		//		tOpt.join();
 		//	}
 		//	tOpt = std::thread(bundlingOptimizationThreadFunc);
 		//}
+
+		if (g_bundler->getNumProcessedFrames() >= g_bundler->getSubMapSize()) {
+			const unsigned int localFrame = g_bundler->getNumProcessedFrames() % g_bundler->getSubMapSize();
+
+			if (localFrame == 1) {
+				g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+			}
+			if (localFrame == 2) {
+				g_bundler->processGlobal();
+			}
+			assert(GlobalBundlingState::get().s_numGlobalNonLinIterations >= 2);
+			assert(GlobalBundlingState::get().s_numGlobalNonLinIterations < g_bundler->getSubMapSize() - 3);
+
+			//start
+			if (localFrame == 3) {
+				g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, true, false);
+			}
+			//iterate
+			if (localFrame > 3 && localFrame < 3 + GlobalBundlingState::get().s_numGlobalNonLinIterations - 1) {
+				g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, false, false);
+			}
+			//end
+			if (localFrame == 3 + GlobalBundlingState::get().s_numGlobalNonLinIterations - 1) {
+				g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, false, true);
+			}
+			 
+		}
 
 		if (g_bundler->getExitBundlingThread()) break;
 	}

@@ -13,7 +13,7 @@ extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_tr
 
 Timer SBA::s_timer;
 
-void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence /*= false*/)
+void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd)
 {
 	if (recordConvergence) m_recordedConvergence.push_back(std::vector<float>());
 
@@ -31,7 +31,7 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 	const unsigned int maxIts = 10;//GlobalAppState::get().s_maxNumResidualsRemoved; //!!!TODO PARAMS
 	unsigned int curIt = 0;
 	do {
-		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits);
+		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits, isStart, isEnd);
 		if (recordConvergence) {
 			const std::vector<float>& conv = m_solver->getConvergenceAnalysis();
 			m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
@@ -50,7 +50,7 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 	//std::cout << "[ align Time:] " << s_timer.getElapsedTimeMS() << " ms" << std::endl;
 }
 
-bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations)
+bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd)
 {
 	EntryJ* d_correspondences = siftManager->getGlobalCorrespondencesDEBUG();
 	m_numCorrespondences = siftManager->getNumGlobalCorrespondences();
@@ -58,9 +58,12 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsig
 	// transforms
 	unsigned int numImages = siftManager->getNumImages();
 
-	m_solver->solve(d_correspondences, m_numCorrespondences, numImages, numNonLinearIterations, numLinearIterations, d_xRot, d_xTrans);
+	m_solver->solve(d_correspondences, m_numCorrespondences, numImages, numNonLinearIterations, numLinearIterations, d_xRot, d_xTrans, isStart, isEnd);
 
-	bool removed = removeMaxResidualCUDA(siftManager, numImages);
+	bool removed = false; 
+	if (isEnd) {
+		removed = removeMaxResidualCUDA(siftManager, numImages);
+	}
 
 	return removed;
 }

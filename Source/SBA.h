@@ -36,7 +36,7 @@ public:
 		if (d_xTrans) cutilSafeCall(cudaFree(d_xTrans));
 	}
 
-	void align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence = false);
+	void align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd);
 
 	float getMaxResidual() const { return m_maxResidual; }
 	const std::vector<float>& getLinearConvergenceAnalysis() const { return m_solver->getLinearConvergenceAnalysis(); }
@@ -49,7 +49,7 @@ public:
 
 private:
 
-	bool alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations);
+	bool alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd);
 
 	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	
