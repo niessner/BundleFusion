@@ -200,7 +200,16 @@ public:
 	void setTimer(CUDATimer* timer) {
 		m_timer = timer;
 	}
+
+	void lock() {
+		m_mutex.lock();
+	}
+
+	void unlock() {
+		m_mutex.unlock();
+	}
 private:
+	std::mutex m_mutex;
 
 	void alloc();
 	void free();

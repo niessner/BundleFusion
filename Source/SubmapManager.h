@@ -25,10 +25,12 @@ class SubmapManager {
 public:
 	CUDACache* currentLocalCache;
 	CUDACache* nextLocalCache;
+	CUDACache* optLocalCache;
 	CUDACache* globalCache;
 
 	SIFTImageManager* currentLocal;
 	SIFTImageManager* nextLocal;
+	SIFTImageManager* optLocal;
 	SIFTImageManager* global;
 
 	float4x4* d_globalTrajectory;
@@ -40,10 +42,15 @@ public:
 	SubmapManager() {
 		currentLocal = NULL;
 		nextLocal = NULL;
+		optLocal = NULL;
 		global = NULL;
 		m_numTotalFrames = 0;
 		m_submapSize = 0;
 
+		currentLocalCache = NULL;
+		nextLocalCache = NULL;
+		globalCache = NULL;
+		optLocalCache = NULL;
 		//m_globalTimer = NULL;
 
 		d_globalTrajectory = NULL;
@@ -67,6 +74,7 @@ public:
 
 		currentLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
 		nextLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
+		optLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
 		globalCache = new CUDACache(downSampWidth, downSampHeight, maxNumGlobalImages, intrinsicsDownsampled);
 
 		m_numTotalFrames = numTotalFrames;
@@ -75,6 +83,7 @@ public:
 		// sift manager
 		currentLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
 		nextLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
+		optLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
 		global = new SIFTImageManager(m_submapSize, maxNumGlobalImages, maxNumKeysPerImage);
 
 		//if (GlobalBundlingState::get().s_enableDetailedTimings) {
@@ -103,16 +112,20 @@ public:
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_imageInvalidateList, sizeof(int) * maxNumGlobalImages * maxNumLocalImages));
 	}
+
 	void setTotalNumFrames(unsigned int n) {
 		m_numTotalFrames = n;
 	}
+
 	~SubmapManager() {
 		SAFE_DELETE(currentLocal);
 		SAFE_DELETE(nextLocal);
+		SAFE_DELETE(optLocal);
 		SAFE_DELETE(global);
 
 		SAFE_DELETE(currentLocalCache);
 		SAFE_DELETE(nextLocalCache);
+		SAFE_DELETE(optLocalCache);
 		SAFE_DELETE(globalCache);
 
 		MLIB_CUDA_SAFE_FREE(d_globalTrajectory);
@@ -174,17 +187,69 @@ public:
 	}
 
 	void switchLocal() {
-		SIFTImageManager* tmp = currentLocal;
-		currentLocal = nextLocal;
-		nextLocal = tmp;
+		
+		//optLocal->lock();	//wait until optimizer has released its lock on opt local
 
-		CUDACache* tmpCache = currentLocalCache;
-		currentLocalCache = nextLocalCache;
-		nextLocalCache = tmpCache;
+		//SIFTImageManager* oldCurrentLocal = currentLocal;
+		//SIFTImageManager* oldOptLocal = optLocal;
+		//SIFTImageManager* oldNextLocal = nextLocal;		
+		//currentLocal = oldNextLocal;
+		//optLocal = oldCurrentLocal;
+		//nextLocal = oldOptLocal;
+
+
+		//CUDACache* oldCurrentLocalCache = currentLocalCache;
+		//CUDACache* oldOptLocalCache = optLocalCache;
+		//CUDACache* oldNextLocalCache = nextLocalCache;
+		//currentLocalCache = oldNextLocalCache;
+		//optLocalCache = oldCurrentLocalCache;
+		//nextLocalCache = oldOptLocalCache;
+
+		//oldOptLocal->unlock();
+
+		std::swap(currentLocal, nextLocal);
+		std::swap(currentLocalCache, nextLocalCache);
+
+	
 	}
+
+	void switchLocalAndFinishOpt() {
+
+		//optLocal->lock();	//wait until optimizer has released its lock on opt local
+
+		//SIFTImageManager* oldCurrentLocal = currentLocal;
+		//SIFTImageManager* oldOptLocal = optLocal;
+		//SIFTImageManager* oldNextLocal = nextLocal;
+		//currentLocal = oldNextLocal;
+		//optLocal = oldCurrentLocal;
+		//nextLocal = oldOptLocal;
+
+
+		//CUDACache* oldCurrentLocalCache = currentLocalCache;
+		//CUDACache* oldOptLocalCache = optLocalCache;
+		//CUDACache* oldNextLocalCache = nextLocalCache;
+		//currentLocalCache = oldNextLocalCache;
+		//optLocalCache = oldCurrentLocalCache;
+		//nextLocalCache = oldOptLocalCache;
+
+		//optLocal->reset();
+		//optLocalCache->reset();
+
+		//oldOptLocal->unlock();
+
+		std::swap(currentLocal, nextLocal);
+		std::swap(currentLocalCache, nextLocalCache);
+		nextLocal->reset();
+		nextLocalCache->reset();
+	}
+
+
 	void finishLocalOpt() {
 		nextLocal->reset();
 		nextLocalCache->reset();
+
+		//optLocal->reset();
+		//optLocalCache->reset();
 	}
 
 	bool isLastFrame(unsigned int curFrame) const { return (curFrame + 1) == m_numTotalFrames; }

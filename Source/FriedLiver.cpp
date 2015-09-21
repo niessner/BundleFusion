@@ -82,16 +82,21 @@ RGBDSensor* g_RGBDSensor = NULL;
 CUDAImageManager* g_imageManager = NULL;
 Bundler* g_bundler = NULL;
 
+void bundlingOptimization() {
+	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+	g_bundler->processGlobal();
+	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+}
+
 void bundlingOptimizationThreadFunc() {
 	/////////////////////////////////////////
 	//// Bundling Optimization
 	/////////////////////////////////////////
 
+	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 
 	for (unsigned int i = 0; i < 10; i++) {
-		g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-		g_bundler->processGlobal();
-		g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+		bundlingOptimization();
 	}
 }
 
@@ -103,6 +108,12 @@ void bundlingThreadFunc() {
 	std::thread tOpt;
 
 	while (1) {
+		//if (g_imageManager->getCurrFrameNumber() % 10 == 1) {
+		//	if (tOpt.joinable()) {
+		//		tOpt.join();
+		//	}
+		//}
+
 		while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
 		{
 			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
@@ -119,12 +130,13 @@ void bundlingThreadFunc() {
 		}
 		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
 
-		if (g_imageManager->getCurrFrameNumber() % 10 == 0) {
-			if (tOpt.joinable()) {
-				tOpt.join();
-			}
-			tOpt = std::thread(bundlingOptimizationThreadFunc);
-		}
+		bundlingOptimization();
+		//if (g_imageManager->getCurrFrameNumber() % 10 == 0) {
+		//	if (tOpt.joinable()) {
+		//		tOpt.join();
+		//	}
+		//	tOpt = std::thread(bundlingOptimizationThreadFunc);
+		//}
 
 		if (g_bundler->getExitBundlingThread()) break;
 	}

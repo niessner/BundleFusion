@@ -188,7 +188,7 @@ bool CUDASolverBundling::useVerification(EntryJ* d_correspondences, unsigned int
 
 	unsigned int numHighResiduals = countHighResiduals(solverInput, m_solverState, parameters, m_timer);
 	unsigned int total = solverInput.numberOfCorrespondences * 3;
-	std::cout << "\t[ useVerification ] " << numHighResiduals << " / " << total << " = " << (float)numHighResiduals / total << " vs " << parameters.verifyOptPercentThresh << std::endl;
+	//std::cout << "\t[ useVerification ] " << numHighResiduals << " / " << total << " = " << (float)numHighResiduals / total << " vs " << parameters.verifyOptPercentThresh << std::endl;
 	if ((float)numHighResiduals / total >= parameters.verifyOptPercentThresh) return true;
 	return false;
 }

@@ -428,7 +428,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 				bool b = ((tgtDepth != MINF && projInputDepth < tgtDepth) && d > distThresh); // bad matches that are known
 				if ((dNormal >= normalThresh && d <= distThresh /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
 
-					const float cameraToKinectProjZ = (pTransInput.z - 0.1f) / (5.0f - 0.1f); //TODO PARAMS HERE
+					const float cameraToKinectProjZ = (pTransInput.z - 0.1f) / (3.0f - 0.1f); //TODO PARAMS HERE
 					const float weight = max(0.0f, 0.5f*((1.0f - d / distThresh) + (1.0f - cameraToKinectProjZ))); // for weighted ICP;
 
 					out.x = length(pTransInput - pTarget);	//residual
