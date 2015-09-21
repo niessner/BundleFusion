@@ -4,7 +4,7 @@
 #include "DX11QuadDrawer.h"
 
 extern "C" void convertColorRawToFloat4(float4* d_output, BYTE* d_input, unsigned int width, unsigned int height);
-
+extern "C" void depthToHSV(float4* d_output, const float* d_input, unsigned int width, unsigned int height, float minDepth, float maxDepth);
 
 //--------------------------------------------------------------------------------------
 // Constant buffers
@@ -262,6 +262,18 @@ void DX11QuadDrawer::OnD3D11DestroyDevice()
 	cutilSafeCall(cudaGraphicsUnregisterResource(s_dCuda2));
 }
 
+HRESULT DX11QuadDrawer::RenderQuadDynamicDEPTHasHSV(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dDeviceContext, const float* d_data, float minDepth, float maxDepth, unsigned int width, unsigned int height, float scale /*= 1.0f*/, D3DXVECTOR2 Pow2Ratios /*= D3DXVECTOR2(1.0f, 1.0f)*/, ID3D11PixelShader* pixelShader /*= NULL*/)
+{
+	//TODO this function is not very efficient...
+	float4* d_dataFloat4;
+	cutilSafeCall(cudaMalloc(&d_dataFloat4, sizeof(float4)*width*height));
+	depthToHSV(d_dataFloat4, d_data, width, height, minDepth, maxDepth);
+	HRESULT hr = RenderQuadDynamic(pd3dDevice, pd3dDeviceContext, (float*)d_dataFloat4, 4, width, height, scale, Pow2Ratios);
+	cutilSafeCall(cudaFree(d_dataFloat4));
+	return hr;
+}
+
+
 HRESULT DX11QuadDrawer::RenderQuadDynamicUCHAR4(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dDeviceContext, const uchar4* d_data, unsigned int width, unsigned int height, float scale /*= 1.0f*/, D3DXVECTOR2 Pow2Ratios /*= D3DXVECTOR2(1.0f, 1.0f)*/, ID3D11PixelShader* pixelShader /*= NULL*/)
 {
 	//TODO this function is not very efficient...
@@ -269,11 +281,10 @@ HRESULT DX11QuadDrawer::RenderQuadDynamicUCHAR4(ID3D11Device* pd3dDevice, ID3D11
 	cutilSafeCall(cudaMalloc(&d_dataFloat4, sizeof(float4)*width*height));
 	convertColorRawToFloat4(d_dataFloat4, (BYTE*)d_data, width, height);
 	HRESULT hr = RenderQuadDynamic(pd3dDevice, pd3dDeviceContext, (float*)d_dataFloat4, 4, width, height, scale, Pow2Ratios);
-
 	cutilSafeCall(cudaFree(d_dataFloat4));
-
 	return hr;
 }
+
 
 HRESULT DX11QuadDrawer::RenderQuadDynamic(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dDeviceContext, float* d_data, unsigned int nChannels, unsigned int width, unsigned int height, float scale /*= 1.0f */, D3DXVECTOR2 Pow2Ratios /*= D3DXVECTOR2(1.0f, 1.0f)*/, ID3D11PixelShader* pixelShader /*= NULL*/)
 {

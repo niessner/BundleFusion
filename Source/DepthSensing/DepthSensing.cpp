@@ -712,6 +712,12 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 		const uchar4* d_color = g_CudaImageManager->getLastIntegrateFrame().getColorFrameGPU();
 		DX11QuadDrawer::RenderQuadDynamicUCHAR4(DXUTGetD3D11Device(), pd3dImmediateContext, d_color, g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
 	}
+	else if (GlobalAppState::get().s_RenderMode == 4) {
+		const float* d_depth = g_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
+		const float minDepth = GlobalAppState::get().s_sensorDepthMin;
+		const float maxDepth = GlobalAppState::get().s_sensorDepthMax;
+		DX11QuadDrawer::RenderQuadDynamicDEPTHasHSV(DXUTGetD3D11Device(), pd3dImmediateContext, d_depth, minDepth, maxDepth, g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
+	}
 	else {
 		std::cout << "Unknown render mode " << GlobalAppState::get().s_RenderMode << std::endl;
 	}

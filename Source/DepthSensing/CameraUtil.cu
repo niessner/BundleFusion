@@ -1681,7 +1681,7 @@ __device__ float3 convertDepthToRGB(float depth, float depthMin, float depthMax)
 	return convertHSVToRGB(make_float3(x, 1.0f, 0.5f));
 }
 
-__global__ void depthToHSVDevice(float4* d_output, float* d_input, unsigned int width, unsigned int height, float minDepth, float maxDepth)
+__global__ void depthToHSVDevice(float4* d_output, const float* d_input, unsigned int width, unsigned int height, float minDepth, float maxDepth)
 {
 	const int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -1698,7 +1698,7 @@ __global__ void depthToHSVDevice(float4* d_output, float* d_input, unsigned int 
 	}
 }
 
-extern "C" void depthToHSV(float4* d_output, float* d_input, unsigned int width, unsigned int height, float minDepth, float maxDepth) {
+extern "C" void depthToHSV(float4* d_output, const float* d_input, unsigned int width, unsigned int height, float minDepth, float maxDepth) {
 	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
 
