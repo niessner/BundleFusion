@@ -53,6 +53,7 @@ void TrajectoryManager::generateUpdateLists()
 
 	for (unsigned int i = 0; i < numFrames; i++) {
 		TrajectoryFrame& f = m_frames[i];
+
 		if (f.optimizedTransform[0] == -std::numeric_limits<float>::infinity()) {
 			//f.type = TrajectoryFrame::Invalid;
 			invalidateFrame(i);	//adding it to the deIntragte list
@@ -82,7 +83,7 @@ void TrajectoryManager::generateUpdateLists()
 	//TODO only generate a topN list
 	auto s = [](const TrajectoryFrame *left, const TrajectoryFrame *right) {
 		if (left->type == TrajectoryFrame::Integrated && right->type != TrajectoryFrame::Integrated)	return true;
-		if (left->type != TrajectoryFrame::Integrated && right->type == TrajectoryFrame::Integrated)	return false;
+		if (left->type != TrajectoryFrame::Integrated) return false; //needs a strict less than comparison function // && right->type == TrajectoryFrame::Integrated)	return false;
 		return left->dist > right->dist;
 	};
 	std::sort(m_framesSort.begin(), m_framesSort.begin() + numFrames, s);

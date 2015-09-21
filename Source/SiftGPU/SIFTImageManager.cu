@@ -29,12 +29,12 @@ int CheckErrorCUDA(const char* location)
 #endif
 }
 
-__device__ bool cmpAndSawp (
+__device__ bool cmpAndSawp(
 	volatile float* dist0,
 	volatile uint2* idx0,
 	volatile float* dist1,
 	volatile uint2* idx1
-	) 
+	)
 {
 	if (dist0[0] > dist1[0]) {
 		float tmpDist = dist0[0];
@@ -58,12 +58,12 @@ __device__ bool cmpAndSawp (
 //we launch 1 thread for two array entries
 void __global__ SortKeyPointMatchesCU_Kernel(
 	const int* d_numMatchesPerImagePair,
-	float* d_matchDistancesGlobal, 
+	float* d_matchDistancesGlobal,
 	uint2* d_matchKeyPointIndicesGlobal)
 {
 	unsigned int imagePairIdx = blockIdx.x;
 	unsigned int tidx = threadIdx.x;
-	
+
 	float* d_matchDistances = &d_matchDistancesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	uint2* d_matchKeyPointIndices = &d_matchKeyPointIndicesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	const unsigned int numMatches = d_numMatchesPerImagePair[imagePairIdx];
@@ -73,7 +73,7 @@ void __global__ SortKeyPointMatchesCU_Kernel(
 	__shared__ float matchDistances[MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	__shared__ uint2 matchKeyPointIndices[MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 
-	if (2*tidx < numMatches) {
+	if (2 * tidx < numMatches) {
 		matchDistances[2 * tidx + 0] = d_matchDistances[2 * tidx + 0];
 		matchKeyPointIndices[2 * tidx + 0] = d_matchKeyPointIndices[2 * tidx + 0];
 
@@ -85,7 +85,8 @@ void __global__ SortKeyPointMatchesCU_Kernel(
 			matchDistances[2 * tidx + 1] = 999.0f;
 			matchKeyPointIndices[2 * tidx + 1] = make_uint2((unsigned int)-1, (unsigned int)-1);
 		}
-	} else {
+	}
+	else {
 		matchDistances[2 * tidx + 0] = 999.0f;
 		matchKeyPointIndices[2 * tidx + 0] = make_uint2((unsigned int)-1, (unsigned int)-1);
 
@@ -105,13 +106,13 @@ void __global__ SortKeyPointMatchesCU_Kernel(
 
 		unsigned int idx0 = 2 * tidx + 0;
 		unsigned int idx1 = 2 * tidx + 1;
-		
+
 		//odd phase
 		if (run & 0x1) {
 			idx0 += 1;
 			idx1 += 1;
 		}
-		
+
 		bool res = false;
 		if (idx1 < MAX_MATCHES_PER_IMAGE_PAIR_RAW) {
 			res = cmpAndSawp(&matchDistances[idx0], &matchKeyPointIndices[idx0], &matchDistances[idx1], &matchKeyPointIndices[idx1]);
@@ -191,7 +192,7 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 {
 	const unsigned int imagePairIdx = blockIdx.x;
 	//const unsigned int imagePairIdx = 1;
-	
+
 	const unsigned int tidx = threadIdx.x;
 
 	const float* d_matchDistances = &d_matchDistancesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
@@ -207,12 +208,13 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	if (tidx < numMatches) {
 		matchDistances[tidx] = d_matchDistances[tidx];
 		matchKeyPointIndices[tidx] = d_matchKeyPointIndices[tidx];
-	} else {
+	}
+	else {
 		matchDistances[tidx] = 999.0f;
 		matchKeyPointIndices[tidx] = make_uint2((unsigned int)-1, (unsigned int)-1);
 	}
 
-	
+
 #if !(FILTER_NUM_BLOCK_THREADS_X == 32)
 	__syncthreads();
 #endif
@@ -223,9 +225,9 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 		float4x4 trans;
 		unsigned int curr = filterKeyPointMatches(d_keyPointsGlobal, matchKeyPointIndices, matchDistances, numMatches, trans);
 		//if (tidx == 0) {
-			numFilteredMatches = curr;
-			d_filteredTransforms[imagePairIdx] = trans;
-			d_filteredTransformsInv[imagePairIdx] = trans.getInverse();
+		numFilteredMatches = curr;
+		d_filteredTransforms[imagePairIdx] = trans;
+		d_filteredTransformsInv[imagePairIdx] = trans.getInverse();
 		//}
 	}
 
@@ -259,8 +261,8 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs) {
 
 	FilterKeyPointMatchesCU_Kernel << <grid, block >> >(
 		d_keyPoints,
-		d_currNumMatchesPerImagePair, 
-		d_currMatchDistances, 
+		d_currNumMatchesPerImagePair,
+		d_currMatchDistances,
 		d_currMatchKeyPointIndices,
 		d_currNumFilteredMatchesPerImagePair,
 		d_currFilteredMatchDistances,
@@ -299,20 +301,20 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs) {
 void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	const SIFTKeyPoint* d_keyPointsGlobal,
 	int* d_numFilteredMatchesPerImagePair,
-	const uint2* d_filteredMatchKeyPointIndicesGlobal, 
+	const uint2* d_filteredMatchKeyPointIndicesGlobal,
 	const float4x4 colorIntrinsicsInv,
 	float areaThresh)
 {
-	const unsigned int imagePairIdx = blockIdx.x;	
+	const unsigned int imagePairIdx = blockIdx.x;
 	//const unsigned int tidx = threadIdx.x;
 
 	const unsigned int numMatches = d_numFilteredMatchesPerImagePair[imagePairIdx];
 	if (numMatches == 0)	return;
 	const uint2* d_keyPointMatchIndices = d_filteredMatchKeyPointIndicesGlobal + imagePairIdx * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED;
-	
-	float area0 = 0.0f; 
-	float area1 = 0.0f;		
-	
+
+	float area0 = 0.0f;
+	float area1 = 0.0f;
+
 
 	// compute area image 0
 	unsigned int which = 0;
@@ -411,7 +413,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 		int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z), (int)roundf(tmp.y / tmp.z)); // subsampled space
 		//float3 tmp = intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z);
 		//int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z) / 4, (int)roundf(tmp.y / tmp.z) / 4); // subsampled space
-		
+
 		if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)imageWidth && screenPos.y < (int)imageHeight) {
 			float4 pTarget = d_modelCamPos[screenPos.y * imageWidth + screenPos.x]; //getBestCorrespondence1x1
 			float4 nTarget = d_modelNormal[screenPos.y * imageWidth + screenPos.x];
@@ -433,7 +435,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 
 					out.x = length(pTransInput - pTarget);	//residual
 					out.y = weight;							//corr weight
-					out.z = 1.0f;	
+					out.z = 1.0f;
 				}
 			} // projected to valid depth
 		} // inside image
@@ -457,7 +459,7 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 	const float4* d_inputCamPos = d_cachedFrames[imagePairIdx].d_cameraposDownsampled;
 	const float4* d_inputNormal = d_cachedFrames[imagePairIdx].d_normalsDownsampled;
 	const uchar4* d_inputColor = d_cachedFrames[imagePairIdx].d_colorDownsampled;
-	
+
 	const float*  d_modelDepth = d_cachedFrames[curImageIdx].d_depthDownsampled;
 	const float4* d_modelCamPos = d_cachedFrames[curImageIdx].d_cameraposDownsampled;
 	const float4* d_modelNormal = d_cachedFrames[curImageIdx].d_normalsDownsampled;
@@ -497,7 +499,7 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 		sumResidual = 0.0f;
 		sumWeight = 0.0f;
 		numCorr = 0;
-	} 
+	}
 	__syncthreads();
 
 	//atomicAdd(&sumResidual, local_sumResidual);
@@ -534,7 +536,7 @@ void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePai
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
 {
 	if (numCurrImagePairs == 0) return;
-	
+
 	dim3 grid(numCurrImagePairs);
 	dim3 block(imageWidth, (imageHeight + FILTER_DENSE_VERIFY_THREAD_SPLIT - 1) / FILTER_DENSE_VERIFY_THREAD_SPLIT);
 
@@ -667,7 +669,7 @@ void __global__ InvalidateImageToImageCU_Kernel(EntryJ* d_globMatches, unsigned 
 			d_globMatches[idx].imgIdx_j == imageToImageIdx.y) {
 			d_globMatches[idx].setInvalid();
 		}
-		
+
 	}
 
 }
@@ -714,7 +716,7 @@ void SIFTImageManager::CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesP
 	cutilSafeCall(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int) * numVars, cudaMemcpyHostToDevice));
 
 	CheckForInvalidFramesCU_Kernel << <grid, block >> >(d_varToCorrNumEntriesPerRow, d_validImages, numVars);
-	
+
 	cutilSafeCall(cudaMemcpy(m_validImages.data(), d_validImages, sizeof(int) * numVars, cudaMemcpyDeviceToHost));
 
 	if (m_timer) m_timer->endEvent();
@@ -743,7 +745,7 @@ void __global__ FuseToGlobalKeyCU_Kernel(unsigned int maxNumKeysAll, int* d_fuse
 				float3 pos = colorIntrinsicsInv * (key.depth * make_float3(key.pos.x, key.pos.y, 1.0f));
 				float3 projPos = colorIntrinsics * (transforms[imgIdx] * pos);
 				float2 loc = make_float2(projPos.x / projPos.z, projPos.y / projPos.z);
-				
+
 				SIFTKeyPoint newKey;
 				newKey.pos = loc;
 				newKey.scale = key.scale;
@@ -777,10 +779,10 @@ unsigned int SIFTImageManager::FuseToGlobalKeyCU(SIFTImageGPU& globalImage, cons
 	dim3 blockMark(MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X);
 
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
-	
+
 	MarkKeysToFuseToGlobalKeyCU_Kernel << <gridMark, blockMark >> >(m_globNumResiduals, d_globMatches,
 		d_globMatchesKeyPointIndices, d_fuseGlobalKeyMarker);
-	
+
 	CheckErrorCUDA(__FUNCTION__);
 
 	const unsigned int maxNumKeysAll = m_submapSize * m_maxKeyPointsPerImage;
@@ -832,17 +834,18 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 			}
 
 			d_currIntegrateTrans[0] = transform;
+
 			break;
 		}
 	}
 }
 
 void SIFTImageManager::computeSiftTransformCU(const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform,
-	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans) 
+	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans)
 {
 	if (curFrameIndex == 0) return;
 
-	getSiftTransformCU_Kernel <<<1, 1 >>>(curFrameIndex,
+	getSiftTransformCU_Kernel << <1, 1 >> >(curFrameIndex,
 		d_completeTrajectory, lastValidCompleteTransform,
 		d_siftTrajectory, curFrameIndexAll,
 		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransformsInv,
@@ -945,10 +948,10 @@ void SIFTImageManager::TestSVDDebugCU(const float3x3& m) {
 
 //we launch 1 thread for two array entries
 void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_trajectory,
-		unsigned int imageWidth, unsigned int imageHeight,
-		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
-		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
-		int* d_validOpt)
+	unsigned int imageWidth, unsigned int imageHeight,
+	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
+	int* d_validOpt)
 {
 	const unsigned int img0 = blockIdx.x / numImages;
 	const unsigned int img1 = blockIdx.x % numImages;
@@ -960,7 +963,7 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_tr
 	const float4* d_inputCamPos = d_cachedFrames[img0].d_cameraposDownsampled;
 	const float4* d_inputNormal = d_cachedFrames[img0].d_normalsDownsampled;
 	const uchar4* d_inputColor = d_cachedFrames[img0].d_colorDownsampled;
-	
+
 	const float*  d_modelDepth = d_cachedFrames[img1].d_depthDownsampled;
 	const float4* d_modelCamPos = d_cachedFrames[img1].d_cameraposDownsampled;
 	const float4* d_modelNormal = d_cachedFrames[img1].d_normalsDownsampled;
@@ -999,7 +1002,7 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_tr
 		sumResidual = 0.0f;
 		sumWeight = 0.0f;
 		numCorr = 0;
-	} 
+	}
 	__syncthreads();
 
 	//atomicAdd(&sumResidual, local_sumResidual);
@@ -1031,13 +1034,13 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_tr
 }
 
 int SIFTImageManager::VerifyTrajectoryCU(unsigned int numImages, float4x4* d_trajectory,
-		unsigned int imageWidth, unsigned int imageHeight,
-		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
-		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
+	unsigned int imageWidth, unsigned int imageHeight,
+	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
 {
 	if (numImages < 2) return 0;
 	const unsigned int numPairs = (numImages * (numImages - 1)) / 2;
-	
+
 	dim3 grid(numPairs);
 	dim3 block(imageWidth, (imageHeight + FILTER_DENSE_VERIFY_THREAD_SPLIT - 1) / FILTER_DENSE_VERIFY_THREAD_SPLIT);
 

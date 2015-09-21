@@ -109,11 +109,13 @@ void Bundler::processInput()
 	}
 	// match with every other local
 	SIFTImageManager* currentLocal = m_SubmapManager.currentLocal;
+
 	if (curLocalFrame > 0) {
 		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
 
 		//currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, m_currentState.m_lastValidCompleteTransform,
 		//	m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame, m_SubmapManager.getCurrIntegrateTransform(curFrame));
+		
 		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
@@ -128,6 +130,7 @@ void Bundler::processInput()
 		// if valid local
 		const std::vector<int>& validImagesLocal = currentLocal->getValidImages();
 		const unsigned int curLocalIdx = m_SubmapManager.getCurrLocal(curFrame);
+
 		if (validImagesLocal[1]) {
 			// ready to solve local
 			MLIB_ASSERT(m_currentState.m_localToSolve == -1);
@@ -404,7 +407,8 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 
 		// --- add to global correspondences
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-		siftManager->AddCurrToResidualsCU(curFrame, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+		if (siftManager->getValidImages()[curFrame] != 0) 
+			siftManager->AddCurrToResidualsCU(curFrame, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeAddCurrResiduals = s_timer.getElapsedTimeMS(); }
 	}
 }

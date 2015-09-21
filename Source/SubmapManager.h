@@ -252,12 +252,14 @@ public:
 		return curLocalIdx;
 	}
 
-	//float4x4* getCurrIntegrateTransform(unsigned int frameIdx) { return d_currIntegrateTransform + frameIdx; }
-
 	void computeCurrentSiftTransform(unsigned int frameIdx, unsigned int localFrameIdx, unsigned int lastValidCompleteTransform) {
 		const std::vector<int>& validImages = currentLocal->getValidImages();
-		if (validImages[localFrameIdx] == 0)
-			m_currIntegrateTransform[frameIdx].setZero(-std::numeric_limits<float>::infinity()); //TODO should probably sync with gpu version for debug purposes
+		if (validImages[localFrameIdx] == 0) {
+			m_currIntegrateTransform[frameIdx].setZero(-std::numeric_limits<float>::infinity());
+			assert(frameIdx > 0);
+			cutilSafeCall(cudaMemcpy(d_siftTrajectory + frameIdx, d_siftTrajectory + frameIdx - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+			//cutilSafeCall(cudaMemcpy(d_currIntegrateTransform + frameIdx, &m_currIntegrateTransform[frameIdx], sizeof(float4x4), cudaMemcpyHostToDevice)); //TODO this is for debug only
+		}
 		if (frameIdx > 0) {
 			currentLocal->computeSiftTransformCU(d_completeTrajectory, lastValidCompleteTransform, d_siftTrajectory, frameIdx, localFrameIdx, d_currIntegrateTransform + frameIdx);
 			cutilSafeCall(cudaMemcpy(&m_currIntegrateTransform[frameIdx], d_currIntegrateTransform + frameIdx, sizeof(float4x4), cudaMemcpyDeviceToHost));
