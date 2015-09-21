@@ -37,9 +37,6 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 			m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
 		}
 		curIt++;
-
-		removed = false;//!!!DEBUG
-
 	} while (removed && curIt < maxIts);
 
 	if (useVerify) m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesDEBUG(), siftManager->getNumGlobalCorrespondences());

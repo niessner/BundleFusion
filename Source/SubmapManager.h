@@ -256,7 +256,8 @@ public:
 
 	void computeCurrentSiftTransform(unsigned int frameIdx, unsigned int localFrameIdx, unsigned int lastValidCompleteTransform) {
 		const std::vector<int>& validImages = currentLocal->getValidImages();
-		if (validImages[localFrameIdx] == 0) m_currIntegrateTransform[frameIdx].setZero(-std::numeric_limits<float>::infinity()); //TODO should probably sync with gpu version for debug purposes
+		if (validImages[localFrameIdx] == 0)
+			m_currIntegrateTransform[frameIdx].setZero(-std::numeric_limits<float>::infinity()); //TODO should probably sync with gpu version for debug purposes
 		if (frameIdx > 0) {
 			currentLocal->computeSiftTransformCU(d_completeTrajectory, lastValidCompleteTransform, d_siftTrajectory, frameIdx, localFrameIdx, d_currIntegrateTransform + frameIdx);
 			cutilSafeCall(cudaMemcpy(&m_currIntegrateTransform[frameIdx], d_currIntegrateTransform + frameIdx, sizeof(float4x4), cudaMemcpyDeviceToHost));

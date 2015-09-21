@@ -158,7 +158,7 @@ void bundlingThreadFunc() {
 			else { // end of sequence just optimize (once)
 				g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
 				g_bundler->processGlobal();
-				g_bundler->optimizeGlobal(5, GlobalBundlingState::get().s_numGlobalLinIterations, true, true);
+				g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations, true, true);
 				//std::cout << "end optimize" << std::endl;
 			}
 			 

@@ -835,13 +835,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		bool validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);		
 		g_depthSensingBundler->confirmProcessedInputFrame();
 
-		//!!!DEBUGGING
-		if (frameIdx >= 30) {
-			std::cout << "frame " << frameIdx << std::endl;
-			std::cout << transformation << std::endl;
-		}
-		//!!!DEBUGGING
-
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
 			//overwrite transform and use given trajectory in this case
 			transformation = g_depthSensingRGBDSensor->getRigidTransform();
