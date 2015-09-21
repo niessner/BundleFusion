@@ -645,7 +645,7 @@ void deIntegrate(const DepthCameraData& depthCameraData, const mat4f& transforma
 
 
 
-void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform, bool gotInputFrame)
+void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform)
 {
 	// If the settings dialog is being shown, then render it instead of rendering the app's scene
 	//if(g_D3DSettingsDlg.IsActive())
@@ -665,12 +665,10 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 	mat4f view = MatrixConversion::toMlib(*g_Camera.GetViewMatrix());
 	mat4f t = mat4f::identity();
 	t(1, 1) *= -1.0f;	view = t * view * t;	//t is self-inverse
-	
-	if (gotInputFrame) {	//only need to ray cast when we have a valid input frame
-		if (g_CudaImageManager->getCurrFrameNumber() > 0) {
-			g_sceneRep->setLastRigidTransformAndCompactify(transform);	//TODO check that
-			g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), transform);
-		}
+
+	if (g_sceneRep->getNumIntegratedFrames() > 0) {
+		g_sceneRep->setLastRigidTransformAndCompactify(transform);	//TODO check that
+		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), transform);
 	}
 	
 	if (GlobalAppState::get().s_RenderMode == 1)	{
@@ -856,7 +854,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// Render with view of current frame
 	///////////////////////////////////////
 	t.start();
-	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform, bGotDepth);
+	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform);
 	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
 	timeVisualize = t.getElapsedTimeMS();
 

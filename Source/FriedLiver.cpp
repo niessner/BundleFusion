@@ -89,9 +89,6 @@ void bundlingOptimization() {
 }
 
 void bundlingOptimizationThreadFunc() {
-	/////////////////////////////////////////
-	//// Bundling Optimization
-	/////////////////////////////////////////
 
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 
