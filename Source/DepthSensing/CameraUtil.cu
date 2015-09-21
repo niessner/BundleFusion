@@ -139,7 +139,7 @@ __global__ void convertColorRawToFloatDevice(float4* d_output, BYTE* d_input, un
 
 	if(x >= width || y >= height) return;
 	
-	uchar4 c = make_uchar4(d_input[4*(y*width+x)+0], d_input[4*(y*width+x)+1], d_input[4*(y*width+x)+2], d_input[4*(y*width+x)+3]);	//note the flip from BGRW to RGBW
+	uchar4 c = make_uchar4(d_input[4*(y*width+x)+0], d_input[4*(y*width+x)+1], d_input[4*(y*width+x)+2], d_input[4*(y*width+x)+3]);
 	if (c.x == 0 && c.y == 0 && c.z == 0) {
 		d_output[y*width+x] = make_float4(MINF, MINF, MINF, MINF);
 	} else {
