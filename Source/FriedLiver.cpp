@@ -82,29 +82,49 @@ RGBDSensor* g_RGBDSensor = NULL;
 CUDAImageManager* g_imageManager = NULL;
 Bundler* g_bundler = NULL;
 
+void bundlingOptimizationThreadFunc() {
+	/////////////////////////////////////////
+	//// Bundling Optimization
+	/////////////////////////////////////////
+
+
+	for (unsigned int i = 0; i < 10; i++) {
+		g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+		g_bundler->processGlobal();
+		g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+	}
+}
+
 void bundlingThreadFunc() {
 	assert(g_RGBDSensor && g_imageManager);
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
+
+	std::thread tOpt;
+
 	while (1) {
 		while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
 		{
 			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
 			{
-				if (g_bundler->getExitBundlingThread()) break;
+				if (g_bundler->getExitBundlingThread()) {
+					if (tOpt.joinable()) {
+						tOpt.join();
+					}
+					break;
+				}
 				g_bundler->processInput();						//perform sift and whatever
 			}
 			g_bundler->setProcessedInputFrame();			//let depth sensing know we have a frame (UNLOCK BUNDLING)
 		}
 		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
 
-		/////////////////////////////////////////
-		//// Bundling Optimization
-		/////////////////////////////////////////
-		//std::cout << "Optimize" << std::endl;
-		g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-		g_bundler->processGlobal();
-		g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+		if (g_imageManager->getCurrFrameNumber() % 10 == 0) {
+			if (tOpt.joinable()) {
+				tOpt.join();
+			}
+			tOpt = std::thread(bundlingOptimizationThreadFunc);
+		}
 
 		if (g_bundler->getExitBundlingThread()) break;
 	}
