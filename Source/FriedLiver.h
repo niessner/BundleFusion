@@ -1,5 +1,8 @@
 
 
+
+#include "GlobalAppState.h"
+
 #ifdef KINECT
 #pragma comment(lib, "Kinect10.lib")
 #endif
@@ -34,10 +37,10 @@
 #pragma comment(lib, "gdiplus.lib")
 #endif
 
-#include "GlobalAppState.h"
 #include "RGBDSensor.h"
 #include "BinaryDumpReader.h"
 //TODO add other sensors here
+#include "StructureSensor.h"
 
 
 #include "GlobalBundlingState.h"

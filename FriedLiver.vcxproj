@@ -66,7 +66,7 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <PreprocessorDefinitions>WIN32;_DEBUG;DEBUG;PROFILE;_CONSOLE;D3DXFX_LARGEADDRESS_HANDLE;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <AdditionalIncludeDirectories>Source\DXUT\Optional;Source\DXUT\Core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Source\DXUT\Optional;Source\DXUT\Core;Include\Uplink;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <AdditionalOptions>/Zm124 %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4819</DisableSpecificWarnings>
@@ -100,7 +100,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <ExceptionHandling>Sync</ExceptionHandling>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;D3DXFX_LARGEADDRESS_HANDLE;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>Source\DXUT\Optional;Source\DXUT\Core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Source\DXUT\Optional;Source\DXUT\Core;Include\Uplink;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <DisableSpecificWarnings>4819</DisableSpecificWarnings>
     </ClCompile>
@@ -214,6 +214,7 @@
     <ClInclude Include="Source\Solver\SolverBundlingState.h" />
     <ClInclude Include="Source\Solver\SolverBundlingUtil.h" />
     <ClInclude Include="Source\stdafx.h" />
+    <ClInclude Include="Source\StructureSensor.h" />
     <ClInclude Include="Source\SubmapManager.h" />
     <ClInclude Include="Source\TimingLog.h" />
     <ClInclude Include="Source\TrajectoryManager.h" />
@@ -300,8 +301,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Source\StructureSensor.cpp" />
     <ClCompile Include="Source\TimingLog.cpp" />
     <ClCompile Include="Source\TrajectoryManager.cpp" />
+    <ClCompile Include="Source\uplink.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Source\CUDAImageUtil.cu" />

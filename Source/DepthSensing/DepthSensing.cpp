@@ -35,6 +35,8 @@
 #include "CUDASceneRepChunkGrid.h"
 #include "CUDAImageManager.h"
 
+#include "../StructureSensor.h"
+
 #include <iomanip>
 
 
@@ -643,7 +645,7 @@ void deIntegrate(const DepthCameraData& depthCameraData, const mat4f& transforma
 
 
 
-void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform)
+void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform, bool gotInputFrame)
 {
 	// If the settings dialog is being shown, then render it instead of rendering the app's scene
 	//if(g_D3DSettingsDlg.IsActive())
@@ -663,11 +665,14 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 	mat4f view = MatrixConversion::toMlib(*g_Camera.GetViewMatrix());
 	mat4f t = mat4f::identity();
 	t(1, 1) *= -1.0f;	view = t * view * t;	//t is self-inverse
-
-	if (g_CudaImageManager->getCurrFrameNumber() > 0) {
-		g_sceneRep->setLastRigidTransformAndCompactify(transform);	//TODO check that
-		g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), transform);
+	
+	if (gotInputFrame) {	//only need to ray cast when we have a valid input frame
+		if (g_CudaImageManager->getCurrFrameNumber() > 0) {
+			g_sceneRep->setLastRigidTransformAndCompactify(transform);	//TODO check that
+			g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), transform);
+		}
 	}
+	
 	if (GlobalAppState::get().s_RenderMode == 1)	{
 		//default render mode (render ray casted depth)
 		const mat4f& renderIntrinsics = g_CudaImageManager->getIntrinsics();
@@ -784,6 +789,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	while (g_CudaImageManager->hasBundlingFrameRdy()) Sleep(0);		//previous frame was not processed by bundling yet
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
+		std::cout << "gotDepth" << std::endl;
 		g_CudaImageManager->setBundlingFrameRdy();					//ready for bundling thread
 		//g_depthSensingBundler->processInput();	//sift extraction, sift matching, and key point filtering
 		//g_depthSensingBundler->setProcessedInputFrame();
@@ -851,7 +857,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// Render with view of current frame
 	///////////////////////////////////////
 	t.start();
-	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform);
+	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform, bGotDepth);
 	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
 	timeVisualize = t.getElapsedTimeMS();
 

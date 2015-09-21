@@ -124,6 +124,10 @@
     </ClCompile>
     <ClCompile Include="Source\TrajectoryManager.cpp" />
     <ClCompile Include="Source\DualGPU.cpp" />
+    <ClCompile Include="Source\uplink.cpp" />
+    <ClCompile Include="Source\StructureSensor.cpp">
+      <Filter>Sensors</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -345,6 +349,9 @@
       <Filter>SiftGPU</Filter>
     </ClInclude>
     <ClInclude Include="Source\DualGPU.h" />
+    <ClInclude Include="Source\StructureSensor.h">
+      <Filter>Sensors</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
