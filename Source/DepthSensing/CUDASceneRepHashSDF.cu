@@ -152,6 +152,8 @@ int3 worldToChunks(const float3& posWorld)
 __device__
 bool isSDFBlockStreamedOut(const int3& sdfBlock, const HashData& hashData, const unsigned int* d_bitMask)	//TODO MATTHIAS (-> move to HashData)
 {
+	if (!d_bitMask) return false;	//TODO can statically disable streaming??
+
 	float3 posWorld = hashData.virtualVoxelPosToWorld(hashData.SDFBlockToVirtualVoxelPos(sdfBlock)); // sdfBlock is assigned to chunk by the bottom right sample pos
 
 	uint index = linearizeChunkPos(worldToChunks(posWorld));

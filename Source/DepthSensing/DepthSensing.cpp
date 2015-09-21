@@ -269,8 +269,10 @@ void StopScanningAndExtractIsoSurfaceMC(const std::string& filename)
 void ResetDepthSensing()
 {
 	g_sceneRep->reset();
-	g_chunkGrid->reset();
 	g_Camera.Reset();
+	if (g_chunkGrid) {
+		g_chunkGrid->reset();
+	}
 }
 
 
@@ -283,8 +285,12 @@ void StopScanningAndSaveSDFHash(const std::string& filename = "test.hash") {
 	vec4f posWorld = vec4f(g_lastRigidTransform*GlobalAppState::get().s_streamingPos, 1.0f); // trans lags one frame
 	vec3f p(posWorld.x, posWorld.y, posWorld.z);
 
-	g_chunkGrid->saveToFile(filename, g_rayCast->getRayCastData(), p, GlobalAppState::getInstance().s_streamingRadius);
-
+	if (g_chunkGrid) {
+		g_chunkGrid->saveToFile(filename, g_rayCast->getRayCastData(), p, GlobalAppState::getInstance().s_streamingRadius);
+	}
+	else {
+		throw MLIB_EXCEPTION("chunk grid not initialized");
+	}
 	std::cout << "Saving Time " << t.getElapsedTime() << " seconds" << std::endl;
 
 	//g_sceneRep->debugHash();
@@ -500,14 +506,15 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	g_marchingCubesHashSDF = new CUDAMarchingCubesHashSDF(CUDAMarchingCubesHashSDF::parametersFromGlobalAppState(GlobalAppState::get()));
 	g_historgram = new CUDAHistrogramHashSDF(g_sceneRep->getHashParams());
 
-	g_chunkGrid = new CUDASceneRepChunkGrid(g_sceneRep, 
-		GlobalAppState::get().s_streamingVoxelExtents, 
-		GlobalAppState::get().s_streamingGridDimensions,
-		GlobalAppState::get().s_streamingMinGridPos,
-		GlobalAppState::get().s_streamingInitialChunkListSize,
-		GlobalAppState::get().s_streamingEnabled,
-		GlobalAppState::get().s_streamingOutParts);
-
+	if (GlobalAppState::get().s_streamingEnabled) {
+		g_chunkGrid = new CUDASceneRepChunkGrid(g_sceneRep,
+			GlobalAppState::get().s_streamingVoxelExtents,
+			GlobalAppState::get().s_streamingGridDimensions,
+			GlobalAppState::get().s_streamingMinGridPos,
+			GlobalAppState::get().s_streamingInitialChunkListSize,
+			GlobalAppState::get().s_streamingEnabled,
+			GlobalAppState::get().s_streamingOutParts);
+	}
 
 	if (!GlobalAppState::get().s_reconstructionEnabled) {
 		GlobalAppState::get().s_RenderMode = 2;
@@ -604,7 +611,9 @@ void integrate(const DepthCameraData& depthCameraData, const mat4f& transformati
 	}
 
 	if (GlobalAppState::get().s_integrationEnabled) {
-		g_sceneRep->integrate(transformation, depthCameraData, g_depthCameraParams, g_chunkGrid->getBitMaskGPU());
+		unsigned int* d_bitMask = NULL;
+		if (g_chunkGrid) d_bitMask = g_chunkGrid->getBitMaskGPU();
+		g_sceneRep->integrate(transformation, depthCameraData, g_depthCameraParams, d_bitMask);
 	} 
 	//else {
 	//	//compactification is required for the ray cast splatting
@@ -622,7 +631,9 @@ void deIntegrate(const DepthCameraData& depthCameraData, const mat4f& transforma
 	}
 
 	if (GlobalAppState::get().s_integrationEnabled) {
-		g_sceneRep->deIntegrate(transformation, depthCameraData, g_depthCameraParams, g_chunkGrid->getBitMaskGPU());
+		unsigned int* d_bitMask = NULL;
+		if (g_chunkGrid) d_bitMask = g_chunkGrid->getBitMaskGPU();
+		g_sceneRep->deIntegrate(transformation, depthCameraData, g_depthCameraParams, d_bitMask);
 	}
 	//else {
 	//	//compactification is required for the ray cast splatting
