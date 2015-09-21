@@ -223,8 +223,8 @@ public:
 	// already in processDepth
 	bool processColor() { return true; }
 
-	void startReceivingFrames() { m_server.startReceiving(); }
-	void stopReceivingFrames() { m_server.stopReceiving(); }
+	void startReceivingFrames() { m_bIsReceivingFrames = true; m_server.startReceiving(); }
+	void stopReceivingFrames() { m_bIsReceivingFrames = false; m_server.stopReceiving(); }
 
 	void updateFeedbackImage(BYTE* tex) {
 		m_server.updateFeedbackImage(tex);

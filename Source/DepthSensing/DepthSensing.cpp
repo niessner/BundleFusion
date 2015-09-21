@@ -100,7 +100,6 @@ Bundler*					g_depthSensingBundler = NULL;
 
 
 
-
 void ResetDepthSensing();
 void StopScanningAndExtractIsoSurfaceMC(const std::string& filename = "./scans/scan.ply");
 
@@ -201,6 +200,7 @@ void RenderHelp()
 	g_pTxtHelper->DrawTextLine(L"  \t'R':\t Reset scan");
 	g_pTxtHelper->DrawTextLine(L"  \t'9':\t Extract geometry (Marching Cubes)");
 	g_pTxtHelper->DrawTextLine(L"  \t'8':\t Save recorded input data to sensor file (if enabled)");
+	g_pTxtHelper->DrawTextLine(L"  \t'7':\t Stop scanning");
 	g_pTxtHelper->DrawTextLine(L"  \t'<tab>':\t Switch to free-view mode");
 	g_pTxtHelper->DrawTextLine(L"  \t");
 	g_pTxtHelper->DrawTextLine(L"  \t'1':\t Visualize reconstruction (default)");
@@ -367,10 +367,7 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			GlobalAppState::get().s_RenderMode = 6;
 			break;
 		case '7':
-			GlobalAppState::get().s_RenderMode = 7;
-			break;
-			//case '8':
-			//GlobalAppState::get().s_RenderMode = 8;
+			g_depthSensingRGBDSensor->stopReceivingFrames();
 		case '8':
 			{
 				if (GlobalAppState::getInstance().s_recordData) {
@@ -745,6 +742,7 @@ void reintegrate()
 		if (tm->getTopFromDeIntegrateList(oldTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+			assert(oldTransform[0] != -std::numeric_limits<float>::infinity());
 			deIntegrate(depthCameraData, oldTransform);
 
 			//std::cout << "ERROR DEINTEGRATE" << std::endl;
@@ -754,6 +752,7 @@ void reintegrate()
 		else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+			assert(newTransform[0] != -std::numeric_limits<float>::infinity());
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
 
@@ -764,6 +763,8 @@ void reintegrate()
 		else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
+			assert(oldTransform[0] != -std::numeric_limits<float>::infinity() &&
+				newTransform[0] != -std::numeric_limits<float>::infinity());
 			deIntegrate(depthCameraData, oldTransform);
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
@@ -791,7 +792,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//Start Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
 
-
 	///////////////////////////////////////
 	// Read Input
 	///////////////////////////////////////
@@ -802,7 +802,10 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		//g_depthSensingBundler->processInput();	//sift extraction, sift matching, and key point filtering
 		//g_depthSensingBundler->setProcessedInputFrame();
 	}
-
+	if (!g_depthSensingRGBDSensor->isReceivingFrames()) {
+		g_CudaImageManager->setBundlingFrameRdy();				// let bundling still optimize after scanning done
+		g_depthSensingBundler->confirmProcessedInputFrame();	// let bundling still optimize after scanning done
+	}
 
 
 	///////////////////////////////////////
@@ -831,6 +834,13 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		unsigned int frameIdx;
 		bool validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);		
 		g_depthSensingBundler->confirmProcessedInputFrame();
+
+		//!!!DEBUGGING
+		if (frameIdx >= 30) {
+			std::cout << "frame " << frameIdx << std::endl;
+			std::cout << transformation << std::endl;
+		}
+		//!!!DEBUGGING
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
 			//overwrite transform and use given trajectory in this case

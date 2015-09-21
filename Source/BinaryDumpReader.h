@@ -42,6 +42,8 @@ public:
 		return m_NumFrames;
 	}
 
+	void stopReceivingFrames() { m_bIsReceivingFrames = false; }
+
 private:
 	//! deletes all allocated data
 	void releaseData();

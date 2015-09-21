@@ -68,8 +68,10 @@ Bundler::~Bundler()
 
 void Bundler::processInput()
 {
-
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
+	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame)
+		return; // nothing new to process
+
 	std::cout << "[ frame " << curFrame << " ]" << std::endl;
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addLocalFrameTiming();
@@ -133,25 +135,26 @@ void Bundler::processInput()
 
 			// switch local submaps
 			m_SubmapManager.switchLocal();
-
-			
 		}
 		else {
 			m_currentState.m_localToSolve = -1; // no need to solve local
 			m_currentState.m_lastLocalSolved = curLocalIdx; // already "solved"
+			m_currentState.m_bProcessGlobal = false;
 			m_currentState.m_bOptimizeGlobal = false;
 			m_currentState.m_lastNumLocalFrames = std::min(m_submapSize, m_SubmapManager.currentLocal->getNumImages());
-			m_currentState.m_numCompleteTransforms = curFrame;
+			m_currentState.m_numCompleteTransforms = m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames;
 
 			//add invalidated (fake) global frame
 			std::cout << "WARNING: invalid local submap " << curFrame << " (" << m_SubmapManager.global->getNumImages() << ", " << m_SubmapManager.currentLocal->getNumImages() << ")" << std::endl;
 			getchar();
+			m_SubmapManager.invalidateImages(m_submapSize * curLocalIdx, m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames);
 			SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
 			m_SubmapManager.global->finalizeSIFTImageGPU(0);
 			m_SubmapManager.switchLocalAndFinishOpt();
 			m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
 
-			m_SubmapManager.updateTrajectory(curFrame);
+			m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
+			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
 			m_SubmapManager.initializeNextGlobalTransform(true);
 		}
 	} // global
@@ -175,7 +178,9 @@ bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& fra
 void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
 	if (m_currentState.m_localToSolve == -1) {
-		assert(false);
+		//if (m_RGBDSensor->isReceivingFrames()) {
+		//	assert(false);
+		//}
 		return; // nothing to solve
 	}
 
@@ -215,6 +220,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 			m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
 
 			m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
+			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
 			m_SubmapManager.initializeNextGlobalTransform(true);
 		}
 		else
@@ -231,7 +237,9 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 void Bundler::processGlobal()
 {
 	if (!m_currentState.m_bProcessGlobal) {
-		assert(false);
+		//if (m_RGBDSensor->isReceivingFrames()) {
+		//	assert(false);
+		//}
 		return;
 	}
 	m_currentState.m_bProcessGlobal = false;
@@ -284,10 +292,10 @@ void Bundler::processGlobal()
 
 void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart /*= true*/, bool isEnd /*= true*/)
 {
-	if (!m_currentState.m_bOptimizeGlobal) {
-		if (m_SubmapManager.global->getNumImages() > 1) {
-			assert(false);
-		}
+	if (!m_currentState.m_bOptimizeGlobal && m_RGBDSensor->isReceivingFrames()) {
+		//if (m_SubmapManager.global->getNumImages() > 1) {
+		//	assert(false);
+		//}
 		return; // nothing to solve
 	}
 

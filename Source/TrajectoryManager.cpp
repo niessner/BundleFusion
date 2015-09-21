@@ -150,7 +150,7 @@ bool TrajectoryManager::getTopFromDeIntegrateList(mat4f& trans, unsigned int& fr
 	assert(m_toDeIntegrateList.front()->type == TrajectoryFrame::Invalid);
 
 	m_mutexUpdateTransforms.lock();
-	trans = m_toDeIntegrateList.front()->optimizedTransform;
+	trans = m_toDeIntegrateList.front()->integratedTransform;
 	frameIdx = m_toDeIntegrateList.front()->frameIdx;
 	m_toDeIntegrateList.pop_front();
 	m_mutexUpdateTransforms.unlock();
@@ -182,7 +182,7 @@ unsigned int TrajectoryManager::getNumActiveOperations() const
 
 void TrajectoryManager::invalidateFrame(unsigned int frameIdx)
 {
-	assert(m_frames[frameIdx].type != TrajectoryFrame::Invalid);
+	if (m_frames[frameIdx].type == TrajectoryFrame::Invalid) return;
 	TrajectoryFrame::TYPE typeBefore = m_frames[frameIdx].type;
 	m_frames[frameIdx].type = TrajectoryFrame::Invalid;
 

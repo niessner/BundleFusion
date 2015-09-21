@@ -14,8 +14,7 @@ extern "C" void updateTrajectoryCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
 	float4x4* d_completeTrajectory, unsigned int numCompleteTransforms,
 	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory, unsigned int numLocalTrajectories,
-	int* d_imageInvalidateList, unsigned int numImagesToInvalidate
-	);
+	int* d_imageInvalidateList);
 
 extern "C" void initNextGlobalTransformCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
@@ -91,7 +90,7 @@ public:
 		//	global->setTimer(m_globalTimer);
 		//}
 
-		m_imageInvalidateList.clear();
+		m_invalidImagesList.resize(maxNumGlobalImages * m_submapSize, 1);
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globalTrajectory, sizeof(float4x4)*maxNumGlobalImages));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_completeTrajectory, sizeof(float4x4)*maxNumGlobalImages*m_submapSize));
@@ -150,21 +149,12 @@ public:
 
 	// update complete trajectory with new global trajectory info
 	void updateTrajectory(unsigned int curFrame) {
-		if (!m_imageInvalidateList.empty())	{
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_imageInvalidateList.data(), sizeof(int)*m_imageInvalidateList.size(), cudaMemcpyHostToDevice));
-			std::cout << "invalidating " << m_imageInvalidateList.size() << " images" << std::endl;;
-			//for (unsigned int i = 0; i < m_imageInvalidateList.size(); i++) std::cout << " " << m_imageInvalidateList[i];
-			//std::cout << std::endl;
-			//getchar();
-		}
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
 			
 		updateTrajectoryCU(d_globalTrajectory, global->getNumImages(),
 			d_completeTrajectory, curFrame,
 			d_localTrajectories, m_submapSize + 1, global->getNumImages(),
-			d_imageInvalidateList, (unsigned int)m_imageInvalidateList.size());
-
-		// done invalidating
-		m_imageInvalidateList.clear();
+			d_imageInvalidateList);
 	}
 
 	void initializeNextGlobalTransform(bool useIdentity = false) {
@@ -179,10 +169,13 @@ public:
 	}
 
 	void invalidateImages(unsigned int startFrame, unsigned int endFrame = -1) {
-		if (endFrame == -1) m_imageInvalidateList.push_back(startFrame);
+		std::cout << "invalidating images (" << startFrame << ", " << endFrame << ")" << std::endl;
+		//getchar();
+
+		if (endFrame == -1) m_invalidImagesList[startFrame] = 0;
 		else {
 			for (unsigned int i = startFrame; i < endFrame; i++)
-				m_imageInvalidateList.push_back(i);
+				m_invalidImagesList[i] = 0;
 		}
 	}
 
@@ -273,7 +266,7 @@ public:
 	const std::vector<mat4f>& getAllIntegrateTransforms() const { return m_currIntegrateTransform; }
 
 private:
-	std::vector<unsigned int>	m_imageInvalidateList;
+	std::vector<unsigned int>	m_invalidImagesList;
 	int*						d_imageInvalidateList; // tmp for updateTrajectory //TODO just to update trajectory on CPU
 
 	float4x4*					d_currIntegrateTransform;

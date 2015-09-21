@@ -23,8 +23,10 @@ void SIFTMatchFilter::filterFrames(SIFTImageManager* siftManager)
 		}
 	}
 
-	if (!connected)
+	if (!connected) {
 		std::cout << "frame " << curFrame << " not connected to previous!" << std::endl;
+		getchar();
+	}
 
 	cutilSafeCall(cudaMemcpy(siftManager->d_validImages + curFrame, &connected, sizeof(int), cudaMemcpyHostToDevice));
 }

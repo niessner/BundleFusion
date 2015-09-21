@@ -130,28 +130,36 @@ void bundlingThreadFunc() {
 		//}
 
 		if (g_bundler->getNumProcessedFrames() >= g_bundler->getSubMapSize()) {
-			const unsigned int localFrame = g_bundler->getNumProcessedFrames() % g_bundler->getSubMapSize();
+			if (g_RGBDSensor->isReceivingFrames()) {
+				const unsigned int localFrame = g_bundler->getNumProcessedFrames() % g_bundler->getSubMapSize();
 
-			if (localFrame == 1) {
+				if (localFrame == 1) {
+					g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+				}
+				if (localFrame == 2) {
+					g_bundler->processGlobal();
+				}
+				assert(GlobalBundlingState::get().s_numGlobalNonLinIterations >= 2);
+				assert(GlobalBundlingState::get().s_numGlobalNonLinIterations < g_bundler->getSubMapSize() - 3);
+
+				//start
+				if (localFrame == 3) {
+					g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, true, false);
+				}
+				//iterate
+				if (localFrame > 3 && localFrame < 3 + GlobalBundlingState::get().s_numGlobalNonLinIterations - 1) {
+					g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, false, false);
+				}
+				//end
+				if (localFrame == 3 + GlobalBundlingState::get().s_numGlobalNonLinIterations - 1) {
+					g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, false, true);
+				}
+			}
+			else { // end of sequence just optimize (once)
 				g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-			}
-			if (localFrame == 2) {
 				g_bundler->processGlobal();
-			}
-			assert(GlobalBundlingState::get().s_numGlobalNonLinIterations >= 2);
-			assert(GlobalBundlingState::get().s_numGlobalNonLinIterations < g_bundler->getSubMapSize() - 3);
-
-			//start
-			if (localFrame == 3) {
-				g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, true, false);
-			}
-			//iterate
-			if (localFrame > 3 && localFrame < 3 + GlobalBundlingState::get().s_numGlobalNonLinIterations - 1) {
-				g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, false, false);
-			}
-			//end
-			if (localFrame == 3 + GlobalBundlingState::get().s_numGlobalNonLinIterations - 1) {
-				g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, false, true);
+				g_bundler->optimizeGlobal(5, GlobalBundlingState::get().s_numGlobalLinIterations, true, true);
+				//std::cout << "end optimize" << std::endl;
 			}
 			 
 		}

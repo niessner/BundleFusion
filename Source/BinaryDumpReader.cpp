@@ -55,7 +55,7 @@ void BinaryDumpReader::createFirstConnected()
 
 	m_NumFrames = m_data.m_DepthNumFrames;
 	assert(m_data.m_ColorNumFrames == m_data.m_DepthNumFrames || m_data.m_ColorNumFrames == 0);		
-		
+
 	if (m_data.m_ColorImages.size() > 0) {
 		m_bHasColorData = true;
 	} else {
@@ -68,8 +68,9 @@ bool BinaryDumpReader::processDepth()
 	if(m_CurrFrame >= m_NumFrames)
 	{
 		GlobalAppState::get().s_playData = false;
-		std::cout << "binary dump sequence complete - press space to run again" << std::endl;
-		m_CurrFrame = 0;
+		//std::cout << "binary dump sequence complete - press space to run again" << std::endl;
+		//m_CurrFrame = 0;
+		stopReceivingFrames();
 	}
 
 	if(GlobalAppState::get().s_playData) {

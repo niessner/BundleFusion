@@ -15,6 +15,8 @@ RGBDSensor::RGBDSensor()
 	m_colorRGBX = NULL;
 
 	m_currentRingBufIdx = 0;
+
+	m_bIsReceivingFrames = true;
 }
 
 void RGBDSensor::init(unsigned int depthWidth, unsigned int depthHeight, unsigned int colorWidth, unsigned int colorHeight, unsigned int depthRingBufferSize)

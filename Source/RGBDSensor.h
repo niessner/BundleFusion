@@ -79,6 +79,10 @@ public:
 	virtual void startReceivingFrames() {}
 	virtual void stopReceivingFrames() {}
 
+	virtual bool isReceivingFrames() {
+		return m_bIsReceivingFrames;
+	}
+
 protected:
 
 	//! must be initialized by the child class
@@ -113,6 +117,8 @@ protected:
 
 	LONG   m_colorWidth;
 	LONG   m_colorHeight;
+
+	bool	m_bIsReceivingFrames;
 
 private:
 	void computePointCurrentPointCloud(PointCloudf& pc, const mat4f& transform = mat4f::identity()) const;
