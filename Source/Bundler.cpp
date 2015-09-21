@@ -146,7 +146,7 @@ void Bundler::processInput()
 
 			//add invalidated (fake) global frame
 			std::cout << "WARNING: invalid local submap " << curFrame << " (" << m_SubmapManager.global->getNumImages() << ", " << m_SubmapManager.currentLocal->getNumImages() << ")" << std::endl;
-			getchar();
+			//getchar();
 			m_SubmapManager.invalidateImages(m_submapSize * curLocalIdx, m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames);
 			SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
 			m_SubmapManager.global->finalizeSIFTImageGPU(0);
@@ -205,7 +205,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 
 		if (valid == 0) {
 			std::cout << "WARNING: invalid local submap from verify " << currLocalIdx << " (" << m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames << ")" << std::endl;
-			getchar();
+			//getchar();
 
 			m_SubmapManager.invalidateImages(m_submapSize * currLocalIdx, m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames);
 			m_currentState.m_bProcessGlobal = false;
