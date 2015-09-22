@@ -369,6 +369,9 @@
     <Filter Include="DepthSensing">
       <UniqueIdentifier>{34a71b1c-31e1-49c5-b28a-0ba08ab941ea}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DepthSensing\Shader">
+      <UniqueIdentifier>{2ca45fc3-51ec-409c-90d7-ee9a731fb16c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Source\CUDAImageUtil.cu">
@@ -415,5 +418,19 @@
     <CudaCompile Include="Source\SiftGPU\CUDASiftConstant.cu">
       <Filter>SiftGPU</Filter>
     </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\QuadDrawer.hlsl">
+      <Filter>DepthSensing\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\RayIntervalSplatting.hlsl">
+      <Filter>DepthSensing\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\RGBDRenderer.hlsl">
+      <Filter>DepthSensing\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\PhongLighting.hlsl">
+      <Filter>DepthSensing\Shader</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

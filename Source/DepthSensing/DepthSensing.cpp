@@ -642,7 +642,7 @@ void deIntegrate(const DepthCameraData& depthCameraData, const mat4f& transforma
 
 
 
-void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform)
+void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3dDevice, const mat4f& transform, bool trackingLost)
 {
 	// If the settings dialog is being shown, then render it instead of rendering the app's scene
 	//if(g_D3DSettingsDlg.IsActive())
@@ -678,7 +678,11 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 		g_RGBDRenderer.RenderDepthMap(pd3dImmediateContext, g_rayCast->getRayCastData().d_depth, g_rayCast->getRayCastData().d_colors, g_rayCast->getRayCastParams().m_width, g_rayCast->getRayCastParams().m_height, MatrixConversion::toMlib(g_rayCast->getRayCastParams().m_intrinsicsInverse), view, renderIntrinsics, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(), GlobalAppState::get().s_renderingDepthDiscontinuityThresOffset, GlobalAppState::get().s_renderingDepthDiscontinuityThresLin);
 		g_CustomRenderTarget.Unbind(pd3dImmediateContext);
 
-		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), false, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight());
+		vec3f overlayColor = vec3f(0.0f, 0.0f, 0.0f);
+		if (trackingLost) {
+			overlayColor.x += 0.5f;
+		}
+		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), false, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(), overlayColor);
 		DX11QuadDrawer::RenderQuad(pd3dImmediateContext, DX11PhongLighting::GetColorsSRV(), 1.0f);
 #ifdef STRUCTURE_SENSOR
 		if (GlobalAppState::get().s_sensorIdx == 7) {
@@ -744,9 +748,6 @@ void reintegrate()
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 			assert(oldTransform[0] != -std::numeric_limits<float>::infinity());
 			deIntegrate(depthCameraData, oldTransform);
-
-			//std::cout << "ERROR DEINTEGRATE" << std::endl;
-			//while (1);
 			continue;
 		}
 		else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
@@ -755,9 +756,6 @@ void reintegrate()
 			assert(newTransform[0] != -std::numeric_limits<float>::infinity());
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
-
-			//std::cout << "ERROR INTEGRATE" << std::endl;
-			//while (1);
 			continue;
 		}
 		else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
@@ -829,10 +827,11 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// Reconstruction of current frame
 	///////////////////////////////////////	
 	t.start();
+	bool validTransform = true;
 	if (bGotDepth) {
 		mat4f transformation = mat4f::zero();
 		unsigned int frameIdx;
-		bool validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);		
+		validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);		
 		g_depthSensingBundler->confirmProcessedInputFrame();
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
@@ -868,7 +867,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// Render with view of current frame
 	///////////////////////////////////////
 	t.start();
-	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform);
+	bool trackingLost = bGotDepth && !validTransform;
+	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform, trackingLost);
 	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
 	timeVisualize = t.getElapsedTimeMS();
 

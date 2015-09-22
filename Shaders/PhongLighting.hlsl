@@ -8,10 +8,8 @@ sampler g_PointSampler : register (s10);
 
 cbuffer cbPerFrame : register( b0 )
 {
-	uint  g_useMaterial; 
-	float dummy0;
-	uint  dummy1;
-	uint  dummy2;
+	uint	g_useMaterial; 
+	float3	g_overlayColor;
 };
 
 cbuffer cbLight : register( b1 )
@@ -61,9 +59,14 @@ float4 PhongPS(VS_OUTPUT Input) : SV_TARGET
 		const float3 eyeDir = normalize(position);
 		const float3 R = normalize(reflect(-normalize(lightDir), normal));
 	
-		return		lightAmbient  * materialAmbient														  // Ambient
-				  + lightDiffuse  * material * max(dot(normal, -normalize(lightDir)), 0.0)				  // Diffuse
-				  + lightSpecular * materialSpecular * pow(max(dot(R, eyeDir), 0.0f), materialShininess); // Specular
+		float4 resColor = 
+			  lightAmbient  * materialAmbient														// Ambient
+			+ lightDiffuse  * material * max(dot(normal, -normalize(lightDir)), 0.0)				// Diffuse
+			+ lightSpecular * materialSpecular * pow(max(dot(R, eyeDir), 0.0f), materialShininess); // Specular
+
+		resColor = resColor + float4(g_overlayColor, 0.0f);
+
+		return resColor;
 	}
 	else
 	{

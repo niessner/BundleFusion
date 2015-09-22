@@ -161,7 +161,7 @@ HRESULT DX11PhongLighting::OnD3D11CreateDevice(ID3D11Device* pd3dDevice, unsigne
 	return hr;
 }
 
-void DX11PhongLighting::render(ID3D11DeviceContext* pd3dDeviceContext, float4* d_positions, float4* d_normals, float4* d_colors, bool useMaterial, unsigned int width, unsigned int height)
+void DX11PhongLighting::render(ID3D11DeviceContext* pd3dDeviceContext, float4* d_positions, float4* d_normals, float4* d_colors, bool useMaterial, unsigned int width, unsigned int height, const vec3f& overlayColor)
 {
 	cudaArray* in_array;
 			
@@ -183,10 +183,10 @@ void DX11PhongLighting::render(ID3D11DeviceContext* pd3dDeviceContext, float4* d
 	cudaMemcpyToArray(in_array, 0, 0, d_colors, 4*sizeof(float)*width*height, cudaMemcpyDeviceToDevice);
 	cutilSafeCall(cudaGraphicsUnmapResources(1, &s_dCudaColors, 0)); // Unmap DX texture
 
-	render(pd3dDeviceContext, s_pTmpTexturePositionsSRV, s_pTmpTextureNormalsSRV, s_pTmpTextureColorsSRV, useMaterial, width, height);
+	render(pd3dDeviceContext, s_pTmpTexturePositionsSRV, s_pTmpTextureNormalsSRV, s_pTmpTextureColorsSRV, useMaterial, width, height, overlayColor);
 }
 
-void DX11PhongLighting::render(ID3D11DeviceContext* pd3dDeviceContext, ID3D11ShaderResourceView* positions, ID3D11ShaderResourceView* normals, ID3D11ShaderResourceView* colors, bool useMaterial, unsigned int width, unsigned int height)
+void DX11PhongLighting::render(ID3D11DeviceContext* pd3dDeviceContext, ID3D11ShaderResourceView* positions, ID3D11ShaderResourceView* normals, ID3D11ShaderResourceView* colors, bool useMaterial, unsigned int width, unsigned int height, const vec3f& overlayColor)
 {
 	// save render targets
 	ID3D11RenderTargetView* rtv = DXUTGetD3D11RenderTargetView();
@@ -207,6 +207,7 @@ void DX11PhongLighting::render(ID3D11DeviceContext* pd3dDeviceContext, ID3D11Sha
 	if(FAILED(hr)) return;
 	cbConstant *cbufferConstant = (cbConstant*)mappedResource.pData;
 	cbufferConstant->useMaterial = useMaterial ? 1 : 0;
+	cbufferConstant->overlayColor = D3DXVECTOR3(overlayColor.x, overlayColor.y, overlayColor.z);
 	pd3dDeviceContext->Unmap(s_ConstantBuffer, 0);
 
 	// copy lightbuffer to gpu

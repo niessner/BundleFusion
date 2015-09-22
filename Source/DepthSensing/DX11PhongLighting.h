@@ -38,10 +38,8 @@ class DX11PhongLighting
 
 		static HRESULT OnD3D11CreateDevice(ID3D11Device* pd3dDevice, unsigned int width = 0, unsigned int height = 0);
 
-		static void renderFromViewpoint(ID3D11DeviceContext* pd3dDeviceContext, float4* d_positions, float4* d_colors, mat4f renderIntrinsics, mat4f view,  bool useMaterial, unsigned int width, unsigned int height);
-
-		static void render(ID3D11DeviceContext* pd3dDeviceContext, float4* d_positions, float4* d_normals, float4* d_colors, bool useMaterial, unsigned int width, unsigned int height);
-		static void render(ID3D11DeviceContext* pd3dDeviceContext, ID3D11ShaderResourceView* positions, ID3D11ShaderResourceView* normals, ID3D11ShaderResourceView* colors, bool useMaterial, unsigned int width, unsigned int height);
+		static void render(ID3D11DeviceContext* pd3dDeviceContext, float4* d_positions, float4* d_normals, float4* d_colors, bool useMaterial, unsigned int width, unsigned int height, const vec3f& overlayColor = vec3f(0.0f, 0.0f, 0.0f));
+		static void render(ID3D11DeviceContext* pd3dDeviceContext, ID3D11ShaderResourceView* positions, ID3D11ShaderResourceView* normals, ID3D11ShaderResourceView* colors, bool useMaterial, unsigned int width, unsigned int height, const vec3f& overlayColor = vec3f(0.0f, 0.0f, 0.0f));
 
 		static void OnD3D11DestroyDevice();
 
@@ -67,9 +65,7 @@ private:
 	struct cbConstant
 	{
 		unsigned int useMaterial;
-		float		 dummy0;
-		unsigned int dummy1;
-		unsigned int dummy2;
+		D3DXVECTOR3 overlayColor;
 	};
 
 	static ID3D11Buffer* s_ConstantBuffer;
