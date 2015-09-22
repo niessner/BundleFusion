@@ -57,6 +57,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 	m_bHasProcessedInputFrame = false;
 	m_bExitBundlingThread = false;
+	m_bIsScanDoneGlobalOpt = false;
 }
 
 Bundler::~Bundler()
@@ -115,7 +116,7 @@ void Bundler::processInput()
 
 		//currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, m_currentState.m_lastValidCompleteTransform,
 		//	m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame, m_SubmapManager.getCurrIntegrateTransform(curFrame));
-		
+
 		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
@@ -123,7 +124,6 @@ void Bundler::processInput()
 
 	// global frame
 	if (m_SubmapManager.isLastFrame(curFrame) || m_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
-		if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 		// cache
 		m_SubmapManager.globalCache->copyCacheFrameFrom(m_SubmapManager.currentLocalCache, 0);
 
@@ -148,6 +148,7 @@ void Bundler::processInput()
 			m_currentState.m_numCompleteTransforms = m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames;
 
 			//add invalidated (fake) global frame
+			if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << " (" << m_SubmapManager.global->getNumImages() << ", " << m_SubmapManager.currentLocal->getNumImages() << ")" << std::endl;
 			//getchar();
 			m_SubmapManager.invalidateImages(m_submapSize * curLocalIdx, m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames);
@@ -188,13 +189,14 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 	}
 
 	const unsigned int currLocalIdx = m_currentState.m_localToSolve;
-	m_currentState.m_localToSolve = -1; 
+	m_currentState.m_localToSolve = -1;
 
 	//m_SubmapManager.optLocal->lock();
 	SIFTImageManager* siftManager = m_SubmapManager.nextLocal;
 	CUDACache* cudaCache = m_SubmapManager.nextLocalCache;
 	m_currentState.m_lastNumLocalFrames = std::min(m_submapSize, siftManager->getNumImages());
-	solve(m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx), siftManager, numNonLinIterations, numLinIterations, true, false, true, true);
+
+	solve(m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx), siftManager, numNonLinIterations, numLinIterations, true, false, true, true, false);
 	// still need this for global key fuse
 
 	// verify
@@ -217,6 +219,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 			m_currentState.m_numCompleteTransforms = m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames;
 
 			//add invalidated (fake) global frame
+			if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 			SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
 			m_SubmapManager.global->finalizeSIFTImageGPU(0);
 			m_SubmapManager.finishLocalOpt();
@@ -249,6 +252,7 @@ void Bundler::processGlobal()
 
 	SIFTImageManager* global = m_SubmapManager.global;
 	if ((int)global->getNumImages() <= m_currentState.m_lastLocalSolved) {
+		if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 		//m_SubmapManager.optLocal->lock();
 		SIFTImageManager* local = m_SubmapManager.nextLocal;
 
@@ -272,7 +276,7 @@ void Bundler::processGlobal()
 
 		//unsigned int gframe = (unsigned int)global->getNumImages() - 1;
 		//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
-		 
+
 		// match with every other global
 		if (global->getNumImages() > 1) {
 			matchAndFilter(global, m_SubmapManager.globalCache, 0, m_submapSize);
@@ -305,7 +309,7 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 	//if (m_SubmapManager.isLastFrame(m_currentState.m_lastFrameProcessed)) {
 	//	numNonLinIterations = numNonLinIterations * 4;
 	//}
-	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd);
+	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, m_bIsScanDoneGlobalOpt);
 
 	if (isEnd) {
 
@@ -331,13 +335,13 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 	}
 }
 
-void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd)
+void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt)
 {
-	bool useVerify = isLocal; 
-	m_SparseBundler.align(siftManager, transforms, numNonLinIters, numLinIters, useVerify, isLocal, recordConvergence, isStart, isEnd);
+	bool useVerify = isLocal;
+	m_SparseBundler.align(siftManager, transforms, numNonLinIters, numLinIters, useVerify, isLocal, recordConvergence, isStart, isEnd, isScanDoneOpt);
 }
 
-void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, 
+void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache,
 	unsigned int frameStart, unsigned int frameSkip, bool print /*= false*/) // frameStart/frameSkip for debugging (printing matches)
 {
 	bool isLocal = (frameSkip == 1);
@@ -407,7 +411,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 
 		// --- add to global correspondences
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-		if (siftManager->getValidImages()[curFrame] != 0) 
+		if (siftManager->getValidImages()[curFrame] != 0)
 			siftManager->AddCurrToResidualsCU(curFrame, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeAddCurrResiduals = s_timer.getElapsedTimeMS(); }
 	}
@@ -513,7 +517,7 @@ void Bundler::saveKeysToPointCloud(const std::string& filename /*= "refined.ply"
 		const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
 		std::vector<mat4f> globalTrajectory(m_SubmapManager.global->getNumImages());
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globalTrajectory.data(), m_SubmapManager.d_globalTrajectory, sizeof(float4x4)*globalTrajectory.size(), cudaMemcpyDeviceToHost));
-		
+
 		m_RGBDSensor->saveRecordedPointCloud(filename, validImagesGlobal, globalTrajectory);
 		//!!!
 		//unsigned int numFrames = (m_SubmapManager.global->getNumImages() > 0) ? (m_SubmapManager.global->getNumImages() - 1)*m_submapSize + m_currentState.m_lastNumLocalFrames : m_currentState.m_lastNumLocalFrames;

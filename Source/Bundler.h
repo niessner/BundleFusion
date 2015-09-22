@@ -167,13 +167,18 @@ public:
 		return m_submapSize;
 	}
 
+	void setScanDoneGlobalOpt() {
+		m_bIsScanDoneGlobalOpt = true;
+	}
+
 private:
 	bool m_bHasProcessedInputFrame;
 	bool m_bExitBundlingThread;
+	bool m_bIsScanDoneGlobalOpt;
 
 	void matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int frameStart, unsigned int frameSkip, bool print = false);
 
-	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd);
+	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt);
 
 	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const;
@@ -196,6 +201,7 @@ private:
 	BundlerInputData		m_bundlerInputData;
 
 	static Timer			s_timer;
+	static Timer			s_timerOpt;
 
 	SiftCameraParams		m_siftCameraParams;
 

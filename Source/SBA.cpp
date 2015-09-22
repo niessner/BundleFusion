@@ -13,7 +13,7 @@ extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_tr
 
 Timer SBA::s_timer;
 
-void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd)
+void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt)
 {
 	if (recordConvergence) m_recordedConvergence.push_back(std::vector<float>());
 
@@ -21,7 +21,7 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 
 	m_maxResidual = -1.0f;
 
-	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
+	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 
 	unsigned int numImages = siftManager->getNumImages();
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans);
@@ -42,7 +42,7 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 
 	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
 	
-	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve = s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve = curIt * maxNumIters; }
+	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve += s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve += curIt * maxNumIters; }
 }
 
 bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd)

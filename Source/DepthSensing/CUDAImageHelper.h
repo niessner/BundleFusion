@@ -4,7 +4,7 @@
 
 #include <D3D11.h>
 #include "DX11Utils.h"
-#include "TimingLog.h"
+#include "TimingLogDepthSensing.h"
 #include "DepthCameraUtil.h"
 
 #include <cutil_inline.h>

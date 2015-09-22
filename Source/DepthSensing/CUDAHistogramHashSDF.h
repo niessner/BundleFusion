@@ -9,7 +9,7 @@
 #include "CUDAScan.h"
 
 #include "GlobalAppState.h"
-#include "TimingLog.h"
+#include "TimingLogDepthSensing.h"
 
 extern "C" void computeHistogramCUDA(unsigned int* d_data, const HashData& hashData, const HashParams& hashParams);
 extern "C" void resetHistrogramCUDA(unsigned int* d_data, unsigned int numValues);

@@ -36,6 +36,7 @@
 #include "CUDAImageManager.h"
 
 #include "../StructureSensor.h"
+#include "../TimingLog.h"
 
 #include <iomanip>
 
@@ -201,6 +202,7 @@ void RenderHelp()
 	g_pTxtHelper->DrawTextLine(L"  \t'9':\t Extract geometry (Marching Cubes)");
 	g_pTxtHelper->DrawTextLine(L"  \t'8':\t Save recorded input data to sensor file (if enabled)");
 	g_pTxtHelper->DrawTextLine(L"  \t'7':\t Stop scanning");
+	g_pTxtHelper->DrawTextLine(L"  \t'6':\t Print Timings");
 	g_pTxtHelper->DrawTextLine(L"  \t'<tab>':\t Switch to free-view mode");
 	g_pTxtHelper->DrawTextLine(L"  \t");
 	g_pTxtHelper->DrawTextLine(L"  \t'1':\t Visualize reconstruction (default)");
@@ -364,10 +366,14 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			GlobalAppState::get().s_RenderMode = 5;
 			break;
 		case '6':
-			GlobalAppState::get().s_RenderMode = 6;
+		{
+			if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::printAllTimings();
+			else std::cout << "Cannot print timings: enable \"s_enableGlobalTimings\" in parameter file" << std::endl;
+		}
 			break;
 		case '7':
 			g_depthSensingRGBDSensor->stopReceivingFrames();
+			break;
 		case '8':
 			{
 				if (GlobalAppState::getInstance().s_recordData) {
@@ -781,9 +787,9 @@ void reintegrate()
 void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext )
 {
 	Timer t;
-	double timeReconstruct = 0.0f;
-	double timeVisualize = 0.0f;
-	double timeReintegrate = 0.0f;
+	//double timeReconstruct = 0.0f;
+	//double timeVisualize = 0.0f;
+	//double timeReintegrate = 0.0f;
 
 	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
 
@@ -809,10 +815,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Fix old frames
 	///////////////////////////////////////
-	t.start();
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.start(); }
 	reintegrate();
-	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
-	timeReintegrate = t.getElapsedTimeMS();
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeReIntegrate = t.getElapsedTimeMS(); }
 
 
 	
@@ -826,7 +831,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Reconstruction of current frame
 	///////////////////////////////////////	
-	t.start();
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.start(); }
 	bool validTransform = true;
 	if (bGotDepth) {
 		mat4f transformation = mat4f::zero();
@@ -860,19 +865,17 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 			g_lastRigidTransform = transformation;
 		}
 	}
-	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
-	timeReconstruct = t.getElapsedTimeMS();
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeReconstruct = t.getElapsedTimeMS(); }
 
 
 
 	///////////////////////////////////////
 	// Render with view of current frame
 	///////////////////////////////////////
-	t.start();
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { t.start(); } // just sync-ed //{ GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.start(); }
 	bool trackingLost = bGotDepth && !validTransform;
 	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_lastRigidTransform, trackingLost);
-	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
-	timeVisualize = t.getElapsedTimeMS();
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeVisualize = t.getElapsedTimeMS(); }
 
 
 	///////////////////////////////////////////

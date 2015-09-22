@@ -159,6 +159,7 @@ void bundlingThreadFunc() {
 				g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
 				g_bundler->processGlobal();
 				g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations, true, true);
+				g_bundler->setScanDoneGlobalOpt();
 				//std::cout << "end optimize" << std::endl;
 			}
 			 
@@ -247,7 +248,7 @@ int main(int argc, char** argv)
 		//	else break;
 		//}
 
-		TimingLog::printTimings("timingLog.txt");
+		//TimingLog::printAllTimings();
 		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
 		g_bundler->saveCompleteTrajectory("trajectory.bin");
 		g_bundler->saveCompleteTrajectory("siftTrajectory.bin");
