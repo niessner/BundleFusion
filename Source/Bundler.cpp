@@ -51,7 +51,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 	m_sift = new SiftGPU;
 	m_siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
-	m_sift->SetParams(GlobalBundlingState::get().s_enableDetailedTimings, 150, GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
+	m_sift->SetParams(false, 150, GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
 	m_sift->InitSiftGPU();
 	m_siftMatcher->InitSiftMatch();
 
@@ -74,8 +74,6 @@ void Bundler::processInput()
 		return; // nothing new to process
 
 	if (GlobalBundlingState::get().s_verbose) std::cout << "[ frame " << curFrame << " ]" << std::endl;
-
-	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addLocalFrameTiming();
 
 	//CUDAImageManager::ManagedRGBDInputFrame& integrateFrame = m_CudaImageManager->getLastIntegrateFrame();
 	getCurrentFrame();

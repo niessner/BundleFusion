@@ -85,11 +85,6 @@ public:
 		optLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
 		global = new SIFTImageManager(m_submapSize, maxNumGlobalImages, maxNumKeysPerImage);
 
-		//if (GlobalBundlingState::get().s_enableDetailedTimings) {
-		//	m_globalTimer = new CUDATimer();
-		//	global->setTimer(m_globalTimer);
-		//}
-
 		m_invalidImagesList.resize(maxNumGlobalImages * m_submapSize, 1);
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globalTrajectory, sizeof(float4x4)*maxNumGlobalImages));
@@ -135,13 +130,6 @@ public:
 		MLIB_CUDA_SAFE_FREE(d_siftTrajectory);
 		MLIB_CUDA_SAFE_FREE(d_currIntegrateTransform);
 	}
-	//void evaluateTimings() {
-	//	if (GlobalBundlingState::get().s_enableDetailedTimings) {
-	//		std::cout << "********* GLOBAL TIMINGS *********" << std::endl;
-	//		m_globalTimer->evaluate(true, true);
-	//		std::cout << std::endl << std::endl;
-	//	}
-	//}
 
 	float4x4* getLocalTrajectoryGPU(unsigned int localIdx) const {
 		return d_localTrajectories + localIdx * (m_submapSize + 1);
@@ -278,8 +266,6 @@ private:
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;
 
-	// debug only
-	//CUDATimer* m_globalTimer;
 };
 
 #endif

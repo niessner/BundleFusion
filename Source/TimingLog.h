@@ -17,6 +17,7 @@ public:
 		double timeSolve;
 		unsigned int numItersSolve;
 
+		double timeSensorProcess; // copy to gpu/resize/etc with input
 		double timeReIntegrate;
 		double timeReconstruct;
 		double timeVisualize;
@@ -32,6 +33,7 @@ public:
 			timeSolve = 0;
 			numItersSolve = 0;
 
+			timeSensorProcess = 0;
 			timeReIntegrate = 0;
 			timeReconstruct = 0;
 			timeVisualize = 0;
@@ -48,6 +50,7 @@ public:
 			*out << "\tTime Solve: " << std::to_string(timeSolve) << "ms" << std::endl;
 			*out << "\t#iters solve: " << std::to_string(numItersSolve) << std::endl;
 			if (printDepthSensing) {
+				*out << "\tTime Process Input: " << std::to_string(timeSensorProcess) << "ms" << std::endl;
 				*out << "\tTime Re-Integrate: " << std::to_string(timeReIntegrate) << "ms" << std::endl;
 				*out << "\tTime Reconstruct: " << std::to_string(timeReconstruct) << std::endl;
 				*out << "\tTime Visualize: " << std::to_string(timeVisualize) << std::endl;
@@ -65,14 +68,19 @@ public:
 	{
 	}
 
-	static void printAllTimings(const std::string& dir = "./")
+	static void printAllTimings(const std::string& dir = "./timings/")
 	{
-		const std::string read = dir + "timingLog.txt";
+		if (!util::directoryExists(dir)) util::makeDirectory(dir);
+		std::string read;
+		if (m_totalFrameTimings.empty())
+			read = dir + "timingLog.txt";
+		else 
+			read = dir + "timingLogPerFrame.txt";
 		printTimings(read);
 		printExcelTimings(dir + "excel");
 	}
 
-	static void printTimings(const std::string& filename) 
+	static void printTimings(const std::string& filename)
 	{
 		//if(GlobalAppState::get().s_timingsDetailledEnabled)
 		{
@@ -83,27 +91,32 @@ public:
 				outFile.open(filename, std::ios::out);
 			}
 			std::ostream &out = (logToFile ? outFile : std::cout);
-			
-			out << "Global Timings Per Frame:" << std::endl;
-			for (unsigned int i = 0; i < m_globalFrameTimings.size(); i++) {
-				out << "[ frame " << i << " ]" << std::endl;
-				m_globalFrameTimings[i].print(&out, false);
-			}
-			out << std::endl << std::endl;
 
-			out << "Local Timings Per Frame:" << std::endl;
-			for (unsigned int i = 0; i < m_localFrameTimings.size(); i++) {
-				out << "[ frame " << i << " ]" << std::endl;
-				m_localFrameTimings[i].print(&out, true);
+			if (!m_globalFrameTimings.empty()) {
+				out << "Global Timings Per Frame:" << std::endl;
+				for (unsigned int i = 0; i < m_globalFrameTimings.size(); i++) {
+					out << "[ frame " << i << " ]" << std::endl;
+					m_globalFrameTimings[i].print(&out, false);
+				}
+				out << std::endl << std::endl;
 			}
 
-			if (m_totalFrameTimings.size() > 0) out << "Total Timings Per Frame:" << std::endl;
-			for (unsigned int i = 0; i < m_totalFrameTimings.size(); i++) {
-				out << "[ frame " << i << " ] " << m_totalFrameTimings[i] << " ms" << std::endl;
+			if (!m_localFrameTimings.empty()) {
+				out << "Local Timings Per Frame:" << std::endl;
+				for (unsigned int i = 0; i < m_localFrameTimings.size(); i++) {
+					out << "[ frame " << i << " ]" << std::endl;
+					m_localFrameTimings[i].print(&out, true);
+				}
+				out << std::endl << std::endl;
 			}
 
-			out << std::endl;
-			out << std::endl;
+			if (!m_totalFrameTimings.empty()) {
+				out << "Total Timings Per Frame:" << std::endl;
+				for (unsigned int i = 0; i < m_totalFrameTimings.size(); i++) {
+					out << "[ frame " << i << " ] " << m_totalFrameTimings[i] << " ms" << std::endl;
+				}
+				out << std::endl << std::endl;
+			}
 		}
 	}
 
@@ -138,6 +151,9 @@ public:
 		*out << std::endl;
 
 		if (printDepthSensing) {
+			*out << "Process Input";
+			for (unsigned int i = 0; i < frameTimings.size(); i++) *out << separator << frameTimings[i].timeSensorProcess;
+			*out << std::endl;
 			*out << "Re-Integrate";
 			for (unsigned int i = 0; i < frameTimings.size(); i++) *out << separator << frameTimings[i].timeReIntegrate;
 			*out << std::endl;
@@ -154,19 +170,29 @@ public:
 	{
 		const std::string separator = ",";
 
-		const std::string globalFile = prefix + "_global.txt";
-		{
+		if (!m_globalFrameTimings.empty()) {
+			const std::string globalFile = prefix + "_global.txt";
 			std::ofstream out(globalFile);
 			printExcelTimings(&out, separator, m_globalFrameTimings, false);
+			out.close();
 		}
-		const std::string localFile = prefix + "_local.txt";
-		{
+		if (!m_localFrameTimings.empty()) {
+			const std::string localFile = prefix + "_local.txt";
 			std::ofstream out(localFile);
 			printExcelTimings(&out, separator, m_localFrameTimings, true);
+			out.close();
+		}
+		if (!m_totalFrameTimings.empty()) {
+			const std::string totalFile = prefix + "_total.txt";
+			std::ofstream out(totalFile);
+			out << "Per Frame Timings";
+			for (unsigned int i = 0; i < m_totalFrameTimings.size(); i++)
+				out << separator << m_totalFrameTimings[i];
+			out.close();
 		}
 	}
 
-	static void printCurrentLocalFrame() 
+	static void printCurrentLocalFrame()
 	{
 		if (m_localFrameTimings.empty()) return;
 
@@ -201,7 +227,7 @@ public:
 	}
 
 	static FrameTiming& getFrameTiming(bool local)
-	{ 
+	{
 		if (local) return m_localFrameTimings.back();
 		else return m_globalFrameTimings.back();
 	}

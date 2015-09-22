@@ -13,7 +13,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 , THREADS_PER_BLOCK(512) // keep consistent with the GPU
 {
 	m_timer = NULL;
-	if (GlobalBundlingState::get().s_enableDetailedTimings) m_timer = new CUDATimer();
+	//if (GlobalBundlingState::get().s_enableDetailedTimings) m_timer = new CUDATimer();
 	m_bRecordConvergence = GlobalBundlingState::get().s_recordSolverConvergence;
 
 	//!!!TODO PARAMS

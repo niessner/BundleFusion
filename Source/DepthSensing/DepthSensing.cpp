@@ -370,8 +370,8 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			break;
 		case '6':
 		{
-			if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::printAllTimings();
-			else std::cout << "Cannot print timings: enable \"s_enableGlobalTimings\" in parameter file" << std::endl;
+			if (GlobalBundlingState::get().s_enableGlobalTimings || GlobalBundlingState::get().s_enablePerFrameTimings) TimingLog::printAllTimings();
+			else std::cout << "Cannot print timings: enable \"s_enableGlobalTimings\" or \"s_enablePerFrameTimings\" in parameter file" << std::endl;
 		}
 			break;
 		case '7':
@@ -795,7 +795,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//double timeReintegrate = 0.0f;
 
 	//Start Timing
-	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
+	if (GlobalBundlingState::get().s_enablePerFrameTimings) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
 
 	///////////////////////////////////////
 	// Read Input
@@ -888,7 +888,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 
 	// Stop Timing
-	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLogDepthSensing::totalTimeRenderMain += GlobalAppState::get().s_Timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeRenderMain++; }
+	if (GlobalBundlingState::get().s_enablePerFrameTimings) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLog::addTotalFrameTime(GlobalAppState::get().s_Timer.getElapsedTimeMS()); }
 	
 
 	std::cout << "<<< Total Frame Process Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;

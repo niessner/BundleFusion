@@ -1,6 +1,8 @@
 #pragma once
 #include "RGBDSensor.h"
 #include "CUDAImageUtil.h"
+#include "GlobalBundlingState.h"
+#include "TimingLog.h"
 
 #include <cuda_runtime.h>
 
@@ -184,6 +186,8 @@ public:
 		if (!m_RGBDSensor->processDepth()) return false;	// Order is important!
 		if (!m_RGBDSensor->processColor()) return false;
 
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { TimingLog::addLocalFrameTiming(); cudaDeviceSynchronize(); s_timer.start(); }
+
 		m_data.push_back(ManagedRGBDInputFrame());
 		ManagedRGBDInputFrame& frame = m_data.back();
 		frame.alloc();
@@ -246,6 +250,8 @@ public:
 		//// SIFT Intensity Image
 		//////////////////////////////////////////////////////////////////////////////////////
 		//CUDAImageUtil::resampleToIntensity(d_intensitySIFT, m_widthSIFT, m_heightSIFT, d_colorInput, m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSensorProcess = s_timer.getElapsedTimeMS(); }
 
 		m_currFrame++;
 		return true;
@@ -361,4 +367,5 @@ private:
 
 	unsigned int m_currFrame;
 
+	static Timer s_timer;
 };
