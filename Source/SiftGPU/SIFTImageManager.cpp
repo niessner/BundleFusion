@@ -429,7 +429,7 @@ void SIFTImageManager::filterFrames(unsigned int numCurrImagePairs)
 	cutilSafeCall(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int) * numCurrImagePairs, cudaMemcpyDeviceToHost));
 
 	for (unsigned int i = 0; i < numCurrImagePairs; i++) { // previous frames
-		if (currNumFilteredMatchesPerImagePair[i] > 0) {
+		if (m_validImages[i] != 0 && currNumFilteredMatchesPerImagePair[i] > 0) {
 			connected = 1;
 			break;
 		}
