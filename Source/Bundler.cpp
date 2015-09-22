@@ -94,6 +94,7 @@ void Bundler::processInput()
 	if (GlobalBundlingState::get().s_recordKeysPointCloud && (curLocalFrame == 0 || m_SubmapManager.isLastLocalFrame(curFrame))) {
 		m_RGBDSensor->recordPointCloud();
 	}
+
 	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);
 	// sift/cuda cache for next local
 	if (m_SubmapManager.isLastLocalFrame(curFrame)) {
