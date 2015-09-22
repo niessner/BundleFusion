@@ -57,6 +57,12 @@ class DX11PhongLighting
 		static ID3D11ShaderResourceView* GetDepthStencilSRV();
 		static ID3D11ShaderResourceView* GetColorsSRV();
 
+		static unsigned int getWidth() {
+			return s_width;
+		}
+		static unsigned int getHeight() {
+			return s_height;
+		}
 private:
 	static unsigned int s_width;
 	static unsigned int s_height;

@@ -62,6 +62,6 @@ private:
 
 
 	unsigned int	m_topNActive;				//only keep up to N
-	float			m_minPoseDist;				//only change if value is larger than this
+	float			m_minPoseDistSqrt;				//only change if value is larger than this
 	float			m_featureRescaleRotToTrans;	//multiply the angle in the distance metric by this factor
 };

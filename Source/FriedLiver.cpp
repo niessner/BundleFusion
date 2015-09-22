@@ -194,8 +194,6 @@ int main(int argc, char** argv)
 		std::cout << VAR_NAME(fileNameDescGlobalBundling) << " = " << fileNameDescGlobalBundling << std::endl;
 		std::cout << std::endl;
 
-
-
 		//Read the global app state
 		ParameterFile parameterFileGlobalApp(fileNameDescGlobalApp);
 		GlobalAppState::getInstance().readMembers(parameterFileGlobalApp);
@@ -231,22 +229,6 @@ int main(int argc, char** argv)
 	
 		//start depthSensing render loop
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
-
-		//while (1) {
-		//	if (g_imageManager->process()) {
-		//		//bundler->process();
-		//		g_bundler->processInput();
-
-		//		//fake call to fix indexing
-		//		g_bundler->getTrajectoryManager()->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, mat4f::identity(), 0);
-
-		//		// these are queried
-		//		g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-		//		g_bundler->processGlobal();
-		//		g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
-		//	}
-		//	else break;
-		//}
 
 		//TimingLog::printAllTimings();
 		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");

@@ -363,7 +363,10 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			GlobalAppState::get().s_RenderMode = 4;
 			break;
 		case '5':
-			GlobalAppState::get().s_RenderMode = 5;
+			//this ist just debug for the rendering shader
+			std::cout << "recompiling render shader..." << std::endl;
+			DX11PhongLighting::OnD3D11DestroyDevice();
+			DX11PhongLighting::OnD3D11CreateDevice(DXUTGetD3D11Device(), DX11PhongLighting::getWidth(), DX11PhongLighting::getHeight());
 			break;
 		case '6':
 		{
@@ -734,7 +737,7 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 
 void reintegrate()
 {
-	const unsigned int maxPerFrameFixes = 10;
+	const unsigned int maxPerFrameFixes = GlobalAppState::get().s_maxFrameFixes;
 	TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
 
 	if (tm->getNumActiveOperations() < maxPerFrameFixes) {
@@ -790,8 +793,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//double timeReconstruct = 0.0f;
 	//double timeVisualize = 0.0f;
 	//double timeReintegrate = 0.0f;
-
-	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
 
 	//Start Timing
 	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
@@ -886,14 +887,16 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//g_depthSensingBundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 
 
+	// Stop Timing
+	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLogDepthSensing::totalTimeRenderMain += GlobalAppState::get().s_Timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeRenderMain++; }
+	
+
 	std::cout << "<<< Total Frame Process Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
 	//std::cout << VAR_NAME(timeReconstruct) << " : " << timeReconstruct << " [ms]" << std::endl;
 	//std::cout << VAR_NAME(timeVisualize) << " : " << timeVisualize << " [ms]" << std::endl;
 	//std::cout << VAR_NAME(timeReintegrate) << " : " << timeReintegrate << " [ms]" << std::endl;
 	//std::cout << std::endl;
 
-	// Stop Timing
-	if (GlobalAppState::get().s_timingsDetailledEnabled) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLogDepthSensing::totalTimeRenderMain += GlobalAppState::get().s_Timer.getElapsedTimeMS(); TimingLogDepthSensing::countTimeRenderMain++; }
 	//std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
 
 	//TimingLogDepthSensing::printTimings();

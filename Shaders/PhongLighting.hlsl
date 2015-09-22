@@ -6,13 +6,13 @@ Texture2D<float4> inputColors : register (t12);
 
 sampler g_PointSampler : register (s10);
 
-cbuffer cbPerFrame : register( b0 )
+cbuffer cbPerFrame : register(b0)
 {
-	uint	g_useMaterial; 
+	uint	g_useMaterial;
 	float3	g_overlayColor;
 };
 
-cbuffer cbLight : register( b1 )
+cbuffer cbLight : register(b1)
 {
 	float4 lightAmbient;
 	float4 lightDiffuse;
@@ -24,7 +24,7 @@ cbuffer cbLight : register( b1 )
 	float4 materialDiffuse;
 };
 
-cbuffer cbPerFrame : register( b10 )
+cbuffer cbPerFrame : register(b10)
 {
 	float m_WidthoverNextPowOfTwo;
 	float m_HeightoverNextPowOfTwo;
@@ -34,7 +34,7 @@ cbuffer cbPerFrame : register( b10 )
 
 struct VS_INPUT
 {
-    float3 vPosition		: POSITION;
+	float3 vPosition		: POSITION;
 	float2 vTexcoord		: TEXCOORD;
 };
 
@@ -47,24 +47,38 @@ struct VS_OUTPUT
 float4 PhongPS(VS_OUTPUT Input) : SV_TARGET
 {
 	const float3 position = inputPositions.Sample(g_PointSampler, Input.vTexcoord).xyz;
-	const float3 normal = inputNormals.Sample(g_PointSampler, Input.vTexcoord).xyz;
+	const float3 normal = normalize(inputNormals.Sample(g_PointSampler, Input.vTexcoord).xyz);
 	const float3 color = inputColors.Sample(g_PointSampler, Input.vTexcoord).xyz;
 
-	if(position.x != MINF && color.x != MINF && normal.x != MINF)
+	if (position.x != MINF && color.x != MINF && normal.x != MINF)
 	{
-		float4 material;
-		if(g_useMaterial == 1)  material = float4(color, 1.0f);
-		else					material = materialDiffuse;
-		
+		float4 resColor = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
 		const float3 eyeDir = normalize(position);
 		const float3 R = normalize(reflect(-normalize(lightDir), normal));
-	
-		float4 resColor = 
-			  lightAmbient  * materialAmbient														// Ambient
-			+ lightDiffuse  * material * max(dot(normal, -normalize(lightDir)), 0.0)				// Diffuse
-			+ lightSpecular * materialSpecular * pow(max(dot(R, eyeDir), 0.0f), materialShininess); // Specular
 
-		//resColor = resColor + float4(g_overlayColor, 0.0f);
+		if (g_useMaterial == 1)  {
+			float4 material = float4(color, 1.0f);
+
+			float4 ambient = lightAmbient * material;
+			float4 diffuse = lightDiffuse  * material * abs(dot(normal, -normalize(lightDir)));
+			float4 specular = lightSpecular* material * pow(max(dot(R, eyeDir), 0.0f), materialShininess);
+
+			float power = 0.6f;
+			diffuse = pow(diffuse, power);
+			resColor = ambient + diffuse + specular;
+			resColor.w = 1.0f;
+			
+		}
+		else {
+			resColor =
+				lightAmbient  * materialAmbient															// Ambient
+				+ lightDiffuse  * materialDiffuse * max(dot(normal, -normalize(lightDir)), 0.0f)		// Diffuse
+				+ lightSpecular * materialSpecular * pow(max(dot(R, eyeDir), 0.0f), materialShininess); // Specular
+		}
+
+
+
 		if (g_overlayColor.x == -1.0f) {
 			resColor.x = resColor.y = resColor.z;
 		}

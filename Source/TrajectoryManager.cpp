@@ -2,7 +2,7 @@
 #include "stdafx.h"
 
 #include "TrajectoryManager.h"     
-
+#include "GlobalAppState.h"
 
 
 TrajectoryManager::TrajectoryManager(unsigned int numMaxImage)
@@ -16,10 +16,8 @@ TrajectoryManager::TrajectoryManager(unsigned int numMaxImage)
 	m_numAddedFrames = 0;
 	m_numOptimizedFrames = 0;
 
-	//TODO move this to some sort of parameter file
-	m_topNActive = 30;
-	m_minPoseDist = 0.02f*0.02f;
-	m_minPoseDist = 0.00f;
+	m_topNActive = GlobalAppState::get().s_topNActive;
+	m_minPoseDistSqrt = GlobalAppState().s_minPoseDistSqrt;
 	m_featureRescaleRotToTrans = 2.0f;
 }
 
@@ -98,7 +96,7 @@ void TrajectoryManager::generateUpdateLists()
 
 	for (unsigned int i = (unsigned int)m_toReIntegrateList.size(); i < m_topNActive && i < numFrames; i++) {
 		auto* f = m_framesSort[i];
-		if (f->dist > m_minPoseDist && f->type == TrajectoryFrame::Integrated) {
+		if (f->dist > m_minPoseDistSqrt && f->type == TrajectoryFrame::Integrated) {
 			f->type = TrajectoryFrame::ReIntegration;
 			m_toReIntegrateList.push_back(f);
 		}

@@ -29,6 +29,9 @@
 	X(unsigned int, s_windowHeight) \
 	X(unsigned int, s_integrationWidth) \
 	X(unsigned int, s_integrationHeight) \
+	X(unsigned int, s_maxFrameFixes) \
+	X(unsigned int, s_topNActive) \
+	X(float, s_minPoseDistSqrt) \
 	X(float, s_sensorDepthMax) \
 	X(float, s_sensorDepthMin) \
 	X(unsigned int, s_hashNumBuckets) \
