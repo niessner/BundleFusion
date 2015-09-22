@@ -32,7 +32,9 @@
 	X(bool, s_recordSolverConvergence) \
 	X(bool, s_erodeSIFTdepth) \
 	X(float, s_verifyOptErrThresh) \
-	X(float, s_verifyOptCorrThresh)
+	X(float, s_verifyOptCorrThresh) \
+	X(unsigned int, s_maxNumResidualsRemoved) \
+	X(bool, s_verbose)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;

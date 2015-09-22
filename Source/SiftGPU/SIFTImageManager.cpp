@@ -435,7 +435,7 @@ void SIFTImageManager::filterFrames(unsigned int numCurrImagePairs)
 		}
 	}
 
-	if (!connected)
+	if (GlobalBundlingState::get().s_verbose && !connected)
 		std::cout << "frame " << numCurrImagePairs << " not connected to previous!" << std::endl;
 
 	m_validImages[numCurrImagePairs] = connected;

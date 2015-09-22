@@ -705,7 +705,7 @@ void __global__ CheckForInvalidFramesCU_Kernel(const int* d_varToCorrNumEntriesP
 
 	if (idx < numVars) {
 		if (d_varToCorrNumEntriesPerRow[idx] == 0) { // no connections!
-			printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
+			//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
 			d_validImages[idx] = 0;
 		}
 	}

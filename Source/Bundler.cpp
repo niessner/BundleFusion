@@ -72,7 +72,7 @@ void Bundler::processInput()
 	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame)
 		return; // nothing new to process
 
-	std::cout << "[ frame " << curFrame << " ]" << std::endl;
+	if (GlobalBundlingState::get().s_verbose) std::cout << "[ frame " << curFrame << " ]" << std::endl;
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addLocalFrameTiming();
 
@@ -148,7 +148,7 @@ void Bundler::processInput()
 			m_currentState.m_numCompleteTransforms = m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames;
 
 			//add invalidated (fake) global frame
-			std::cout << "WARNING: invalid local submap " << curFrame << " (" << m_SubmapManager.global->getNumImages() << ", " << m_SubmapManager.currentLocal->getNumImages() << ")" << std::endl;
+			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << " (" << m_SubmapManager.global->getNumImages() << ", " << m_SubmapManager.currentLocal->getNumImages() << ")" << std::endl;
 			//getchar();
 			m_SubmapManager.invalidateImages(m_submapSize * curLocalIdx, m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames);
 			SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
@@ -207,7 +207,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 			GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
 
 		if (valid == 0) {
-			std::cout << "WARNING: invalid local submap from verify " << currLocalIdx << " (" << m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames << ")" << std::endl;
+			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap from verify " << currLocalIdx << " (" << m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames << ")" << std::endl;
 			//getchar();
 
 			m_SubmapManager.invalidateImages(m_submapSize * currLocalIdx, m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames);
@@ -283,8 +283,7 @@ void Bundler::processGlobal()
 				m_currentState.m_bOptimizeGlobal = true;
 			}
 			else {
-				std::cout << "WARNING: last image not valid! no new global images for solve" << std::endl;
-				std::cout << "#global images = " << global->getNumImages() << std::endl;
+				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
 				//getchar();
 			}
 		}

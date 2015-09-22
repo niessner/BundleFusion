@@ -19,7 +19,6 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 
 	m_bVerify = false;
 
-	//std::cout << "[ align ]" << std::endl;
 	m_maxResidual = -1.0f;
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
@@ -28,7 +27,7 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans);
 
 	bool removed = false;
-	const unsigned int maxIts = 10;//GlobalAppState::get().s_maxNumResidualsRemoved; //!!!TODO PARAMS
+	const unsigned int maxIts = GlobalBundlingState::get().s_maxNumResidualsRemoved;
 	unsigned int curIt = 0;
 	do {
 		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits, isStart, isEnd);
@@ -44,7 +43,6 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
 	
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve = s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve = curIt * maxNumIters; }
-	//std::cout << "[ align Time:] " << s_timer.getElapsedTimeMS() << " ms" << std::endl;
 }
 
 bool SBA::alignCUDA(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd)
@@ -70,7 +68,7 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 	ml::vec2ui imageIndices;
 	bool remove = m_solver->getMaxResidual(siftManager->getGlobalCorrespondencesDEBUG(), imageIndices, m_maxResidual);
 	if (remove) {
-		std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
+		if (GlobalBundlingState::get().s_verbose) std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
 		//getchar();
 		// invalidate correspondence
 		siftManager->InvalidateImageToImageCU(make_uint2(imageIndices.x, imageIndices.y));
