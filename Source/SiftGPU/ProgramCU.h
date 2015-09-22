@@ -40,7 +40,7 @@ public:
 	static void FilterImage(CuTexImage *dst, CuTexImage *src, CuTexImage* buf, unsigned int width, unsigned int filterIndex);
 	//static void FilterImage(CuTexImage *dst, CuTexImage *src, CuTexImage* buf, float sigma);
 	static void ComputeDOG(CuTexImage* gus, CuTexImage* dog, CuTexImage* got);
-	static void ComputeKEY(CuTexImage* dog, CuTexImage* key, float Tdog, float Tedge, CuTexImage* featureList, int* d_featureCount, unsigned int featureOctLevelidx, float keyLocScale, float keyLocOffset, const float* d_depthData);
+	static void ComputeKEY(CuTexImage* dog, CuTexImage* key, float Tdog, float Tedge, CuTexImage* featureList, int* d_featureCount, unsigned int featureOctLevelidx, float keyLocScale, float keyLocOffset, const float* d_depthData, float siftDepthMin, float siftDepthMax);
 	static void InitHistogram(CuTexImage* key, CuTexImage* hist);
 	static void ReduceHistogram(CuTexImage*hist1, CuTexImage* hist2);
 	static void GenerateList(CuTexImage* list, CuTexImage* hist);		//TODO get rid of it doesn't seem to be used

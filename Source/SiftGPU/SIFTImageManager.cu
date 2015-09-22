@@ -402,7 +402,8 @@ void SIFTImageManager::FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePai
 __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, float colorThresh, const float4x4& transform, const float4x4& intrinsics,
 	const float* d_inputDepth, const float4* d_inputCamPos, const float4* d_inputNormal, const uchar4* d_inputColor,
-	const float* d_modelDepth, const float4* d_modelCamPos, const float4* d_modelNormal, const uchar4* d_modelColor)
+	const float* d_modelDepth, const float4* d_modelCamPos, const float4* d_modelNormal, const uchar4* d_modelColor,
+	float sensorDepthMin, float sensorDepthMax)
 {
 	float3 out = make_float3(0.0f);
 
@@ -453,7 +454,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 //we launch 1 thread for two array entries
 void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, unsigned int imageHeight, const float4x4 intrinsics,
 	int* d_currNumFilteredMatchesPerImagePair, const float4x4* d_currFilteredTransforms, const float4x4* d_currFilteredTransformsInv, const CUDACachedFrame* d_cachedFrames,
-	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
+	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax)
 {
 	const unsigned int curImageIdx = gridDim.x;
 	const unsigned int imagePairIdx = blockIdx.x; // prev image idx
@@ -485,10 +486,10 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 
 			float3 inputToModel = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform, intrinsics,
 				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor,
-				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor);
+				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor, sensorDepthMin, sensorDepthMax);
 			float3 modelToInput = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform.getInverse(), intrinsics,
 				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor,
-				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor);
+				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor, sensorDepthMin, sensorDepthMax);
 
 			local_sumResidual += inputToModel.x + modelToInput.x;	//residual
 			local_sumWeight += inputToModel.y + modelToInput.y;		//corr weight
@@ -538,7 +539,7 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 //TODO camera stuff here
 void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
 	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
-	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
+	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax)
 {
 	if (numCurrImagePairs == 0) return;
 
@@ -550,7 +551,8 @@ void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePai
 	FilterMatchesByDenseVerifyCU_Kernel << <grid, block >> >(
 		imageWidth, imageHeight, intrinsics,
 		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms, d_currFilteredTransformsInv, d_cachedFrames,
-		distThresh, normalThresh, colorThresh, errThresh, corrThresh);
+		distThresh, normalThresh, colorThresh, errThresh, corrThresh,
+		sensorDepthMin, sensorDepthMax);
 
 	if (m_timer) m_timer->endEvent();
 
@@ -956,7 +958,7 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_tr
 	unsigned int imageWidth, unsigned int imageHeight,
 	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
-	int* d_validOpt)
+	int* d_validOpt, float sensorDepthMin, float sensorDepthMax)
 {
 	const unsigned int img0 = blockIdx.x / numImages;
 	const unsigned int img1 = blockIdx.x % numImages;
@@ -988,10 +990,10 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_tr
 
 			float3 inputToModel = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform, intrinsics,
 				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor,
-				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor);
+				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor, sensorDepthMin, sensorDepthMax);
 			float3 modelToInput = computeProjError(idx, imageWidth, imageHeight, distThresh, normalThresh, colorThresh, transform.getInverse(), intrinsics,
 				d_modelDepth, d_modelCamPos, d_modelNormal, d_modelColor,
-				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor);
+				d_inputDepth, d_inputCamPos, d_inputNormal, d_inputColor, sensorDepthMin, sensorDepthMax);
 
 			local_sumResidual += inputToModel.x + modelToInput.x;	//residual
 			local_sumWeight += inputToModel.y + modelToInput.y;		//corr weight
@@ -1041,7 +1043,8 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_tr
 int SIFTImageManager::VerifyTrajectoryCU(unsigned int numImages, float4x4* d_trajectory,
 	unsigned int imageWidth, unsigned int imageHeight,
 	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
-	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh)
+	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
+	float sensorDepthMin, float sensorDepthMax)
 {
 	if (numImages < 2) return 0;
 	const unsigned int numPairs = (numImages * (numImages - 1)) / 2;
@@ -1057,7 +1060,7 @@ int SIFTImageManager::VerifyTrajectoryCU(unsigned int numImages, float4x4* d_tra
 	VerifyTrajectoryCU_Kernel << <grid, block >> >(
 		numImages, d_trajectory, imageWidth, imageHeight, intrinsics,
 		d_cachedFrames, distThresh, normalThresh, colorThresh, errThresh, corrThresh,
-		d_validOpt);
+		d_validOpt, sensorDepthMin, sensorDepthMax);
 
 	cutilSafeCall(cudaMemcpy(&valid, d_validOpt, sizeof(int), cudaMemcpyDeviceToHost));
 

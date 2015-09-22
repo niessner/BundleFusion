@@ -50,9 +50,8 @@ public:
 	static int		_NormalizedSIFT;
 	static int		_FeatureCountThreshold;
 	static bool		_EnableDetailedTimings;
-
-	////////////////////////////////////////
-    static int              _DeviceIndex; 
+	static float	_SiftDepthMin;
+	static float	_SiftDepthMax;
 };
 
 

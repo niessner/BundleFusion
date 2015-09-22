@@ -123,12 +123,13 @@ public:
 
 	void FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
 		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
-		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh);
+		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax);
 
 	int VerifyTrajectoryCU(unsigned int numImages, float4x4* d_trajectory,
 		unsigned int imageWidth, unsigned int imageHeight,
 		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
-		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh);
+		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
+		float sensorDepthMin, float sensorDepthMax);
 
 	//void FilterFramesCU(unsigned int numCurrImagePairs);
 

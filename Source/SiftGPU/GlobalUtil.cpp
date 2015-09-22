@@ -60,9 +60,8 @@ int GlobalUtil::_TruncateMethod = 0;
 int GlobalUtil::_FeatureCountThreshold = -1;
 
 bool GlobalUtil::_EnableDetailedTimings = false;
-
-///////////////////////////////////////////////
-int GlobalUtil::_DeviceIndex = 0;
+float GlobalUtil::_SiftDepthMin = 0.1f;
+float GlobalUtil::_SiftDepthMax = 3.0f;
 
 
 

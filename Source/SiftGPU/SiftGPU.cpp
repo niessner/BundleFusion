@@ -61,7 +61,7 @@ SiftGPU::~SiftGPU()
 }
 
 
-void SiftGPU::InitSiftGPU(unsigned int depthWidth, unsigned int depthHeight, unsigned int intensityWidth, unsigned int intensityHeight)
+void SiftGPU::InitSiftGPU()
 {
 	if (_initialized) return;
 
@@ -221,10 +221,10 @@ void SiftGPU::PrintUsage()
 		<< "\n";
 }
 
-void SiftGPU::SetParams(int cudaDeviceIndex, bool enableTiming, unsigned int featureCountThreshold)
+void SiftGPU::SetParams(bool enableTiming, unsigned int featureCountThreshold, float siftDepthMin, float siftDepthMax)
 {
-	// use cuda 
-	GlobalUtil::_DeviceIndex = cudaDeviceIndex;
+	GlobalUtil::_SiftDepthMin = siftDepthMin;
+	GlobalUtil::_SiftDepthMax = siftDepthMax;
 
 	//!!!TODO TRY THIS
 	//GlobalUtil::_LoweOrigin = 1;

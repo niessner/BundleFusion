@@ -94,7 +94,7 @@ public:
 
 
 	//Initialize OpenGL and SIFT paremeters, and create the shaders accordingly
-	void InitSiftGPU(unsigned int depthWidth, unsigned int depthHeight, unsigned int intensityWidth, unsigned int intensityHeight);
+	void InitSiftGPU();
 	//get the number of SIFT features in current image
 	 int	GetFeatureNum();
 
@@ -109,7 +109,7 @@ public:
 	//Copy the SIFT result to two vectors
 	// void CopyFeatureVectorToCPU(SiftKeypoint * keys, float * descriptors);
 	//parse SiftGPU parameters
-	 void SetParams(int cudaDeviceIndex, bool enableTiming, unsigned int featureCountThreshold);
+	 void SetParams(bool enableTiming, unsigned int featureCountThreshold, float siftDepthMin, float siftDepthMax);
 
 	int RunSIFT(float* d_colorData, const float* d_depthData);
 	//set the active pyramid...dropped function

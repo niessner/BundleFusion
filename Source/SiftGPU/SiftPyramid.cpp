@@ -365,7 +365,8 @@ void SiftPyramid::DetectKeypoints(const float* d_depthData)
 			float keyLocScale = os * (1 << (featureOctLevelIndex / param._dog_level_num));
 			//input, dog, dog + 1, dog -1
 			//output, key
-			ProgramCU::ComputeKEY(dog, key, param._dog_threshold, param._edge_threshold, &_featureTexRaw[featureOctLevelIndex], d_featureCount, featureOctLevelIndex, keyLocScale, keyLocOffset, d_depthData);
+			ProgramCU::ComputeKEY(dog, key, param._dog_threshold, param._edge_threshold, &_featureTexRaw[featureOctLevelIndex], d_featureCount, featureOctLevelIndex,
+				keyLocScale, keyLocOffset, d_depthData, GlobalUtil::_SiftDepthMin, GlobalUtil::_SiftDepthMax);
 		}
 	}
 

@@ -51,8 +51,8 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 	m_sift = new SiftGPU;
 	m_siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
-	m_sift->SetParams(0, GlobalBundlingState::get().s_enableDetailedTimings, 150);
-	m_sift->InitSiftGPU(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight(), m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
+	m_sift->SetParams(GlobalBundlingState::get().s_enableDetailedTimings, 150, GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
+	m_sift->InitSiftGPU();
 	m_siftMatcher->InitSiftMatch();
 
 	m_bHasProcessedInputFrame = false;
@@ -201,10 +201,10 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 	if (m_SparseBundler.useVerification()) {
 		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
 		int valid = siftManager->VerifyTrajectoryCU(siftManager->getNumImages(), m_SubmapManager.getLocalTrajectoryGPU(currLocalIdx),
-			cudaCache->getWidth(), cudaCache->getHeight(),
-			MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
+			cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
 			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
-			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifyOptErrThresh, GlobalBundlingState::get().s_verifyOptCorrThresh);
+			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifyOptErrThresh, GlobalBundlingState::get().s_verifyOptCorrThresh,
+			GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
 
 		if (valid == 0) {
 			std::cout << "WARNING: invalid local submap from verify " << currLocalIdx << " (" << m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames << ")" << std::endl;
@@ -393,7 +393,8 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
 		siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
 			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
-			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh);
+			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh,
+			GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterDenseVerify = s_timer.getElapsedTimeMS(); }
 
 		// --- filter frames
