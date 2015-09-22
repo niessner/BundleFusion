@@ -199,7 +199,12 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	const uint2* d_matchKeyPointIndices = &d_matchKeyPointIndicesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	unsigned int numMatches = d_numMatchesPerImagePair[imagePairIdx];
 
-	if (numMatches == 0)	return;
+	if (numMatches == 0) {
+		if (tidx == 0) {
+			d_numFilteredMatchesPerImagePair[imagePairIdx] = 0;
+		}
+		return;
+	}
 	if (numMatches > MAX_MATCHES_PER_IMAGE_PAIR_RAW) numMatches = MAX_MATCHES_PER_IMAGE_PAIR_RAW;
 
 	__shared__ float matchDistances[MAX_MATCHES_PER_IMAGE_PAIR_RAW];
