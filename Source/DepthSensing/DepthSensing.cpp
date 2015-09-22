@@ -888,10 +888,12 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 
 	// Stop Timing
-	if (GlobalBundlingState::get().s_enablePerFrameTimings) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop(); TimingLog::addTotalFrameTime(GlobalAppState::get().s_Timer.getElapsedTimeMS()); }
+	if (GlobalBundlingState::get().s_enablePerFrameTimings) { 
+		GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop();
+		TimingLog::addTotalFrameTime(GlobalAppState::get().s_Timer.getElapsedTimeMS());
+		std::cout << "<<< [Frame: " << g_CudaImageManager->getCurrFrameNumber() << " ] Total Frame Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
+	}
 	
-
-	std::cout << "<<< Total Frame Process Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
 	//std::cout << VAR_NAME(timeReconstruct) << " : " << timeReconstruct << " [ms]" << std::endl;
 	//std::cout << VAR_NAME(timeVisualize) << " : " << timeVisualize << " [ms]" << std::endl;
 	//std::cout << VAR_NAME(timeReintegrate) << " : " << timeReintegrate << " [ms]" << std::endl;
