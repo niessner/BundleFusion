@@ -856,7 +856,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		}
 
 		
-		g_lastRigidTransform = transformation;
+		if (validTransform) {
+			g_lastRigidTransform = transformation;
+		}
 	}
 	GlobalAppState::get().WaitForGPU();	cudaDeviceSynchronize();
 	timeReconstruct = t.getElapsedTimeMS();
