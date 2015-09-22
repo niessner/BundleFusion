@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GlobalAppState.h"
+#include "GlobalBundlingState.h"
 
 #ifdef STRUCTURE_SENSOR
 
@@ -21,9 +22,10 @@
 
 struct ExampleServerSession : uplink::DesktopServerSession
 {
-	ExampleServerSession(int socketDescriptor, uplink::Server* server)
+	ExampleServerSession(int socketDescriptor, uplink::Server* server, bool sendFeedbackImage)
 		: DesktopServerSession(socketDescriptor, server)
 	{
+		m_bSendFeedbackImage = sendFeedbackImage;
 	}
 
 	virtual void onCustomCommand(const std::string& command)
@@ -83,10 +85,12 @@ struct ExampleServerSession : uplink::DesktopServerSession
 				// FIXME: This const-cast sucks.
 				//if (sendPingPongColorFeedback && !cameraFrame.colorImage.isEmpty())
 				//	sendImage(const_cast<uplink::Image&>(cameraFrame.colorImage));
-				const uplink::Image& feedback = server().getFeedbackImage();
-				if (!feedback.isEmpty()) {
-					//FreeImageWrapper::saveImage("test.png", ColorImageR8G8B8(feedback.height, feedback.width, (vec3uc*)feedback.planes[0].buffer));
-					sendImage(const_cast<uplink::Image&>(feedback));
+				if (m_bSendFeedbackImage) {
+					const uplink::Image& feedback = server().getFeedbackImage();
+					if (!feedback.isEmpty()) {
+						//FreeImageWrapper::saveImage("test.png", ColorImageR8G8B8(feedback.height, feedback.width, (vec3uc*)feedback.planes[0].buffer));
+						sendImage(const_cast<uplink::Image&>(feedback));
+					}
 				}
 				//static unsigned long long count = 0; // FIXME: Use a real steady-rate timer.
 				//if (0 == count++ % 150)
@@ -112,6 +116,7 @@ struct ExampleServerSession : uplink::DesktopServerSession
 
 
 	//static FrameTimer s_timer;
+	bool m_bSendFeedbackImage;
 };
 
 
@@ -121,8 +126,12 @@ struct ExampleSessionSetup : uplink::SessionSetup
 {
 	ExampleSessionSetup()
 	{
-		addSetColorModeAction(uplink::ColorMode_VGA);
-		//addSetColorModeAction(uplink::ColorMode_1296x968);
+		if (GlobalBundlingState::get().s_widthSIFT == 1296 && GlobalBundlingState::get().s_heightSIFT == 968)
+			addSetColorModeAction(uplink::ColorMode_1296x968);
+		else if (GlobalBundlingState::get().s_widthSIFT == 640 && GlobalBundlingState::get().s_heightSIFT == 480)
+			addSetColorModeAction(uplink::ColorMode_VGA);
+		else
+			throw MLIB_EXCEPTION("invalid sift dimensions for structure sensor frames");
 		addSetDepthModeAction(uplink::DepthMode_VGA);
 		addSetRegistrationModeAction(uplink::RegistrationMode_RegisteredDepth);
 		addSetFrameSyncModeAction(uplink::FrameSyncMode_Depth);
@@ -157,7 +166,7 @@ struct ExampleServerDelegate : uplink::ServerDelegate
 	{
 		_server = server;
 
-		return new ExampleServerSession(socketDescriptor, server);
+		return new ExampleServerSession(socketDescriptor, server, GlobalBundlingState::get().s_sendUplinkFeedbackImage);
 	}
 
 	virtual void onConnect(uintptr_t sessionId)
@@ -182,7 +191,7 @@ public:
 		m_server("UplinkTool", 6666, &m_serverDelegate)
 	{
 		unsigned int bufferFrameSize = 2;	// depth/color buffer size //!!! TODO
-		m_server.init(3, GlobalAppState::get().s_windowWidth, GlobalAppState::get().s_windowHeight); 
+		m_server.init(bufferFrameSize, GlobalAppState::get().s_windowWidth, GlobalAppState::get().s_windowHeight); 
 		m_oldDepth = NULL;
 		m_oldColor = NULL;
 	}

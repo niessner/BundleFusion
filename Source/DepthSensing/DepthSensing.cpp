@@ -776,7 +776,7 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), false, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(), overlayColor);
 		DX11QuadDrawer::RenderQuad(pd3dImmediateContext, DX11PhongLighting::GetColorsSRV(), 1.0f);
 #ifdef STRUCTURE_SENSOR
-		if (GlobalAppState::get().s_sensorIdx == 7) {
+		if (GlobalAppState::get().s_sensorIdx == 7 && GlobalBundlingState::get().s_sendUplinkFeedbackImage) {
 			ID3D11Texture2D* pSurface;
 			HRESULT hr = DXUTGetDXGISwapChain()->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pSurface));
 			if (pSurface) {

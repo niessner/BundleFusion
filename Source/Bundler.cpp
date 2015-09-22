@@ -121,6 +121,15 @@ void Bundler::processInput()
 	m_currentState.m_lastFrameProcessed = curFrame;
 	m_currentState.m_bLastFrameValid = (currentLocal->getValidImages()[curLocalFrame] != 0);
 
+	////!!!DEBUGGING
+	//const mat4f& intTransform = m_SubmapManager.getCurrentIntegrateTransform(curFrame);
+	//if (m_currentState.m_bLastFrameValid && ((intTransform(0, 0) == 0.0f && intTransform(1, 1) == 0.0f && intTransform(2, 2) == 0.0f && intTransform(3, 3) == 0.0f) ||
+	//	intTransform[0] == -std::numeric_limits<float>::infinity())) {
+	//	std::cout << "valid but transform = " << std::endl << intTransform << std::endl;
+	//	getchar();
+	//}
+	////!!!DEBUGGING
+
 	// global frame
 	if (m_SubmapManager.isLastFrame(curFrame) || m_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
 		// cache

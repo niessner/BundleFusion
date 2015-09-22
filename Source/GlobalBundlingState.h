@@ -34,7 +34,8 @@
 	X(float, s_verifyOptErrThresh) \
 	X(float, s_verifyOptCorrThresh) \
 	X(unsigned int, s_maxNumResidualsRemoved) \
-	X(bool, s_verbose)
+	X(bool, s_verbose) \
+	X(bool, s_sendUplinkFeedbackImage)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;
