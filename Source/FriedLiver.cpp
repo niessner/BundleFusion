@@ -187,6 +187,7 @@ int main(int argc, char** argv)
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
 			fileNameDescGlobalApp = "zParametersDefault.txt";
+			//fileNameDescGlobalApp = "zParametersHigh.txt";
 			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 		}
 
