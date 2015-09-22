@@ -680,7 +680,7 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 
 		vec3f overlayColor = vec3f(0.0f, 0.0f, 0.0f);
 		if (trackingLost) {
-			overlayColor.x += 0.5f;
+			overlayColor += vec3f(-1.0f, 0.0f, 0.0f);
 		}
 		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), false, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(), overlayColor);
 		DX11QuadDrawer::RenderQuad(pd3dImmediateContext, DX11PhongLighting::GetColorsSRV(), 1.0f);

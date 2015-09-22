@@ -64,7 +64,10 @@ float4 PhongPS(VS_OUTPUT Input) : SV_TARGET
 			+ lightDiffuse  * material * max(dot(normal, -normalize(lightDir)), 0.0)				// Diffuse
 			+ lightSpecular * materialSpecular * pow(max(dot(R, eyeDir), 0.0f), materialShininess); // Specular
 
-		resColor = resColor + float4(g_overlayColor, 0.0f);
+		//resColor = resColor + float4(g_overlayColor, 0.0f);
+		if (g_overlayColor.x == -1.0f) {
+			resColor.x = resColor.y = resColor.z;
+		}
 
 		return resColor;
 	}
