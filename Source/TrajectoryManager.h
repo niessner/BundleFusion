@@ -45,6 +45,14 @@ public:
 	unsigned int getNumOptimizedFrames() const;
 	unsigned int getNumAddedFrames() const;
 	unsigned int getNumActiveOperations() const;
+
+	void lockUpdateTransforms() {
+		m_mutexUpdateTransforms.lock();
+	}
+
+	void unlockUpdateTransforms() {
+		m_mutexUpdateTransforms.unlock();
+	}
 private:
 	void invalidateFrame(unsigned int frameIdx);
 

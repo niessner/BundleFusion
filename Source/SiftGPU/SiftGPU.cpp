@@ -221,7 +221,7 @@ void SiftGPU::PrintUsage()
 		<< "\n";
 }
 
-void SiftGPU::SetParams(bool enableTiming, unsigned int featureCountThreshold, float siftDepthMin, float siftDepthMax)
+void SiftGPU::SetParams(unsigned int siftWidth, unsigned int siftHeight, bool enableTiming, unsigned int featureCountThreshold, float siftDepthMin, float siftDepthMax)
 {
 	GlobalUtil::_SiftDepthMin = siftDepthMin;
 	GlobalUtil::_SiftDepthMax = siftDepthMax;
@@ -233,8 +233,8 @@ void SiftGPU::SetParams(bool enableTiming, unsigned int featureCountThreshold, f
 	GlobalUtil::_FeatureCountThreshold = (int)featureCountThreshold;
 
 	// pyramid size to allocate
-	GlobalUtil::_InitPyramidWidth = 1296;
-	GlobalUtil::_InitPyramidHeight = 968;
+	GlobalUtil::_InitPyramidWidth = siftWidth;
+	GlobalUtil::_InitPyramidHeight = siftHeight;
 
 	// don't use subpixel localization
 	GlobalUtil::_SubpixelLocalization = 0;

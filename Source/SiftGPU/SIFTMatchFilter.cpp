@@ -31,7 +31,7 @@ void SIFTMatchFilter::filterFrames(SIFTImageManager* siftManager)
 	cutilSafeCall(cudaMemcpy(siftManager->d_validImages + curFrame, &connected, sizeof(int), cudaMemcpyHostToDevice));
 }
 
-void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager)
+void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -50,7 +50,7 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager)
 
 		float4x4 transform;
 		unsigned int newNumMatches = 
-			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform);
+			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv);
 		//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
 
 		transforms[i] = transform;
@@ -65,7 +65,7 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager)
 	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransforms, transforms.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
 }
 
-unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform)
+unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv)
 {
 	unsigned int numRawMatches = (unsigned int)keyPointIndices.size();
 	if (numRawMatches < MIN_NUM_MATCHES_FILTERED) return 0;
@@ -78,14 +78,14 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<S
 	//unsigned int numTry = ::filterKeyPointMatches(keys0.data(),keys1.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform);
 	//unsigned int numRef = filterKeyPointMatchesReference(copy_keys0.data(), copy_keys1.data(), copy_keyPointIndices.data(), copy_matchDistances.data(), numRawMatches, copy_transform);
 
-	unsigned int numRef = filterKeyPointMatchesReference(keys.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform);
+	unsigned int numRef = filterKeyPointMatchesReference(keys.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform, siftIntrinsicsInv);
 	return numRef;
 
 	//unsigned int numTry = ::filterKeyPointMatches(keys.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform);
 	//return numTry;
 }
 
-void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames)
+void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& siftIntrinsicsInv)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -110,7 +110,7 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 
 		//std::cout << "(" << i << ", " << curFrame << "): ";
 		bool valid =
-			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices);
+			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices, siftIntrinsicsInv);
 
 		if (!valid) {
 			// invalidate
@@ -120,12 +120,12 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 	}
 }
 
-bool SIFTMatchFilter::filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices)
+bool SIFTMatchFilter::filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices, const float4x4& siftIntrinsicsInv)
 {
 	if (keyPointIndices.size() < MIN_NUM_MATCHES_FILTERED) return false;
 
 	const float minSurfaceAreaPca = 0.032f;
-	float2 areas = computeSurfaceArea(keys.data(), keyPointIndices.data(), depth0, depth1, (unsigned int)keyPointIndices.size());
+	float2 areas = computeSurfaceArea(keys.data(), keyPointIndices.data(), depth0, depth1, (unsigned int)keyPointIndices.size(), siftIntrinsicsInv);
 
 	//std::cout << "areas = " << areas.x << " " << areas.y << std::endl;
 
@@ -134,13 +134,13 @@ bool SIFTMatchFilter::filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoin
 	return true;
 }
 
-float2 SIFTMatchFilter::computeSurfaceArea(const SIFTKeyPoint* keys, const uint2* keyPointIndices, float* depth0, float* depth1, unsigned int numMatches)
+float2 SIFTMatchFilter::computeSurfaceArea(const SIFTKeyPoint* keys, const uint2* keyPointIndices, float* depth0, float* depth1, unsigned int numMatches, const float4x4& siftIntrinsicsInv)
 {
 	ml::vec2f area(0.0f); ml::vec2f totalAreas(1.0f);
 
 	std::vector<ml::vec3f> srcPts(numMatches);
 	std::vector<ml::vec3f> tgtPts(numMatches);
-	getKeySourceAndTargetPointsReference(keys, keyPointIndices, numMatches, (float3*)srcPts.data(), (float3*)tgtPts.data());
+	getKeySourceAndTargetPointsReference(keys, keyPointIndices, numMatches, (float3*)srcPts.data(), (float3*)tgtPts.data(), siftIntrinsicsInv);
 
 
 	std::vector<ml::vec2f> srcPtsProj(numMatches);

@@ -296,15 +296,14 @@ __host__ __device__ bool addMatch(const uint2& addkeyIndices, const SIFTKeyPoint
 	return true;
 }
 
-__host__ __device__  void getKeySourceAndTargetPoints(const SIFTKeyPoint* keyPoints, volatile uint2* keyIndices, unsigned int numMatches, volatile float3* srcPts, volatile float3* tgtPts)
+__host__ __device__  void getKeySourceAndTargetPoints(const SIFTKeyPoint* keyPoints, volatile uint2* keyIndices, unsigned int numMatches, volatile float3* srcPts, volatile float3* tgtPts, const float4x4& colorIntrinsicsInv)
 {
-	//!!!TODO PARAMS
-	const float _colorIntrinsicsInverse[16] = {
-		0.000847232877f, 0.0f, -0.549854159f, 0.0f,
-		0.0f, 0.000850733835f, -0.411329806f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f };
-	float4x4 colorIntrinsicsInv(_colorIntrinsicsInverse);
+	//const float _colorIntrinsicsInverse[16] = {
+	//	0.000847232877f, 0.0f, -0.549854159f, 0.0f,
+	//	0.0f, 0.000850733835f, -0.411329806f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f };
+	//float4x4 colorIntrinsicsInv(_colorIntrinsicsInverse);
 
 	for (unsigned int i = 0; i < numMatches; i++) {
 		// source points
@@ -427,7 +426,7 @@ unsigned int filterKeyPointMatches(
 	volatile uint2* keyPointIndices,
 	volatile float* matchDistances, 
 	unsigned int numRawMatches, 
-	float4x4& transformEstimate)
+	float4x4& transformEstimate, const float4x4& colorIntrinsicsInverse)
 {
 	const float maxResThresh = MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
 
@@ -466,7 +465,7 @@ unsigned int filterKeyPointMatches(
 
 			// check geometric consistency
 			if (curNumMatches >= 3) {
-				getKeySourceAndTargetPoints(keyPoints, keyPointIndices, curNumMatches, srcPts, tgtPts);
+				getKeySourceAndTargetPoints(keyPoints, keyPointIndices, curNumMatches, srcPts, tgtPts, colorIntrinsicsInverse);
 				validTransform = ComputeReprojection(srcPts, tgtPts, curNumMatches, residuals, transformEstimate, keyPointIndices, matchDistances);
 				bool b = validTransform;
 				float4x4 prevTransform = transformEstimate;

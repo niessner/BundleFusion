@@ -121,8 +121,8 @@ struct ExampleSessionSetup : uplink::SessionSetup
 {
 	ExampleSessionSetup()
 	{
-		//addSetColorModeAction(uplink::ColorMode_VGA);
-		addSetColorModeAction(uplink::ColorMode_1296x968);
+		addSetColorModeAction(uplink::ColorMode_VGA);
+		//addSetColorModeAction(uplink::ColorMode_1296x968);
 		addSetDepthModeAction(uplink::DepthMode_VGA);
 		addSetRegistrationModeAction(uplink::RegistrationMode_RegisteredDepth);
 		addSetFrameSyncModeAction(uplink::FrameSyncMode_Depth);

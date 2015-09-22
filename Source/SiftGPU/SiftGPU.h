@@ -109,7 +109,7 @@ public:
 	//Copy the SIFT result to two vectors
 	// void CopyFeatureVectorToCPU(SiftKeypoint * keys, float * descriptors);
 	//parse SiftGPU parameters
-	 void SetParams(bool enableTiming, unsigned int featureCountThreshold, float siftDepthMin, float siftDepthMax);
+	 void SetParams(unsigned int siftWidth, unsigned int siftHeight, bool enableTiming, unsigned int featureCountThreshold, float siftDepthMin, float siftDepthMax);
 
 	int RunSIFT(float* d_colorData, const float* d_depthData);
 	//set the active pyramid...dropped function

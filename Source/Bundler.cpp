@@ -51,7 +51,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 	m_sift = new SiftGPU;
 	m_siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
-	m_sift->SetParams(false, 150, GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
+	m_sift->SetParams(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT, false, 150, GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
 	m_sift->InitSiftGPU();
 	m_siftMatcher->InitSiftMatch();
 
@@ -378,7 +378,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 
 		// --- filter matches
 		//SIFTMatchFilter::filterKeyPointMatches(siftManager);
-		siftManager->FilterKeyPointMatchesCU(curFrame);
+		siftManager->FilterKeyPointMatchesCU(curFrame, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = s_timer.getElapsedTimeMS(); }
 
 		// --- surface area filter

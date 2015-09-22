@@ -293,15 +293,14 @@ __host__ __device__ bool addMatchReference(const uint2& addkeyIndices, const SIF
 	return true;
 }
 
-__host__ __device__ void getKeySourceAndTargetPointsReference(const SIFTKeyPoint* keyPoints, const uint2* keyIndices, unsigned int numMatches, float3* srcPts, float3* tgtPts)
+__host__ __device__ void getKeySourceAndTargetPointsReference(const SIFTKeyPoint* keyPoints, const uint2* keyIndices, unsigned int numMatches, float3* srcPts, float3* tgtPts, const float4x4& colorIntrinsicsInv)
 {
-	//!!!TODO PARAMS
-	const float _colorIntrinsicsInverse[16] = { 
-		0.000847232877f, 0.0f, -0.549854159f, 0.0f,
-		0.0f, 0.000850733835f, -0.411329806f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f};
-	float4x4 colorIntrinsicsInv(_colorIntrinsicsInverse);
+	//const float _colorIntrinsicsInverse[16] = { 
+	//	0.000847232877f, 0.0f, -0.549854159f, 0.0f,
+	//	0.0f, 0.000850733835f, -0.411329806f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f};
+	//float4x4 colorIntrinsicsInv(_colorIntrinsicsInverse);
 
 	for (unsigned int i = 0; i < numMatches; i++) {
 		// source points
@@ -383,7 +382,7 @@ __host__ __device__ bool ComputeReprojectionReference(float3* srcPts, float3* tg
 
 //! assumes sorted by distance, ascending
 __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoint* keyPoints,
-	/*volatile*/ uint2* keyPointIndices, /*volatile*/ float* matchDistances, unsigned int numRawMatches, float4x4& transformEstimate)
+	/*volatile*/ uint2* keyPointIndices, /*volatile*/ float* matchDistances, unsigned int numRawMatches, float4x4& transformEstimate, const float4x4& colorIntrinsicsInv)
 {
 	const float maxResThresh = MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
 
@@ -418,7 +417,7 @@ __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoi
 
 			// check geometric consistency
 			if (curNumMatches >= 3) {
-				getKeySourceAndTargetPointsReference(keyPoints, curKeyIndices, curNumMatches, srcPts, tgtPts);
+				getKeySourceAndTargetPointsReference(keyPoints, curKeyIndices, curNumMatches, srcPts, tgtPts, colorIntrinsicsInv);
 				bool prevValid = validTransform;
 				validTransform = ComputeReprojectionReference(srcPts, tgtPts, curNumMatches, residuals, transformEstimate, curKeyIndices, curMatchDistances);
 				bool b = validTransform;

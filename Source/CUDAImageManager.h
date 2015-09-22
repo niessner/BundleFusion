@@ -43,8 +43,8 @@ public:
 				MLIB_CUDA_SAFE_CALL(cudaMalloc(&s_colorIntegrationGlobal, sizeof(uchar4)*width*height));
 			}
 			else {
-				s_depthIntegrationGlobal = NULL;
-				s_colorIntegrationGlobal = NULL;
+				s_depthIntegrationGlobal = new float[width*height];
+				s_colorIntegrationGlobal = new uchar4[width*height];
 			}
 		}
 		static void globalFree() 
@@ -52,6 +52,10 @@ public:
 			if (!s_bIsOnGPU) {
 				MLIB_CUDA_SAFE_FREE(s_depthIntegrationGlobal);
 				MLIB_CUDA_SAFE_FREE(s_colorIntegrationGlobal);
+			}
+			else {
+				SAFE_DELETE_ARRAY(s_depthIntegrationGlobal);
+				SAFE_DELETE_ARRAY(s_colorIntegrationGlobal);
 			}
 		}
 
@@ -104,18 +108,49 @@ public:
 				return s_colorIntegrationGlobal;
 			}
 		}
-	private:
 
+		const float* getDepthFrameCPU() {
+			if (s_bIsOnGPU) {
+				if (this != s_activeDepthCPU) {
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(s_depthIntegrationGlobal, m_depthIntegration, sizeof(float)*s_width*s_height, cudaMemcpyDeviceToHost));
+					s_activeDepthCPU = this;
+				}
+				return s_depthIntegrationGlobal;
+			}
+			else {
+				return m_depthIntegration;
+			}
+		}
+		const uchar4* getColorFrameCPU() {
+			if (s_bIsOnGPU) {
+				if (this != s_activeColorCPU) {
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(s_colorIntegrationGlobal, m_colorIntegration, sizeof(uchar4)*s_width*s_height, cudaMemcpyDeviceToHost));
+					s_activeDepthCPU = this;
+				}
+				return s_colorIntegrationGlobal;
+			}
+			else {
+				return m_colorIntegration;
+			}
+		}
+
+	private:
 		float*	m_depthIntegration;	//either on the GPU or CPU
 		uchar4*	m_colorIntegration;	//either on the GPU or CPU
 
 		static bool			s_bIsOnGPU;
-		static float*		s_depthIntegrationGlobal;
-		static uchar4*		s_colorIntegrationGlobal;
 		static unsigned int s_width;
 		static unsigned int s_height;
+
+		static float*		s_depthIntegrationGlobal;
+		static uchar4*		s_colorIntegrationGlobal;
 		static ManagedRGBDInputFrame*	s_activeColorGPU;
 		static ManagedRGBDInputFrame*	s_activeDepthGPU;
+
+		static float*		s_depthIntegrationGlobalCPU;
+		static uchar4*		s_colorIntegrationGlobalCPU;
+		static ManagedRGBDInputFrame*	s_activeColorCPU;
+		static ManagedRGBDInputFrame*	s_activeDepthCPU;
 	};
 
 	CUDAImageManager(unsigned int widthIntegration, unsigned int heightIntegration, unsigned int widthSIFT, unsigned int heightSIFT, RGBDSensor* sensor, bool storeFramesOnGPU = false) {
