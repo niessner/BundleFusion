@@ -166,8 +166,6 @@ void bundlingThreadFunc() {
 
 		if (g_bundler->getExitBundlingThread()) break;
 	}
-
-	SAFE_DELETE(g_bundler);
 }
 
 int main(int argc, char** argv)
@@ -209,32 +207,6 @@ int main(int argc, char** argv)
 		DualGPU& dualGPU = DualGPU::get();	//needs to be called to initialize devices
 		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
 
-		//{
-		//	int* d_tmp_gpu0;
-		//	int* d_tmp_gpu1;
-		//	const DualGPU::GPU& gpu0 = dualGPU.getDevice(DualGPU::DEVICE_RECONSTRUCTION);
-		//	const DualGPU::GPU& gpu1 = dualGPU.getDevice(DualGPU::DEVICE_BUNDLING);
-
-		//	unsigned int size = 1024 * 1024 * 100;
-		//	gpu0.set();
-		//	std::cout << "mem used before " << gpu0.getUsedMemoryMB() << std::endl;
-		//	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_tmp_gpu0, sizeof(int)*size));
-		//	std::cout << "mem used after " << gpu0.getUsedMemoryMB() << std::endl;
-
-		//	gpu1.set();
-		//	std::cout << "mem used before " << gpu1.getUsedMemoryMB() << std::endl;
-		//	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_tmp_gpu1, sizeof(int)*size));
-		//	std::cout << "mem used after " << gpu1.getUsedMemoryMB() << std::endl;
-
-		//	int input = 5; int res = 0;
-		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_tmp_gpu0, &input, sizeof(int), cudaMemcpyHostToDevice));
-		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_tmp_gpu1, d_tmp_gpu0, sizeof(int), cudaMemcpyDeviceToDevice));
-		//	//dualGPU.setDevice(DualGPU::DEVICE_BUNDLING);
-		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(&res, d_tmp_gpu1, sizeof(int), cudaMemcpyDeviceToHost));
-
-		//	int a = 5;
-		//}
-
 
 		g_RGBDSensor = getRGBDSensor();
 
@@ -246,7 +218,9 @@ int main(int argc, char** argv)
 		g_imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, g_RGBDSensor, false);
 
-		std::thread(bundlingThreadFunc).detach();
+		//std::thread(bundlingThreadFunc).detach();
+		std::thread bundlingThread(bundlingThreadFunc);
+		
 
 		//waiting until bundler is initialized
 		while (!g_bundler)	Sleep(0);
@@ -282,14 +256,16 @@ int main(int argc, char** argv)
 		//bundler->saveDEBUG();
 
 		g_bundler->exitBundlingThread();
-		//release all bundling locks
-		g_imageManager->setBundlingFrameRdy();
-		while (!g_bundler->hasProcssedInputFrame()) Sleep(0);	//wait bundler is done with it's current processing	
-		while (g_bundler) Sleep(0);								//wait until this is deleted
+
+		g_imageManager->setBundlingFrameRdy();			//release all bundling locks
+		g_bundler->confirmProcessedInputFrame();		//release all bundling locks
+		//while (!g_bundler->hasProcssedInputFrame()) Sleep(0);	//wait bundler is done with it's current processing	
+		if (bundlingThread.joinable())	bundlingThread.join();	//wait for the bundling thread to return;
+		SAFE_DELETE(g_bundler);
 		SAFE_DELETE(g_imageManager);
 		
 
-		std::cout << "DONE!" << std::endl;
+		std::cout << "DONE! <<press key to exit program>>" << std::endl;
 		getchar();
 	}
 	catch (const std::exception& e)
