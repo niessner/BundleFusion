@@ -169,7 +169,7 @@ public:
 	}
 
 	void invalidateImages(unsigned int startFrame, unsigned int endFrame = -1) {
-		std::cout << "invalidating images (" << startFrame << ", " << endFrame << ")" << std::endl;
+		//std::cout << "invalidating images (" << startFrame << ", " << endFrame << ")" << std::endl;
 		//getchar();
 
 		if (endFrame == -1) m_invalidImagesList[startFrame] = 0;
