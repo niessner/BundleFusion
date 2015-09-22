@@ -2,6 +2,8 @@
 #include "stdafx.h"
 
 #include "RGBDSensor.h"
+
+#include "GlobalAppState.h"
 #include <limits>
 
 RGBDSensor::RGBDSensor()
@@ -17,6 +19,9 @@ RGBDSensor::RGBDSensor()
 	m_currentRingBufIdx = 0;
 
 	m_bIsReceivingFrames = true;
+
+	m_recordDataWidth = 0;
+	m_recordDataHeight = 0;
 }
 
 void RGBDSensor::init(unsigned int depthWidth, unsigned int depthHeight, unsigned int colorWidth, unsigned int colorHeight, unsigned int depthRingBufferSize)
@@ -39,6 +44,9 @@ void RGBDSensor::init(unsigned int depthWidth, unsigned int depthHeight, unsigne
 
 	SAFE_DELETE_ARRAY(m_colorRGBX);
 	m_colorRGBX = new vec4uc[m_colorWidth*m_colorHeight];
+
+	m_recordDataWidth = GlobalAppState::get().s_recordDataWidth;
+	m_recordDataHeight = GlobalAppState::get().s_recordDataHeight;
 
 }
 
@@ -216,11 +224,42 @@ void RGBDSensor::savePointCloud( const std::string& filename, const mat4f& trans
 
 void RGBDSensor::recordFrame()
 {
-	m_recordedDepthData.push_back(m_depthFloat[m_currentRingBufIdx]);
-	m_recordedColorData.push_back(m_colorRGBX);
-
-	m_depthFloat[m_currentRingBufIdx] = new float[getDepthWidth()*getDepthHeight()];
-	m_colorRGBX = new vec4uc[getColorWidth()*getColorWidth()];
+	// resample if m_recordDataWidt/height != 0
+	if ((m_recordDataWidth == 0 && m_recordDataHeight == 0) || (getDepthWidth() == m_recordDataWidth && getDepthHeight() == m_recordDataHeight)) {
+		m_recordedDepthData.push_back(m_depthFloat[m_currentRingBufIdx]);
+		m_depthFloat[m_currentRingBufIdx] = new float[getDepthWidth()*getDepthHeight()];
+	}
+	else {
+		m_recordedDepthData.push_back(new float[m_recordDataWidth*m_recordDataHeight]);
+		float* depth = m_recordedDepthData.back();
+		float scaleX = (float)getDepthWidth() / m_recordDataWidth;
+		float scaleY = (float)getDepthHeight() / m_recordDataHeight;
+		for (unsigned int y = 0; y < m_recordDataHeight; y++) {
+			for (unsigned int x = 0; x < m_recordDataWidth; x++) {
+				unsigned int _x = math::round(scaleX*x);	_x = math::clamp(_x, 0u, getDepthWidth());
+				unsigned int _y = math::round(scaleY*y);	_y = math::clamp(_y, 0u, getDepthHeight());
+				depth[y*m_recordDataWidth + x] = m_depthFloat[m_currentRingBufIdx][_y*getDepthWidth() + _x];
+			}
+		}
+	}
+	
+	if ((m_recordDataWidth == 0 && m_recordDataHeight == 0) || (getColorWidth() == m_recordDataWidth && getColorHeight() == m_recordDataHeight)) {
+		m_recordedColorData.push_back(m_colorRGBX);
+		m_colorRGBX = new vec4uc[getColorWidth()*getColorWidth()];
+	}
+	else {
+		m_recordedColorData.push_back(new vec4uc[m_recordDataWidth*m_recordDataHeight]);
+		vec4uc* color = m_recordedColorData.back();
+		float scaleX = (float)getColorWidth() / m_recordDataWidth;
+		float scaleY = (float)getColorHeight() / m_recordDataHeight;
+		for (unsigned int y = 0; y < m_recordDataHeight; y++) {
+			for (unsigned int x = 0; x < m_recordDataWidth; x++) {
+				unsigned int _x = math::round(scaleX*x);	_x = math::clamp(_x, 0u, getColorWidth());
+				unsigned int _y = math::round(scaleY*y);	_y = math::clamp(_y, 0u, getColorHeight());
+				color[y*m_recordDataWidth + x] = m_colorRGBX[_y*getColorWidth() + _x];
+			}
+		}
+	}
 }
 
 void RGBDSensor::recordTrajectory(const mat4f& transform)

@@ -126,6 +126,9 @@ private:
 	vec3f depthToSkeleton(unsigned int ux, unsigned int uy, float depth) const;
 	vec3f getNormal(unsigned int x, unsigned int y) const;
 
+	unsigned int m_recordDataWidth;
+	unsigned int m_recordDataHeight;
+
 	std::list<float*> m_recordedDepthData;
 	std::list<vec4uc*>	m_recordedColorData;
 

@@ -86,6 +86,8 @@
 	X(float, s_streamingRadius) \
 	X(vec3f, s_streamingPos) \
 	X(unsigned int, s_streamingOutParts) \
+	X(unsigned int, s_recordDataWidth) \
+	X(unsigned int, s_recordDataHeight) \
 	X(bool, s_recordData) \
 	X(std::string, s_recordDataFile) \
 	X(bool, s_reconstructionEnabled)
