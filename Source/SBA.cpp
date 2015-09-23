@@ -67,6 +67,7 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 {
 	ml::vec2ui imageIndices;
 	bool remove = m_solver->getMaxResidual(siftManager->getGlobalCorrespondencesDEBUG(), imageIndices, m_maxResidual);
+
 	if (remove) {
 		if (GlobalBundlingState::get().s_verbose) std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
 		//getchar();

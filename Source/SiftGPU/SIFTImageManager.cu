@@ -701,34 +701,58 @@ void SIFTImageManager::InvalidateImageToImageCU(const uint2& imageToImageIdx) {
 }
 
 
+#define CHECK_FOR_INVALID_FRAMES_X 128
 #define CHECK_FOR_INVALID_FRAMES_THREADS_X 16
 
-void __global__ CheckForInvalidFramesCU_Kernel(const int* d_varToCorrNumEntriesPerRow, int* d_validImages, unsigned int numVars)
+void __global__ CheckForInvalidFramesCU_Kernel(const int* d_varToCorrNumEntriesPerRow, int* d_validImages, unsigned int numVars,
+	EntryJ* d_globMatches, unsigned int numGlobResiduals)
 {
-	const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
+	//const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
 
-	if (idx < numVars) {
-		if (d_varToCorrNumEntriesPerRow[idx] == 0) { // no connections!
+	//if (idx < numVars) {
+	//	if (d_varToCorrNumEntriesPerRow[idx] == 0) { // no connections!
+	//		//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
+	//		d_validImages[idx] = 0;
+	//	}
+	//}
+
+	//if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0 && threadIdx.y == 0) {
+	//	printf("(vars) blockDim = %d %d, (res)gridDim = %d %d\n", blockDim.x, blockDim.y, gridDim.x, gridDim.y);
+	//}
+	const unsigned int resIdx = blockDim.x*blockIdx.x + blockIdx.y;
+	const unsigned int varIdx = gridDim.x*threadIdx.x + threadIdx.y;
+
+	//printf("%d,%d | %d,%d -> (v %d, r %d) (%d, %d)\n", blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, varIdx, resIdx, numVars, numGlobResiduals);
+
+	if (varIdx < numVars && resIdx < numGlobResiduals) {
+		if (d_varToCorrNumEntriesPerRow[varIdx] == 0) { // no connections!
+			if (d_globMatches[resIdx].isValid() && (d_globMatches[resIdx].imgIdx_i == varIdx || d_globMatches[resIdx].imgIdx_j == varIdx)) { // invalidate residuals
+				d_globMatches[resIdx].setInvalid();
+			}
 			//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
-			d_validImages[idx] = 0;
+			if (d_validImages[varIdx] != 0) d_validImages[varIdx] = 0;
 		}
 	}
 
 }
-
+//TODO CHECK grid/block dim (too many threads?)
 void SIFTImageManager::CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesPerRow, unsigned int numVars)
 {
-	const unsigned int threadsPerBlock = CHECK_FOR_INVALID_FRAMES_THREADS_X;
-	dim3 grid((numVars + threadsPerBlock - 1) / threadsPerBlock);
-	dim3 block(threadsPerBlock);
+	dim3 block((m_globNumResiduals + CHECK_FOR_INVALID_FRAMES_X - 1) / CHECK_FOR_INVALID_FRAMES_X, CHECK_FOR_INVALID_FRAMES_X);
+	dim3 threadsPerBlock((numVars + CHECK_FOR_INVALID_FRAMES_THREADS_X - 1) / CHECK_FOR_INVALID_FRAMES_THREADS_X, CHECK_FOR_INVALID_FRAMES_THREADS_X);
 
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
+	//std::cout << __FUNCTION__ << ", #vars = " << numVars << ", #res = " << m_globNumResiduals << std::endl;
+
 	cutilSafeCall(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int) * numVars, cudaMemcpyHostToDevice));
 
-	CheckForInvalidFramesCU_Kernel << <grid, block >> >(d_varToCorrNumEntriesPerRow, d_validImages, numVars);
+	CheckForInvalidFramesCU_Kernel << <block, threadsPerBlock >> >(d_varToCorrNumEntriesPerRow, d_validImages, numVars, d_globMatches, m_globNumResiduals);
 
 	cutilSafeCall(cudaMemcpy(m_validImages.data(), d_validImages, sizeof(int) * numVars, cudaMemcpyDeviceToHost));
+
+	//std::cout << "done (press key to continue)" << std::endl;
+	//getchar();
 
 	if (m_timer) m_timer->endEvent();
 
