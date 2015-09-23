@@ -35,7 +35,9 @@
 	X(float, s_verifyOptCorrThresh) \
 	X(unsigned int, s_maxNumResidualsRemoved) \
 	X(bool, s_verbose) \
-	X(bool, s_sendUplinkFeedbackImage)
+	X(bool, s_sendUplinkFeedbackImage) \
+	X(unsigned int, s_minNumMatchesLocal) \
+	X(unsigned int, s_minNumMatchesGlobal)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;

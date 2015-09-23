@@ -276,7 +276,6 @@ __host__ __device__ float3 covarianceSVD(volatile float3* source, unsigned numPo
 
 //!!!todo params or defines???
 #define MAX_KABSCH_RESIDUAL_THRESH 0.03f
-#define MIN_NUM_MATCHES_FILTERED 4
 #define MATCH_FILTER_PIXEL_DIST_THRESH 5
 #define KABSCH_CONDITION_THRESH 100.0f
 
@@ -426,7 +425,7 @@ unsigned int filterKeyPointMatches(
 	volatile uint2* keyPointIndices,
 	volatile float* matchDistances, 
 	unsigned int numRawMatches, 
-	float4x4& transformEstimate, const float4x4& colorIntrinsicsInverse)
+	float4x4& transformEstimate, const float4x4& colorIntrinsicsInverse, unsigned int minNumMatches)
 {
 	const float maxResThresh = MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
 
@@ -450,7 +449,7 @@ unsigned int filterKeyPointMatches(
 
 	while (!done) {
 		if (idx == numRawMatches || curNumMatches >= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) {
-			if (curNumMatches < MIN_NUM_MATCHES_FILTERED || curMaxResidual >= maxResThresh || !validTransform) { // invalid
+			if (curNumMatches < minNumMatches || curMaxResidual >= maxResThresh || !validTransform) { // invalid
 				curNumMatches = 0;
 			}
 			done = true;

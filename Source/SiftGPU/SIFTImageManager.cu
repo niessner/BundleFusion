@@ -189,7 +189,8 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	uint2* d_filteredMatchKeyPointIndicesGlobal,
 	float4x4* d_filteredTransforms,
 	float4x4* d_filteredTransformsInv,
-	float4x4 siftIntrinsicsInv)
+	float4x4 siftIntrinsicsInv,
+	unsigned int minNumMatches)
 {
 	const unsigned int imagePairIdx = blockIdx.x;
 	//const unsigned int imagePairIdx = 1;
@@ -229,7 +230,7 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 
 	if (tidx == 0) 	{
 		float4x4 trans;
-		unsigned int curr = filterKeyPointMatches(d_keyPointsGlobal, matchKeyPointIndices, matchDistances, numMatches, trans, siftIntrinsicsInv);
+		unsigned int curr = filterKeyPointMatches(d_keyPointsGlobal, matchKeyPointIndices, matchDistances, numMatches, trans, siftIntrinsicsInv, minNumMatches);
 		//if (tidx == 0) {
 		numFilteredMatches = curr;
 		d_filteredTransforms[imagePairIdx] = trans;
@@ -256,7 +257,7 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	}
 }
 
-void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, const float4x4& siftIntrinsicsInv) {
+void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches) {
 
 	if (numCurrImagePairs == 0) return;
 
@@ -275,7 +276,8 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, c
 		d_currFilteredMatchKeyPointIndices,
 		d_currFilteredTransforms,
 		d_currFilteredTransformsInv,
-		siftIntrinsicsInv);
+		siftIntrinsicsInv,
+		minNumMatches);
 
 	if (m_timer) m_timer->endEvent();
 

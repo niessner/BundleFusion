@@ -388,7 +388,8 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 
 		// --- filter matches
 		//SIFTMatchFilter::filterKeyPointMatches(siftManager);
-		siftManager->FilterKeyPointMatchesCU(curFrame, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+		const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
+		siftManager->FilterKeyPointMatchesCU(curFrame, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv), minNumMatches);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = s_timer.getElapsedTimeMS(); }
 
 		// --- surface area filter
