@@ -53,7 +53,7 @@ public:
 
 	void receive(uint16* recDepth, uint8* recColor) {
 
-		if (!m_bIsReceiving || recColor == NULL) return;
+		if (!m_bIsReceiving || recColor == NULL || recDepth == NULL) return;
 		//std::cout << "[receive]: " << m_depthFilledList.size() << ", " << m_depthEmptyList.size() << std::endl;
 		while (m_depthEmptyList.empty()) {
 			//std::cout << "list full -- frame lost" << std::endl;
