@@ -40,7 +40,8 @@
 	X(float, s_depthSigmaR) \
 	X(bool, s_depthFilter) \
 	X(unsigned int, s_minNumMatchesLocal) \
-	X(unsigned int, s_minNumMatchesGlobal)
+	X(unsigned int, s_minNumMatchesGlobal) \
+	X(bool, s_useComprehensiveFrameInvalidation)
 	//X(std::string, s_outputDirectory) 
 
 using namespace ml;

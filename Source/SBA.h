@@ -6,6 +6,7 @@
 #include "PoseHelper.h"
 
 #include "Solver/CUDASolverBundling.h"
+#include "GlobalBundlingState.h"
 
 
 
@@ -20,6 +21,8 @@ public:
 		d_xRot = NULL;
 		d_xTrans = NULL;
 		m_solver = NULL;
+
+		m_bUseComprehensiveFrameInvalidation = false;
 	}
 	void init(unsigned int maxImages, unsigned int maxNumCorrPerImage) {
 		unsigned int maxNumImages = maxImages;
@@ -28,6 +31,8 @@ public:
 
 		m_solver = new CUDASolverBundling(maxImages, maxNumCorrPerImage);
 		m_bVerify = false;
+
+		m_bUseComprehensiveFrameInvalidation = GlobalBundlingState::get().s_useComprehensiveFrameInvalidation;
 	}
 	~SBA() {
 		SAFE_DELETE(m_solver);
@@ -58,6 +63,8 @@ private:
 	unsigned int	m_numCorrespondences;
 
 	CUDASolverBundling* m_solver;
+
+	bool m_bUseComprehensiveFrameInvalidation;
 
 	//for gpu solver
 	float m_maxResidual; //!!!todo why is this here...

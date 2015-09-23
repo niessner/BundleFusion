@@ -759,6 +759,37 @@ void SIFTImageManager::CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesP
 	CheckErrorCUDA(__FUNCTION__);
 }
 
+void __global__ CheckForInvalidFramesSimpleCU_Kernel(const int* d_varToCorrNumEntriesPerRow, int* d_validImages, unsigned int numVars)
+{
+	const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
+
+	if (idx < numVars) {
+		if (d_varToCorrNumEntriesPerRow[idx] == 0) { // no connections!
+			//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
+			d_validImages[idx] = 0;
+		}
+	}
+}
+//TODO CHECK grid/block dim (too many threads?)
+void SIFTImageManager::CheckForInvalidFramesSimpleCU(const int* d_varToCorrNumEntriesPerRow, unsigned int numVars)
+{
+	const unsigned int threadsPerBlock = CHECK_FOR_INVALID_FRAMES_THREADS_X;
+	dim3 grid((numVars + threadsPerBlock - 1) / threadsPerBlock);
+	dim3 block(threadsPerBlock);
+
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
+
+	cutilSafeCall(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int) * numVars, cudaMemcpyHostToDevice));
+
+	CheckForInvalidFramesSimpleCU_Kernel << <grid, block >> >(d_varToCorrNumEntriesPerRow, d_validImages, numVars);
+
+	cutilSafeCall(cudaMemcpy(m_validImages.data(), d_validImages, sizeof(int) * numVars, cudaMemcpyDeviceToHost));
+
+	if (m_timer) m_timer->endEvent();
+
+	CheckErrorCUDA(__FUNCTION__);
+}
+
 
 #define MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X 128
 #define FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X 512

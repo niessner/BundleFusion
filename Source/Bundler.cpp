@@ -584,10 +584,23 @@ void Bundler::getCurrentFrame()
 		}
 	}
 	if (m_bundlerInputData.m_bFilterDepthValues) {
+		////!!!DEBUGGING
+		//DepthImage32 depthImage(m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), m_bundlerInputData.d_inputDepth, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("depthBefore.png", ColorImageR32G32B32(depthImage));
+		////!!!DEBUGGING
+
 		CUDAImageUtil::gaussFilterFloatMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth,
 			m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,
 			m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
 		std::swap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper);
+
+		////!!!DEBUGGING
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), m_bundlerInputData.d_inputDepth, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("depthAfter.png", ColorImageR32G32B32(depthImage));
+		//std::cout << "waiting..." << std::endl;
+		//getchar();
+		////!!!DEBUGGING
 	}
 }
 
