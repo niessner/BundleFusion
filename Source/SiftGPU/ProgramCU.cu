@@ -2019,6 +2019,8 @@ void ProgramCU::CreateGlobalKeyPointList(CuTexImage* curLevelList, float4* d_out
 
 	const unsigned int threadsPerBlock = 64;
 	int curNumFeatures = curLevelList->GetImgWidth();
+	if (curNumFeatures == 0) return;
+
 	dim3 grid((curNumFeatures + threadsPerBlock - 1) / threadsPerBlock);
 	dim3 block(threadsPerBlock, 1, 1);
 
@@ -2038,6 +2040,7 @@ void __global__  ConvertDescriptorToUChar_Kernel(const float* d_descriptorsFloat
 }
 
 void ProgramCU::ConvertDescriptorToUChar(float* d_descriptorsFloat, unsigned int numDescriptorElements, unsigned char* d_descriptorsUChar) {
+	if (numDescriptorElements == 0) return;
 
 	const unsigned int threadsPerBlock = 64;
 	dim3 grid((numDescriptorElements + threadsPerBlock - 1) / threadsPerBlock);

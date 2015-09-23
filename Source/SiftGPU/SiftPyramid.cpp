@@ -729,7 +729,7 @@ void SiftPyramid::GetFeatureVectorCUDA(unsigned char* d_descriptor)
 	if (GlobalUtil::_EnableDetailedTimings) {
 		_timer->startEvent("ConvertDescriptorToUChar");
 	}
-	ProgramCU::ConvertDescriptorToUChar(d_outDescriptorList, _featureNum * 128, d_descriptor);
+	if (_featureNum > 0) ProgramCU::ConvertDescriptorToUChar(d_outDescriptorList, _featureNum * 128, d_descriptor);
 	if (GlobalUtil::_EnableDetailedTimings) {
 		_timer->endEvent();
 	}
