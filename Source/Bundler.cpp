@@ -313,10 +313,6 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 		return; // nothing to solve
 	}
 
-	//solve!
-	//if (m_SubmapManager.isLastFrame(m_currentState.m_lastFrameProcessed)) {
-	//	numNonLinIterations = numNonLinIterations * 4;
-	//}
 	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, m_bIsScanDoneGlobalOpt);
 
 	if (isEnd) {
