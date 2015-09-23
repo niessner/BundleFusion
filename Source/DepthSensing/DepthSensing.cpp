@@ -127,7 +127,7 @@ int startDepthSensing(Bundler* bundler, RGBDSensor* sensor, CUDAImageManager* im
 
 	DXUTInit(true, true); // Parse the command line, show msgboxes on error, and an extra cmd line param to force REF for now
 	DXUTSetCursorSettings(true, true); // Show the cursor and clip it when in full screen
-	DXUTCreateWindow(GlobalAppState::get().s_windowWidth, GlobalAppState::get().s_windowHeight, L"VoxelHashing", false);
+	DXUTCreateWindow(GlobalAppState::get().s_windowWidth, GlobalAppState::get().s_windowHeight, L"Fried Liver", false);
 
 	DXUTSetIsInGammaCorrectMode(false);	//gamma fix (for kinect color)
 
@@ -455,6 +455,7 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			break;
 		case '6':
 			DumpinputManagerData("./dump/dump.sensor");
+			//std::cout << "press 8" << std::endl;
 			break;
 		case '7':
 			g_depthSensingRGBDSensor->stopReceivingFrames();
@@ -466,7 +467,9 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 						std::cout << "[dump frames] stopped receiving frames from structure sensor" << std::endl;
 						g_depthSensingRGBDSensor->stopReceivingFrames();
 					}
-					g_depthSensingRGBDSensor->saveRecordedFramesToFile(GlobalAppState::getInstance().s_recordDataFile);
+					std::vector<mat4f> trajectory;
+					g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+					g_depthSensingRGBDSensor->saveRecordedFramesToFile(GlobalAppState::getInstance().s_recordDataFile, trajectory);
 				} else {
 					std::cout << "Cannot save recording: enable \"s_recordData\" in parameter file" << std::endl;
 				}
@@ -935,7 +938,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 		if (GlobalAppState::getInstance().s_recordData) {
 			g_depthSensingRGBDSensor->recordFrame();
-			g_depthSensingRGBDSensor->recordTrajectory(transformation);
 
 		}
 

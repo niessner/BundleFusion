@@ -191,7 +191,6 @@ void RGBDSensor::reset()
 		}
 		m_recordedColorData.clear();
 	}
-	m_recordedTrajectory.clear();
 	m_recordedPoints.clear();
 }
 
@@ -245,7 +244,7 @@ void RGBDSensor::recordFrame()
 	
 	if ((m_recordDataWidth == 0 && m_recordDataHeight == 0) || (getColorWidth() == m_recordDataWidth && getColorHeight() == m_recordDataHeight)) {
 		m_recordedColorData.push_back(m_colorRGBX);
-		m_colorRGBX = new vec4uc[getColorWidth()*getColorWidth()];
+		m_colorRGBX = new vec4uc[getColorWidth()*getColorHeight()];
 	}
 	else {
 		m_recordedColorData.push_back(new vec4uc[m_recordDataWidth*m_recordDataHeight]);
@@ -262,13 +261,12 @@ void RGBDSensor::recordFrame()
 	}
 }
 
-void RGBDSensor::recordTrajectory(const mat4f& transform)
+void RGBDSensor::saveRecordedFramesToFile(const std::string& filename, const std::vector<mat4f>& trajectory)
 {
-	m_recordedTrajectory.push_back(transform);
-}
+	unsigned int numFrames = (unsigned int)trajectory.size();
+	numFrames = std::min(numFrames, (unsigned int)m_recordedDepthData.size());
+	numFrames = std::min(numFrames, (unsigned int)m_recordedColorData.size());
 
-void RGBDSensor::saveRecordedFramesToFile( const std::string& filename )
-{
 	if (m_recordedDepthData.size() == 0 || m_recordedColorData.size() == 0) return;
 
 	CalibratedSensorData cs;
@@ -276,8 +274,8 @@ void RGBDSensor::saveRecordedFramesToFile( const std::string& filename )
 	cs.m_DepthImageHeight = getDepthHeight();
 	cs.m_ColorImageWidth = getColorWidth();
 	cs.m_ColorImageHeight = getColorHeight();
-	cs.m_DepthNumFrames = (unsigned int)m_recordedDepthData.size();
-	cs.m_ColorNumFrames = (unsigned int)m_recordedColorData.size();
+	cs.m_DepthNumFrames = numFrames;
+	cs.m_ColorNumFrames = numFrames;
 
 	cs.m_CalibrationDepth.m_Intrinsic = getDepthIntrinsics();
 	cs.m_CalibrationDepth.m_Extrinsic = getDepthExtrinsics();
@@ -289,23 +287,28 @@ void RGBDSensor::saveRecordedFramesToFile( const std::string& filename )
 	cs.m_CalibrationColor.m_IntrinsicInverse = cs.m_CalibrationColor.m_Intrinsic.getInverse();
 	cs.m_CalibrationColor.m_ExtrinsicInverse = cs.m_CalibrationColor.m_Extrinsic.getInverse();
 
-	cs.m_DepthImages.resize(cs.m_DepthNumFrames);
-	cs.m_ColorImages.resize(cs.m_ColorNumFrames);
+	cs.m_DepthImages.resize(numFrames);
+	cs.m_ColorImages.resize(numFrames); 
+	cs.m_trajectory.resize(numFrames);
+
 	unsigned int dFrame = 0;
 	for (auto& a : m_recordedDepthData) {
+		if (dFrame >= numFrames) break;
 		cs.m_DepthImages[dFrame] = a;
 		dFrame++;
 	}
 	unsigned int cFrame = 0;
 	for (auto& a : m_recordedColorData) {
+		if (cFrame >= numFrames) break;
 		cs.m_ColorImages[cFrame] = a;
 		cFrame++;
 	}
 
-	cs.m_trajectory = m_recordedTrajectory;
-
+	for (unsigned int i = 0; i < numFrames; i++) {
+		cs.m_trajectory[i] = trajectory[i];
+	}
+	
 	std::cout << cs << std::endl;
-	std::cout << "dumping recorded frames... ";
 
 	std::string folder = util::directoryFromPath(filename);
 	if (!util::directoryExists(folder)) {
@@ -325,6 +328,11 @@ void RGBDSensor::saveRecordedFramesToFile( const std::string& filename )
 		}
 		actualFilename = path + base + std::to_string(num+1) + "." + ext;
 	}
+
+
+	
+	std::cout << "dumping recorded frames to " << actualFilename << " ...";
+
 
 	BinaryDataStreamFile outStream(actualFilename, true);
 	//BinaryDataStreamZLibFile outStream(filename, true);

@@ -46,6 +46,27 @@ public:
 	unsigned int getNumAddedFrames() const;
 	unsigned int getNumActiveOperations() const;
 
+
+	void getOptimizedTransforms(std::vector<mat4f>& transforms) {
+		m_mutexUpdateTransforms.lock();
+
+		unsigned int numFrames = std::min(m_numAddedFrames, m_numOptimizedFrames);
+		transforms.resize(numFrames);
+
+		for (unsigned int i = 0; i < numFrames; i++) {
+			const auto&f = m_frames[i];
+			assert(f.frameIdx == i);
+			if (f.type == TrajectoryManager::TrajectoryFrame::Invalid) {
+				for (unsigned int k = 0; k < 16; k++) {
+					transforms[i][k] = -std::numeric_limits<float>::infinity();
+				}
+			}
+			else {
+				transforms[i] = f.optimizedTransform;
+			}
+		}
+		m_mutexUpdateTransforms.unlock();
+	}
 	void lockUpdateTransforms() {
 		m_mutexUpdateTransforms.lock();
 	}

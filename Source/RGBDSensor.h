@@ -59,9 +59,6 @@ public:
 	//! records the current frame to an internally
 	void recordFrame();
 
-	//! records current transform
-	void recordTrajectory(const mat4f& transform);
-
 	//! accumulates
 	void recordPointCloud(const mat4f& transform = mat4f::identity());
 	void saveRecordedPointCloud(const std::string& filename);
@@ -69,7 +66,7 @@ public:
 	void saveRecordedPointCloudDEBUG(const std::string& filename, const std::vector<int>& validImages, const std::vector<mat4f>& trajectory, unsigned int submapSize);
 
 	//! saves all previously recorded frames to file
-	void saveRecordedFramesToFile(const std::string& filename);
+	void saveRecordedFramesToFile(const std::string& filename, const std::vector<mat4f>& trajectory);
 
 	//! returns the current rigid transform; if not specified by the 'actual' sensor the identiy is returned
 	virtual mat4f getRigidTransform() const {
@@ -132,6 +129,5 @@ private:
 	std::list<float*> m_recordedDepthData;
 	std::list<vec4uc*>	m_recordedColorData;
 
-	std::vector<mat4f> m_recordedTrajectory;
 	std::vector<PointCloudf> m_recordedPoints;
 };

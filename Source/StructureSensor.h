@@ -190,7 +190,7 @@ public:
 	StructureSensor() :
 		m_server("UplinkTool", 6666, &m_serverDelegate)
 	{
-		unsigned int bufferFrameSize = 2;	// depth/color buffer size //!!! TODO
+		unsigned int bufferFrameSize = 3;	// depth/color buffer size //!!! TODO
 		m_server.init(bufferFrameSize, GlobalAppState::get().s_windowWidth, GlobalAppState::get().s_windowHeight); 
 		m_oldDepth = NULL;
 		m_oldColor = NULL;
