@@ -583,6 +583,12 @@ void Bundler::getCurrentFrame()
 			}
 		}
 	}
+	if (m_bundlerInputData.m_bFilterDepthValues) {
+		CUDAImageUtil::gaussFilterFloatMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth,
+			m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,
+			m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
+		std::swap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper);
+	}
 }
 
 //void Bundler::saveDEBUG()

@@ -407,3 +407,61 @@ void CUDAImageUtil::erodeDepthMap(float* d_output, float* d_input, int structure
 	cutilCheckMsg(__FUNCTION__);
 #endif
 }
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Gauss Filter Float Map
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+__global__ void gaussFilterFloatMapDevice(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+{
+	const int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if(x >= width || y >= height) return;
+
+	const int kernelRadius = (int)ceil(2.0*sigmaD);
+
+	d_output[y*width+x] = MINF;
+
+	float sum = 0.0f;
+	float sumWeight = 0.0f;
+
+	const float depthCenter = d_input[y*width+x];
+	if(depthCenter != MINF)
+	{
+		for(int m = x-kernelRadius; m <= x+kernelRadius; m++)
+		{
+			for(int n = y-kernelRadius; n <= y+kernelRadius; n++)
+			{		
+				if(m >= 0 && n >= 0 && m < width && n < height)
+				{
+					const float currentDepth = d_input[n*width+m];
+
+					if(currentDepth != MINF && fabs(depthCenter-currentDepth) < sigmaR)
+					{
+						const float weight = gaussD(sigmaD, m-x, n-y);
+
+						sumWeight += weight;
+						sum += weight*currentDepth;
+					}
+				}
+			}
+		}
+	}
+
+	if(sumWeight > 0.0f) d_output[y*width+x] = sum / sumWeight;
+}
+
+void CUDAImageUtil::gaussFilterFloatMap(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	gaussFilterFloatMapDevice<<<gridSize, blockSize>>>(d_output, d_input, sigmaD, sigmaR, width, height);
+	#ifdef _DEBUG
+		cutilSafeCall(cudaDeviceSynchronize());
+		cutilCheckMsg(__FUNCTION__);
+	#endif
+}

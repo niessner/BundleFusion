@@ -29,6 +29,9 @@ public:
 		mat4f					m_SIFTIntrinsicsInv;
 		float*					d_depthErodeHelper;
 
+		bool m_bFilterDepthValues;
+		float m_fBilateralFilterSigmaD, m_fBilateralFilterSigmaR;
+
 		BundlerInputData() {
 			m_inputDepthWidth = 0;	m_inputDepthHeight = 0;
 			m_inputColorWidth = 0;	m_inputColorHeight = 0;
@@ -57,6 +60,10 @@ public:
 			m_SIFTIntrinsics._m11 *= scaleHeightSIFT; m_SIFTIntrinsics._m12 *= scaleHeightSIFT;
 			m_SIFTIntrinsicsInv = sensor->getColorIntrinsicsInv();
 			m_SIFTIntrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTIntrinsicsInv._m11 /= scaleHeightSIFT;
+
+			m_bFilterDepthValues = GlobalBundlingState::get().s_depthFilter;
+			m_fBilateralFilterSigmaR = GlobalBundlingState::get().s_depthSigmaR;
+			m_fBilateralFilterSigmaD = GlobalBundlingState::get().s_depthSigmaD;
 		}
 		~BundlerInputData() {
 			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepth));

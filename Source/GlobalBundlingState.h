@@ -36,6 +36,9 @@
 	X(unsigned int, s_maxNumResidualsRemoved) \
 	X(bool, s_verbose) \
 	X(bool, s_sendUplinkFeedbackImage) \
+	X(float, s_depthSigmaD) \
+	X(float, s_depthSigmaR) \
+	X(bool, s_depthFilter) \
 	X(unsigned int, s_minNumMatchesLocal) \
 	X(unsigned int, s_minNumMatchesGlobal)
 	//X(std::string, s_outputDirectory) 
