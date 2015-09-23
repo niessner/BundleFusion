@@ -60,9 +60,20 @@ public:
 			return;
 		}
 
+		float* depth = NULL;
+		uint8* color = NULL;
+		{
+			const MutexLocker m(m_mutex);
+			depth = m_depthEmptyList.front();
+			m_depthEmptyList.pop_front();
+			while (m_colorEmptyList.empty()) {
+				std::cout << "ERROR: color/depth not synced" << std::endl;
+				return;
+			}
+			color = m_colorEmptyList.front();
+			m_colorEmptyList.pop_front();
+		}
 		// depth
-		float* depth = m_depthEmptyList.front();
-		m_depthEmptyList.pop_front();
 		for (unsigned int i = 0; i < m_depthWidth*m_depthHeight; i++) {
 			uint16 v = recDepth[i];
 			if (v > 0 && v < shift2depth(0xffff)) {
@@ -73,24 +84,14 @@ public:
 			}
 		}
 		// color
-		while (m_colorEmptyList.empty()) {
-			std::cout << "ERROR: color/depth not synced" << std::endl;
-		}
-		uint8* color = m_colorEmptyList.front();
-		m_colorEmptyList.pop_front();
-		if (recColor != NULL) { // copy
-			for (unsigned int y = 0; y < m_colorHeight; y++) {
-				for (unsigned int x = 0; x < m_colorWidth; x++) {
-					unsigned int idx = y * m_colorWidth + x;
-					color[idx*m_numColorChannels + 0] = recColor[idx * 3 + 0];
-					color[idx*m_numColorChannels + 1] = recColor[idx * 3 + 1];
-					color[idx*m_numColorChannels + 2] = recColor[idx * 3 + 2];
-					color[idx*m_numColorChannels + 3] = 255;
-				}
+		for (unsigned int y = 0; y < m_colorHeight; y++) {
+			for (unsigned int x = 0; x < m_colorWidth; x++) {
+				unsigned int idx = y * m_colorWidth + x;
+				color[idx*m_numColorChannels + 0] = recColor[idx * 3 + 0];
+				color[idx*m_numColorChannels + 1] = recColor[idx * 3 + 1];
+				color[idx*m_numColorChannels + 2] = recColor[idx * 3 + 2];
+				color[idx*m_numColorChannels + 3] = 255;
 			}
-		}
-		else {
-			memset(color, 0, sizeof(uint8) * m_numColorChannels * m_colorWidth * m_colorHeight);
 		}
 
 		const MutexLocker m(m_mutex);

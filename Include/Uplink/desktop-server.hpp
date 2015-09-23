@@ -47,6 +47,11 @@ void DesktopServer::init(unsigned int bufferSize, unsigned int feedbackWidth, un
 	m_depthBuffer.resize(bufferSize, NULL);
 	m_colorBuffer.resize(bufferSize, NULL);
 
+	m_depthEmptyList.clear();
+	m_colorEmptyList.clear();
+	m_depthFilledList.clear();
+	m_colorFilledList.clear();
+
 	//m_depthTimestamps.resize(bufferSize, -1.0);
 	//m_colorTimestamps.resize(bufferSize, -1.0);
 
