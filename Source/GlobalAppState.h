@@ -93,7 +93,8 @@
 	X(bool, s_recordData) \
 	X(std::string, s_recordDataFile) \
 	X(bool, s_reconstructionEnabled) \
-	X(bool, s_generateVideo)
+	X(bool, s_generateVideo) \
+	X(std::string, s_generateVideoDir)
 
 
 #ifndef VAR_NAME
