@@ -1109,4 +1109,9 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	}
 
 	frameNumber++;
+
+	if (!g_depthSensingRGBDSensor->isReceivingFrames()) {
+		std::cout << "DONE DONE DONE" << std::endl;
+		exit(1);
+	}
 }
