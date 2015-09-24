@@ -27,8 +27,8 @@ public:
 		params.m_height = gas.s_integrationHeight;			//TODO check the ray tracing resolution
 		params.m_intrinsics = MatrixConversion::toCUDA(intrinsics);
 		params.m_intrinsicsInverse = MatrixConversion::toCUDA(intrinsicsInv);
-		params.m_minDepth = gas.s_sensorDepthMin;
-		params.m_maxDepth = gas.s_sensorDepthMax;
+		params.m_minDepth = gas.s_renderDepthMin;
+		params.m_maxDepth = gas.s_renderDepthMax;
 		params.m_rayIncrement = gas.s_SDFRayIncrementFactor * gas.s_SDFTruncation;
 		params.m_thresSampleDist = gas.s_SDFRayThresSampleDistFactor * params.m_rayIncrement;
 		params.m_thresDist = gas.s_SDFRayThresDistFactor * params.m_rayIncrement;

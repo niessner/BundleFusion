@@ -34,6 +34,8 @@
 	X(float, s_minPoseDistSqrt) \
 	X(float, s_sensorDepthMax) \
 	X(float, s_sensorDepthMin) \
+	X(float, s_renderDepthMax) \
+	X(float, s_renderDepthMin) \
 	X(unsigned int, s_hashNumBuckets) \
 	X(unsigned int, s_hashNumSDFBlocks) \
 	X(unsigned int, s_hashMaxCollisionLinkedListSize) \

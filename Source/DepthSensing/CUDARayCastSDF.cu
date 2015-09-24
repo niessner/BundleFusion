@@ -45,6 +45,9 @@ __global__ void renderKernel(HashData hashData, RayCastData rayCastData)
 		if (minInterval == 0 || minInterval == MINF) return;
 		if (maxInterval == 0 || maxInterval == MINF) return;
 
+		minInterval = max(minInterval, rayCastParams.m_minDepth);
+		maxInterval = min(maxInterval, rayCastParams.m_maxDepth);
+
 		// debugging 
 		//if (maxInterval < minInterval) {
 		//	printf("ERROR (%d,%d): [ %f, %f ]\n", x, y, minInterval, maxInterval);

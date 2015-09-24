@@ -485,8 +485,8 @@ __global__ void integrateDepthMapKernel(HashData hashData, DepthCameraData camer
 
 					if (!deIntegrate) {	//integration
 						//hashData.combineVoxel(hashData.d_SDFBlocks[idx], curr, newVoxel);
-						//float3 res = (c0 + c1) / 2;
-						float3 res = (currColor*curr.weight + oldColor*oldVoxel.weight) / (curr.weight + oldVoxel.weight);
+						float3 res = (currColor + oldColor) / 2;
+						//float3 res = (currColor*curr.weight + oldColor*oldVoxel.weight) / (curr.weight + oldVoxel.weight);
 						res = make_float3(round(res.x), round(res.y), round(res.z));
 						res = fmaxf(make_float3(0.0f), fminf(res, make_float3(254.5f)));
 						//newVoxel.color.x = (uchar)(res.x + 0.5f);	newVoxel.color.y = (uchar)(res.y + 0.5f);	newVoxel.color.z = (uchar)(res.z + 0.5f);

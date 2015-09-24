@@ -64,9 +64,10 @@ float4 PhongPS(VS_OUTPUT Input) : SV_TARGET
 			float4 diffuse = lightDiffuse  * material * abs(dot(normal, -normalize(lightDir)));
 			float4 specular = lightSpecular* material * pow(max(dot(R, eyeDir), 0.0f), materialShininess);
 
-			float power = 0.6f;
+			float power = 1.2f;
 			diffuse = pow(diffuse, power);
-			resColor = ambient + diffuse + specular;
+			resColor = ambient*0.5f + 1.2f*diffuse + 0.8f*specular;
+			resColor *= 1.2f;	//this should potentially be a parameter
 			resColor.w = 1.0f;
 			
 		}

@@ -14,6 +14,6 @@ struct DepthCameraParams {
 	unsigned int m_imageWidth;
 	unsigned int m_imageHeight;
 
-	float m_sensorDepthWorldMin;
-	float m_sensorDepthWorldMax;
+	float m_sensorDepthWorldMin;	//render depth min
+	float m_sensorDepthWorldMax;	//render depth max
 };

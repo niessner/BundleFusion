@@ -482,7 +482,8 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			StopScanningAndExtractIsoSurfaceMC();
 			break;
 		case '0':
-			GlobalAppState::get().s_RenderMode = 0;
+			DX11PhongLighting::OnD3D11DestroyDevice();
+			DX11PhongLighting::OnD3D11CreateDevice(DXUTGetD3D11Device(), DX11PhongLighting::getWidth(), DX11PhongLighting::getHeight());
 			break;
 		case 'T':
 			GlobalAppState::get().s_timingsDetailledEnabled = !GlobalAppState::get().s_timingsDetailledEnabled;
@@ -624,8 +625,8 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	g_depthCameraParams.fy = g_CudaImageManager->getIntrinsics()(1, 1);
 	g_depthCameraParams.mx = g_CudaImageManager->getIntrinsics()(0, 2);
 	g_depthCameraParams.my = g_CudaImageManager->getIntrinsics()(1, 2);
-	g_depthCameraParams.m_sensorDepthWorldMin = GlobalAppState::get().s_sensorDepthMin;
-	g_depthCameraParams.m_sensorDepthWorldMax = GlobalAppState::get().s_sensorDepthMax;
+	g_depthCameraParams.m_sensorDepthWorldMin = GlobalAppState::get().s_renderDepthMin;
+	g_depthCameraParams.m_sensorDepthWorldMax = GlobalAppState::get().s_renderDepthMax;
 	g_depthCameraParams.m_imageWidth = g_CudaImageManager->getIntegrationWidth();
 	g_depthCameraParams.m_imageHeight = g_CudaImageManager->getIntegrationHeight();
 	DepthCameraData::updateParams(g_depthCameraParams);
@@ -817,8 +818,8 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 	}
 	else if (GlobalAppState::get().s_RenderMode == 4) {
 		const float* d_depth = g_CudaImageManager->getLastIntegrateFrame().getDepthFrameGPU();
-		const float minDepth = GlobalAppState::get().s_sensorDepthMin;
-		const float maxDepth = GlobalAppState::get().s_sensorDepthMax;
+		const float minDepth = GlobalAppState::get().s_sensorDepthMin;	//not that this is not the render depth!
+		const float maxDepth = GlobalAppState::get().s_sensorDepthMax;	//not that this is not the render depth!
 		DX11QuadDrawer::RenderQuadDynamicDEPTHasHSV(DXUTGetD3D11Device(), pd3dImmediateContext, d_depth, minDepth, maxDepth, g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight());
 	}
 	else {
