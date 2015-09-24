@@ -90,7 +90,8 @@
 	X(unsigned int, s_recordDataHeight) \
 	X(bool, s_recordData) \
 	X(std::string, s_recordDataFile) \
-	X(bool, s_reconstructionEnabled)
+	X(bool, s_reconstructionEnabled) \
+	X(bool, s_generateVideo)
 
 
 #ifndef VAR_NAME

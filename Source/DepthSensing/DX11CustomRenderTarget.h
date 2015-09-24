@@ -70,7 +70,7 @@ public:
 
 		if (desc.Format == DXGI_FORMAT_R32_FLOAT) elementByteWidth = 1 * 4;
 		else if (desc.Format == DXGI_FORMAT_R32G32B32A32_FLOAT) elementByteWidth = 4 * 4;
-		else if (desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB) elementByteWidth = 4 * 1;
+		else if (desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM) elementByteWidth = 4 * 1;//else if (desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB) elementByteWidth = 4 * 1;
 		else MLIB_EXCEPTION("unknown texture format");
 
 
