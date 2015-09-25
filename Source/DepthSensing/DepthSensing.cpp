@@ -1007,6 +1007,13 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	if (GlobalAppState::get().s_generateVideo) { // still renders the frames during the end optimize
 		renderToFile(pd3dImmediateContext, g_lastRigidTransform, trackingLost);
 	}
+	if (!g_depthSensingRGBDSensor->isReceivingFrames() && !GlobalAppState::get().s_printTimingsDirectory.empty()) {
+		const std::string outDir = GlobalAppState::get().s_printTimingsDirectory;
+		if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+		TimingLog::printAllTimings(outDir); // might skip the last frames but whatever
+		exit(1);
+	}
+
 
 	DXUT_EndPerfEvent();
 }

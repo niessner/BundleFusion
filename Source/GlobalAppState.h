@@ -94,7 +94,9 @@
 	X(std::string, s_recordDataFile) \
 	X(bool, s_reconstructionEnabled) \
 	X(bool, s_generateVideo) \
-	X(std::string, s_generateVideoDir)
+	X(std::string, s_generateVideoDir) \
+	X(std::string, s_printTimingsDirectory) \
+	X(std::string, s_printConvergenceFile)
 
 
 #ifndef VAR_NAME

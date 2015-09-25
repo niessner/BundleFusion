@@ -160,6 +160,14 @@ void bundlingThreadFunc() {
 				g_bundler->processGlobal();
 				g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations, true, true);
 				g_bundler->setScanDoneGlobalOpt();
+
+				if (!GlobalAppState::get().s_printConvergenceFile.empty()) {
+					const std::string outFile = GlobalAppState::get().s_printConvergenceFile;
+					const std::string outDir = util::directoryFromPath(outFile);
+					if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+					g_bundler->saveConvergence(outFile);
+					exit(1);
+				}
 				//std::cout << "end optimize" << std::endl;
 			}
 			 
