@@ -79,7 +79,7 @@ void RenderHelp();
 
 CDXUTDialogResourceManager	g_DialogResourceManager; // manager for shared resources of dialogs
 CDXUTTextHelper*            g_pTxtHelper = NULL;
-bool						g_renderText = true;
+bool						g_renderText = false;
 bool						g_bRenderHelp = true;
 
 CModelViewerCamera          g_Camera;               // A model viewing camera
@@ -763,6 +763,7 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 	pd3dImmediateContext->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 	mat4f view = MatrixConversion::toMlib(*g_Camera.GetViewMatrix());
+	view.setIdentity();	//wanna disable that for the video..
 	mat4f t = mat4f::identity();
 	t(1, 1) *= -1.0f;	view = t * view * t;	//t is self-inverse
 
@@ -1025,6 +1026,7 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	ssFrameNumber << frameNumber;
 
 	mat4f view = MatrixConversion::toMlib(*g_Camera.GetViewMatrix());
+	view.setIdentity();
 
 	{	// reconstruction
 		const mat4f renderIntrinsics = g_CudaImageManager->getIntrinsics();

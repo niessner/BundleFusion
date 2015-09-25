@@ -125,6 +125,8 @@ private:
 
 	unsigned int m_recordDataWidth;
 	unsigned int m_recordDataHeight;
+	mat4f m_recordIntrinsics;
+	mat4f m_recordIntrinsicsInv;
 
 	std::list<float*> m_recordedDepthData;
 	std::list<vec4uc*>	m_recordedColorData;

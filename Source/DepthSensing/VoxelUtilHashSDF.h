@@ -245,11 +245,14 @@ struct HashData {
 		float3 c0 = make_float3(v0.color.x, v0.color.y, v0.color.z);
 		float3 c1 = make_float3(v1.color.x, v1.color.y, v1.color.z);
 
-		float3 res = (c0+c1)/2;
+		//float3 res = (c0+c1)/2;
 		//float3 res = (c0 * (float)v0.weight + c1 * (float)v1.weight) / ((float)v0.weight + (float)v1.weight);
 		//float3 res = c1;
-
-		out.color.x = (uchar)(res.x+0.5f);	out.color.y = (uchar)(res.y+0.5f); out.color.z = (uchar)(res.z+0.5f);
+		if (v0.weight == 0) out.color = v1.color;
+		else {
+			float3 res = 0.5f*c0 + 0.5f*c1;
+			out.color.x = (uchar)(res.x+0.5f);	out.color.y = (uchar)(res.y+0.5f); out.color.z = (uchar)(res.z+0.5f);
+		}
 		
 		
 

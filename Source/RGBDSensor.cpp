@@ -125,6 +125,14 @@ void RGBDSensor::initializeDepthIntrinsics(float fovX, float fovY, float centerX
 
 	m_depthIntrinsicsInv = m_depthIntrinsics.getInverse();
 	std::cout << m_depthIntrinsics << std::endl;
+
+	m_recordIntrinsics = m_depthIntrinsics;
+	const float scaleWidth = (float)m_recordDataWidth / (float)getDepthWidth();
+	const float scaleHeight = (float)m_recordDataHeight / (float)getDepthHeight();
+	m_recordIntrinsics._m00 *= scaleWidth;  m_recordIntrinsics._m02 *= scaleWidth;
+	m_recordIntrinsics._m11 *= scaleHeight; m_recordIntrinsics._m12 *= scaleHeight;
+	m_recordIntrinsicsInv = m_depthIntrinsicsInv;
+	m_recordIntrinsicsInv._m00 /= scaleWidth; m_depthIntrinsicsInv._m11 /= scaleHeight;
 }
 
 void RGBDSensor::initializeColorIntrinsics(float fovX, float fovY, float centerX, float centerY)
@@ -270,19 +278,19 @@ void RGBDSensor::saveRecordedFramesToFile(const std::string& filename, const std
 	if (m_recordedDepthData.size() == 0 || m_recordedColorData.size() == 0) return;
 
 	CalibratedSensorData cs;
-	cs.m_DepthImageWidth = getDepthWidth();
-	cs.m_DepthImageHeight = getDepthHeight();
-	cs.m_ColorImageWidth = getColorWidth();
-	cs.m_ColorImageHeight = getColorHeight();
+	cs.m_DepthImageWidth = m_recordDataWidth;
+	cs.m_DepthImageHeight = m_recordDataHeight;
+	cs.m_ColorImageWidth = m_recordDataWidth;
+	cs.m_ColorImageHeight = m_recordDataHeight;
 	cs.m_DepthNumFrames = numFrames;
 	cs.m_ColorNumFrames = numFrames;
 
-	cs.m_CalibrationDepth.m_Intrinsic = getDepthIntrinsics();
+	cs.m_CalibrationDepth.m_Intrinsic = m_recordIntrinsics;
 	cs.m_CalibrationDepth.m_Extrinsic = getDepthExtrinsics();
 	cs.m_CalibrationDepth.m_IntrinsicInverse = cs.m_CalibrationDepth.m_Intrinsic.getInverse();
 	cs.m_CalibrationDepth.m_ExtrinsicInverse = cs.m_CalibrationDepth.m_Extrinsic.getInverse();
 
-	cs.m_CalibrationColor.m_Intrinsic = getColorIntrinsics();
+	cs.m_CalibrationColor.m_Intrinsic = m_recordIntrinsics;
 	cs.m_CalibrationColor.m_Extrinsic = getColorExtrinsics();
 	cs.m_CalibrationColor.m_IntrinsicInverse = cs.m_CalibrationColor.m_Intrinsic.getInverse();
 	cs.m_CalibrationColor.m_ExtrinsicInverse = cs.m_CalibrationColor.m_Extrinsic.getInverse();
