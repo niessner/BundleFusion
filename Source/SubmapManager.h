@@ -172,9 +172,16 @@ public:
 			cutilSafeCall(cudaMemcpy(d_siftTrajectory + frameIdx, d_siftTrajectory + frameIdx - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
 			//cutilSafeCall(cudaMemcpy(d_currIntegrateTransform + frameIdx, &m_currIntegrateTransform[frameIdx], sizeof(float4x4), cudaMemcpyHostToDevice)); //TODO this is for debug only
 		}
-		if (frameIdx > 0) {
+		else if (frameIdx > 0) {
 			currentLocal->computeSiftTransformCU(d_completeTrajectory, lastValidCompleteTransform, d_siftTrajectory, frameIdx, localFrameIdx, d_currIntegrateTransform + frameIdx);
 			cutilSafeCall(cudaMemcpy(&m_currIntegrateTransform[frameIdx], d_currIntegrateTransform + frameIdx, sizeof(float4x4), cudaMemcpyDeviceToHost));
+
+			////!!!DEBUGGING
+			//if (isnan(m_currIntegrateTransform[frameIdx][0])) {
+			//	std::cerr << "computeCurrentSiftTransform: NaN transform!" << std::endl;
+			//	assert(false);
+			//}
+			////!!!DEBUGGING
 		}
 	}
 	const mat4f& getCurrentIntegrateTransform(unsigned int frameIdx) const { return m_currIntegrateTransform[frameIdx]; }
