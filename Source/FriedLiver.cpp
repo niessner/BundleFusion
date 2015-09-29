@@ -165,8 +165,7 @@ void bundlingThreadFunc() {
 				//	const std::string outFile = GlobalAppState::get().s_printConvergenceFile;
 				//	const std::string outDir = util::directoryFromPath(outFile);
 				//	if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
-				//	g_bundler->saveConvergence(outFile);
-				//	exit(1);
+				//	g_bundler->saveConvergence(outFile); // BROKEN MULTITHREADING
 				//}
 				//std::cout << "end optimize" << std::endl;
 			}

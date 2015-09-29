@@ -27,7 +27,7 @@ void SBA::align(SIFTImageManager* siftManager, float4x4* d_transforms, unsigned 
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans);
 
 	bool removed = false;
-	const unsigned int maxIts = GlobalBundlingState::get().s_maxNumResidualsRemoved;
+	const unsigned int maxIts = 1;//GlobalBundlingState::get().s_maxNumResidualsRemoved;
 	unsigned int curIt = 0;
 	do {
 		removed = alignCUDA(siftManager, d_transforms, maxNumIters, numPCGits, isStart, isEnd);
