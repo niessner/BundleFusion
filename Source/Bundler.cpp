@@ -66,46 +66,21 @@ void Bundler::processInput()
 
 	if (GlobalBundlingState::get().s_verbose) std::cout << "[ frame " << curFrame << " ]" << std::endl;
 
-	//CUDAImageManager::ManagedRGBDInputFrame& integrateFrame = m_CudaImageManager->getLastIntegrateFrame();
 	getCurrentFrame();
 
-	// run SIFT
-	SIFTImageGPU& cur = m_SubmapManager.currentLocal->createSIFTImageGPU();
+	// run SIFT & process cuda cache
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-	int success = m_SubmapManager.getSiftDEBUG()->RunSIFT(m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepth);
-	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection on frame " + std::to_string(curFrame));
-	unsigned int numKeypoints = m_SubmapManager.getSiftDEBUG()->GetKeyPointsAndDescriptorsCUDA(cur, m_bundlerInputData.d_inputDepth);
-	m_SubmapManager.currentLocal->finalizeSIFTImageGPU(numKeypoints);
+	const unsigned int curLocalFrame = m_SubmapManager.runSIFT(curFrame, m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepth,
+		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
-	// process cuda cache
-	const unsigned int curLocalFrame = m_SubmapManager.currentLocal->getNumImages() - 1;
-	m_SubmapManager.currentLocalCache->storeFrame(m_bundlerInputData.d_inputDepth, m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight,
-		m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
-	if (GlobalBundlingState::get().s_recordKeysPointCloud && (curLocalFrame == 0 || m_SubmapManager.isLastLocalFrame(curFrame))) {
-		m_RGBDSensor->recordPointCloud();
-	}
-
 	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);
-	// sift/cuda cache for next local
-	if (m_SubmapManager.isLastLocalFrame(curFrame)) {
-		MLIB_ASSERT(m_currentState.m_lastLocalSolved + 1 == m_SubmapManager.getCurrLocal(curFrame)); // otherwise this will overwrite the data needed by the local solve!
-		MLIB_ASSERT(m_SubmapManager.nextLocal->getNumImages() == 0);
-
-		SIFTImageGPU& curNext = m_SubmapManager.nextLocal->createSIFTImageGPU();
-		cutilSafeCall(cudaMemcpy(curNext.d_keyPoints, cur.d_keyPoints, sizeof(SIFTKeyPoint) * numKeypoints, cudaMemcpyDeviceToDevice));
-		cutilSafeCall(cudaMemcpy(curNext.d_keyPointDescs, cur.d_keyPointDescs, sizeof(SIFTKeyPointDesc) * numKeypoints, cudaMemcpyDeviceToDevice));
-		m_SubmapManager.nextLocal->finalizeSIFTImageGPU(numKeypoints);
-		m_SubmapManager.nextLocalCache->copyCacheFrameFrom(m_SubmapManager.currentLocalCache, curLocalFrame);
-	}
+	
 	// match with every other local
 	SIFTImageManager* currentLocal = m_SubmapManager.currentLocal;
 
 	if (curLocalFrame > 0) {
 		matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
-
-		//currentLocal->computeSiftTransformCU(m_SubmapManager.d_completeTrajectory, m_currentState.m_lastValidCompleteTransform,
-		//	m_SubmapManager.d_siftTrajectory, curFrame, curLocalFrame, m_SubmapManager.getCurrIntegrateTransform(curFrame));
 
 		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}

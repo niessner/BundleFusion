@@ -25,6 +25,12 @@ extern "C" void initNextGlobalTransformCU(
 
 class SubmapManager {
 public:
+	enum TYPE {
+		LOCAL_CURRENT,
+		LOCAL_NEXT,
+		GLOBAL
+	};
+
 	CUDACache* currentLocalCache;
 	CUDACache* nextLocalCache;
 	CUDACache* optLocalCache;
@@ -58,7 +64,7 @@ public:
 	// update complete trajectory with new global trajectory info
 	void updateTrajectory(unsigned int curFrame) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
-			
+
 		updateTrajectoryCU(d_globalTrajectory, global->getNumImages(),
 			d_completeTrajectory, curFrame,
 			d_localTrajectories, m_submapSize + 1, global->getNumImages(),
@@ -88,7 +94,7 @@ public:
 	}
 
 	void switchLocal() {
-		
+
 		//optLocal->lock();	//wait until optimizer has released its lock on opt local
 
 		//SIFTImageManager* oldCurrentLocal = currentLocal;
@@ -111,7 +117,7 @@ public:
 		std::swap(currentLocal, nextLocal);
 		std::swap(currentLocalCache, nextLocalCache);
 
-	
+
 	}
 
 	void switchLocalAndFinishOpt() {
@@ -176,17 +182,17 @@ public:
 	const mat4f& getCurrentIntegrateTransform(unsigned int frameIdx) const { return m_currIntegrateTransform[frameIdx]; }
 	const std::vector<mat4f>& getAllIntegrateTransforms() const { return m_currIntegrateTransform; }
 
+	//! run sift for current local
+	unsigned int runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth,
+		unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor,
+		unsigned int colorWidth, unsigned int colorHeight);
+
 	//!!!TODO DEBUG HACK ONLY
-	SiftGPU* getSiftDEBUG() { return m_sift; }
+	//SiftGPU* getSiftDEBUG() { return m_sift; }
 	SiftMatchGPU* getSiftMatcherDEBUG() { return m_siftMatcher; }
 	//!!!
 
 private:
-	enum TYPE {
-		LOCAL_CURRENT,
-		LOCAL_NEXT,
-		GLOBAL
-	};
 	std::pair<SIFTImageManager*, CUDACache*> SubmapManager::get(TYPE type);
 	void SubmapManager::finish(TYPE type);
 
