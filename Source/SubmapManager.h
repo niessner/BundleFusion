@@ -31,12 +31,10 @@ public:
 		GLOBAL
 	};
 
-	CUDACache* currentLocalCache;
 	CUDACache* nextLocalCache;
 	CUDACache* optLocalCache;
 	CUDACache* globalCache;
 
-	SIFTImageManager* currentLocal;
 	SIFTImageManager* nextLocal;
 	SIFTImageManager* optLocal;
 	SIFTImageManager* global;
@@ -182,17 +180,19 @@ public:
 	const mat4f& getCurrentIntegrateTransform(unsigned int frameIdx) const { return m_currIntegrateTransform[frameIdx]; }
 	const std::vector<mat4f>& getAllIntegrateTransforms() const { return m_currIntegrateTransform; }
 
+	void getCacheIntrinsics(float4x4& intrinsics, float4x4& intrinsicsInv);
+
 	//! run sift for current local
 	unsigned int runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth,
 		unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor,
 		unsigned int colorWidth, unsigned int colorHeight);
 	//! sift matching
-	void matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv);
+	bool matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv);
+	//! valid if at least frames 0, 1 valid
+	bool isCurrentLocalValidChunk();
+	unsigned int getNumCurrentLocalFrames();
 
-	//!!!TODO DEBUG HACK ONLY
-	//SiftGPU* getSiftDEBUG() { return m_sift; }
-	SiftMatchGPU* getSiftMatcherDEBUG() { return m_siftMatcher; }
-	//!!!
+	void copyToGlobalCache();
 
 private:
 	std::pair<SIFTImageManager*, CUDACache*> SubmapManager::get(TYPE type);
@@ -207,6 +207,9 @@ private:
 	std::mutex mutex_curLocal;
 	std::mutex mutex_nextLocal;
 	std::mutex mutex_global;
+
+	CUDACache* currentLocalCache;
+	SIFTImageManager* currentLocal;
 	//************************************
 
 	std::vector<unsigned int>	m_invalidImagesList;

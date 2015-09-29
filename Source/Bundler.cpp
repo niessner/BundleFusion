@@ -44,8 +44,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_siftCameraParams.m_intensityHeight = m_bundlerInputData.m_heightSIFT;
 	m_siftCameraParams.m_siftIntrinsics = MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics);
 	m_siftCameraParams.m_siftIntrinsicsInv = MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv);
-	m_siftCameraParams.m_downSampIntrinsics = MatrixConversion::toCUDA(m_SubmapManager.currentLocalCache->getIntrinsics());
-	m_siftCameraParams.m_downSampIntrinsicsInv = MatrixConversion::toCUDA(m_SubmapManager.currentLocalCache->getIntrinsicsInv());
+	m_SubmapManager.getCacheIntrinsics(m_siftCameraParams.m_downSampIntrinsics, m_siftCameraParams.m_downSampIntrinsicsInv);
 	updateConstantSiftCameraParams(m_siftCameraParams);
 
 	m_bHasProcessedInputFrame = false;
@@ -77,16 +76,14 @@ void Bundler::processInput()
 	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);
 	
 	// match with every other local
-	SIFTImageManager* currentLocal = m_SubmapManager.currentLocal;
-
+	m_currentState.m_bLastFrameValid = 1;
 	if (curLocalFrame > 0) {
-		//matchAndFilter(currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
-		m_SubmapManager.matchAndFilter(SubmapManager::LOCAL_CURRENT, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+		//matchAndFilter(m_SubmapManager.currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
+		m_currentState.m_bLastFrameValid = m_SubmapManager.matchAndFilter(SubmapManager::LOCAL_CURRENT, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 
 		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
-	m_currentState.m_bLastFrameValid = (currentLocal->getValidImages()[curLocalFrame] != 0);
 
 	////!!!DEBUGGING
 	//const mat4f& intTransform = m_SubmapManager.getCurrentIntegrateTransform(curFrame);
@@ -100,13 +97,12 @@ void Bundler::processInput()
 	// global frame
 	if (m_SubmapManager.isLastFrame(curFrame) || m_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
 		// cache
-		m_SubmapManager.globalCache->copyCacheFrameFrom(m_SubmapManager.currentLocalCache, 0);
+		m_SubmapManager.copyToGlobalCache();
 
-		// if valid local
-		const std::vector<int>& validImagesLocal = currentLocal->getValidImages();
 		const unsigned int curLocalIdx = m_SubmapManager.getCurrLocal(curFrame);
 
-		if (validImagesLocal[1]) {
+		// if valid local
+		if (m_SubmapManager.isCurrentLocalValidChunk()) {
 			// ready to solve local
 			MLIB_ASSERT(m_currentState.m_localToSolve == -1);
 			m_currentState.m_localToSolve = curLocalIdx;
@@ -119,12 +115,12 @@ void Bundler::processInput()
 			m_currentState.m_lastLocalSolved = curLocalIdx; // already "solved"
 			m_currentState.m_bProcessGlobal = false;
 			m_currentState.m_bOptimizeGlobal = false;
-			m_currentState.m_lastNumLocalFrames = std::min(m_submapSize, m_SubmapManager.currentLocal->getNumImages());
+			m_currentState.m_lastNumLocalFrames = m_SubmapManager.getNumCurrentLocalFrames();
 			m_currentState.m_numCompleteTransforms = m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames;
 
 			//add invalidated (fake) global frame
 			if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
-			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << " (" << m_SubmapManager.global->getNumImages() << ", " << m_SubmapManager.currentLocal->getNumImages() << ")" << std::endl;
+			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << std::endl;
 			//getchar();
 			m_SubmapManager.invalidateImages(m_submapSize * curLocalIdx, m_submapSize * curLocalIdx + m_currentState.m_lastNumLocalFrames);
 			SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();

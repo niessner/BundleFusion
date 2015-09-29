@@ -185,7 +185,7 @@ unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIF
 	return curLocalFrame;
 }
 
-void SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
+bool SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
 {
 	auto& cur = get(type);
 	bool isLocal = (type != GLOBAL);
@@ -219,6 +219,7 @@ void SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
 	}
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeSiftMatching = timer.getElapsedTimeMS(); }
 
+	bool lastValid = true;
 	if (curFrame > 0) { // can have a match to another frame
 
 		// --- sort the current key point matches
@@ -263,6 +264,44 @@ void SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
 		if (siftManager->getValidImages()[curFrame] != 0)
 			siftManager->AddCurrToResidualsCU(curFrame, siftIntrinsicsInv);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeAddCurrResiduals = timer.getElapsedTimeMS(); }
+
+		if (siftManager->getValidImages()[curFrame] == 0) lastValid = false;
 	}
 	finish(type);
+
+	return lastValid;
+}
+
+bool SubmapManager::isCurrentLocalValidChunk()
+{
+	bool valid = false;
+	auto& cur = get(LOCAL_CURRENT);
+	if (cur.first->getValidImages()[1] != 0) valid = true;
+	finish(LOCAL_CURRENT);
+	return valid;
+}
+
+unsigned int SubmapManager::getNumCurrentLocalFrames()
+{
+	auto& cur = get(LOCAL_CURRENT);
+	unsigned int numFrames = std::min(m_submapSize, cur.first->getNumImages());
+	finish(LOCAL_CURRENT);
+	return numFrames;
+}
+
+void SubmapManager::getCacheIntrinsics(float4x4& intrinsics, float4x4& intrinsicsInv)
+{
+	auto& cur = get(LOCAL_CURRENT); 
+	intrinsics = MatrixConversion::toCUDA(cur.second->getIntrinsics());
+	intrinsicsInv = MatrixConversion::toCUDA(cur.second->getIntrinsicsInv());
+	finish(LOCAL_CURRENT);
+}
+
+void SubmapManager::copyToGlobalCache()
+{
+	auto& mCur = get(LOCAL_CURRENT);
+	auto& mGlobal = get(GLOBAL);
+	mGlobal.second->copyCacheFrameFrom(mCur.second, 0);
+	finish(LOCAL_CURRENT);
+	finish(GLOBAL);
 }
