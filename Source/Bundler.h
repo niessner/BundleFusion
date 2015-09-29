@@ -12,9 +12,6 @@ class CUDAImageManager;
 class SIFTImageManager;
 class CUDACache;
 
-class SiftGPU;
-class SiftMatchGPU;
-
 class Bundler
 {
 public:
@@ -198,8 +195,6 @@ private:
 	SubmapManager			m_SubmapManager;
 	SBA						m_SparseBundler;
 
-	SiftGPU*				m_sift;
-	SiftMatchGPU*			m_siftMatcher;
 	TrajectoryManager*		m_trajectoryManager;
 
 	unsigned int			m_submapSize;

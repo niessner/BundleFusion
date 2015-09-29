@@ -302,6 +302,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\StructureSensor.cpp" />
+    <ClCompile Include="Source\SubmapManager.cpp" />
     <ClCompile Include="Source\TimingLog.cpp" />
     <ClCompile Include="Source\TrajectoryManager.cpp" />
     <ClCompile Include="Source\uplink.cpp" />

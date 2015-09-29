@@ -4,7 +4,6 @@
 #include "SiftGPU/SiftGPU.h"
 #include "SiftGPU/SiftMatch.h"
 #include "SiftGPU/MatrixConversion.h"
-#include "SiftGPU/SIFTMatchFilter.h"
 #include "ImageHelper.h"
 #include "CUDAImageUtil.h"
 
@@ -49,12 +48,6 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_siftCameraParams.m_downSampIntrinsicsInv = MatrixConversion::toCUDA(m_SubmapManager.currentLocalCache->getIntrinsicsInv());
 	updateConstantSiftCameraParams(m_siftCameraParams);
 
-	m_sift = new SiftGPU;
-	m_siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
-	m_sift->SetParams(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT, false, 150, GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
-	m_sift->InitSiftGPU();
-	m_siftMatcher->InitSiftMatch();
-
 	m_bHasProcessedInputFrame = false;
 	m_bExitBundlingThread = false;
 	m_bIsScanDoneGlobalOpt = false;
@@ -62,8 +55,6 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 Bundler::~Bundler()
 {
-	SAFE_DELETE(m_sift);
-	SAFE_DELETE(m_siftMatcher);
 	SAFE_DELETE(m_trajectoryManager);
 }
 
@@ -81,9 +72,9 @@ void Bundler::processInput()
 	// run SIFT
 	SIFTImageGPU& cur = m_SubmapManager.currentLocal->createSIFTImageGPU();
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-	int success = m_sift->RunSIFT(m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepth);
+	int success = m_SubmapManager.getSiftDEBUG()->RunSIFT(m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepth);
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection on frame " + std::to_string(curFrame));
-	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, m_bundlerInputData.d_inputDepth);
+	unsigned int numKeypoints = m_SubmapManager.getSiftDEBUG()->GetKeyPointsAndDescriptorsCUDA(cur, m_bundlerInputData.d_inputDepth);
 	m_SubmapManager.currentLocal->finalizeSIFTImageGPU(numKeypoints);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
@@ -352,6 +343,7 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 	const std::vector<int>& validImages = siftManager->getValidImages();
 
 	// match with every other
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 	const unsigned int curFrame = siftManager->getNumImages() - 1;
 	for (unsigned int prev = 0; prev < curFrame; prev++) {
 		uint2 keyPointOffset = make_uint2(0, 0);
@@ -367,13 +359,13 @@ void Bundler::matchAndFilter(SIFTImageManager* siftManager, const CUDACache* cud
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(imagePairMatch.d_numMatches, &numMatch, sizeof(unsigned int), cudaMemcpyHostToDevice));
 		}
 		else {
-			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-			m_siftMatcher->SetDescriptors(0, num1, (unsigned char*)image_i.d_keyPointDescs);
-			m_siftMatcher->SetDescriptors(1, num2, (unsigned char*)image_j.d_keyPointDescs);
-			m_siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset);
-			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSiftMatching = s_timer.getElapsedTimeMS(); }
+			SiftMatchGPU* matcher = m_SubmapManager.getSiftMatcherDEBUG();
+			matcher->SetDescriptors(0, num1, (unsigned char*)image_i.d_keyPointDescs);
+			matcher->SetDescriptors(1, num2, (unsigned char*)image_j.d_keyPointDescs);
+			matcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset);
 		}
 	}
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSiftMatching = s_timer.getElapsedTimeMS(); }
 
 	if (curFrame > 0) { // can have a match to another frame
 
