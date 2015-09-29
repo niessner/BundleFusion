@@ -186,6 +186,8 @@ public:
 	unsigned int runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth,
 		unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor,
 		unsigned int colorWidth, unsigned int colorHeight);
+	//! sift matching
+	void matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv);
 
 	//!!!TODO DEBUG HACK ONLY
 	//SiftGPU* getSiftDEBUG() { return m_sift; }
