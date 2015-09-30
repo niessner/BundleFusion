@@ -13,7 +13,8 @@
 SubmapManager::SubmapManager()
 {
 	m_sift = NULL;
-	m_siftMatcher = NULL;
+	m_siftMatcherLocal = NULL;
+	m_siftMatcherGlobal = NULL;
 
 	currentLocal = NULL;
 	nextLocal = NULL;
@@ -38,11 +39,13 @@ SubmapManager::SubmapManager()
 void SubmapManager::initSIFT(unsigned int widthSift, unsigned int heightSift)
 {
 	m_sift = new SiftGPU;
-	m_siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
+	m_siftMatcherLocal = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
+	m_siftMatcherGlobal = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
 
 	m_sift->SetParams(widthSift, heightSift, false, 150, GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
 	m_sift->InitSiftGPU();
-	m_siftMatcher->InitSiftMatch();
+	m_siftMatcherLocal->InitSiftMatch();
+	m_siftMatcherGlobal->InitSiftMatch();
 }
 
 void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage, unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames /*= (unsigned int)-1*/)
@@ -98,7 +101,8 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 SubmapManager::~SubmapManager()
 {
 	SAFE_DELETE(m_sift);
-	SAFE_DELETE(m_siftMatcher);
+	SAFE_DELETE(m_siftMatcherLocal);
+	SAFE_DELETE(m_siftMatcherGlobal);
 
 	SAFE_DELETE(currentLocal);
 	SAFE_DELETE(nextLocal);
@@ -189,6 +193,7 @@ bool SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
 {
 	auto& cur = get(type);
 	bool isLocal = (type != GLOBAL);
+	SiftMatchGPU* matcher = (isLocal) ? m_siftMatcherLocal : m_siftMatcherGlobal;
 
 	SIFTImageManager* siftManager = cur.first;
 	const CUDACache* cudaCache = cur.second;
@@ -212,9 +217,9 @@ bool SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(imagePairMatch.d_numMatches, &numMatch, sizeof(unsigned int), cudaMemcpyHostToDevice));
 		}
 		else {
-			m_siftMatcher->SetDescriptors(0, num1, (unsigned char*)image_i.d_keyPointDescs);
-			m_siftMatcher->SetDescriptors(1, num2, (unsigned char*)image_j.d_keyPointDescs);
-			m_siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset);
+			matcher->SetDescriptors(0, num1, (unsigned char*)image_i.d_keyPointDescs);
+			matcher->SetDescriptors(1, num2, (unsigned char*)image_j.d_keyPointDescs);
+			matcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset);
 		}
 	}
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeSiftMatching = timer.getElapsedTimeMS(); }

@@ -209,7 +209,8 @@ private:
 
 	//*********** SIFT *******************
 	SiftGPU*				m_sift;
-	SiftMatchGPU*			m_siftMatcher;
+	SiftMatchGPU*			m_siftMatcherLocal;
+	SiftMatchGPU*			m_siftMatcherGlobal;
 	//************ SUBMAPS ********************
 	std::mutex mutex_curLocal;
 	std::mutex mutex_nextLocal;
