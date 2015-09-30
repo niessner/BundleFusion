@@ -302,9 +302,7 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 	}
 
 	const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
-	unsigned int numFrames = (numGlobalFrames > 0) ? ((numGlobalFrames - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames) : m_currentState.m_lastNumLocalFrames;
-	//unsigned int numFrames = m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames;
-	//!!!TODO CHECK
+	unsigned int numFrames = m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames;
 
 	if (m_currentState.m_bOptimizeGlobal == BundlerState::PROCESS) {
 		solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, m_bIsScanDoneGlobalOpt);
