@@ -33,10 +33,11 @@ public:
 	};
 
 	CUDACache* nextLocalCache;
+	SIFTImageManager* nextLocal;
+
 	CUDACache* optLocalCache;
 	CUDACache* globalCache;
 
-	SIFTImageManager* nextLocal;
 	SIFTImageManager* optLocal;
 	SIFTImageManager* global;
 
@@ -58,27 +59,6 @@ public:
 
 	float4x4* getLocalTrajectoryGPU(unsigned int localIdx) const {
 		return d_localTrajectories + localIdx * (m_submapSize + 1);
-	}
-
-	// update complete trajectory with new global trajectory info
-	void updateTrajectory(unsigned int curFrame) {
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
-
-		updateTrajectoryCU(d_globalTrajectory, global->getNumImages(),
-			d_completeTrajectory, curFrame,
-			d_localTrajectories, m_submapSize + 1, global->getNumImages(),
-			d_imageInvalidateList);
-	}
-
-	void initializeNextGlobalTransform(bool useIdentity = false) {
-		const unsigned int numGlobalFrames = global->getNumImages();
-		MLIB_ASSERT(numGlobalFrames >= 1);
-		if (useIdentity) {
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames, d_globalTrajectory + numGlobalFrames - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
-		}
-		else {
-			initNextGlobalTransformCU(d_globalTrajectory, numGlobalFrames, d_localTrajectories, m_submapSize + 1);
-		}
 	}
 
 	void invalidateImages(unsigned int startFrame, unsigned int endFrame = -1) {
@@ -113,18 +93,10 @@ public:
 
 		//oldOptLocal->unlock();
 
+		mutex_nextLocal.lock();
 		std::swap(currentLocal, nextLocal);
 		std::swap(currentLocalCache, nextLocalCache);
-
-
-	}
-
-	void finishLocalOpt() {
-		nextLocal->reset();
-		nextLocalCache->reset();
-
-		//optLocal->reset();
-		//optLocalCache->reset();
+		mutex_nextLocal.unlock();
 	}
 
 	bool isLastFrame(unsigned int curFrame) const { return (curFrame + 1) == m_numTotalFrames; }
@@ -167,18 +139,48 @@ public:
 	bool matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv);
 	//! valid if at least frames 0, 1 valid
 	bool isCurrentLocalValidChunk();
-	unsigned int getNumLocalFrames(TYPE type);
+	unsigned int getNumNextLocalFrames();
 
 	void copyToGlobalCache();
 
 	//! optimize local
 	bool optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations);
+	int computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const float4x4& siftIntrinsics, const float4x4& siftIntrinsicsInv);
+	void addInvalidGlobalKey();
 
+	//!!!TODO MOVE
+	//! called when global locked
+	// update complete trajectory with new global trajectory info
+	void updateTrajectory(unsigned int curFrame) {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
+
+		updateTrajectoryCU(d_globalTrajectory, global->getNumImages(),
+			d_completeTrajectory, curFrame,
+			d_localTrajectories, m_submapSize + 1, global->getNumImages(),
+			d_imageInvalidateList);
+	}
 private:
-	std::pair<SIFTImageManager*, CUDACache*> SubmapManager::get(TYPE type);
-	void SubmapManager::finish(TYPE type);
 
 	void initSIFT(unsigned int widthSift, unsigned int heightSift);
+	//! called when global locked
+	void initializeNextGlobalTransform(bool useIdentity = false) {
+		const unsigned int numGlobalFrames = global->getNumImages();
+		MLIB_ASSERT(numGlobalFrames >= 1);
+		if (useIdentity) {
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames, d_globalTrajectory + numGlobalFrames - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+		}
+		else {
+			initNextGlobalTransformCU(d_globalTrajectory, numGlobalFrames, d_localTrajectories, m_submapSize + 1);
+		}
+	}
+	//! called when nextlocal locked
+	void finishLocalOpt() {
+		nextLocal->reset();
+		nextLocalCache->reset();
+
+		//optLocal->reset();
+		//optLocalCache->reset();
+	}
 
 	//*********** SIFT *******************
 	SiftGPU*				m_sift;
@@ -187,12 +189,12 @@ private:
 	//************ SUBMAPS ********************
 	SBA						m_SparseBundler;
 
-	std::mutex mutex_curLocal;
 	std::mutex mutex_nextLocal;
 	std::mutex mutex_global;
 
 	CUDACache* currentLocalCache;
 	SIFTImageManager* currentLocal;
+
 	//************************************
 
 	std::vector<unsigned int>	m_invalidImagesList;
