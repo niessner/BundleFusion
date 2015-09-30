@@ -286,11 +286,11 @@ bool SubmapManager::isCurrentLocalValidChunk()
 	return valid;
 }
 
-unsigned int SubmapManager::getNumCurrentLocalFrames()
+unsigned int SubmapManager::getNumLocalFrames(TYPE type)
 {
-	auto& cur = get(LOCAL_CURRENT);
+	auto& cur = get(type);
 	unsigned int numFrames = std::min(m_submapSize, cur.first->getNumImages());
-	finish(LOCAL_CURRENT);
+	finish(type);
 	return numFrames;
 }
 

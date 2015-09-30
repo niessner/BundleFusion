@@ -116,6 +116,8 @@ void Bundler::processInput()
 			// invalidate the local
 			m_currentState.m_localToSolve = -((int)curLocalIdx + m_currentState.s_markOffset);
 			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << std::endl;
+			// switch local submaps
+			m_SubmapManager.switchLocal();
 
 			//m_currentState.m_localToSolve = -1; // no need to solve local
 			//m_currentState.m_lastLocalSolved = curLocalIdx; // already "solved"
@@ -162,7 +164,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 		return; // nothing to solve
 	}
 
-	m_currentState.m_bProcessGlobal = 0;
+	m_currentState.m_bProcessGlobal = BundlerState::DO_NOTHING;
 	unsigned int currLocalIdx;
 	if (m_currentState.m_localToSolve >= 0) {
 		currLocalIdx = m_currentState.m_localToSolve;
@@ -188,52 +190,34 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap from verify " << currLocalIdx << " (" << m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames << ")" << std::endl;
 				//getchar();
 
-				m_SubmapManager.invalidateImages(m_submapSize * currLocalIdx, m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames);
-				m_currentState.m_bProcessGlobal = false;
+				m_currentState.m_bProcessGlobal = BundlerState::INVALIDATE;
 
-				m_currentState.m_bOptimizeGlobal = false;
-				m_currentState.m_numCompleteTransforms = m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames;
+				//m_SubmapManager.invalidateImages(m_submapSize * currLocalIdx, m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames);
+				//m_currentState.m_bOptimizeGlobal = false;
+				//m_currentState.m_numCompleteTransforms = m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames;
 
-				//add invalidated (fake) global frame
-				if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
-				SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
-				m_SubmapManager.global->finalizeSIFTImageGPU(0);
-				m_SubmapManager.finishLocalOpt();
-				m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
+				////add invalidated (fake) global frame
+				//if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
+				//SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
+				//m_SubmapManager.global->finalizeSIFTImageGPU(0);
+				//m_SubmapManager.finishLocalOpt();
+				//m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
 
-				m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
-				m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
-				m_SubmapManager.initializeNextGlobalTransform(true);
+				//m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
+				//m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
+				//m_SubmapManager.initializeNextGlobalTransform(true);
 			}
 			else
-				m_currentState.m_bProcessGlobal = 1;
+				m_currentState.m_bProcessGlobal = BundlerState::PROCESS;
 		}
 		else
-			m_currentState.m_bProcessGlobal = 1;
+			m_currentState.m_bProcessGlobal = BundlerState::PROCESS;
 		//m_SubmapManager.optLocal->unlock();
 	}
 	else {
 		currLocalIdx = -m_currentState.m_localToSolve - m_currentState.s_markOffset;
-		m_currentState.m_bProcessGlobal = 2; //invalidate
-
-		//!!!TODO MOVE TO PROCESSGLOBAL
-		m_currentState.m_bOptimizeGlobal = false;
-		m_currentState.m_lastNumLocalFrames = m_SubmapManager.getNumCurrentLocalFrames();
-		m_currentState.m_numCompleteTransforms = m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames;
-
-		//add invalidated (fake) global frame
-		if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
-		//getchar();
-		m_SubmapManager.invalidateImages(m_submapSize * currLocalIdx, m_submapSize * currLocalIdx + m_currentState.m_lastNumLocalFrames);
-		SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
-		m_SubmapManager.global->finalizeSIFTImageGPU(0);
-		m_SubmapManager.switchLocalAndFinishOpt();
-		m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
-
-		m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
-		m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
-		m_SubmapManager.initializeNextGlobalTransform(true);
-		//!!!TODO MOVE TO PROCESSGLOBAL
+		m_currentState.m_bProcessGlobal = BundlerState::INVALIDATE; //invalidate
+		m_currentState.m_lastNumLocalFrames = m_SubmapManager.getNumLocalFrames(SubmapManager::LOCAL_NEXT);
 	}
 	m_currentState.m_localToSolve = -1;
 	m_currentState.m_lastLocalSolved = currLocalIdx;
@@ -242,56 +226,75 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 
 void Bundler::processGlobal()
 {
-	if (!m_currentState.m_bProcessGlobal) {
-		//if (m_RGBDSensor->isReceivingFrames()) {
-		//	assert(false);
-		//}
+	if (m_currentState.m_bProcessGlobal == BundlerState::DO_NOTHING) {
 		return;
 	}
-	m_currentState.m_bProcessGlobal = false;
+	if (m_currentState.m_bProcessGlobal == BundlerState::PROCESS) {
 
-	SIFTImageManager* global = m_SubmapManager.global;
-	if ((int)global->getNumImages() <= m_currentState.m_lastLocalSolved) {
-		if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
-		//m_SubmapManager.optLocal->lock();
-		SIFTImageManager* local = m_SubmapManager.nextLocal;
+		SIFTImageManager* global = m_SubmapManager.global;
+		if ((int)global->getNumImages() <= m_currentState.m_lastLocalSolved) {
+			if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
+			//m_SubmapManager.optLocal->lock();
+			SIFTImageManager* local = m_SubmapManager.nextLocal;
 
-		// fuse to global
-		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-		SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
-		unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, m_SubmapManager.getLocalTrajectoryGPU(m_currentState.m_lastLocalSolved),
-			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
-		global->finalizeSIFTImageGPU(numGlobalKeys);
-		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = s_timer.getElapsedTimeMS(); }
+			// fuse to global
+			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
+			SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
+			unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, m_SubmapManager.getLocalTrajectoryGPU(m_currentState.m_lastLocalSolved),
+				MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+			global->finalizeSIFTImageGPU(numGlobalKeys);
+			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
-		const std::vector<int>& validImagesLocal = local->getValidImages();
-		for (unsigned int i = 0; i < std::min(m_submapSize, local->getNumImages()); i++) {
-			if (validImagesLocal[i] == 0)
-				m_SubmapManager.invalidateImages((global->getNumImages() - 1) * m_submapSize + i);
-		}
-		m_SubmapManager.initializeNextGlobalTransform(false);
-		// done with local data!
-		m_SubmapManager.finishLocalOpt();
-		//m_SubmapManager.optLocal->unlock();
-
-		//unsigned int gframe = (unsigned int)global->getNumImages() - 1;
-		//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
-
-		// match with every other global
-		if (global->getNumImages() > 1) {
-			//matchAndFilter(global, m_SubmapManager.globalCache, 0, m_submapSize);
-			m_SubmapManager.matchAndFilter(SubmapManager::GLOBAL, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
-
-			if (global->getValidImages()[global->getNumImages() - 1]) {
-				// ready to solve global
-				m_currentState.m_bOptimizeGlobal = true;
+			const std::vector<int>& validImagesLocal = local->getValidImages();
+			for (unsigned int i = 0; i < std::min(m_submapSize, local->getNumImages()); i++) {
+				if (validImagesLocal[i] == 0)
+					m_SubmapManager.invalidateImages((global->getNumImages() - 1) * m_submapSize + i);
 			}
-			else {
-				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
-				//getchar();
+			m_SubmapManager.initializeNextGlobalTransform(false);
+			// done with local data!
+			m_SubmapManager.finishLocalOpt();
+			//m_SubmapManager.optLocal->unlock();
+
+			//unsigned int gframe = (unsigned int)global->getNumImages() - 1;
+			//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
+
+			// match with every other global
+			if (global->getNumImages() > 1) {
+				//matchAndFilter(global, m_SubmapManager.globalCache, 0, m_submapSize);
+				m_SubmapManager.matchAndFilter(SubmapManager::GLOBAL, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+
+				if (global->getValidImages()[global->getNumImages() - 1]) {
+					// ready to solve global
+					m_currentState.m_bOptimizeGlobal = true;
+				}
+				else {
+					if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
+					//getchar();
+				}
 			}
 		}
 	}
+	else {
+		m_currentState.m_bOptimizeGlobal = false;
+
+		//add invalidated (fake) global frame
+		if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
+		//getchar();
+		m_SubmapManager.invalidateImages(m_submapSize * m_currentState.m_lastLocalSolved, m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames);
+		SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
+		m_SubmapManager.global->finalizeSIFTImageGPU(0);
+		m_SubmapManager.finishLocalOpt();
+
+
+		//!!!TODO MOVE TO OPTIMIZEGLOBAL
+		m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
+		m_currentState.m_numCompleteTransforms = m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames;
+		m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
+		m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
+		m_SubmapManager.initializeNextGlobalTransform(true);
+		//!!!TODO MOVE TO OPTIMIZEGLOBAL
+	}
+	m_currentState.m_bProcessGlobal = BundlerState::DO_NOTHING;
 }
 
 

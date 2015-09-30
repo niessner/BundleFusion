@@ -70,6 +70,12 @@ public:
 		}
 	};
 	struct BundlerState {
+		enum PROCESS_STATE {
+			DO_NOTHING,
+			PROCESS,
+			INVALIDATE
+		};
+
 		int						m_localToSolve;		// index of local submap to solve (-1) if none
 		int						m_lastLocalSolved; // to check if can fuse to global
 		bool					m_bOptimizeGlobal; // ready to optimize global
@@ -82,7 +88,7 @@ public:
 		unsigned int			m_numCompleteTransforms;
 		unsigned int			m_lastValidCompleteTransform;
 
-		int						m_bProcessGlobal; //0 -> don't process, 1 -> process, 2 -> invalidate
+		PROCESS_STATE			m_bProcessGlobal;
 
 		static int				s_markOffset;
 
@@ -96,7 +102,7 @@ public:
 			m_lastNumLocalFrames = 0;
 			m_numCompleteTransforms = 0;
 			m_lastValidCompleteTransform = 0;
-			m_bProcessGlobal = 0;
+			m_bProcessGlobal = DO_NOTHING;
 		}
 	};
 

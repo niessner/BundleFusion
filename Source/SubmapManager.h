@@ -118,35 +118,35 @@ public:
 
 	}
 
-	void switchLocalAndFinishOpt() {
+	//void switchLocalAndFinishOpt() {
 
-		//optLocal->lock();	//wait until optimizer has released its lock on opt local
+	//	//optLocal->lock();	//wait until optimizer has released its lock on opt local
 
-		//SIFTImageManager* oldCurrentLocal = currentLocal;
-		//SIFTImageManager* oldOptLocal = optLocal;
-		//SIFTImageManager* oldNextLocal = nextLocal;
-		//currentLocal = oldNextLocal;
-		//optLocal = oldCurrentLocal;
-		//nextLocal = oldOptLocal;
+	//	//SIFTImageManager* oldCurrentLocal = currentLocal;
+	//	//SIFTImageManager* oldOptLocal = optLocal;
+	//	//SIFTImageManager* oldNextLocal = nextLocal;
+	//	//currentLocal = oldNextLocal;
+	//	//optLocal = oldCurrentLocal;
+	//	//nextLocal = oldOptLocal;
 
 
-		//CUDACache* oldCurrentLocalCache = currentLocalCache;
-		//CUDACache* oldOptLocalCache = optLocalCache;
-		//CUDACache* oldNextLocalCache = nextLocalCache;
-		//currentLocalCache = oldNextLocalCache;
-		//optLocalCache = oldCurrentLocalCache;
-		//nextLocalCache = oldOptLocalCache;
+	//	//CUDACache* oldCurrentLocalCache = currentLocalCache;
+	//	//CUDACache* oldOptLocalCache = optLocalCache;
+	//	//CUDACache* oldNextLocalCache = nextLocalCache;
+	//	//currentLocalCache = oldNextLocalCache;
+	//	//optLocalCache = oldCurrentLocalCache;
+	//	//nextLocalCache = oldOptLocalCache;
 
-		//optLocal->reset();
-		//optLocalCache->reset();
+	//	//optLocal->reset();
+	//	//optLocalCache->reset();
 
-		//oldOptLocal->unlock();
+	//	//oldOptLocal->unlock();
 
-		std::swap(currentLocal, nextLocal);
-		std::swap(currentLocalCache, nextLocalCache);
-		nextLocal->reset();
-		nextLocalCache->reset();
-	}
+	//	std::swap(currentLocal, nextLocal);
+	//	std::swap(currentLocalCache, nextLocalCache);
+	//	nextLocal->reset();
+	//	nextLocalCache->reset();
+	//}
 
 
 	void finishLocalOpt() {
@@ -197,7 +197,7 @@ public:
 	bool matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv);
 	//! valid if at least frames 0, 1 valid
 	bool isCurrentLocalValidChunk();
-	unsigned int getNumCurrentLocalFrames();
+	unsigned int getNumLocalFrames(TYPE type);
 
 	void copyToGlobalCache();
 
