@@ -271,9 +271,7 @@ void SubmapManager::getCacheIntrinsics(float4x4& intrinsics, float4x4& intrinsic
 
 void SubmapManager::copyToGlobalCache()
 {
-	mutex_global.lock();
-	globalCache->copyCacheFrameFrom(currentLocalCache, 0);
-	mutex_global.unlock();
+	globalCache->copyCacheFrameFrom(nextLocalCache, 0);
 }
 
 bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations)
@@ -317,7 +315,6 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 
 int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const float4x4& siftIntrinsics, const float4x4& siftIntrinsicsInv)
 {
-	//!!!TODO LOCK GLOBAL
 	int ret = 0; ////!!!TODO FIX
 	if ((int)global->getNumImages() <= lastLocalSolved) {
 		//m_SubmapManager.optLocal->lock();
@@ -368,14 +365,10 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 
 void SubmapManager::addInvalidGlobalKey()
 {
-	mutex_global.lock();
-
 	SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
 	global->finalizeSIFTImageGPU(0);
 	mutex_nextLocal.lock();
 	finishLocalOpt();
 	mutex_nextLocal.unlock();
 	initializeNextGlobalTransform(true);
-
-	mutex_global.unlock();
 }

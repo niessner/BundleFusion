@@ -98,9 +98,6 @@ void Bundler::processInput()
 
 	// global frame
 	if (m_SubmapManager.isLastFrame(curFrame) || m_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
-		// cache
-		m_SubmapManager.copyToGlobalCache();
-
 		const unsigned int curLocalIdx = m_SubmapManager.getCurrLocal(curFrame);
 
 		// if valid local
@@ -167,6 +164,8 @@ void Bundler::processGlobal()
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 	if (m_currentState.m_bProcessGlobal == BundlerState::PROCESS) {
+		// cache
+		m_SubmapManager.copyToGlobalCache();
 
 		m_currentState.m_bOptimizeGlobal = (BundlerState::PROCESS_STATE)m_SubmapManager.computeAndMatchGlobalKeys(m_currentState.m_lastLocalSolved,
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));

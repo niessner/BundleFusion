@@ -190,7 +190,6 @@ private:
 	SBA						m_SparseBundler;
 
 	std::mutex mutex_nextLocal;
-	std::mutex mutex_global;
 
 	CUDACache* currentLocalCache;
 	SIFTImageManager* currentLocal;
