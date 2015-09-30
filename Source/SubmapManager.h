@@ -32,15 +32,6 @@ public:
 		GLOBAL
 	};
 
-	CUDACache* nextLocalCache;
-	SIFTImageManager* nextLocal;
-
-	CUDACache* optLocalCache;
-	CUDACache* globalCache;
-
-	SIFTImageManager* optLocal;
-	SIFTImageManager* global;
-
 	float4x4* d_globalTrajectory;
 	float4x4* d_completeTrajectory;
 	float4x4* d_localTrajectories;
@@ -148,8 +139,34 @@ public:
 	int computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const float4x4& siftIntrinsics, const float4x4& siftIntrinsicsInv);
 	void addInvalidGlobalKey();
 
-	//!!!TODO MOVE
-	//! called when global locked
+	//! optimize global
+	bool optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone) {
+		bool ret = false;
+		const unsigned int numGlobalFrames = global->getNumImages();
+
+		const bool useVerify = false; 
+		m_SparseBundler.align(global, d_globalTrajectory, numNonLinIterations, numLinIterations,
+			useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, isScanDone);
+
+		if (isEnd) {
+			// may invalidate already invalidated images
+			const std::vector<int>& validImagesGlobal = global->getValidImages();
+			for (unsigned int i = 0; i < numGlobalFrames; i++) {
+				if (validImagesGlobal[i] == 0) {
+					invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
+				}
+			}
+
+			if (validImagesGlobal[numGlobalFrames - 1] != 0) ret = true;
+		}
+		return ret;
+	}
+
+	void invalidateLastGlobalFrame() {
+		MLIB_ASSERT(global->getNumImages() > 1);
+		global->invalidateFrame(global->getNumImages() - 1);
+	}
+
 	// update complete trajectory with new global trajectory info
 	void updateTrajectory(unsigned int curFrame) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
@@ -194,6 +211,15 @@ private:
 	CUDACache* currentLocalCache;
 	SIFTImageManager* currentLocal;
 
+	CUDACache* nextLocalCache;
+	SIFTImageManager* nextLocal;
+
+	CUDACache* globalCache;
+	SIFTImageManager* global;
+
+	//!!!TODO HERE
+	CUDACache* optLocalCache;
+	SIFTImageManager* optLocal;
 	//************************************
 
 	std::vector<unsigned int>	m_invalidImagesList;

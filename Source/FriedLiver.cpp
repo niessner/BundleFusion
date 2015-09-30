@@ -252,7 +252,6 @@ int main(int argc, char** argv)
 		g_bundler->saveCompleteTrajectory("trajectory.bin");
 		g_bundler->saveCompleteTrajectory("siftTrajectory.bin");
 		g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
-		if (GlobalBundlingState::get().s_recordKeysPointCloud) g_bundler->saveKeysToPointCloud();
 		//bundler->saveDEBUG();
 
 		g_bundler->exitBundlingThread();

@@ -189,32 +189,23 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 		return; // nothing to solve
 	}
 
-	const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
 	unsigned int numFrames = m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames;
 
 	if (m_currentState.m_bOptimizeGlobal == BundlerState::PROCESS) {
-		solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, m_bIsScanDoneGlobalOpt);
+		bool valid = m_SubmapManager.optimizeGlobal(numFrames, numNonLinIterations, numLinIterations, isStart, isEnd, m_bIsScanDoneGlobalOpt);
 
 		if (isEnd) {
-			// may invalidate already invalidated images
-			const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
-			for (unsigned int i = 0; i < numGlobalFrames; i++) {
-				if (validImagesGlobal[i] == 0) {
-					m_SubmapManager.invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
-				}
-			}
-
 			m_SubmapManager.updateTrajectory(numFrames);
 			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
 			m_currentState.m_numCompleteTransforms = numFrames;
-			if (validImagesGlobal[numGlobalFrames - 1] != 0) m_currentState.m_lastValidCompleteTransform = m_submapSize * m_currentState.m_lastLocalSolved; //TODO over-conservative but easier
+			if (valid) m_currentState.m_lastValidCompleteTransform = m_submapSize * m_currentState.m_lastLocalSolved; //TODO over-conservative but easier
 
 			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}
 	}
 	else {
 		if (isStart) {
-			m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
+			m_SubmapManager.invalidateLastGlobalFrame();
 			m_currentState.m_numCompleteTransforms = numFrames;
 			m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
 			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
@@ -322,24 +313,6 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
 			prevImage, curImage, 0.7f, filtered);
-	}
-}
-
-void Bundler::saveKeysToPointCloud(const std::string& filename /*= "refined.ply"*/) const
-{
-	if (GlobalBundlingState::get().s_recordKeysPointCloud) {
-		const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
-		std::vector<mat4f> globalTrajectory(m_SubmapManager.global->getNumImages());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globalTrajectory.data(), m_SubmapManager.d_globalTrajectory, sizeof(float4x4)*globalTrajectory.size(), cudaMemcpyDeviceToHost));
-
-		m_RGBDSensor->saveRecordedPointCloud(filename, validImagesGlobal, globalTrajectory);
-		//!!!
-		//unsigned int numFrames = (m_SubmapManager.global->getNumImages() > 0) ? (m_SubmapManager.global->getNumImages() - 1)*m_submapSize + m_currentState.m_lastNumLocalFrames : m_currentState.m_lastNumLocalFrames;
-		//std::cout << "found " << numFrames << " total frames" << std::endl;
-		//std::vector<mat4f> completeTrajectory(numFrames);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(completeTrajectory.data(), m_SubmapManager.d_completeTrajectory, sizeof(float4x4)*completeTrajectory.size(), cudaMemcpyDeviceToHost));
-		//m_RGBDSensor->saveRecordedPointCloudDEBUG(filename, validImagesGlobal, completeTrajectory, m_submapSize);
-		//!!!
 	}
 }
 
