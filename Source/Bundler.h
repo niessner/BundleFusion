@@ -82,7 +82,9 @@ public:
 		unsigned int			m_numCompleteTransforms;
 		unsigned int			m_lastValidCompleteTransform;
 
-		bool					m_bProcessGlobal;
+		int						m_bProcessGlobal; //0 -> don't process, 1 -> process, 2 -> invalidate
+
+		static int				s_markOffset;
 
 		BundlerState() {
 			m_localToSolve = -1;
@@ -94,7 +96,7 @@ public:
 			m_lastNumLocalFrames = 0;
 			m_numCompleteTransforms = 0;
 			m_lastValidCompleteTransform = 0;
-			m_bProcessGlobal = false;
+			m_bProcessGlobal = 0;
 		}
 	};
 
@@ -201,7 +203,7 @@ private:
 	BundlerInputData		m_bundlerInputData;
 
 	static Timer			s_timer;
-	static Timer			s_timerOpt;
+	static Timer			s_timerOpt; //!!!TODO don't need?
 
 	SiftCameraParams		m_siftCameraParams;
 
