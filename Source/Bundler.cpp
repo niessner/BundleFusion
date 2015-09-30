@@ -207,7 +207,7 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 			m_SubmapManager.updateTrajectory(numFrames);
 			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
 			m_currentState.m_numCompleteTransforms = numFrames;
-			m_currentState.m_lastValidCompleteTransform = numFrames - 1;
+			if (validImagesGlobal[numGlobalFrames - 1] != 0) m_currentState.m_lastValidCompleteTransform = m_submapSize * m_currentState.m_lastLocalSolved; //TODO over-conservative but easier
 
 			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}

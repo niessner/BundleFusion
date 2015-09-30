@@ -881,7 +881,6 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 	const int* d_numFilteredMatchesPerImagePair,
 	const float4x4* d_filteredTransformsInv, float4x4* d_currIntegrateTrans)
 {
-
 	for (int i = (int)curFrameIndex - 1; i >= 0; i--) {
 		if (d_numFilteredMatchesPerImagePair[i] > 0) {
 			float4x4 transform;
@@ -898,6 +897,21 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 				const float4x4 offset = d_siftTrajectory[lastValidCompleteTransform].getInverse() * d_siftTrajectory[idxPrevSiftKnown];
 				transform = d_completeTrajectory[lastValidCompleteTransform] * offset * d_filteredTransformsInv[i];
 			}
+
+			//if (debug) {
+			//	printf("(%d, %d) -> prev sift known %d, %d, last valid %d\n", curFrameIndexAll, curFrameIndex,
+			//		idxPrevSiftKnown, i, lastValidCompleteTransform);
+			//	printf("sift at prev known:\n");
+			//	d_siftTrajectory[idxPrevSiftKnown].print();
+			//	printf("sift at last valid:\n");
+			//	d_siftTrajectory[lastValidCompleteTransform].print();
+			//	printf("complete at last valid:\n");
+			//	d_completeTrajectory[lastValidCompleteTransform].print();
+			//	printf("delta:\n");
+			//	d_filteredTransformsInv[i].print();
+			//	printf("transform:\n");
+			//	transform.print();
+			//}
 
 			d_currIntegrateTrans[0] = transform;
 
@@ -916,7 +930,6 @@ void SIFTImageManager::computeSiftTransformCU(const float4x4* d_completeTrajecto
 		d_siftTrajectory, curFrameIndexAll,
 		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransformsInv,
 		d_currIntegrateTrans);
-
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());

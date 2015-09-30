@@ -967,7 +967,10 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	}
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeReconstruct = t.getElapsedTimeMS(); }
 
-
+	//if (validTransform && isnan(g_lastRigidTransform[0])) {
+	//	std::cout << "ERROR WITH TRANSFORM" << std::endl;
+	//	getchar();
+	//}
 
 	///////////////////////////////////////
 	// Render with view of current frame
