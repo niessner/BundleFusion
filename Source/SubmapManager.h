@@ -32,12 +32,6 @@ public:
 		GLOBAL
 	};
 
-	float4x4* d_globalTrajectory;
-	float4x4* d_completeTrajectory;
-	float4x4* d_localTrajectories;
-
-	float4x4*	 d_siftTrajectory; // frame-to-frame sift tracking for all frames in sequence
-
 	SubmapManager();
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
 		unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames = (unsigned int)-1);
@@ -85,8 +79,8 @@ public:
 		//oldOptLocal->unlock();
 
 		mutex_nextLocal.lock();
-		std::swap(currentLocal, nextLocal);
-		std::swap(currentLocalCache, nextLocalCache);
+		std::swap(m_currentLocal, m_nextLocal);
+		std::swap(m_currentLocalCache, m_nextLocalCache);
 		mutex_nextLocal.unlock();
 	}
 
@@ -98,7 +92,7 @@ public:
 	}
 
 	void computeCurrentSiftTransform(unsigned int frameIdx, unsigned int localFrameIdx, unsigned int lastValidCompleteTransform) {
-		const std::vector<int>& validImages = currentLocal->getValidImages();
+		const std::vector<int>& validImages = m_currentLocal->getValidImages();
 		if (validImages[localFrameIdx] == 0) {
 			m_currIntegrateTransform[frameIdx].setZero(-std::numeric_limits<float>::infinity());
 			assert(frameIdx > 0);
@@ -106,15 +100,8 @@ public:
 			//cutilSafeCall(cudaMemcpy(d_currIntegrateTransform + frameIdx, &m_currIntegrateTransform[frameIdx], sizeof(float4x4), cudaMemcpyHostToDevice)); //TODO this is for debug only
 		}
 		else if (frameIdx > 0) {
-			currentLocal->computeSiftTransformCU(d_completeTrajectory, lastValidCompleteTransform, d_siftTrajectory, frameIdx, localFrameIdx, d_currIntegrateTransform + frameIdx);
+			m_currentLocal->computeSiftTransformCU(d_completeTrajectory, lastValidCompleteTransform, d_siftTrajectory, frameIdx, localFrameIdx, d_currIntegrateTransform + frameIdx);
 			cutilSafeCall(cudaMemcpy(&m_currIntegrateTransform[frameIdx], d_currIntegrateTransform + frameIdx, sizeof(float4x4), cudaMemcpyDeviceToHost));
-
-			////!!!DEBUGGING
-			//if (isnan(m_currIntegrateTransform[frameIdx][0])) {
-			//	std::cerr << "computeCurrentSiftTransform: NaN transform!" << std::endl;
-			//	assert(false);
-			//}
-			////!!!DEBUGGING
 		}
 	}
 	const mat4f& getCurrentIntegrateTransform(unsigned int frameIdx) const { return m_currIntegrateTransform[frameIdx]; }
@@ -140,48 +127,34 @@ public:
 	void addInvalidGlobalKey();
 
 	//! optimize global
-	bool optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone) {
-		bool ret = false;
-		const unsigned int numGlobalFrames = global->getNumImages();
-
-		const bool useVerify = false; 
-		m_SparseBundler.align(global, d_globalTrajectory, numNonLinIterations, numLinIterations,
-			useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, isScanDone);
-
-		if (isEnd) {
-			// may invalidate already invalidated images
-			const std::vector<int>& validImagesGlobal = global->getValidImages();
-			for (unsigned int i = 0; i < numGlobalFrames; i++) {
-				if (validImagesGlobal[i] == 0) {
-					invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
-				}
-			}
-
-			if (validImagesGlobal[numGlobalFrames - 1] != 0) ret = true;
-		}
-		return ret;
-	}
+	bool optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone);
 
 	void invalidateLastGlobalFrame() {
-		MLIB_ASSERT(global->getNumImages() > 1);
-		global->invalidateFrame(global->getNumImages() - 1);
+		MLIB_ASSERT(m_global->getNumImages() > 1);
+		m_global->invalidateFrame(m_global->getNumImages() - 1);
 	}
 
 	// update complete trajectory with new global trajectory info
 	void updateTrajectory(unsigned int curFrame) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
 
-		updateTrajectoryCU(d_globalTrajectory, global->getNumImages(),
+		updateTrajectoryCU(d_globalTrajectory, m_global->getNumImages(),
 			d_completeTrajectory, curFrame,
-			d_localTrajectories, m_submapSize + 1, global->getNumImages(),
+			d_localTrajectories, m_submapSize + 1, m_global->getNumImages(),
 			d_imageInvalidateList);
 	}
+
+	const float4x4* getCompleteTrajectory() const { return d_completeTrajectory; }
+
+	//debugging
+	void saveCompleteTrajectory(const std::string& filename, unsigned int numTransforms) const;
+	void saveSiftTrajectory(const std::string& filename, unsigned int numTransforms) const;
 private:
 
 	void initSIFT(unsigned int widthSift, unsigned int heightSift);
 	//! called when global locked
 	void initializeNextGlobalTransform(bool useIdentity = false) {
-		const unsigned int numGlobalFrames = global->getNumImages();
+		const unsigned int numGlobalFrames = m_global->getNumImages();
 		MLIB_ASSERT(numGlobalFrames >= 1);
 		if (useIdentity) {
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames, d_globalTrajectory + numGlobalFrames - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
@@ -192,8 +165,8 @@ private:
 	}
 	//! called when nextlocal locked
 	void finishLocalOpt() {
-		nextLocal->reset();
-		nextLocalCache->reset();
+		m_nextLocal->reset();
+		m_nextLocalCache->reset();
 
 		//optLocal->reset();
 		//optLocalCache->reset();
@@ -208,18 +181,24 @@ private:
 
 	std::mutex mutex_nextLocal;
 
-	CUDACache* currentLocalCache;
-	SIFTImageManager* currentLocal;
+	CUDACache*			m_currentLocalCache;
+	SIFTImageManager*	m_currentLocal;
 
-	CUDACache* nextLocalCache;
-	SIFTImageManager* nextLocal;
+	CUDACache*			m_nextLocalCache;
+	SIFTImageManager*	m_nextLocal;
 
-	CUDACache* globalCache;
-	SIFTImageManager* global;
+	CUDACache*			m_globalCache;
+	SIFTImageManager*	m_global;
 
 	//!!!TODO HERE
-	CUDACache* optLocalCache;
-	SIFTImageManager* optLocal;
+	CUDACache*			m_optLocalCache;
+	SIFTImageManager*	m_optLocal;
+	//*********** TRAJECTORIES ************
+	float4x4* d_globalTrajectory;
+	float4x4* d_completeTrajectory;
+	float4x4* d_localTrajectories;
+
+	float4x4*	 d_siftTrajectory; // frame-to-frame sift tracking for all frames in sequence
 	//************************************
 
 	std::vector<unsigned int>	m_invalidImagesList;

@@ -16,17 +16,17 @@ SubmapManager::SubmapManager()
 	m_siftMatcherLocal = NULL;
 	m_siftMatcherGlobal = NULL;
 
-	currentLocal = NULL;
-	nextLocal = NULL;
-	optLocal = NULL;
-	global = NULL;
+	m_currentLocal = NULL;
+	m_nextLocal = NULL;
+	m_optLocal = NULL;
+	m_global = NULL;
 	m_numTotalFrames = 0;
 	m_submapSize = 0;
 
-	currentLocalCache = NULL;
-	nextLocalCache = NULL;
-	globalCache = NULL;
-	optLocalCache = NULL;
+	m_currentLocalCache = NULL;
+	m_nextLocalCache = NULL;
+	m_globalCache = NULL;
+	m_optLocalCache = NULL;
 	//m_globalTimer = NULL;
 
 	d_globalTrajectory = NULL;
@@ -63,19 +63,19 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 	intrinsicsDownsampled._m00 *= scaleWidth;  intrinsicsDownsampled._m02 *= scaleWidth;
 	intrinsicsDownsampled._m11 *= scaleHeight; intrinsicsDownsampled._m12 *= scaleHeight;
 
-	currentLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
-	nextLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
-	optLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
-	globalCache = new CUDACache(downSampWidth, downSampHeight, maxNumGlobalImages, intrinsicsDownsampled);
+	m_currentLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
+	m_nextLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
+	m_optLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
+	m_globalCache = new CUDACache(downSampWidth, downSampHeight, maxNumGlobalImages, intrinsicsDownsampled);
 
 	m_numTotalFrames = numTotalFrames;
 	m_submapSize = submapSize;
 
 	// sift manager
-	currentLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
-	nextLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
-	optLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
-	global = new SIFTImageManager(m_submapSize, maxNumGlobalImages, maxNumKeysPerImage);
+	m_currentLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
+	m_nextLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
+	m_optLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
+	m_global = new SIFTImageManager(m_submapSize, maxNumGlobalImages, maxNumKeysPerImage);
 
 	m_invalidImagesList.resize(maxNumGlobalImages * m_submapSize, 1);
 
@@ -105,15 +105,15 @@ SubmapManager::~SubmapManager()
 	SAFE_DELETE(m_siftMatcherLocal);
 	SAFE_DELETE(m_siftMatcherGlobal);
 
-	SAFE_DELETE(currentLocal);
-	SAFE_DELETE(nextLocal);
-	SAFE_DELETE(optLocal);
-	SAFE_DELETE(global);
+	SAFE_DELETE(m_currentLocal);
+	SAFE_DELETE(m_nextLocal);
+	SAFE_DELETE(m_optLocal);
+	SAFE_DELETE(m_global);
 
-	SAFE_DELETE(currentLocalCache);
-	SAFE_DELETE(nextLocalCache);
-	SAFE_DELETE(optLocalCache);
-	SAFE_DELETE(globalCache);
+	SAFE_DELETE(m_currentLocalCache);
+	SAFE_DELETE(m_nextLocalCache);
+	SAFE_DELETE(m_optLocalCache);
+	SAFE_DELETE(m_globalCache);
 
 	MLIB_CUDA_SAFE_FREE(d_globalTrajectory);
 	MLIB_CUDA_SAFE_FREE(d_completeTrajectory);
@@ -126,24 +126,24 @@ SubmapManager::~SubmapManager()
 
 unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth, unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor, unsigned int colorWidth, unsigned int colorHeight)
 {
-	SIFTImageGPU& curImage = currentLocal->createSIFTImageGPU();
+	SIFTImageGPU& curImage = m_currentLocal->createSIFTImageGPU();
 	int success = m_sift->RunSIFT(d_intensitySIFT, d_inputDepth);
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection");
 	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(curImage, d_inputDepth);
-	currentLocal->finalizeSIFTImageGPU(numKeypoints);
+	m_currentLocal->finalizeSIFTImageGPU(numKeypoints);
 
 	// process cuda cache
-	const unsigned int curLocalFrame = currentLocal->getNumImages() - 1;
-	currentLocalCache->storeFrame(d_inputDepth, depthWidth, depthHeight, d_inputColor, colorWidth, colorHeight);
+	const unsigned int curLocalFrame = m_currentLocal->getNumImages() - 1;
+	m_currentLocalCache->storeFrame(d_inputDepth, depthWidth, depthHeight, d_inputColor, colorWidth, colorHeight);
 
 	// init next
 	if (isLastLocalFrame(curFrame)) {
 		mutex_nextLocal.lock();
-		SIFTImageGPU& nextImage = nextLocal->createSIFTImageGPU();
+		SIFTImageGPU& nextImage = m_nextLocal->createSIFTImageGPU();
 		cutilSafeCall(cudaMemcpy(nextImage.d_keyPoints, curImage.d_keyPoints, sizeof(SIFTKeyPoint) * numKeypoints, cudaMemcpyDeviceToDevice));
 		cutilSafeCall(cudaMemcpy(nextImage.d_keyPointDescs, curImage.d_keyPointDescs, sizeof(SIFTKeyPointDesc) * numKeypoints, cudaMemcpyDeviceToDevice));
-		nextLocal->finalizeSIFTImageGPU(numKeypoints);
-		nextLocalCache->copyCacheFrameFrom(currentLocalCache, curLocalFrame);
+		m_nextLocal->finalizeSIFTImageGPU(numKeypoints);
+		m_nextLocalCache->copyCacheFrameFrom(m_currentLocalCache, curLocalFrame);
 		mutex_nextLocal.unlock();
 	}
 
@@ -159,13 +159,13 @@ bool SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
 	CUDACache* cudaCache = NULL;
 	SiftMatchGPU* matcher = NULL;
 	if (isLocal) {
-		siftManager = currentLocal;
-		cudaCache = currentLocalCache;
+		siftManager = m_currentLocal;
+		cudaCache = m_currentLocalCache;
 		matcher = m_siftMatcherLocal;
 	}
 	else {
-		siftManager = global;
-		cudaCache = globalCache;
+		siftManager = m_global;
+		cudaCache = m_globalCache;
 		matcher = m_siftMatcherGlobal;
 	}
 
@@ -251,27 +251,27 @@ bool SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
 bool SubmapManager::isCurrentLocalValidChunk()
 {
 	bool valid = false;
-	if (currentLocal->getValidImages()[1] != 0) valid = true;
+	if (m_currentLocal->getValidImages()[1] != 0) valid = true;
 	return valid;
 }
 
 unsigned int SubmapManager::getNumNextLocalFrames()
 {
 	mutex_nextLocal.lock();
-	unsigned int numFrames = std::min(m_submapSize, nextLocal->getNumImages());
+	unsigned int numFrames = std::min(m_submapSize, m_nextLocal->getNumImages());
 	mutex_nextLocal.unlock();
 	return numFrames;
 }
 
 void SubmapManager::getCacheIntrinsics(float4x4& intrinsics, float4x4& intrinsicsInv)
 {
-	intrinsics = MatrixConversion::toCUDA(currentLocalCache->getIntrinsics());
-	intrinsicsInv = MatrixConversion::toCUDA(currentLocalCache->getIntrinsicsInv());
+	intrinsics = MatrixConversion::toCUDA(m_currentLocalCache->getIntrinsics());
+	intrinsicsInv = MatrixConversion::toCUDA(m_currentLocalCache->getIntrinsicsInv());
 }
 
 void SubmapManager::copyToGlobalCache()
 {
-	globalCache->copyCacheFrameFrom(nextLocalCache, 0);
+	m_globalCache->copyCacheFrameFrom(m_nextLocalCache, 0);
 }
 
 bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations)
@@ -280,8 +280,8 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 
 	//m_SubmapManager.optLocal->lock();
 	mutex_nextLocal.lock();
-	SIFTImageManager* siftManager = nextLocal;
-	CUDACache* cudaCache = nextLocalCache;
+	SIFTImageManager* siftManager = m_nextLocal;
+	CUDACache* cudaCache = m_nextLocalCache;
 
 	//solve(getLocalTrajectoryGPU(curLocalIdx), siftManager, numNonLinIterations, numLinIterations, true, false, true, true, false);
 	bool useVerify = false; //!!!TODO
@@ -316,21 +316,21 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const float4x4& siftIntrinsics, const float4x4& siftIntrinsicsInv)
 {
 	int ret = 0; ////!!!TODO FIX
-	if ((int)global->getNumImages() <= lastLocalSolved) {
+	if ((int)m_global->getNumImages() <= lastLocalSolved) {
 		//m_SubmapManager.optLocal->lock();
 		mutex_nextLocal.lock();
-		SIFTImageManager* local = nextLocal;
+		SIFTImageManager* local = m_nextLocal;
 
 		// fuse to global
-		SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
+		SIFTImageGPU& curGlobalImage = m_global->createSIFTImageGPU();
 		unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, getLocalTrajectoryGPU(lastLocalSolved),
 			siftIntrinsics, siftIntrinsicsInv);
-		global->finalizeSIFTImageGPU(numGlobalKeys);
+		m_global->finalizeSIFTImageGPU(numGlobalKeys);
 		
 		const std::vector<int>& validImagesLocal = local->getValidImages();
 		for (unsigned int i = 0; i < std::min(m_submapSize, local->getNumImages()); i++) {
 			if (validImagesLocal[i] == 0)
-				invalidateImages((global->getNumImages() - 1) * m_submapSize + i);
+				invalidateImages((m_global->getNumImages() - 1) * m_submapSize + i);
 		}
 		initializeNextGlobalTransform(false);
 		// done with local data!
@@ -342,16 +342,16 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
 
 		// match with every other global
-		if (global->getNumImages() > 1) {
+		if (m_global->getNumImages() > 1) {
 			//matchAndFilter(global, m_SubmapManager.globalCache, 0, m_submapSize);
 			matchAndFilter(SubmapManager::GLOBAL, siftIntrinsicsInv);
 
-			if (global->getValidImages()[global->getNumImages() - 1]) {
+			if (m_global->getValidImages()[m_global->getNumImages() - 1]) {
 				// ready to solve global
 				ret = 1;
 			}
 			else {
-				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
+				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
 				//getchar();
 				ret = 2;
 			}
@@ -365,10 +365,53 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 
 void SubmapManager::addInvalidGlobalKey()
 {
-	SIFTImageGPU& curGlobalImage = global->createSIFTImageGPU();
-	global->finalizeSIFTImageGPU(0);
+	SIFTImageGPU& curGlobalImage = m_global->createSIFTImageGPU();
+	m_global->finalizeSIFTImageGPU(0);
 	mutex_nextLocal.lock();
 	finishLocalOpt();
 	mutex_nextLocal.unlock();
 	initializeNextGlobalTransform(true);
+}
+
+bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone)
+{
+	bool ret = false;
+	const unsigned int numGlobalFrames = m_global->getNumImages();
+
+	const bool useVerify = false;
+	m_SparseBundler.align(m_global, d_globalTrajectory, numNonLinIterations, numLinIterations,
+		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, isScanDone);
+
+	if (isEnd) {
+		// may invalidate already invalidated images
+		const std::vector<int>& validImagesGlobal = m_global->getValidImages();
+		for (unsigned int i = 0; i < numGlobalFrames; i++) {
+			if (validImagesGlobal[i] == 0) {
+				invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
+			}
+		}
+
+		if (validImagesGlobal[numGlobalFrames - 1] != 0) ret = true;
+	}
+	return ret;
+}
+
+void SubmapManager::saveCompleteTrajectory(const std::string& filename, unsigned int numTransforms) const
+{
+	std::vector<mat4f> completeTrajectory(numTransforms);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(completeTrajectory.data(), d_completeTrajectory, sizeof(mat4f)*completeTrajectory.size(), cudaMemcpyDeviceToHost));
+
+	BinaryDataStreamFile s(filename, true);
+	s << completeTrajectory;
+	s.closeStream();
+}
+
+void SubmapManager::saveSiftTrajectory(const std::string& filename, unsigned int numTransforms) const
+{
+	std::vector<mat4f> siftTrjectory(numTransforms);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(siftTrjectory.data(), d_siftTrajectory, sizeof(mat4f)*siftTrjectory.size(), cudaMemcpyDeviceToHost));
+
+	BinaryDataStreamFile s(filename, true);
+	s << siftTrjectory;
+	s.closeStream();
 }

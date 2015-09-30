@@ -29,7 +29,7 @@ public:
 
 
 	//! called by Bundler; whenever the optimization finishes
-	void updateOptimizedTransform(float4x4* d_trajectory, unsigned int numFrames);
+	void updateOptimizedTransform(const float4x4* d_trajectory, unsigned int numFrames);
 
 	void generateUpdateLists();
 

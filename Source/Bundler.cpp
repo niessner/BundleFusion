@@ -196,7 +196,7 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 
 		if (isEnd) {
 			m_SubmapManager.updateTrajectory(numFrames);
-			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
+			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.getCompleteTrajectory(), numFrames);
 			m_currentState.m_numCompleteTransforms = numFrames;
 			if (valid) m_currentState.m_lastValidCompleteTransform = m_submapSize * m_currentState.m_lastLocalSolved; //TODO over-conservative but easier
 
@@ -208,7 +208,7 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 			m_SubmapManager.invalidateLastGlobalFrame();
 			m_currentState.m_numCompleteTransforms = numFrames;
 			m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
-			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
+			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.getCompleteTrajectory(), m_currentState.m_numCompleteTransforms);
 
 			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}
@@ -318,22 +318,12 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 
 void Bundler::saveCompleteTrajectory(const std::string& filename) const
 {
-	std::vector<mat4f> completeTrajectory(m_currentState.m_numCompleteTransforms);
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(completeTrajectory.data(), m_SubmapManager.d_completeTrajectory, sizeof(mat4f)*completeTrajectory.size(), cudaMemcpyDeviceToHost));
-
-	BinaryDataStreamFile s(filename, true);
-	s << completeTrajectory;
-	s.closeStream();
+	m_SubmapManager.saveCompleteTrajectory(filename, m_currentState.m_numCompleteTransforms);
 }
 
 void Bundler::saveSiftTrajectory(const std::string& filename) const
 {
-	std::vector<mat4f> siftTrjectory(m_currentState.m_numCompleteTransforms);
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(siftTrjectory.data(), m_SubmapManager.d_siftTrajectory, sizeof(mat4f)*siftTrjectory.size(), cudaMemcpyDeviceToHost));
-
-	BinaryDataStreamFile s(filename, true);
-	s << siftTrjectory;
-	s.closeStream();
+	m_SubmapManager.saveSiftTrajectory(filename, m_currentState.m_numCompleteTransforms);
 }
 
 void Bundler::saveIntegrateTrajectory(const std::string& filename)

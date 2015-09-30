@@ -31,7 +31,7 @@ void TrajectoryManager::addFrame(TrajectoryFrame::TYPE what, const mat4f& transf
 	m_numAddedFrames++;
 }
 
-void TrajectoryManager::updateOptimizedTransform(float4x4* d_trajectory, unsigned int numFrames)
+void TrajectoryManager::updateOptimizedTransform(const float4x4* d_trajectory, unsigned int numFrames)
 {
 
 	m_mutexUpdateTransforms.lock();
