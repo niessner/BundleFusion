@@ -51,6 +51,7 @@ void SubmapManager::initSIFT(unsigned int widthSift, unsigned int heightSift)
 void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage, unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames /*= (unsigned int)-1*/)
 {
 	initSIFT(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
+	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
 
 	// cache
 	const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth;
@@ -309,4 +310,43 @@ void SubmapManager::copyToGlobalCache()
 	mGlobal.second->copyCacheFrameFrom(mCur.second, 0);
 	finish(LOCAL_CURRENT);
 	finish(GLOBAL);
+}
+
+bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations)
+{
+	bool ret = false;
+
+	//m_SubmapManager.optLocal->lock();
+	auto& cur = get(LOCAL_NEXT);
+	SIFTImageManager* siftManager = cur.first;
+	CUDACache* cudaCache = cur.second;
+
+	//solve(getLocalTrajectoryGPU(curLocalIdx), siftManager, numNonLinIterations, numLinIterations, true, false, true, true, false);
+	bool useVerify = false; //!!!TODO
+	m_SparseBundler.align(siftManager, getLocalTrajectoryGPU(curLocalIdx), numNonLinIterations, numLinIterations,
+		useVerify, true, false, true, true, false);
+	// still need this for global key fuse
+
+	// verify
+	if (m_SparseBundler.useVerification()) {
+		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
+		int valid = siftManager->VerifyTrajectoryCU(siftManager->getNumImages(), getLocalTrajectoryGPU(curLocalIdx),
+			cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
+			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
+			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifyOptErrThresh, GlobalBundlingState::get().s_verifyOptCorrThresh,
+			GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
+
+		if (valid == 0) {
+			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
+			//getchar();
+			ret = false;
+		}
+		else
+			ret = true;
+	}
+	else
+		ret = true;
+	//m_SubmapManager.optLocal->unlock();
+	finish(LOCAL_NEXT);
+	return ret;
 }

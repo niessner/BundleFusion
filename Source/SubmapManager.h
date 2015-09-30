@@ -5,6 +5,7 @@
 #include "SiftGPU/SIFTImageManager.h"
 #include "CUDAImageManager.h"
 #include "CUDACache.h"
+#include "SBA.h"
 
 #include "SiftGPU/CUDATimer.h"
 #include "GlobalBundlingState.h"
@@ -118,37 +119,6 @@ public:
 
 	}
 
-	//void switchLocalAndFinishOpt() {
-
-	//	//optLocal->lock();	//wait until optimizer has released its lock on opt local
-
-	//	//SIFTImageManager* oldCurrentLocal = currentLocal;
-	//	//SIFTImageManager* oldOptLocal = optLocal;
-	//	//SIFTImageManager* oldNextLocal = nextLocal;
-	//	//currentLocal = oldNextLocal;
-	//	//optLocal = oldCurrentLocal;
-	//	//nextLocal = oldOptLocal;
-
-
-	//	//CUDACache* oldCurrentLocalCache = currentLocalCache;
-	//	//CUDACache* oldOptLocalCache = optLocalCache;
-	//	//CUDACache* oldNextLocalCache = nextLocalCache;
-	//	//currentLocalCache = oldNextLocalCache;
-	//	//optLocalCache = oldCurrentLocalCache;
-	//	//nextLocalCache = oldOptLocalCache;
-
-	//	//optLocal->reset();
-	//	//optLocalCache->reset();
-
-	//	//oldOptLocal->unlock();
-
-	//	std::swap(currentLocal, nextLocal);
-	//	std::swap(currentLocalCache, nextLocalCache);
-	//	nextLocal->reset();
-	//	nextLocalCache->reset();
-	//}
-
-
 	void finishLocalOpt() {
 		nextLocal->reset();
 		nextLocalCache->reset();
@@ -201,6 +171,9 @@ public:
 
 	void copyToGlobalCache();
 
+	//! optimize local
+	bool optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations);
+
 private:
 	std::pair<SIFTImageManager*, CUDACache*> SubmapManager::get(TYPE type);
 	void SubmapManager::finish(TYPE type);
@@ -212,6 +185,8 @@ private:
 	SiftMatchGPU*			m_siftMatcherLocal;
 	SiftMatchGPU*			m_siftMatcherGlobal;
 	//************ SUBMAPS ********************
+	SBA						m_SparseBundler;
+
 	std::mutex mutex_curLocal;
 	std::mutex mutex_nextLocal;
 	std::mutex mutex_global;
