@@ -78,7 +78,7 @@ public:
 
 		int						m_localToSolve;		// index of local submap to solve (-1) if none
 		int						m_lastLocalSolved; // to check if can fuse to global
-		bool					m_bOptimizeGlobal; // ready to optimize global
+		PROCESS_STATE			m_bOptimizeGlobal; // ready to optimize global
 
 		//TODO do we really need
 		unsigned int			m_lastFrameProcessed;
@@ -94,7 +94,7 @@ public:
 
 		BundlerState() {
 			m_localToSolve = -1;
-			m_bOptimizeGlobal = false;
+			m_bOptimizeGlobal = DO_NOTHING;
 			m_lastLocalSolved = -1;
 
 			m_lastFrameProcessed = 0;

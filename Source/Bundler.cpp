@@ -265,17 +265,21 @@ void Bundler::processGlobal()
 
 				if (global->getValidImages()[global->getNumImages() - 1]) {
 					// ready to solve global
-					m_currentState.m_bOptimizeGlobal = true;
+					m_currentState.m_bOptimizeGlobal = BundlerState::PROCESS;
 				}
 				else {
 					if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
 					//getchar();
+					m_currentState.m_bOptimizeGlobal = BundlerState::INVALIDATE;
 				}
+			}
+			else {
+				m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 			}
 		}
 	}
 	else {
-		m_currentState.m_bOptimizeGlobal = false;
+		m_currentState.m_bOptimizeGlobal = BundlerState::INVALIDATE;
 
 		//add invalidated (fake) global frame
 		if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
@@ -284,15 +288,7 @@ void Bundler::processGlobal()
 		SIFTImageGPU& curGlobalImage = m_SubmapManager.global->createSIFTImageGPU();
 		m_SubmapManager.global->finalizeSIFTImageGPU(0);
 		m_SubmapManager.finishLocalOpt();
-
-
-		//!!!TODO MOVE TO OPTIMIZEGLOBAL
-		m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
-		m_currentState.m_numCompleteTransforms = m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames;
-		m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
-		m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
 		m_SubmapManager.initializeNextGlobalTransform(true);
-		//!!!TODO MOVE TO OPTIMIZEGLOBAL
 	}
 	m_currentState.m_bProcessGlobal = BundlerState::DO_NOTHING;
 }
@@ -301,37 +297,46 @@ void Bundler::processGlobal()
 
 void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart /*= true*/, bool isEnd /*= true*/)
 {
-	if (!m_currentState.m_bOptimizeGlobal && m_RGBDSensor->isReceivingFrames()) {
-		//if (m_SubmapManager.global->getNumImages() > 1) {
-		//	assert(false);
-		//}
+	if (m_currentState.m_bOptimizeGlobal == BundlerState::DO_NOTHING && m_RGBDSensor->isReceivingFrames()) {
 		return; // nothing to solve
 	}
 
-	solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, m_bIsScanDoneGlobalOpt);
+	const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
+	unsigned int numFrames = (numGlobalFrames > 0) ? ((numGlobalFrames - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames) : m_currentState.m_lastNumLocalFrames;
+	//unsigned int numFrames = m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames;
+	//!!!TODO CHECK
 
-	if (isEnd) {
+	if (m_currentState.m_bOptimizeGlobal == BundlerState::PROCESS) {
+		solve(m_SubmapManager.d_globalTrajectory, m_SubmapManager.global, numNonLinIterations, numLinIterations, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, m_bIsScanDoneGlobalOpt);
 
-		const unsigned int numGlobalFrames = m_SubmapManager.global->getNumImages();
-		unsigned int numFrames = (numGlobalFrames > 0) ? ((numGlobalFrames - 1) * m_submapSize + m_currentState.m_lastNumLocalFrames) : m_currentState.m_lastNumLocalFrames;
-
-		// may invalidate already invalidated images
-		const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
-		for (unsigned int i = 0; i < numGlobalFrames; i++) {
-			if (validImagesGlobal[i] == 0) {
-				m_SubmapManager.invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
+		if (isEnd) {
+			// may invalidate already invalidated images
+			const std::vector<int>& validImagesGlobal = m_SubmapManager.global->getValidImages();
+			for (unsigned int i = 0; i < numGlobalFrames; i++) {
+				if (validImagesGlobal[i] == 0) {
+					m_SubmapManager.invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
+				}
 			}
+
+			m_SubmapManager.updateTrajectory(numFrames);
+			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
+			m_currentState.m_numCompleteTransforms = numFrames;
+			m_currentState.m_lastValidCompleteTransform = numFrames - 1;
+
+			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}
-
-
-		m_SubmapManager.updateTrajectory(numFrames);
-		m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, numFrames);
-		m_currentState.m_numCompleteTransforms = numFrames;
-		m_currentState.m_lastValidCompleteTransform = numFrames - 1;
-
-
-		m_currentState.m_bOptimizeGlobal = false;
 	}
+	else {
+		if (isStart) {
+			m_SubmapManager.global->invalidateFrame(m_SubmapManager.global->getNumImages() - 1);
+			m_currentState.m_numCompleteTransforms = numFrames;
+			m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
+			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.d_completeTrajectory, m_currentState.m_numCompleteTransforms);
+
+			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
+		}
+	}
+
 }
 
 void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt)
