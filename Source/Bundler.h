@@ -145,9 +145,9 @@ public:
 		unsigned int frameStart, unsigned int frameSkip) const;
 	//void saveDEBUG();
 
-	void saveCompleteTrajectory(const std::string& filename) const;
-	void saveSiftTrajectory(const std::string& filename) const;
-	void saveIntegrateTrajectory(const std::string& filename);
+	void saveCompleteTrajectory(const std::string& filename, bool saveAllProcessed) const;
+	void saveSiftTrajectory(const std::string& filename, bool saveAllProcessed) const;
+	void saveIntegrateTrajectory(const std::string& filename, bool saveAllProcessed);
 
 	TrajectoryManager* getTrajectoryManager() {
 		return m_trajectoryManager;

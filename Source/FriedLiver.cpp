@@ -82,7 +82,7 @@ RGBDSensor* g_RGBDSensor = NULL;
 CUDAImageManager* g_imageManager = NULL;
 Bundler* g_bundler = NULL;
 
-//#define TEST_MULTITHREAD
+#define TEST_MULTITHREAD
 
 void bundlingOptimization() {
 	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
@@ -258,9 +258,9 @@ int main(int argc, char** argv)
 
 		//TimingLog::printAllTimings();
 		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
-		g_bundler->saveCompleteTrajectory("trajectory.bin");
-		g_bundler->saveCompleteTrajectory("siftTrajectory.bin");
-		g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
+		g_bundler->saveCompleteTrajectory("trajectory.bin", true);
+		g_bundler->saveSiftTrajectory("siftTrajectory.bin", true);
+		g_bundler->saveIntegrateTrajectory("intTrajectory.bin", true);
 		//bundler->saveDEBUG();
 
 		g_bundler->exitBundlingThread();

@@ -132,11 +132,6 @@ bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& fra
 
 void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
-	//!!!DEBUGGING
-	if (m_currentState.m_lastFrameProcessed == 170)
-		int a = 5;
-	//!!!DEBUGGING
-
 	if (m_currentState.m_localToSolve == -1) {
 		return; // nothing to solve
 	}
@@ -313,19 +308,28 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 	}
 }
 
-void Bundler::saveCompleteTrajectory(const std::string& filename) const
+void Bundler::saveCompleteTrajectory(const std::string& filename, bool saveAllProcessed) const
 {
-	m_SubmapManager.saveCompleteTrajectory(filename, m_currentState.m_numCompleteTransforms);
+	if (saveAllProcessed)
+		m_SubmapManager.saveCompleteTrajectory(filename, m_currentState.m_lastFrameProcessed + 1);
+	else
+		m_SubmapManager.saveCompleteTrajectory(filename, m_currentState.m_numCompleteTransforms);
 }
 
-void Bundler::saveSiftTrajectory(const std::string& filename) const
+void Bundler::saveSiftTrajectory(const std::string& filename, bool saveAllProcessed) const
 {
-	m_SubmapManager.saveSiftTrajectory(filename, m_currentState.m_numCompleteTransforms);
+	if (saveAllProcessed)
+		m_SubmapManager.saveSiftTrajectory(filename, m_currentState.m_lastFrameProcessed + 1);
+	else
+		m_SubmapManager.saveSiftTrajectory(filename, m_currentState.m_numCompleteTransforms);
 }
 
-void Bundler::saveIntegrateTrajectory(const std::string& filename)
+void Bundler::saveIntegrateTrajectory(const std::string& filename, bool saveAllProcessed)
 {
 	const std::vector<mat4f>& integrateTrajectory = m_SubmapManager.getAllIntegrateTransforms();
+	std::vector<mat4f> saveIntegrateTrajectory;
+	if (saveAllProcessed) saveIntegrateTrajectory.assign(integrateTrajectory.begin(), integrateTrajectory.begin() + m_currentState.m_lastFrameProcessed + 1);
+	else saveIntegrateTrajectory.assign(integrateTrajectory.begin(), integrateTrajectory.begin() + m_currentState.m_numCompleteTransforms);
 	BinaryDataStreamFile s(filename, true);
 	s << integrateTrajectory;
 	s.closeStream();

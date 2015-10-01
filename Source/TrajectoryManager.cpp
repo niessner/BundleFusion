@@ -120,11 +120,17 @@ bool TrajectoryManager::getTopFromReIntegrateList(mat4f& oldTransform, mat4f& ne
 	assert(m_toReIntegrateList.front()->type == TrajectoryFrame::ReIntegration);
 
 	m_mutexUpdateTransforms.lock();
-	newTransform = m_toReIntegrateList.front()->optimizedTransform;
-	frameIdx = m_toReIntegrateList.front()->frameIdx;
-	oldTransform = m_toReIntegrateList.front()->integratedTransform;
-	m_toReIntegrateList.front()->integratedTransform = newTransform;
-	m_toReIntegrateList.pop_front();
+	while (!m_toReIntegrateList.empty()) { // some may have been invalidated in the meantime by updateOptimizedTransforms
+		TrajectoryFrame* f = m_toReIntegrateList.front();
+		newTransform = f->optimizedTransform;
+		frameIdx = f->frameIdx;
+		oldTransform = f->integratedTransform;
+		m_toReIntegrateList.pop_front();
+		if (newTransform[0] != -std::numeric_limits<float>::infinity()) {
+			f->integratedTransform = newTransform;
+			break;
+		} // otherwise will be added to the deintegrate list next time
+	}
 	m_mutexUpdateTransforms.unlock();
 	return true;
 }
