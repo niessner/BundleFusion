@@ -50,7 +50,7 @@ public:
 	void evaluateSolverTimings() {
 		m_solver->evaluateTimings();
 	}
-	void printConvergence(const std::string& filename);
+	void printConvergence(const std::string& filename) const;
 
 private:
 

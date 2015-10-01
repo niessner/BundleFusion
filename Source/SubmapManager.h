@@ -26,12 +26,6 @@ extern "C" void initNextGlobalTransformCU(
 
 class SubmapManager {
 public:
-	enum TYPE {
-		LOCAL_CURRENT,
-		LOCAL_NEXT,
-		GLOBAL
-	};
-
 	SubmapManager();
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
 		unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames = (unsigned int)-1);
@@ -113,11 +107,12 @@ public:
 	unsigned int runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth,
 		unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor,
 		unsigned int colorWidth, unsigned int colorHeight);
-	//! sift matching
-	bool matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv);
 	//! valid if at least frames 0, 1 valid
 	bool isCurrentLocalValidChunk();
 	unsigned int getNumNextLocalFrames();
+	bool localMatchAndFilter(const float4x4& siftIntrinsicsInv) {
+		return matchAndFilter(true, m_currentLocal, m_currentLocalCache, m_siftMatcherLocal, siftIntrinsicsInv);
+	}
 
 	void copyToGlobalCache();
 
@@ -149,7 +144,13 @@ public:
 	//debugging
 	void saveCompleteTrajectory(const std::string& filename, unsigned int numTransforms) const;
 	void saveSiftTrajectory(const std::string& filename, unsigned int numTransforms) const;
+	void printConvergence(const std::string& filename) const {
+		m_SparseBundler.printConvergence(filename);
+	}
 private:
+
+	//! sift matching
+	bool matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, SiftMatchGPU* matcher, const float4x4& siftIntrinsicsInv); //!!!TODO FIX TIMING LOG
 
 	void initSIFT(unsigned int widthSift, unsigned int heightSift);
 	//! called when global locked

@@ -2,7 +2,6 @@
 
 #include "SiftGPU/SiftCameraParams.h"
 #include "SubmapManager.h"
-#include "SBA.h"
 
 #include "RGBDSensor.h"
 #include "BinaryDumpReader.h"
@@ -75,14 +74,16 @@ public:
 			PROCESS,
 			INVALIDATE
 		};
-
+		//shared
 		int						m_localToSolve;		// index of local submap to solve (-1) if none
-		int						m_lastLocalSolved; // to check if can fuse to global
-		PROCESS_STATE			m_bOptimizeGlobal; // ready to optimize global
 
-		//TODO do we really need
+		//only in process input
 		unsigned int			m_lastFrameProcessed;
 		bool					m_bLastFrameValid;
+
+		//only in opt
+		int						m_lastLocalSolved; // to check if can fuse to global
+		PROCESS_STATE			m_bOptimizeGlobal; // ready to optimize global
 
 		unsigned int			m_lastNumLocalFrames;
 		unsigned int			m_numCompleteTransforms;
@@ -90,6 +91,7 @@ public:
 
 		PROCESS_STATE			m_bProcessGlobal;
 
+		//shared but constant
 		static int				s_markOffset;
 
 		BundlerState() {
@@ -133,8 +135,8 @@ public:
 	//	m_SubmapManager.evaluateTimings();
 	//	m_SparseBundler.evaluateSolverTimings();
 	//}
-	void saveConvergence(const std::string& filename) {
-		m_SparseBundler.printConvergence(filename);
+	void saveConvergence(const std::string& filename) const {
+		m_SubmapManager.printConvergence(filename);
 	}
 
 	//! debug vis functions
@@ -187,8 +189,6 @@ private:
 	bool m_bExitBundlingThread;
 	bool m_bIsScanDoneGlobalOpt;
 
-	void solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt);
-
 	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const;
 
@@ -198,7 +198,6 @@ private:
 	RGBDSensor*				m_RGBDSensor;			//managed outside
 
 	SubmapManager			m_SubmapManager;
-	SBA						m_SparseBundler;
 
 	TrajectoryManager*		m_trajectoryManager;
 

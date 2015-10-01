@@ -150,25 +150,8 @@ unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIF
 	return curLocalFrame;
 }
 
-bool SubmapManager::matchAndFilter(TYPE type, const float4x4& siftIntrinsicsInv)
+bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, SiftMatchGPU* matcher, const float4x4& siftIntrinsicsInv)
 {
-	MLIB_ASSERT(type == LOCAL_CURRENT || type == GLOBAL);
-	bool isLocal = (type != GLOBAL);
-
-	SIFTImageManager* siftManager = NULL;
-	CUDACache* cudaCache = NULL;
-	SiftMatchGPU* matcher = NULL;
-	if (isLocal) {
-		siftManager = m_currentLocal;
-		cudaCache = m_currentLocalCache;
-		matcher = m_siftMatcherLocal;
-	}
-	else {
-		siftManager = m_global;
-		cudaCache = m_globalCache;
-		matcher = m_siftMatcherGlobal;
-	}
-
 	const std::vector<int>& validImages = siftManager->getValidImages();
 	Timer timer;
 
@@ -344,7 +327,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (m_global->getNumImages() > 1) {
 			//matchAndFilter(global, m_SubmapManager.globalCache, 0, m_submapSize);
-			matchAndFilter(SubmapManager::GLOBAL, siftIntrinsicsInv);
+			matchAndFilter(false, m_global, m_globalCache, m_siftMatcherGlobal, siftIntrinsicsInv);
 
 			if (m_global->getValidImages()[m_global->getNumImages() - 1]) {
 				// ready to solve global

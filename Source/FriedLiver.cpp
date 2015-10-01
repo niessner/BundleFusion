@@ -82,6 +82,8 @@ RGBDSensor* g_RGBDSensor = NULL;
 CUDAImageManager* g_imageManager = NULL;
 Bundler* g_bundler = NULL;
 
+//#define TEST_MULTITHREAD
+
 void bundlingOptimization() {
 	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
 	g_bundler->processGlobal();
@@ -92,9 +94,9 @@ void bundlingOptimizationThreadFunc() {
 
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 
-	for (unsigned int i = 0; i < 10; i++) {
+	//for (unsigned int i = 0; i < 10; i++) {
 		bundlingOptimization();
-	}
+	//}
 }
 
 void bundlingThreadFunc() {
@@ -102,7 +104,9 @@ void bundlingThreadFunc() {
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
 
-	//std::thread tOpt;
+#ifdef TEST_MULTITHREAD
+	std::thread tOpt;
+#endif
 
 	while (1) {
 		while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
@@ -110,9 +114,11 @@ void bundlingThreadFunc() {
 			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
 			{
 				if (g_bundler->getExitBundlingThread()) {
-					//if (tOpt.joinable()) {
-					//	tOpt.join();
-					//}
+#ifdef TEST_MULTITHREAD
+					if (tOpt.joinable()) {
+						tOpt.join();
+					}
+#endif
 					break;
 				}
 				g_bundler->processInput();						//perform sift and whatever
@@ -122,13 +128,16 @@ void bundlingThreadFunc() {
 		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
 
 		//bundlingOptimization();
-		//if (g_imageManager->getCurrFrameNumber() % 10 == 0) {
-		//	if (tOpt.joinable()) {
-		//		tOpt.join();
-		//	}
-		//	tOpt = std::thread(bundlingOptimizationThreadFunc);
-		//}
-
+#ifdef TEST_MULTITHREAD
+		if (g_imageManager->getCurrFrameNumber() % 10 == 9) { // stop solve
+			if (tOpt.joinable()) {
+				tOpt.join();
+			}
+		}
+		if (g_imageManager->getCurrFrameNumber() % 10 == 0) { // start solve
+			tOpt = std::thread(bundlingOptimizationThreadFunc);
+		}
+#else
 		if (g_bundler->getNumProcessedFrames() >= g_bundler->getSubMapSize()) {
 			if (g_RGBDSensor->isReceivingFrames()) {
 				const unsigned int localFrame = g_bundler->getNumProcessedFrames() % g_bundler->getSubMapSize();
@@ -171,7 +180,7 @@ void bundlingThreadFunc() {
 			}
 			 
 		}
-
+#endif
 		if (g_bundler->getExitBundlingThread()) break;
 	}
 }

@@ -83,7 +83,7 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 	return false;
 }
 
-void SBA::printConvergence(const std::string& filename)
+void SBA::printConvergence(const std::string& filename) const
 {
 	//if (m_recordedConvergence.empty()) return;
 	//std::ofstream s(filename);

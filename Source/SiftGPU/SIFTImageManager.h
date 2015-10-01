@@ -150,6 +150,16 @@ public:
 	const std::vector<int>& getValidImages() const { return m_validImages; }
 	void invalidateFrame(unsigned int frame) { m_validImages[frame] = 0; }
 
+	void getNumRawMatchesDEBUG(std::vector<unsigned int>& numMatches) const {
+		MLIB_ASSERT(getNumImages() > 1);
+		numMatches.resize(getNumImages() - 1);
+		cutilSafeCall(cudaMemcpy(numMatches.data(), d_currNumMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost));
+	}
+	void getNumFiltMatchesDEBUG(std::vector<unsigned int>& numMatches) const {
+		MLIB_ASSERT(getNumImages() > 1);
+		numMatches.resize(getNumImages() - 1);
+		cutilSafeCall(cudaMemcpy(numMatches.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost));
+	}
 	void getSIFTKeyPointsDEBUG(std::vector<SIFTKeyPoint>& keys) const {
 		keys.resize(m_numKeyPoints);
 		cutilSafeCall(cudaMemcpy(keys.data(), d_keyPoints, sizeof(SIFTKeyPoint) * keys.size(), cudaMemcpyDeviceToHost));

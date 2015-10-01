@@ -35,7 +35,6 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	if (GlobalAppState::get().s_sensorIdx == 3) {
 		m_SubmapManager.setTotalNumFrames(((BinaryDumpReader*)m_RGBDSensor)->getNumTotalFrames());
 	}
-	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
 
 	m_trajectoryManager = new TrajectoryManager(GlobalBundlingState::get().s_maxNumImages * m_submapSize);
 
@@ -81,7 +80,7 @@ void Bundler::processInput()
 	m_currentState.m_bLastFrameValid = 1;
 	if (curLocalFrame > 0) {
 		//matchAndFilter(m_SubmapManager.currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
-		m_currentState.m_bLastFrameValid = m_SubmapManager.matchAndFilter(SubmapManager::LOCAL_CURRENT, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+		m_currentState.m_bLastFrameValid = m_SubmapManager.localMatchAndFilter(MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 
 		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}
@@ -133,6 +132,11 @@ bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& fra
 
 void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
+	//!!!DEBUGGING
+	if (m_currentState.m_lastFrameProcessed == 170)
+		int a = 5;
+	//!!!DEBUGGING
+
 	if (m_currentState.m_localToSolve == -1) {
 		return; // nothing to solve
 	}
@@ -161,12 +165,11 @@ void Bundler::processGlobal()
 	if (m_currentState.m_bProcessGlobal == BundlerState::DO_NOTHING) {
 		return;
 	}
+	// cache
+	m_SubmapManager.copyToGlobalCache(); //!!!TODO HACK FIX INDEXING IF NO COPY NEEDED
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 	if (m_currentState.m_bProcessGlobal == BundlerState::PROCESS) {
-		// cache
-		m_SubmapManager.copyToGlobalCache();
-
 		m_currentState.m_bOptimizeGlobal = (BundlerState::PROCESS_STATE)m_SubmapManager.computeAndMatchGlobalKeys(m_currentState.m_lastLocalSolved,
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 	}
@@ -214,12 +217,6 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 		}
 	}
 
-}
-
-void Bundler::solve(float4x4* transforms, SIFTImageManager* siftManager, unsigned int numNonLinIters, unsigned int numLinIters, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt)
-{
-	bool useVerify = isLocal;
-	m_SparseBundler.align(siftManager, transforms, numNonLinIters, numLinIters, useVerify, isLocal, recordConvergence, isStart, isEnd, isScanDoneOpt);
 }
 
 void Bundler::printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame) const
