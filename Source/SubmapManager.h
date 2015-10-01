@@ -111,7 +111,7 @@ public:
 	bool isCurrentLocalValidChunk();
 	unsigned int getNumNextLocalFrames();
 	bool localMatchAndFilter(const float4x4& siftIntrinsicsInv) {
-		return matchAndFilter(true, m_currentLocal, m_currentLocalCache, m_siftMatcherLocal, siftIntrinsicsInv);
+		return matchAndFilter(true, m_currentLocal, m_currentLocalCache, siftIntrinsicsInv);
 	}
 
 	void copyToGlobalCache();
@@ -150,7 +150,7 @@ public:
 private:
 
 	//! sift matching
-	bool matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, SiftMatchGPU* matcher, const float4x4& siftIntrinsicsInv); //!!!TODO FIX TIMING LOG
+	bool matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, const float4x4& siftIntrinsicsInv); //!!!TODO FIX TIMING LOG
 
 	void initSIFT(unsigned int widthSift, unsigned int heightSift);
 	//! called when global locked
@@ -175,12 +175,12 @@ private:
 
 	//*********** SIFT *******************
 	SiftGPU*				m_sift;
-	SiftMatchGPU*			m_siftMatcherLocal;
-	SiftMatchGPU*			m_siftMatcherGlobal;
+	SiftMatchGPU*			m_siftMatcher;
 	//************ SUBMAPS ********************
 	SBA						m_SparseBundler;
 
 	std::mutex mutex_nextLocal;
+	std::mutex m_mutexMatcher;
 
 	CUDACache*			m_currentLocalCache;
 	SIFTImageManager*	m_currentLocal;
