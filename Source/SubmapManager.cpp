@@ -152,9 +152,9 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 	Timer timer;
 
 	// match with every other
-	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 	const unsigned int curFrame = siftManager->getNumImages() - 1;
-	m_mutexMatcher.lock();
+	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
+	if (isLocal) m_mutexMatcher.lock();
 	for (unsigned int prev = 0; prev < curFrame; prev++) {
 		uint2 keyPointOffset = make_uint2(0, 0);
 		ImagePairMatch& imagePairMatch = siftManager->getImagePairMatch(prev, keyPointOffset);
@@ -169,12 +169,14 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(imagePairMatch.d_numMatches, &numMatch, sizeof(unsigned int), cudaMemcpyHostToDevice));
 		}
 		else {
+			if (!isLocal) m_mutexMatcher.lock();
 			m_siftMatcher->SetDescriptors(0, num1, (unsigned char*)image_i.d_keyPointDescs);
 			m_siftMatcher->SetDescriptors(1, num2, (unsigned char*)image_j.d_keyPointDescs);
 			m_siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset);
+			if (!isLocal) m_mutexMatcher.unlock();
 		}
 	}
-	m_mutexMatcher.unlock();
+	if (isLocal) m_mutexMatcher.unlock();
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeSiftMatching = timer.getElapsedTimeMS(); }
 
 	bool lastValid = true;
@@ -312,10 +314,13 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		SIFTImageManager* local = m_nextLocal;
 
 		// fuse to global
+		Timer timer;
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		SIFTImageGPU& curGlobalImage = m_global->createSIFTImageGPU();
 		unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, getLocalTrajectoryGPU(lastLocalSolved),
 			siftIntrinsics, siftIntrinsicsInv);
 		m_global->finalizeSIFTImageGPU(numGlobalKeys);
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = timer.getElapsedTimeMS(); }
 		
 		const std::vector<int>& validImagesLocal = local->getValidImages();
 		for (unsigned int i = 0; i < std::min(m_submapSize, local->getNumImages()); i++) {
