@@ -145,9 +145,9 @@ public:
 		unsigned int frameStart, unsigned int frameSkip) const;
 	void saveDEBUG();
 
-	void saveCompleteTrajectory(const std::string& filename, bool saveAllProcessed) const;
-	void saveSiftTrajectory(const std::string& filename, bool saveAllProcessed) const;
-	void saveIntegrateTrajectory(const std::string& filename, bool saveAllProcessed);
+	void saveCompleteTrajectory(const std::string& filename) const;
+	void saveSiftTrajectory(const std::string& filename) const;
+	void saveIntegrateTrajectory(const std::string& filename);
 
 	TrajectoryManager* getTrajectoryManager() {
 		return m_trajectoryManager;
@@ -172,8 +172,11 @@ public:
 		return m_bExitBundlingThread;
 	}
 
-	unsigned int getNumProcessedFrames() const {
+	unsigned int getCurrProcessedFrame() const {
 		return m_currentState.m_lastFrameProcessed;
+	}
+	unsigned int getNumProcessedFrames() const {
+		return m_currentState.m_lastFrameProcessed + 1;
 	}
 
 	unsigned int getSubMapSize() const {

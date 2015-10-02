@@ -82,7 +82,7 @@ RGBDSensor* g_RGBDSensor = NULL;
 CUDAImageManager* g_imageManager = NULL;
 Bundler* g_bundler = NULL;
 
-#define TEST_MULTITHREAD
+#define USE_MULTITHREAD
 
 void bundlingOptimization() {
 	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
@@ -104,7 +104,7 @@ void bundlingThreadFunc() {
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
 
-#ifdef TEST_MULTITHREAD
+#ifdef USE_MULTITHREAD
 	std::thread tOpt;
 #endif
 
@@ -114,7 +114,7 @@ void bundlingThreadFunc() {
 			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
 			{
 				if (g_bundler->getExitBundlingThread()) {
-#ifdef TEST_MULTITHREAD
+#ifdef USE_MULTITHREAD
 					if (tOpt.joinable()) {
 						tOpt.join();
 					}
@@ -128,20 +128,28 @@ void bundlingThreadFunc() {
 		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
 
 		//bundlingOptimization();
-#ifdef TEST_MULTITHREAD
-		if (g_bundler->getNumProcessedFrames() % 10 == 9) { // stop solve
+#ifdef USE_MULTITHREAD
+		if (g_RGBDSensor->isReceivingFrames()) {
+			if (g_bundler->getCurrProcessedFrame() % 10 == 9) { // stop solve
+				if (tOpt.joinable()) {
+					tOpt.join();
+				}
+			}
+			if (g_bundler->getCurrProcessedFrame() % 10 == 0) { // start solve
+				MLIB_ASSERT(!tOpt.joinable());
+				tOpt = std::thread(bundlingOptimizationThreadFunc);
+			}
+		}
+		else {
 			if (tOpt.joinable()) {
 				tOpt.join();
 			}
-		}
-		if (g_bundler->getNumProcessedFrames() % 10 == 0) { // start solve
-			MLIB_ASSERT(!tOpt.joinable());
 			tOpt = std::thread(bundlingOptimizationThreadFunc);
 		}
 #else
-		if (g_bundler->getNumProcessedFrames() >= g_bundler->getSubMapSize()) {
+		if (g_bundler->getCurrProcessedFrame() >= g_bundler->getSubMapSize()) {
 			if (g_RGBDSensor->isReceivingFrames()) {
-				const unsigned int localFrame = g_bundler->getNumProcessedFrames() % g_bundler->getSubMapSize();
+				const unsigned int localFrame = g_bundler->getCurrProcessedFrame() % g_bundler->getSubMapSize();
 
 				if (localFrame == 1) {
 					g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
@@ -259,9 +267,9 @@ int main(int argc, char** argv)
 
 		TimingLog::printAllTimings();
 		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
-		g_bundler->saveCompleteTrajectory("trajectory.bin", true);
-		g_bundler->saveSiftTrajectory("siftTrajectory.bin", true);
-		g_bundler->saveIntegrateTrajectory("intTrajectory.bin", true);
+		g_bundler->saveCompleteTrajectory("trajectory.bin");
+		g_bundler->saveSiftTrajectory("siftTrajectory.bin");
+		g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
 		//g_bundler->saveDEBUG();
 
 		g_bundler->exitBundlingThread();

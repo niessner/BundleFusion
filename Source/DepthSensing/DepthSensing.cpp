@@ -309,7 +309,7 @@ void DumpinputManagerData(const std::string& filename)
 	tm->unlockUpdateTransforms();
 
 	std::cout << cs << std::endl;
-	std::cout << "dumping recorded frames... ";
+	std::cout << "dumping recorded frames (" << numFrames << ")... ";
 
 	BinaryDataStreamFile outStream(actualFilename, true);
 	//BinaryDataStreamZLibFile outStream(filename, true);
@@ -855,14 +855,14 @@ void reintegrate()
 		if (tm->getTopFromDeIntegrateList(oldTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-			assert(oldTransform[0] != -std::numeric_limits<float>::infinity());
+			MLIB_ASSERT(!isnan(oldTransform[0]));
 			deIntegrate(depthCameraData, oldTransform);
 			continue;
 		}
 		else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-			assert(newTransform[0] != -std::numeric_limits<float>::infinity());
+			MLIB_ASSERT(!isnan(newTransform[0]));
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
 			continue;
@@ -870,8 +870,7 @@ void reintegrate()
 		else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-			assert(oldTransform[0] != -std::numeric_limits<float>::infinity() &&
-				newTransform[0] != -std::numeric_limits<float>::infinity());
+			MLIB_ASSERT(!isnan(oldTransform[0]) && !isnan(newTransform[0]));
 			deIntegrate(depthCameraData, oldTransform);
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);

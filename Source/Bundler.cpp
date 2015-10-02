@@ -308,30 +308,22 @@ void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageMan
 	}
 }
 
-void Bundler::saveCompleteTrajectory(const std::string& filename, bool saveAllProcessed) const
+void Bundler::saveCompleteTrajectory(const std::string& filename) const
 {
-	if (saveAllProcessed)
-		m_SubmapManager.saveCompleteTrajectory(filename, m_currentState.m_lastFrameProcessed + 1);
-	else
-		m_SubmapManager.saveCompleteTrajectory(filename, m_currentState.m_numCompleteTransforms);
+	m_SubmapManager.saveCompleteTrajectory(filename, m_currentState.m_numCompleteTransforms);
 }
 
-void Bundler::saveSiftTrajectory(const std::string& filename, bool saveAllProcessed) const
+void Bundler::saveSiftTrajectory(const std::string& filename) const
 {
-	if (saveAllProcessed)
-		m_SubmapManager.saveSiftTrajectory(filename, m_currentState.m_lastFrameProcessed + 1);
-	else
-		m_SubmapManager.saveSiftTrajectory(filename, m_currentState.m_numCompleteTransforms);
+	m_SubmapManager.saveSiftTrajectory(filename, m_currentState.m_numCompleteTransforms);
 }
 
-void Bundler::saveIntegrateTrajectory(const std::string& filename, bool saveAllProcessed)
+void Bundler::saveIntegrateTrajectory(const std::string& filename)
 {
 	const std::vector<mat4f>& integrateTrajectory = m_SubmapManager.getAllIntegrateTransforms();
-	std::vector<mat4f> saveIntegrateTrajectory;
-	if (saveAllProcessed) saveIntegrateTrajectory.assign(integrateTrajectory.begin(), integrateTrajectory.begin() + m_currentState.m_lastFrameProcessed + 1);
-	else saveIntegrateTrajectory.assign(integrateTrajectory.begin(), integrateTrajectory.begin() + m_currentState.m_numCompleteTransforms);
+	std::vector<mat4f> saveIntegrateTrajectory(integrateTrajectory.begin(), integrateTrajectory.begin() + m_currentState.m_numCompleteTransforms);
 	BinaryDataStreamFile s(filename, true);
-	s << integrateTrajectory;
+	s << saveIntegrateTrajectory;
 	s.closeStream();
 }
 
