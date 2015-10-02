@@ -377,11 +377,8 @@ void Bundler::getCurrentFrame()
 	}
 }
 
-//void Bundler::saveDEBUG()
-//{
-//	const std::vector<int> validImages(m_SubmapManager.global->getNumImages() * m_submapSize, 1);
-//	std::vector<mat4f> siftTrajectory(validImages.size());
-//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(siftTrajectory.data(), m_SubmapManager.d_siftTrajectory, sizeof(float4x4)*siftTrajectory.size(), cudaMemcpyDeviceToHost));
-//	m_RGBDSensor->saveRecordedPointCloud("test.ply", validImages, siftTrajectory);
-//}
+void Bundler::saveDEBUG()
+{
+	m_SubmapManager.saveVerifyDEBUG("debug/");
+}
 

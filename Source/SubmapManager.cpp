@@ -257,6 +257,8 @@ void SubmapManager::copyToGlobalCache()
 
 bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
+	//_idxsLocalOptimized.push_back(curLocalIdx);
+
 	bool ret = false;
 
 	//m_SubmapManager.optLocal->lock();
@@ -265,7 +267,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 	CUDACache* cudaCache = m_nextLocalCache;
 
 	//solve(getLocalTrajectoryGPU(curLocalIdx), siftManager, numNonLinIterations, numLinIterations, true, false, true, true, false);
-	bool useVerify = false; //!!!TODO
+	bool useVerify = true;
 	m_SparseBundler.align(siftManager, getLocalTrajectoryGPU(curLocalIdx), numNonLinIterations, numLinIterations,
 		useVerify, true, false, true, true, false);
 	// still need this for global key fuse
@@ -280,6 +282,12 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 			GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
 
 		if (valid == 0) {
+			////!!!DEBUGGING
+			//_idxsLocalInvalidVerify.push_back(curLocalIdx);
+			//saveLocalOptToPointCloud("opt-" + std::to_string(curLocalIdx) + ".ply", curLocalIdx, m_nextLocal->getNumImages());
+			//std::cout << "SAVED " << curLocalIdx << std::endl;
+			////!!!DEBUGGING
+
 			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
 			//getchar();
 			ret = false;
@@ -290,6 +298,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 	else
 		ret = true;
 	//m_SubmapManager.optLocal->unlock();
+
 	mutex_nextLocal.unlock();
 	return ret;
 }
@@ -356,6 +365,8 @@ void SubmapManager::addInvalidGlobalKey()
 
 bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone)
 {
+	//_idxsGlobalOptimized.push_back(m_global->getNumImages() - 1);
+
 	bool ret = false;
 	const unsigned int numGlobalFrames = m_global->getNumImages();
 
@@ -395,4 +406,58 @@ void SubmapManager::saveSiftTrajectory(const std::string& filename, unsigned int
 	BinaryDataStreamFile s(filename, true);
 	s << siftTrjectory;
 	s.closeStream();
+}
+
+void SubmapManager::saveLocalOptToPointCloud(const std::string& filename, unsigned int localIdx, unsigned int numFrames)
+{
+	//transforms
+	std::vector<mat4f> transforms(numFrames);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), getLocalTrajectoryGPU(localIdx), sizeof(float4x4)*numFrames, cudaMemcpyDeviceToHost));
+	//frames
+	ColorImageR32G32B32A32 camPosition;
+	ColorImageR8G8B8A8 color;
+	camPosition.allocate(m_nextLocalCache->getWidth(), m_nextLocalCache->getHeight());
+	color.allocate(m_nextLocalCache->getWidth(), m_nextLocalCache->getHeight());
+	const std::vector<CUDACachedFrame>& cacheFrames = m_nextLocalCache->getCacheFrames();
+
+	PointCloudf pc;
+	for (unsigned int f = 0; f < numFrames; f++) {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getPointer(), cacheFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), cacheFrames[f].d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+
+		for (unsigned int i = 0; i < camPosition.getNumPixels(); i++) {
+			const vec4f& p = camPosition.getPointer()[i];
+			if (p.x != -std::numeric_limits<float>::infinity()) {
+				pc.m_points.push_back(transforms[f] * p.getVec3());
+				const vec4uc& c = color.getPointer()[i];
+				pc.m_colors.push_back(vec4f(c.x, c.y, c.z, c.w) / 255.f);
+			}
+		}
+	}
+	PointCloudIOf::saveToFile(filename, pc);
+}
+
+void SubmapManager::saveVerifyDEBUG(const std::string& prefix) const
+{
+	{
+		std::ofstream s(prefix + "_localOpt.txt");
+		s << _idxsLocalOptimized.size() << " local optimized" << std::endl;
+		for (unsigned int i = 0; i < _idxsLocalOptimized.size(); i++)
+			s << _idxsLocalOptimized[i] << std::endl;
+		s.close();
+	}
+		{
+			std::ofstream s(prefix + "_localFailVerify.txt");
+			s << _idxsLocalInvalidVerify.size() << " local failed verify" << std::endl;
+			for (unsigned int i = 0; i < _idxsLocalInvalidVerify.size(); i++)
+				s << _idxsLocalInvalidVerify[i] << std::endl;
+			s.close();
+		}
+		{
+			std::ofstream s(prefix + "_globalOptimized.txt");
+			s << _idxsGlobalOptimized.size() << " global optimized" << std::endl;
+			for (unsigned int i = 0; i < _idxsGlobalOptimized.size(); i++)
+				s << _idxsGlobalOptimized[i] << std::endl;
+			s.close();
+		}
 }

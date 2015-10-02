@@ -143,7 +143,7 @@ public:
 	void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame) const;
 	void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, bool filtered,
 		unsigned int frameStart, unsigned int frameSkip) const;
-	//void saveDEBUG();
+	void saveDEBUG();
 
 	void saveCompleteTrajectory(const std::string& filename, bool saveAllProcessed) const;
 	void saveSiftTrajectory(const std::string& filename, bool saveAllProcessed) const;

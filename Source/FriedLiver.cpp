@@ -129,12 +129,13 @@ void bundlingThreadFunc() {
 
 		//bundlingOptimization();
 #ifdef TEST_MULTITHREAD
-		if (g_imageManager->getCurrFrameNumber() % 10 == 9) { // stop solve
+		if (g_bundler->getNumProcessedFrames() % 10 == 9) { // stop solve
 			if (tOpt.joinable()) {
 				tOpt.join();
 			}
 		}
-		if (g_imageManager->getCurrFrameNumber() % 10 == 0) { // start solve
+		if (g_bundler->getNumProcessedFrames() % 10 == 0) { // start solve
+			MLIB_ASSERT(!tOpt.joinable());
 			tOpt = std::thread(bundlingOptimizationThreadFunc);
 		}
 #else
@@ -256,12 +257,12 @@ int main(int argc, char** argv)
 		//start depthSensing render loop
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
-		//TimingLog::printAllTimings();
+		TimingLog::printAllTimings();
 		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
 		g_bundler->saveCompleteTrajectory("trajectory.bin", true);
 		g_bundler->saveSiftTrajectory("siftTrajectory.bin", true);
 		g_bundler->saveIntegrateTrajectory("intTrajectory.bin", true);
-		//bundler->saveDEBUG();
+		//g_bundler->saveDEBUG();
 
 		g_bundler->exitBundlingThread();
 

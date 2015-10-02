@@ -147,6 +147,9 @@ public:
 	void printConvergence(const std::string& filename) const {
 		m_SparseBundler.printConvergence(filename);
 	}
+
+	void saveVerifyDEBUG(const std::string& prefix) const;
+
 private:
 
 	//! sift matching
@@ -172,6 +175,9 @@ private:
 		//optLocal->reset();
 		//optLocalCache->reset();
 	}
+	//! assumes nextlocal locked
+	void saveLocalOptToPointCloud(const std::string& filename, unsigned int localIdx, unsigned int numFrames);
+
 
 	//*********** SIFT *******************
 	SiftGPU*				m_sift;
@@ -211,6 +217,11 @@ private:
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;
 
+	//!!!DEBUGGING
+	std::vector<unsigned int> _idxsLocalOptimized;
+	std::vector<unsigned int> _idxsLocalInvalidVerify;
+	std::vector<unsigned int> _idxsGlobalOptimized;
+	//!!!DEBUGGING
 };
 
 #endif
