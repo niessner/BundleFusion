@@ -126,9 +126,11 @@ void bundlingThreadFunc() {
 			tOpt = std::thread(bundlingOptimizationThreadFunc);
 		}
 
-		//ConditionManager::lockImageManagerFrameReady(ConditionManager::Bundling);
-		//while (!g_imageManager->hasBundlingFrameRdy()) ConditionManager::waitImageManagerFrameReady(ConditionManager::Bundling); //wait for a new input frame (LOCK IMAGE MANAGER)
-		while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
+		ConditionManager::lockImageManagerFrameReady(ConditionManager::Bundling);
+		while (!g_imageManager->hasBundlingFrameRdy()) {
+			ConditionManager::waitImageManagerFrameReady(ConditionManager::Bundling); //wait for a new input frame (LOCK IMAGE MANAGER)
+		}
+		//while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
 		{
 			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
 			{
@@ -136,6 +138,7 @@ void bundlingThreadFunc() {
 					if (tOpt.joinable()) {
 						tOpt.join();
 					}
+					ConditionManager::release(ConditionManager::Bundling);
 					break;
 				}
 				g_bundler->processInput();						//perform sift and whatever
@@ -143,9 +146,12 @@ void bundlingThreadFunc() {
 			g_bundler->setProcessedInputFrame();			//let depth sensing know we have a frame (UNLOCK BUNDLING)
 		}
 		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
-		//ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Bundling);
+		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Bundling);
 
-		if (g_bundler->getExitBundlingThread()) break;
+		if (g_bundler->getExitBundlingThread()) {
+			ConditionManager::release(ConditionManager::Bundling);
+			break;
+		}
 	}
 }
 
@@ -231,12 +237,13 @@ int main(int argc, char** argv)
 		
 		g_imageManager->setBundlingFrameRdy();			//release all bundling locks
 		g_bundler->confirmProcessedInputFrame();		//release all bundling locks
-		ConditionManager::release();				// release all locks
-		//while (!g_bundler->hasProcssedInputFrame()) Sleep(0);	//wait bundler is done with it's current processing	
+		ConditionManager::release(ConditionManager::Recon); // release bundling locks
+
 		if (bundlingThread.joinable())	bundlingThread.join();	//wait for the bundling thread to return;
 		SAFE_DELETE(g_bundler);
 		SAFE_DELETE(g_imageManager);
 		
+		//ConditionManager::DEBUGRELEASE();
 
 		std::cout << "DONE! <<press key to exit program>>" << std::endl;
 		getchar();

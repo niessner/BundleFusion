@@ -9,16 +9,27 @@ public:
 		Recon,
 		Bundling
 	};
+	ConditionManager() {}
+	~ConditionManager() {}
 
 	static void init() {
+		s_lockImageManagerFrameReady.resize(2);
 		s_lockImageManagerFrameReady[0] = std::unique_lock<std::mutex>(s_mutexImageManagerHasFrameReady, std::defer_lock);
 		s_lockImageManagerFrameReady[1] = std::unique_lock<std::mutex>(s_mutexImageManagerHasFrameReady, std::defer_lock);
 	}
 
-	static void release() {
-		for (unsigned int i = 0; i < 2; i++) {
-			if (s_lockImageManagerFrameReady[i].owns_lock()) s_lockImageManagerFrameReady[i].unlock();
+	static void release(THREAD_NAME type) {
+		if (s_lockImageManagerFrameReady[type].owns_lock()) {
+			s_lockImageManagerFrameReady[type].unlock();
 		}
+		s_frameReadyCheck.notify_one(); // possibly unlocked but not notified
+	}
+
+	static void DEBUGRELEASE() {
+		if (s_lockImageManagerFrameReady[0].owns_lock())
+			std::cout << "ERROR: CONDITION MANAGER: RECON STILL OWNS LOCK" << std::endl;
+		if (s_lockImageManagerFrameReady[1].owns_lock())
+			std::cout << "ERROR: CONDITION MANAGER: BUNDLE STILL OWNS LOCK" << std::endl;
 	}
 
 	static void lockImageManagerFrameReady(THREAD_NAME type) {
@@ -36,5 +47,5 @@ private:
 	static std::mutex s_mutexImageManagerHasFrameReady;
 	static std::condition_variable s_frameReadyCheck;
 
-	static std::unique_lock<std::mutex> s_lockImageManagerFrameReady[2];
+	static std::vector<std::unique_lock<std::mutex>> s_lockImageManagerFrameReady;
 };

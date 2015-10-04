@@ -136,6 +136,7 @@
   <ItemGroup>
     <ClInclude Include="Source\BinaryDumpReader.h" />
     <ClInclude Include="Source\Bundler.h" />
+    <ClInclude Include="Source\ConditionManager.h" />
     <ClInclude Include="Source\CUDACache.h" />
     <ClInclude Include="Source\CUDACacheUtil.h" />
     <ClInclude Include="Source\CUDAImageManager.h" />
@@ -222,6 +223,7 @@
   <ItemGroup>
     <ClCompile Include="Source\BinaryDumpReader.cpp" />
     <ClCompile Include="Source\Bundler.cpp" />
+    <ClCompile Include="Source\ConditionManager.cpp" />
     <ClCompile Include="Source\CUDACache.cpp" />
     <ClCompile Include="Source\CUDAImageManager.cpp" />
     <ClCompile Include="Source\DepthSensing\CUDAHistogramHashSDF.cpp" />
