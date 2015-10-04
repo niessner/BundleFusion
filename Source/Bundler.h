@@ -116,6 +116,8 @@ public:
 	//! takes last frame from imageManager: runs sift and sift matching (including filtering)
 	void processInput();
 
+	void prepareLocalSolve(unsigned int curFrame, bool isLastFrame = false);
+
 	//! returns the last frame-to-frame aligned matrix; could be invalid
 	bool getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx);
 	//! optimize current local submap (nextLocal in submapManager)

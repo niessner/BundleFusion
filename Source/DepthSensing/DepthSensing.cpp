@@ -899,15 +899,19 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Read Input
 	///////////////////////////////////////
+	//ConditionManager::lockImageManagerFrameReady(ConditionManager::Recon);
+	//while (g_CudaImageManager->hasBundlingFrameRdy()) ConditionManager::waitImageManagerFrameReady(ConditionManager::Recon);
 	while (g_CudaImageManager->hasBundlingFrameRdy()) Sleep(0);		//previous frame was not processed by bundling yet
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
 		g_CudaImageManager->setBundlingFrameRdy();					//ready for bundling thread
-		//g_depthSensingBundler->processInput();	//sift extraction, sift matching, and key point filtering
-		//g_depthSensingBundler->setProcessedInputFrame();
+		//ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
 	}
 	if (!g_depthSensingRGBDSensor->isReceivingFrames()) {
 		g_CudaImageManager->setBundlingFrameRdy();				// let bundling still optimize after scanning done
+		//TODO CHECK 
+		//ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
+
 		g_depthSensingBundler->confirmProcessedInputFrame();	// let bundling still optimize after scanning done
 	}
 

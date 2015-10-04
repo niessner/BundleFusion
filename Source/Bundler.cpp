@@ -61,8 +61,14 @@ Bundler::~Bundler()
 void Bundler::processInput()
 {
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
-	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame)
+	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame) {
+		static bool processLastFrame = true;
+		if (processLastFrame && m_currentState.m_localToSolve == -1) {
+			if (!m_SubmapManager.isLastLocalFrame(curFrame)) prepareLocalSolve(curFrame, true);
+			processLastFrame = false;
+		}
 		return; // nothing new to process
+	}
 
 	if (GlobalBundlingState::get().s_verbose) std::cout << "[ frame " << curFrame << " ]" << std::endl;
 
@@ -96,22 +102,8 @@ void Bundler::processInput()
 	////!!!DEBUGGING
 
 	// global frame
-	if (m_SubmapManager.isLastFrame(curFrame) || m_SubmapManager.isLastLocalFrame(curFrame)) { // end frame or global frame
-		const unsigned int curLocalIdx = m_SubmapManager.getCurrLocal(curFrame);
-
-		// if valid local
-		if (m_SubmapManager.isCurrentLocalValidChunk()) {
-			// ready to solve local
-			MLIB_ASSERT(m_currentState.m_localToSolve == -1);
-			m_currentState.m_localToSolve = curLocalIdx;
-		}
-		else {
-			// invalidate the local
-			m_currentState.m_localToSolve = -((int)curLocalIdx + m_currentState.s_markOffset);
-			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << std::endl;
-		}
-		// switch local submaps
-		m_SubmapManager.switchLocal();
+	if (m_SubmapManager.isLastLocalFrame(curFrame)) { // global frame
+		prepareLocalSolve(curFrame);
 	} // global
 }
 
@@ -158,6 +150,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 void Bundler::processGlobal()
 {
 	if (m_currentState.m_bProcessGlobal == BundlerState::DO_NOTHING) {
+		if (!m_RGBDSensor->isReceivingFrames()) m_currentState.m_bOptimizeGlobal = BundlerState::PROCESS;
 		return;
 	}
 	// cache
@@ -183,7 +176,7 @@ void Bundler::processGlobal()
 
 void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart /*= true*/, bool isEnd /*= true*/)
 {
-	if (m_currentState.m_bOptimizeGlobal == BundlerState::DO_NOTHING && m_RGBDSensor->isReceivingFrames()) {
+	if (m_currentState.m_bOptimizeGlobal == BundlerState::DO_NOTHING) {
 		return; // nothing to solve
 	}
 
@@ -349,28 +342,40 @@ void Bundler::getCurrentFrame()
 		}
 	}
 	if (m_bundlerInputData.m_bFilterDepthValues) {
-		////!!!DEBUGGING
-		//DepthImage32 depthImage(m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), m_bundlerInputData.d_inputDepth, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("depthBefore.png", ColorImageR32G32B32(depthImage));
-		////!!!DEBUGGING
-
 		CUDAImageUtil::gaussFilterFloatMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth,
 			m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,
 			m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
 		std::swap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper);
-
-		////!!!DEBUGGING
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), m_bundlerInputData.d_inputDepth, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("depthAfter.png", ColorImageR32G32B32(depthImage));
-		//std::cout << "waiting..." << std::endl;
-		//getchar();
-		////!!!DEBUGGING
 	}
 }
 
 void Bundler::saveDEBUG()
 {
 	m_SubmapManager.saveVerifyDEBUG("debug/");
+}
+
+void Bundler::prepareLocalSolve(unsigned int curFrame, bool isLastFrame /*= false*/)
+{
+	unsigned int curLocalIdx = m_SubmapManager.getCurrLocal(curFrame);
+	if (isLastFrame && (curFrame % m_submapSize) == 0) { // only the overlap frame
+		// invalidate
+		curLocalIdx++;
+		m_currentState.m_localToSolve = -((int)curLocalIdx + m_currentState.s_markOffset);
+		if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last local submap 1 frame -> invalidating" << curFrame << std::endl;
+	} 
+
+	// if valid local
+	if (m_SubmapManager.isCurrentLocalValidChunk()) {
+		// ready to solve local
+		MLIB_ASSERT(m_currentState.m_localToSolve == -1);
+		m_currentState.m_localToSolve = curLocalIdx;
+	}
+	else {
+		// invalidate the local
+		m_currentState.m_localToSolve = -((int)curLocalIdx + m_currentState.s_markOffset);
+		if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << std::endl;
+	}
+	// switch local submaps
+	m_SubmapManager.switchLocal();
 }
 

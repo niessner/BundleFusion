@@ -82,7 +82,7 @@ RGBDSensor* g_RGBDSensor = NULL;
 CUDAImageManager* g_imageManager = NULL;
 Bundler* g_bundler = NULL;
 
-#define USE_MULTITHREAD
+
 
 void bundlingOptimization() {
 	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
@@ -104,38 +104,17 @@ void bundlingThreadFunc() {
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
 
-#ifdef USE_MULTITHREAD
 	std::thread tOpt;
-#endif
 
 	while (1) {
-		while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
-		{
-			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
-			{
-				if (g_bundler->getExitBundlingThread()) {
-#ifdef USE_MULTITHREAD
-					if (tOpt.joinable()) {
-						tOpt.join();
-					}
-#endif
-					break;
-				}
-				g_bundler->processInput();						//perform sift and whatever
-			}
-			g_bundler->setProcessedInputFrame();			//let depth sensing know we have a frame (UNLOCK BUNDLING)
-		}
-		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
-
-		//bundlingOptimization();
-#ifdef USE_MULTITHREAD
+		// opt
 		if (g_RGBDSensor->isReceivingFrames()) {
-			if (g_bundler->getCurrProcessedFrame() % 10 == 9) { // stop solve
+			if (g_bundler->getCurrProcessedFrame() % 10 == 0) { // stop solve
 				if (tOpt.joinable()) {
 					tOpt.join();
 				}
 			}
-			if (g_bundler->getCurrProcessedFrame() % 10 == 0) { // start solve
+			if (g_bundler->getCurrProcessedFrame() % 10 == 1) { // start solve
 				MLIB_ASSERT(!tOpt.joinable());
 				tOpt = std::thread(bundlingOptimizationThreadFunc);
 			}
@@ -146,50 +125,26 @@ void bundlingThreadFunc() {
 			}
 			tOpt = std::thread(bundlingOptimizationThreadFunc);
 		}
-#else
-		if (g_bundler->getCurrProcessedFrame() >= g_bundler->getSubMapSize()) {
-			if (g_RGBDSensor->isReceivingFrames()) {
-				const unsigned int localFrame = g_bundler->getCurrProcessedFrame() % g_bundler->getSubMapSize();
 
-				if (localFrame == 1) {
-					g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+		//ConditionManager::lockImageManagerFrameReady(ConditionManager::Bundling);
+		//while (!g_imageManager->hasBundlingFrameRdy()) ConditionManager::waitImageManagerFrameReady(ConditionManager::Bundling); //wait for a new input frame (LOCK IMAGE MANAGER)
+		while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
+		{
+			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
+			{
+				if (g_bundler->getExitBundlingThread()) {
+					if (tOpt.joinable()) {
+						tOpt.join();
+					}
+					break;
 				}
-				if (localFrame == 2) {
-					g_bundler->processGlobal();
-				}
-				assert(GlobalBundlingState::get().s_numGlobalNonLinIterations >= 2);
-				assert(GlobalBundlingState::get().s_numGlobalNonLinIterations < g_bundler->getSubMapSize() - 3);
-
-				//start
-				if (localFrame == 3) {
-					g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, true, false);
-				}
-				//iterate
-				if (localFrame > 3 && localFrame < 3 + GlobalBundlingState::get().s_numGlobalNonLinIterations - 1) {
-					g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, false, false);
-				}
-				//end
-				if (localFrame == 3 + GlobalBundlingState::get().s_numGlobalNonLinIterations - 1) {
-					g_bundler->optimizeGlobal(1, GlobalBundlingState::get().s_numGlobalLinIterations, false, true);
-				}
+				g_bundler->processInput();						//perform sift and whatever
 			}
-			else { // end of sequence just optimize (once)
-				g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-				g_bundler->processGlobal();
-				g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations, true, true);
-				g_bundler->setScanDoneGlobalOpt();
-
-				//if (!GlobalAppState::get().s_printConvergenceFile.empty()) {
-				//	const std::string outFile = GlobalAppState::get().s_printConvergenceFile;
-				//	const std::string outDir = util::directoryFromPath(outFile);
-				//	if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
-				//	g_bundler->saveConvergence(outFile); // BROKEN MULTITHREADING
-				//}
-				//std::cout << "end optimize" << std::endl;
-			}
-			 
+			g_bundler->setProcessedInputFrame();			//let depth sensing know we have a frame (UNLOCK BUNDLING)
 		}
-#endif
+		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
+		//ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Bundling);
+
 		if (g_bundler->getExitBundlingThread()) break;
 	}
 }
@@ -240,7 +195,7 @@ int main(int argc, char** argv)
 
 		DualGPU& dualGPU = DualGPU::get();	//needs to be called to initialize devices
 		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
-
+		ConditionManager::init();
 
 		g_RGBDSensor = getRGBDSensor();
 
@@ -273,9 +228,10 @@ int main(int argc, char** argv)
 		//g_bundler->saveDEBUG();
 
 		g_bundler->exitBundlingThread();
-
+		
 		g_imageManager->setBundlingFrameRdy();			//release all bundling locks
 		g_bundler->confirmProcessedInputFrame();		//release all bundling locks
+		ConditionManager::release();				// release all locks
 		//while (!g_bundler->hasProcssedInputFrame()) Sleep(0);	//wait bundler is done with it's current processing	
 		if (bundlingThread.joinable())	bundlingThread.join();	//wait for the bundling thread to return;
 		SAFE_DELETE(g_bundler);

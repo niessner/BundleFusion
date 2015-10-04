@@ -268,7 +268,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 	SIFTImageManager* siftManager = m_nextLocal;
 	CUDACache* cudaCache = m_nextLocalCache;
 
-	//solve(getLocalTrajectoryGPU(curLocalIdx), siftManager, numNonLinIterations, numLinIterations, true, false, true, true, false);
+	MLIB_ASSERT(m_nextLocal->getNumImages() > 1);
 	bool useVerify = true;
 	m_SparseBundler.align(siftManager, getLocalTrajectoryGPU(curLocalIdx), numNonLinIterations, numLinIterations,
 		useVerify, true, false, true, true, false);
@@ -321,7 +321,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			siftIntrinsics, siftIntrinsicsInv);
 		m_global->finalizeSIFTImageGPU(numGlobalKeys);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = timer.getElapsedTimeMS(); }
-		
+
 		const std::vector<int>& validImagesLocal = local->getValidImages();
 		for (unsigned int i = 0; i < std::min(m_submapSize, local->getNumImages()); i++) {
 			if (validImagesLocal[i] == 0)
