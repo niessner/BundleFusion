@@ -132,7 +132,9 @@ void bundlingThreadFunc() {
 		}
 		//while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
 		{
-			while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
+			ConditionManager::lockBundlerProcessedInput(ConditionManager::Bundling);
+			while (g_bundler->hasProcssedInputFrame()) ConditionManager::waitBundlerProcessedInput(ConditionManager::Bundling);	//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
+			//while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
 			{
 				if (g_bundler->getExitBundlingThread()) {
 					if (tOpt.joinable()) {
@@ -144,6 +146,7 @@ void bundlingThreadFunc() {
 				g_bundler->processInput();						//perform sift and whatever
 			}
 			g_bundler->setProcessedInputFrame();			//let depth sensing know we have a frame (UNLOCK BUNDLING)
+			ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Bundling);
 		}
 		g_imageManager->confirmRdyBundlingFrame();		//here it's processing with a new input frame  (GIVE DEPTH SENSING THE POSSIBLITY TO LOCK IF IT WANTS)
 		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Bundling);

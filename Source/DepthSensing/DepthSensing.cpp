@@ -909,10 +909,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	}
 	if (!g_depthSensingRGBDSensor->isReceivingFrames()) {
 		g_CudaImageManager->setBundlingFrameRdy();				// let bundling still optimize after scanning done
-		//TODO CHECK 
 		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
-
 		g_depthSensingBundler->confirmProcessedInputFrame();	// let bundling still optimize after scanning done
+		ConditionManager::notifyBundlerProcessedInput();
 	}
 
 
@@ -927,7 +926,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	
 	//wait until the bundling thread is done with: sift extraction, sift matching, and key point filtering
 	if (bGotDepth) {
-		while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
+		ConditionManager::lockBundlerProcessedInput(ConditionManager::Recon);
+		while (!g_depthSensingBundler->hasProcssedInputFrame()) ConditionManager::waitBundlerProcessedInput(ConditionManager::Recon);
+		//while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
 	}	
 	
 
@@ -942,6 +943,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		unsigned int frameIdx;
 		validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);		
 		g_depthSensingBundler->confirmProcessedInputFrame();
+		ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Recon);
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
 			//overwrite transform and use given trajectory in this case
