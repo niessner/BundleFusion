@@ -115,6 +115,7 @@ public:
 	}
 
 	void copyToGlobalCache();
+	void incrementGlobalCache() { m_globalCache->incrementCache(); }
 
 	//! optimize local
 	bool optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations);

@@ -4,4 +4,5 @@
 
 
 #include "mLibCore.cpp"
-#include "mLibZLib.cpp"
+//#include "mLibZLib.cpp"
+#include "mLibLodePNG.cpp"

@@ -153,15 +153,18 @@ void Bundler::processGlobal()
 		if (!m_RGBDSensor->isReceivingFrames()) m_currentState.m_bOptimizeGlobal = BundlerState::PROCESS;
 		return;
 	}
-	// cache
-	m_SubmapManager.copyToGlobalCache(); //!!!TODO HACK FIX INDEXING IF NO COPY NEEDED
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 	if (m_currentState.m_bProcessGlobal == BundlerState::PROCESS) {
+		// cache
+		m_SubmapManager.copyToGlobalCache(); 
+
 		m_currentState.m_bOptimizeGlobal = (BundlerState::PROCESS_STATE)m_SubmapManager.computeAndMatchGlobalKeys(m_currentState.m_lastLocalSolved,
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 	}
 	else {
+		// cache
+		m_SubmapManager.incrementGlobalCache();
 		m_currentState.m_bOptimizeGlobal = BundlerState::INVALIDATE;
 
 		//getchar();

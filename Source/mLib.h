@@ -15,7 +15,8 @@
 #include "mLibCore.h"
 #include "mLibDepthCamera.h"
 #include "mLibFreeImage.h"
-#include "mLibZlib.h"
+//#include "mLibZlib.h"
+#include "mLibLodePNG.h"
 
 
 //move this to mlib (it's currently local)

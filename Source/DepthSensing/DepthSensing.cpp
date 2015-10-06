@@ -1031,8 +1031,8 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	static unsigned int frameNumber = 0;
 	std::string baseFolder = GlobalAppState::get().s_generateVideoDir;
 	if (!util::directoryExists(baseFolder)) util::makeDirectory(baseFolder);
-	const std::string inputColorDir = baseFolder + "input_color/"; if (!util::directoryExists(inputColorDir)) util::makeDirectory(inputColorDir);
-	const std::string inputDepthDir = baseFolder + "input_depth/"; if (!util::directoryExists(inputDepthDir)) util::makeDirectory(inputDepthDir);
+	//const std::string inputColorDir = baseFolder + "input_color/"; if (!util::directoryExists(inputColorDir)) util::makeDirectory(inputColorDir);
+	//const std::string inputDepthDir = baseFolder + "input_depth/"; if (!util::directoryExists(inputDepthDir)) util::makeDirectory(inputDepthDir);
 	const std::string reconstructionDir = baseFolder + "reconstruction/"; if (!util::directoryExists(reconstructionDir)) util::makeDirectory(reconstructionDir);
 	const std::string reconstructColorDir = baseFolder + "reconstruction_color/"; if (!util::directoryExists(reconstructColorDir)) util::makeDirectory(reconstructColorDir);
 
@@ -1074,7 +1074,8 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
 				image.getPointer()[i].w = 255;
 		}
-		FreeImageWrapper::saveImage(reconstructionDir + ssFrameNumber.str() + ".png", image);
+		//FreeImageWrapper::saveImage(reconstructionDir + ssFrameNumber.str() + ".png", image);
+		LodePNG::save(image, reconstructionDir + ssFrameNumber.str() + ".png");
 		SAFE_DELETE_ARRAY(data);
 	}
 	{	// reconstruction color
@@ -1102,28 +1103,29 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
 				image.getPointer()[i].w = 255;
 		}
-		FreeImageWrapper::saveImage(reconstructColorDir + ssFrameNumber.str() + ".png", image);
+		//FreeImageWrapper::saveImage(reconstructColorDir + ssFrameNumber.str() + ".png", image);
+		LodePNG::save(image, reconstructColorDir + ssFrameNumber.str() + ".png");
 		SAFE_DELETE_ARRAY(data);
 	}
 
-	// for input color/depth
-	{	// input color
-		ColorImageR8G8B8A8 image(g_depthSensingRGBDSensor->getColorWidth(), g_depthSensingRGBDSensor->getColorHeight(), (vec4uc*)g_depthSensingRGBDSensor->getColorRGBX());
-		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-				image.getPointer()[i].w = 255;
-		}
-		FreeImageWrapper::saveImage(inputColorDir + ssFrameNumber.str() + ".png", image);
-	}
-	{	// input depth
-		DepthImage32 depthImage(g_depthSensingRGBDSensor->getDepthWidth(), g_depthSensingRGBDSensor->getDepthHeight(), g_depthSensingRGBDSensor->getDepthFloat());
-		ColorImageR32G32B32A32 image(depthImage);
-		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-				image.getPointer()[i].w = 1.0f;
-		}
-		FreeImageWrapper::saveImage(inputDepthDir + ssFrameNumber.str() + ".png", image);
-	}
+	//// for input color/depth
+	//{	// input color
+	//	ColorImageR8G8B8A8 image(g_depthSensingRGBDSensor->getColorWidth(), g_depthSensingRGBDSensor->getColorHeight(), (vec4uc*)g_depthSensingRGBDSensor->getColorRGBX());
+	//	for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
+	//		if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
+	//			image.getPointer()[i].w = 255;
+	//	}
+	//	FreeImageWrapper::saveImage(inputColorDir + ssFrameNumber.str() + ".png", image);
+	//}
+	//{	// input depth
+	//	DepthImage32 depthImage(g_depthSensingRGBDSensor->getDepthWidth(), g_depthSensingRGBDSensor->getDepthHeight(), g_depthSensingRGBDSensor->getDepthFloat());
+	//	ColorImageR32G32B32A32 image(depthImage);
+	//	for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
+	//		if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
+	//			image.getPointer()[i].w = 1.0f;
+	//	}
+	//	FreeImageWrapper::saveImage(inputDepthDir + ssFrameNumber.str() + ".png", image);
+	//}
 
 	frameNumber++;
 
