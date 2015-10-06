@@ -1115,16 +1115,22 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
 				image.getPointer()[i].w = 255;
 		}
-		FreeImageWrapper::saveImage(inputColorDir + ssFrameNumber.str() + ".png", image);
+		//FreeImageWrapper::saveImage(inputColorDir + ssFrameNumber.str() + ".png", image);
+		LodePNG::save(image, inputColorDir + ssFrameNumber.str() + ".png");
 	}
 	{	// input depth
 		DepthImage32 depthImage(g_depthSensingRGBDSensor->getDepthWidth(), g_depthSensingRGBDSensor->getDepthHeight(), g_depthSensingRGBDSensor->getDepthFloat());
 		ColorImageR32G32B32A32 image(depthImage);
-		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-				image.getPointer()[i].w = 1.0f;
+		//for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
+		//	if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
+		//		image.getPointer()[i].w = 1.0f;
+		//}
+		//FreeImageWrapper::saveImage(inputDepthDir + ssFrameNumber.str() + ".png", image);
+		ColorImageR8G8B8A8 imageU(image.getWidth(), image.getHeight());
+		for (unsigned int i = 0; i < image.getNumPixels(); i++) {
+			imageU.getPointer()[i] = vec4uc(image.getPointer()[i] * 255.0f);
 		}
-		FreeImageWrapper::saveImage(inputDepthDir + ssFrameNumber.str() + ".png", image);
+		LodePNG::save(imageU, inputDepthDir + ssFrameNumber.str() + ".png");
 	}
 
 	frameNumber++;
