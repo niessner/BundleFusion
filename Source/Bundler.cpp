@@ -166,7 +166,7 @@ void Bundler::processGlobal()
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 
 		//!!!DEBUGGING
-		printKey("debug/keysGlobal/key" + std::to_string(m_currentState.m_lastLocalSolved) + ".png", m_currentState.m_lastLocalSolved*m_submapSize, m_SubmapManager.getGlobalDEBUG(), m_currentState.m_lastLocalSolved);
+		//printKey("debug/keysGlobal/key" + std::to_string(m_currentState.m_lastLocalSolved) + ".png", m_currentState.m_lastLocalSolved*m_submapSize, m_SubmapManager.getGlobalDEBUG(), m_currentState.m_lastLocalSolved);
 		if (m_currentState.m_bOptimizeGlobal == BundlerState::INVALIDATE)
 			int a = 5;
 		//!!!DEBUGGING

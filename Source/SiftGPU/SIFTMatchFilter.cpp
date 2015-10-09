@@ -41,6 +41,7 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const
 	std::vector<SIFTKeyPoint> keyPoints;
 	siftManager->getSIFTKeyPointsDEBUG(keyPoints);
 	std::vector<float4x4> transforms(curFrame);
+	std::vector<float4x4> transformsInv(curFrame);
 
 	for (unsigned int i = 0; i < curFrame; i++) { // previous frames
 
@@ -49,11 +50,18 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		float4x4 transform;
-		unsigned int newNumMatches = 
+		unsigned int newNumMatches =
 			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv);
 		//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
 
-		transforms[i] = transform;
+		if (newNumMatches > 0) {
+			transforms[i] = transform;
+			transformsInv[i] = transform.getInverse();
+		}
+		else {
+			transforms[i].setValue(0.0f);
+			transformsInv[i].setValue(0.0f);
+		}
 
 		// copy back
 		cutilSafeCall(cudaMemcpy(siftManager->d_currNumFilteredMatchesPerImagePair + i, &newNumMatches, sizeof(unsigned int), cudaMemcpyHostToDevice));
@@ -63,6 +71,7 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const
 		}
 	}
 	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransforms, transforms.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
+	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
 }
 
 unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv)

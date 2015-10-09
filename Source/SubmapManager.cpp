@@ -200,9 +200,9 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		//!!!
 
 		// --- filter matches
-		//SIFTMatchFilter::filterKeyPointMatches(siftManager, siftIntrinsicsInv);
-		const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
-		siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, (_debugPrintMatches && !isLocal));
+		SIFTMatchFilter::filterKeyPointMatches(siftManager, siftIntrinsicsInv);
+		//const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
+		//siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, (_debugPrintMatches && !isLocal));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = timer.getElapsedTimeMS(); }
 
 		//!!!
@@ -379,17 +379,17 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (m_global->getNumImages() > 1) {
 			//!!!DEBUGGING
-			if (m_global->getNumImages() >= 55) {
-				setPrintMatchesDEBUG(true);
-				int a = 5;
-			}
+			//if (m_global->getNumImages() >= 55) {
+			//	setPrintMatchesDEBUG(true);
+			//	int a = 5;
+			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			if (m_global->getNumImages() >= 55) {
-				setPrintMatchesDEBUG(false);
-				int a = 5;
-			}
+			//if (m_global->getNumImages() >= 55) {
+			//	setPrintMatchesDEBUG(false);
+			//	int a = 5;
+			//}
 			//!!!DEBUGGING
 
 			if (m_global->getValidImages()[m_global->getNumImages() - 1]) {
