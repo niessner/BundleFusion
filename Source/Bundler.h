@@ -143,8 +143,6 @@ public:
 
 	//! debug vis functions
 	void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame) const;
-	void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, bool filtered,
-		unsigned int frameStart, unsigned int frameSkip) const;
 	void saveDEBUG();
 
 	void saveCompleteTrajectory(const std::string& filename) const;
@@ -193,9 +191,6 @@ private:
 	bool m_bHasProcessedInputFrame;
 	bool m_bExitBundlingThread;
 	bool m_bIsScanDoneGlobalOpt;
-
-	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
-		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const;
 
 	void getCurrentFrame();
 

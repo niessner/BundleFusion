@@ -150,6 +150,12 @@ public:
 	}
 
 	void saveVerifyDEBUG(const std::string& prefix) const;
+	//! only debug 
+	const SIFTImageManager* getCurrentLocalDEBUG() const { return m_currentLocal; }
+	const SIFTImageManager* getGlobalDEBUG() const { return m_global; }
+	void setPrintMatchesDEBUG(bool b) {
+		_debugPrintMatches = b;
+	}
 
 private:
 
@@ -177,8 +183,11 @@ private:
 		//optLocalCache->reset();
 	}
 	//! assumes nextlocal locked
-	void saveLocalOptToPointCloud(const std::string& filename, unsigned int localIdx, unsigned int numFrames);
+	void saveOptToPointCloud(const std::string& filename, const CUDACache* cudaCache, const std::vector<int>& valid, const float4x4* d_transforms, unsigned int numFrames);
 
+	void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache, bool filtered) const;
+	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
+		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const;
 
 	//*********** SIFT *******************
 	SiftGPU*				m_sift;
@@ -222,6 +231,8 @@ private:
 	std::vector<unsigned int> _idxsLocalOptimized;
 	std::vector<unsigned int> _idxsLocalInvalidVerify;
 	std::vector<unsigned int> _idxsGlobalOptimized;
+
+	bool _debugPrintMatches;
 	//!!!DEBUGGING
 };
 

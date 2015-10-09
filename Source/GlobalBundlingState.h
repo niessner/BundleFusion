@@ -40,8 +40,12 @@
 	X(bool, s_depthFilter) \
 	X(unsigned int, s_minNumMatchesLocal) \
 	X(unsigned int, s_minNumMatchesGlobal) \
-	X(bool, s_useComprehensiveFrameInvalidation)
-	//X(std::string, s_outputDirectory) 
+	X(bool, s_useComprehensiveFrameInvalidation) \
+	X(float, s_maxKabschResidual2) \
+	X(float, s_minKeyScale) \
+	X(float, s_siftMatchThresh) \
+	X(float, s_siftMatchRatioMaxLocal) \
+	X(float, s_siftMatchRatioMaxGlobal)
 
 using namespace ml;
 

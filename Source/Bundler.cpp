@@ -46,6 +46,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_siftCameraParams.m_siftIntrinsics = MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics);
 	m_siftCameraParams.m_siftIntrinsicsInv = MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv);
 	m_SubmapManager.getCacheIntrinsics(m_siftCameraParams.m_downSampIntrinsics, m_siftCameraParams.m_downSampIntrinsicsInv);
+	m_siftCameraParams.m_minKeyScale = GlobalBundlingState::get().s_minKeyScale;
 	updateConstantSiftCameraParams(m_siftCameraParams);
 
 	m_bHasProcessedInputFrame = false;
@@ -80,26 +81,28 @@ void Bundler::processInput()
 		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
-	//printKey("key" + std::to_string(curLocalFrame) + ".png", curFrame, g_SubmapManager.currentLocal, curLocalFrame);
+	//if (curFrame >= 160 && curFrame < 170) {
+	//	printKey("debug/key" + std::to_string(curFrame) + ".png", curFrame, m_SubmapManager.getCurrentLocalDEBUG(), curLocalFrame);
+	//}
+	//if (curFrame == 170)
+	//	int a = 5;
 	
 	// match with every other local
 	m_currentState.m_bLastFrameValid = 1;
 	if (curLocalFrame > 0) {
-		//matchAndFilter(m_SubmapManager.currentLocal, m_SubmapManager.currentLocalCache, curFrame - curLocalFrame, 1);
+		//if (curFrame >= 161 && curFrame <= 170) {
+		//	m_SubmapManager.setPrintMatchesDEBUG(true);
+			//int a = 5;
+		//}
 		m_currentState.m_bLastFrameValid = m_SubmapManager.localMatchAndFilter(MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+		//if (curFrame >= 161 && curFrame <= 170) {
+		//	m_SubmapManager.setPrintMatchesDEBUG(false);
+		//	int a = 5;
+		//}
 
 		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}
 	m_currentState.m_lastFrameProcessed = curFrame;
-
-	////!!!DEBUGGING
-	//const mat4f& intTransform = m_SubmapManager.getCurrentIntegrateTransform(curFrame);
-	//if (m_currentState.m_bLastFrameValid && ((intTransform(0, 0) == 0.0f && intTransform(1, 1) == 0.0f && intTransform(2, 2) == 0.0f && intTransform(3, 3) == 0.0f) ||
-	//	intTransform[0] == -std::numeric_limits<float>::infinity())) {
-	//	std::cout << "valid but transform = " << std::endl << intTransform << std::endl;
-	//	getchar();
-	//}
-	////!!!DEBUGGING
 
 	// global frame
 	if (m_SubmapManager.isLastLocalFrame(curFrame)) { // global frame
@@ -161,6 +164,12 @@ void Bundler::processGlobal()
 
 		m_currentState.m_bOptimizeGlobal = (BundlerState::PROCESS_STATE)m_SubmapManager.computeAndMatchGlobalKeys(m_currentState.m_lastLocalSolved,
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+
+		//!!!DEBUGGING
+		printKey("debug/keysGlobal/key" + std::to_string(m_currentState.m_lastLocalSolved) + ".png", m_currentState.m_lastLocalSolved*m_submapSize, m_SubmapManager.getGlobalDEBUG(), m_currentState.m_lastLocalSolved);
+		if (m_currentState.m_bOptimizeGlobal == BundlerState::INVALIDATE)
+			int a = 5;
+		//!!!DEBUGGING
 	}
 	else {
 		// cache
@@ -233,76 +242,6 @@ void Bundler::printKey(const std::string& filename, unsigned int allFrame, const
 	FreeImageWrapper::saveImage(filename, im);
 }
 
-void Bundler::printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const
-{
-	// get data
-	std::vector<SIFTKeyPoint> keys;
-	siftManager->getSIFTKeyPointsDEBUG(keys); // prev frame
-
-	std::vector<uint2> keyPointIndices;
-	std::vector<float> matchDistances;
-	if (filtered) {
-		siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(imageIndices.x, keyPointIndices, matchDistances);
-	}
-	else {
-		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(imageIndices.x, keyPointIndices, matchDistances);
-	}
-	if (keyPointIndices.size() == 0) return;
-
-	ColorImageR32G32B32 matchImage(image1.getWidth() * 2, image1.getHeight());
-	ColorImageR32G32B32 im1(image1);
-	ColorImageR32G32B32 im2(image2);
-	matchImage.copyIntoImage(im1, 0, 0);
-	matchImage.copyIntoImage(im2, image1.getWidth(), 0);
-
-	float maxMatchDistance = 0.0f;
-	RGBColor lowColor = ml::RGBColor::Blue;
-	RGBColor highColor = ml::RGBColor::Red;
-	for (unsigned int i = 0; i < keyPointIndices.size(); i++) {
-		const SIFTKeyPoint& key1 = keys[keyPointIndices[i].x];
-		const SIFTKeyPoint& key2 = keys[keyPointIndices[i].y];
-		if (matchDistances[i] > maxMatchDistance) maxMatchDistance = matchDistances[i];
-
-		RGBColor c = RGBColor::interpolate(lowColor, highColor, matchDistances[i] / distMax);
-		vec3f color(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f);
-		vec2i p0 = ml::math::round(ml::vec2f(key1.pos.x, key1.pos.y));
-		vec2i p1 = ml::math::round(ml::vec2f(key2.pos.x + image1.getWidth(), key2.pos.y));
-		ImageHelper::drawCircle(matchImage, p0, ml::math::round(key1.scale), color);
-		ImageHelper::drawCircle(matchImage, p1, ml::math::round(key2.scale), color);
-		ImageHelper::drawLine(matchImage, p0, p1, color);
-	}
-	std::cout << "(" << imageIndices << "): max match distance = " << maxMatchDistance << std::endl;
-	FreeImageWrapper::saveImage(filename, matchImage);
-}
-
-void Bundler::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, bool filtered, unsigned int frameStart, unsigned int frameSkip) const
-{
-	const unsigned int numFrames = siftManager->getNumImages();
-	if (numFrames <= 1) return;
-
-	const std::string dir = util::directoryFromPath(outPath);
-	MLIB_ASSERT(util::directoryExists(dir));
-
-	// get images
-	unsigned int curFrame = numFrames - 1; //TODO get color cpu for these functions
-	CUDAImageManager::ManagedRGBDInputFrame& curIntegrateFrame = m_CudaImageManager->getIntegrateFrame(curFrame * frameSkip + frameStart);
-	ColorImageR8G8B8A8 curImage(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curImage.getPointer(), curIntegrateFrame.getColorFrameGPU(),
-		sizeof(uchar4) * curImage.getNumPixels(), cudaMemcpyDeviceToHost));
-	curImage.reSample(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
-
-	//print out images
-	for (unsigned int prev = 0; prev < curFrame; prev++) {
-		CUDAImageManager::ManagedRGBDInputFrame& prevIntegrateFrame = m_CudaImageManager->getIntegrateFrame(prev * frameSkip + frameStart);
-		ColorImageR8G8B8A8 prevImage(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevImage.getPointer(), prevIntegrateFrame.getColorFrameGPU(),
-			sizeof(uchar4) * prevImage.getNumPixels(), cudaMemcpyDeviceToHost));
-		prevImage.reSample(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
-
-		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
-			prevImage, curImage, 0.7f, filtered);
-	}
-}
 
 void Bundler::saveCompleteTrajectory(const std::string& filename) const
 {

@@ -190,7 +190,9 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	float4x4* d_filteredTransforms,
 	float4x4* d_filteredTransformsInv,
 	float4x4 siftIntrinsicsInv,
-	unsigned int minNumMatches)
+	unsigned int minNumMatches,
+	float maxKabschRes2,
+	bool printDebug)
 {
 	const unsigned int imagePairIdx = blockIdx.x;
 	//const unsigned int imagePairIdx = 1;
@@ -230,7 +232,8 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 
 	if (tidx == 0) 	{
 		float4x4 trans;
-		unsigned int curr = filterKeyPointMatches(d_keyPointsGlobal, matchKeyPointIndices, matchDistances, numMatches, trans, siftIntrinsicsInv, minNumMatches);
+		unsigned int curr = filterKeyPointMatches(d_keyPointsGlobal, matchKeyPointIndices, matchDistances, numMatches,
+			trans, siftIntrinsicsInv, minNumMatches, maxKabschRes2, (printDebug && imagePairIdx == 53));
 		//if (tidx == 0) {
 		numFilteredMatches = curr;
 		d_filteredTransforms[imagePairIdx] = trans;
@@ -257,7 +260,7 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	}
 }
 
-void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches) {
+void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxKabschRes2, bool printDebug) {
 
 	if (numCurrImagePairs == 0) return;
 
@@ -277,7 +280,9 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, c
 		d_currFilteredTransforms,
 		d_currFilteredTransformsInv,
 		siftIntrinsicsInv,
-		minNumMatches);
+		minNumMatches,
+		maxKabschRes2,
+		printDebug);
 
 	if (m_timer) m_timer->endEvent();
 
@@ -1026,7 +1031,7 @@ void SIFTImageManager::TestSVDDebugCU(const float3x3& m) {
 
 
 //we launch 1 thread for two array entries
-void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_trajectory,
+void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, int* d_validImages, float4x4* d_trajectory,
 	unsigned int imageWidth, unsigned int imageHeight,
 	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
@@ -1036,7 +1041,7 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_tr
 	const unsigned int img1 = blockIdx.x % numImages;
 
 	if (img0 >= img1) return;
-	//if (d_validOpt[0] == 0) return; //TODO 
+	if (d_validImages[img0] == 0 || d_validImages[img1] == 0) return; // invalid image
 
 	const float*  d_inputDepth = d_cachedFrames[img0].d_depthDownsampled;
 	const float4* d_inputCamPos = d_cachedFrames[img0].d_cameraposDownsampled;
@@ -1104,9 +1109,9 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, float4x4* d_tr
 	if (threadIdx.x == 0 && threadIdx.y == 0) {
 		float err = sumResidual / sumWeight;
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
-		//printf("VERIFY LOCAL SUBMAP[%d-%d]: %f %f\n", img0, img1, err, corr);
 
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
+			//printf("VERIFY LOCAL SUBMAP[%d-%d]: %f %f\n", img0, img1, err, corr);
 			d_validOpt[0] = 0;
 		}
 	}
@@ -1128,9 +1133,10 @@ int SIFTImageManager::VerifyTrajectoryCU(unsigned int numImages, float4x4* d_tra
 
 	int valid = 1;
 	cutilSafeCall(cudaMemcpy(d_validOpt, &valid, sizeof(int), cudaMemcpyHostToDevice));
+	cutilSafeCall(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int)*numImages, cudaMemcpyHostToDevice));
 
 	VerifyTrajectoryCU_Kernel << <grid, block >> >(
-		numImages, d_trajectory, imageWidth, imageHeight, intrinsics,
+		numImages, d_validImages, d_trajectory, imageWidth, imageHeight, intrinsics,
 		d_cachedFrames, distThresh, normalThresh, colorThresh, errThresh, corrThresh,
 		d_validOpt, sensorDepthMin, sensorDepthMax);
 

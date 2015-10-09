@@ -18,4 +18,10 @@ struct SiftCameraParams {
 
 	float4x4 m_downSampIntrinsics;
 	float4x4 m_downSampIntrinsicsInv;
+
+	float m_minKeyScale;
+
+	unsigned int dummy0;
+	unsigned int dummy1;
+	unsigned int dummy2;
 };

@@ -1892,8 +1892,8 @@ void __global__  ColMatch_Kernel(int height, int num2, float distmax, float rati
 	}
 
 	if (threadIdx.x == 0) {
-		const float dist = acosf(min(result[0].x * 0.000003814697265625f, 1.0f));
-		const float distn = acosf(min(result[0].z * 0.000003814697265625f, 1.0f));
+		const float dist = acosf(min(result[0].x * 0.000003814697265625f, 1.0f)); // first min
+		const float distn = acosf(min(result[0].z * 0.000003814697265625f, 1.0f)); // second min
 		//float ratio = dist / distn;
 		const int res = (dist < distmax) && (dist < distn * ratiomax) ? result[0].y : -1;//?  : -1;
 		//d_result[colIdx] = res;	//don't even writ it out
@@ -1943,7 +1943,7 @@ void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, i
 	if (idx < numInputElements) {
 		const float* src = (const float*)d_raw + 4 * idx;
 		unsigned short * orientations = (unsigned short*)(&src[3]);
-		if (src[2] * keyLocScale >= 5) {
+		if (src[2] * keyLocScale >= c_siftCameraParams.m_minKeyScale) {
 			if (orientations[0] != 65535) {
 				int currFeature = atomicAdd(d_featureCount, 1);
 				d_out[currFeature].x = src[0];

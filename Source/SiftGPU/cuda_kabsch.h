@@ -425,9 +425,11 @@ unsigned int filterKeyPointMatches(
 	volatile uint2* keyPointIndices,
 	volatile float* matchDistances, 
 	unsigned int numRawMatches, 
-	float4x4& transformEstimate, const float4x4& colorIntrinsicsInverse, unsigned int minNumMatches)
+	float4x4& transformEstimate, const float4x4& colorIntrinsicsInverse, unsigned int minNumMatches,
+	float maxKabschRes2,
+	bool printDebug)
 {
-	const float maxResThresh = MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
+	const float maxResThresh = maxKabschRes2;//MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
 
 #ifdef __CUDACC__
 	__shared__ float3 srcPts[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];
@@ -469,6 +471,11 @@ unsigned int filterKeyPointMatches(
 				bool b = validTransform;
 				float4x4 prevTransform = transformEstimate;
 				curMaxResidual = residuals[curNumMatches - 1];
+
+				//!!!DEBUGGING
+				if (printDebug) printf("%d: max res = %f, %d\n", curNumMatches, curMaxResidual, validTransform);
+				//!!!DEBUGGING
+
 				if (curMaxResidual > maxResThresh) { // some bad matches
 					float lastRes = -1;
 					int startIdx = (int)curNumMatches - 1;

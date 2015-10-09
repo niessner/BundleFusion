@@ -117,7 +117,7 @@ public:
 	//sorts the key point matches inside image pair matches
 	void SortKeyPointMatchesCU(unsigned int numCurrImagePairs);
 
-	void FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches);
+	void FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxKabschRes2, bool printDebug);
 
 	void FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv, float areaThresh);
 

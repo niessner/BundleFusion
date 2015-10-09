@@ -184,9 +184,8 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersHigh.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
 
-			fileNameDescGlobalApp = "video_params\\zParametersVideo_Michael.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingMichael.txt";
-
+			fileNameDescGlobalApp = "zParametersKinect.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
