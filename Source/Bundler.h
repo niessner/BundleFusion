@@ -145,9 +145,11 @@ public:
 	void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame) const;
 	void saveDEBUG();
 
+	//! debug functions only call at end
 	void saveCompleteTrajectory(const std::string& filename) const;
 	void saveSiftTrajectory(const std::string& filename) const;
 	void saveIntegrateTrajectory(const std::string& filename);
+	void saveGlobalSiftManagerToFile(const std::string& filename) const { m_SubmapManager.saveGlobalSiftManagerToFile(filename); }
 
 	TrajectoryManager* getTrajectoryManager() {
 		return m_trajectoryManager;

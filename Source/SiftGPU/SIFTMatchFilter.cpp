@@ -5,6 +5,9 @@
 //#include "cuda_kabsch.h"
 #include "../GlobalBundlingState.h"
 
+std::vector<std::vector<unsigned int>> SIFTMatchFilter::s_combinations;
+bool SIFTMatchFilter::s_bInit;
+
 void SIFTMatchFilter::filterFrames(SIFTImageManager* siftManager)
 {
 	const unsigned int numImages = siftManager->getNumImages();
@@ -255,7 +258,7 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
 
-	const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth; 
+	const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth;
 	const unsigned int downSampHeight = GlobalBundlingState::get().s_downsampledHeight;
 
 	// current data
@@ -289,8 +292,8 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 
 		//std::cout << "(" << i << ", " << curFrame << "): ";
 		bool valid =
-			filterImagePairByDenseVerify(prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(), 
-			curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(), 
+			filterImagePairByDenseVerify(prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(),
+			curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(),
 			transforms[i], downSampWidth, downSampHeight);
 		//if (valid) std::cout << "VALID" << std::endl;
 		//else std::cout << "INVALID" << std::endl;
@@ -566,3 +569,169 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 
 }
 
+void SIFTMatchFilter::ransacKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool debugPrint)
+{
+	const unsigned int numImages = siftManager->getNumImages();
+	if (numImages <= 1) return;
+
+	if (!s_bInit) {
+		std::cout << "warining: initialzing combinations" << std::endl;
+		init();
+	}
+
+	// current data
+	const unsigned int curFrame = numImages - 1;
+	std::vector<SIFTKeyPoint> keyPoints;
+	siftManager->getSIFTKeyPointsDEBUG(keyPoints);
+	std::vector<float4x4> transforms(curFrame);
+	std::vector<float4x4> transformsInv(curFrame);
+
+	for (unsigned int i = 0; i < curFrame; i++) { // previous frames
+
+		std::vector<uint2> keyPointIndices;
+		std::vector<float> matchDistances;
+		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
+
+		if (debugPrint) std::cout << "(" << i << ", " << curFrame << ")" << std::endl;
+		float4x4 transform;
+		unsigned int newNumMatches =
+			filterImagePairKeyPointMatchesRANSAC(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, maxResThresh2,
+			(unsigned int)s_combinations[0].size(), s_combinations, debugPrint);
+
+		if (newNumMatches > 0) {
+			transforms[i] = transform;
+			transformsInv[i] = transform.getInverse();
+		}
+		else {
+			transforms[i].setValue(0.0f);
+			transformsInv[i].setValue(0.0f);
+		}
+
+		// copy back
+		cutilSafeCall(cudaMemcpy(siftManager->d_currNumFilteredMatchesPerImagePair + i, &newNumMatches, sizeof(unsigned int), cudaMemcpyHostToDevice));
+		if (newNumMatches > 0) {
+			cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredMatchKeyPointIndices + i * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, keyPointIndices.data(), sizeof(uint2) * newNumMatches, cudaMemcpyHostToDevice));
+			cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredMatchDistances + i * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, matchDistances.data(), sizeof(float) * newNumMatches, cudaMemcpyHostToDevice));
+		}
+	}
+	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransforms, transforms.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
+	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
+}
+
+unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances,
+	float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2,
+	unsigned int k, const std::vector<std::vector<unsigned int>>& combinations, bool debugPrint)
+{
+	unsigned int numRawMatches = (unsigned int)keyPointIndices.size();
+	if (numRawMatches < MIN_NUM_MATCHES_FILTERED) return 0;
+
+	//const unsigned int ransacMax = 100;
+	//std::vector<float> errors(ransacMax);
+	//std::vector<vec4uc> indices(ransacMax);
+
+	//for (unsigned int i = 0; i < ransacMax; i++) {
+
+	//} // tests
+
+
+	unsigned int numValidCombs = 0;
+	unsigned int numValidStarts = 0;
+
+	// RANSAC TEST
+	unsigned int maxNumInliers = 0;
+	float bestMaxResidual = std::numeric_limits<float>::infinity();
+	std::vector<unsigned int> bestCombinationIndices;
+	for (unsigned int c = 0; c < combinations.size(); c++) {
+		std::vector<unsigned int> indices = combinations[c];
+
+		// check if has combination
+		bool validCombination = true;
+		for (unsigned int i = 0; i < indices.size(); i++) {
+			if (indices[i] >= numRawMatches) {
+				validCombination = false;
+				break;
+			}
+		}
+		if (!validCombination) continue;
+		numValidCombs++;
+
+		std::vector<float3> srcPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED), tgtPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+		getKeySourceAndTargetPointsByIndices(keys.data(), keyPointIndices.data(), indices.data(), k, srcPts.data(), tgtPts.data(), siftIntrinsicsInv);
+		unsigned int curNumMatches = k;
+		float3 eigenvalues; float4x4 transformEstimate;
+		float curMaxResidual = computeKabschReprojError(srcPts.data(), tgtPts.data(), curNumMatches, eigenvalues, transformEstimate);
+		if (curMaxResidual > maxResThresh2) continue;
+
+		numValidStarts++;
+
+		std::vector<bool> marker(numRawMatches, false);
+		for (unsigned int i = 0; i < indices.size(); i++) marker[indices[i]] = true;
+		// collect inliers
+		for (unsigned int m = 0; m < numRawMatches; m++) {
+			if (curNumMatches == MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) break;
+			if (marker[m]) continue;
+
+			getKeySourceAndTargetPointsForIndex(keys.data(), keyPointIndices.data(), m, srcPts.data() + curNumMatches, tgtPts.data() + curNumMatches, siftIntrinsicsInv);
+			float3 d = transformEstimate * srcPts[curNumMatches] - tgtPts[curNumMatches]; //TODO recompute kabsch with new?? (refine transform)
+			float curRes2 = dot(d, d);
+
+			if (curRes2 <= maxResThresh2) { // inlier
+				curNumMatches++;
+				indices.push_back(m);
+				if (curRes2 > curMaxResidual) curMaxResidual = curRes2;
+			}
+		}
+		if (curNumMatches > maxNumInliers || (curNumMatches == maxNumInliers && curMaxResidual < bestMaxResidual)) {
+			maxNumInliers = curNumMatches;
+			bestCombinationIndices = indices;
+			bestMaxResidual = curMaxResidual;
+		}
+	}
+
+	if (debugPrint) std::cout << "#valid com = " << numValidCombs << ", #valid starts = " << numValidStarts << " (" << numRawMatches << ", " << maxNumInliers << ")" << std::endl;
+
+	if (maxNumInliers >= MIN_NUM_MATCHES_FILTERED) {
+		std::vector<float3> srcPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED), tgtPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+		getKeySourceAndTargetPointsByIndices(keys.data(), keyPointIndices.data(), bestCombinationIndices.data(), k, srcPts.data(), tgtPts.data(), siftIntrinsicsInv);
+		float3 eigenvalues;
+		transform = kabschReference(srcPts.data(), tgtPts.data(), maxNumInliers, eigenvalues);
+
+		float c1 = eigenvalues.x / eigenvalues.y; // ok if coplanar
+		eigenvalues = covarianceSVDReference(srcPts.data(), maxNumInliers);
+		float cp = eigenvalues.x / eigenvalues.y; // ok if coplanar
+		eigenvalues = covarianceSVDReference(tgtPts.data(), maxNumInliers);
+		float cq = eigenvalues.x / eigenvalues.y; // ok if coplanar
+
+		if (isnan(c1) || isnan(cp) || isnan(cq) || fabs(c1) > KABSCH_CONDITION_THRESH || fabs(cp) > KABSCH_CONDITION_THRESH || fabs(cq) > KABSCH_CONDITION_THRESH) {
+			if (debugPrint) {
+				std::cout << "failed condition test (" << c1 << ", " << cp << ", " << cq << ")" << std::endl;
+				getchar();
+			}
+			return 0;
+		}
+		else {
+			unsigned int maxBestComboIndex = 0;
+			for (unsigned int i = 0; i < k; i++) {
+				if (bestCombinationIndices[i] > maxBestComboIndex)
+					maxBestComboIndex = bestCombinationIndices[i];
+			}
+			if (debugPrint) {
+				std::cout << "max index = " << maxBestComboIndex << std::endl;
+				std::cout << "\t#inliers = " << maxNumInliers << ", max res = " << bestMaxResidual << std::endl;
+			}
+
+			uint2 newKeyIndices[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];
+			float newMatchDists[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED]; //TODO don't actually need this now
+			for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) {
+				newKeyIndices[i] = keyPointIndices[i];
+				newMatchDists[i] = matchDistances[i];
+			}
+			for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) {
+				keyPointIndices[i] = newKeyIndices[i];
+				matchDistances[i] = newMatchDists[i];
+			}
+			return maxNumInliers;
+		}
+	}
+	return 0;
+}

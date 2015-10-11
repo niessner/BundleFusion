@@ -10,6 +10,36 @@
 #include "SIFTImageManager.h"
 
 
+
+
+__host__ __device__ void getKeySourceAndTargetPointsForIndex(const SIFTKeyPoint* keyPoints, const uint2* keyIndices,
+	unsigned int index, float3* srcPt, float3* tgtPt, const float4x4& colorIntrinsicsInv)
+{
+	// source points
+	const SIFTKeyPoint& key0 = keyPoints[index];
+	srcPt[0] = colorIntrinsicsInv * (key0.depth * make_float3(key0.pos.x, key0.pos.y, 1.0f));
+
+	// target points
+	const SIFTKeyPoint& key1 = keyPoints[index];
+	tgtPt[0] = colorIntrinsicsInv * (key1.depth * make_float3(key1.pos.x, key1.pos.y, 1.0f));
+}
+
+__host__ __device__ void getKeySourceAndTargetPointsByIndices(const SIFTKeyPoint* keyPoints, const uint2* keyIndices,
+	const unsigned int* indices, unsigned int numIndices, float3* srcPts, float3* tgtPts, const float4x4& colorIntrinsicsInv)
+{
+	for (unsigned int j = 0; j < numIndices; j++) {
+		unsigned int i = indices[j];
+
+		// source points
+		const SIFTKeyPoint& key0 = keyPoints[keyIndices[i].x];
+		srcPts[j] = colorIntrinsicsInv * (key0.depth * make_float3(key0.pos.x, key0.pos.y, 1.0f));
+
+		// target points
+		const SIFTKeyPoint& key1 = keyPoints[keyIndices[i].y];
+		tgtPts[j] = colorIntrinsicsInv * (key1.depth * make_float3(key1.pos.x, key1.pos.y, 1.0f));
+	}
+}
+
 __host__ __device__ float3x3 covReference(volatile float3* source, unsigned numPoints) {
 	matNxM<3, MAX_MATCHES_PER_IMAGE_PAIR_FILTERED> P;
 
@@ -269,6 +299,21 @@ __host__ __device__ float3 covarianceSVDReference(volatile float3* source, unsig
 	}
 
 	return evs;
+}
+
+__host__ __device__ float computeKabschReprojError(float3* srcPts, float3* tgtPts, unsigned int numMatches, float3& eigenvalues, float4x4& transformEstimate) {
+
+	// kabsch
+	transformEstimate = kabschReference(srcPts, tgtPts, numMatches, eigenvalues);
+
+	// kabsch residuals
+	float maxResidual = 0.0f;
+	for (unsigned int i = 0; i < numMatches; i++) {
+		float3 d = transformEstimate * srcPts[i] - tgtPts[i];
+		float residual_i = dot(d, d);
+		if (residual_i > maxResidual) maxResidual = residual_i;
+	}
+	return maxResidual;
 }
 
 //!!!todo params or defines???

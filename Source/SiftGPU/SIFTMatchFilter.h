@@ -11,6 +11,7 @@ public:
 	SIFTMatchFilter() {}
 	~SIFTMatchFilter() {}
 
+	static void ransacKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool debugPrint);
 	static void filterKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv);
 
 	static void filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& siftIntrinsicsInv);
@@ -18,7 +19,36 @@ public:
 	static void filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames);
 
 	static void filterFrames(SIFTImageManager* siftManager);
+
+	static void init() {
+		if (s_bInit) return;
+		generateKCombinations(20, 4, s_combinations);
+		s_bInit = true;
+	}
 private:
+	static bool s_bInit;
+	static std::vector<std::vector<unsigned int>> s_combinations;
+
+	static void generateKCombinations(unsigned int n, unsigned int k, std::vector<std::vector<unsigned int>>& combinations) {
+		MLIB_ASSERT(k <= n);
+		combinations.clear();
+		std::vector<unsigned int> current;
+		generateKCombinationsInternal(0, k, n, current, combinations);
+	}
+	static void generateKCombinationsInternal(unsigned int offset, unsigned int k, unsigned int n, std::vector<unsigned int>& current, std::vector<std::vector<unsigned int>>& combinations) {
+		if (k == 0) {
+			combinations.push_back(current);
+			return;
+		}
+		for (unsigned int i = offset; i <= n - k; i++) {
+			current.push_back(i);
+			generateKCombinationsInternal(i + 1, k - 1, n, current, combinations);
+			current.pop_back();
+		}
+	}
+
+	static unsigned int filterImagePairKeyPointMatchesRANSAC(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2,
+		unsigned int k, const std::vector<std::vector<unsigned int>>& combinations, bool debugPrint);
 
 	static unsigned int filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv);
 	static bool filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices, const float4x4& siftIntrinsicsInv);

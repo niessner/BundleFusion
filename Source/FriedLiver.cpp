@@ -175,8 +175,8 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			//fileNameDescGlobalApp = "zParametersDefault.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			fileNameDescGlobalApp = "zParametersDefault.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 
 			//fileNameDescGlobalApp = "zParametersMedium.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
@@ -184,8 +184,8 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersHigh.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
 
-			fileNameDescGlobalApp = "zParametersKinect.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
+			//fileNameDescGlobalApp = "zParametersKinect.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -200,6 +200,14 @@ int main(int argc, char** argv)
 		ParameterFile parameterFileGlobalBundling(fileNameDescGlobalBundling);
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
+		//!!!DEBUGGING
+		{
+			TestMatching test;
+			test.load("debug/global");
+		}
+		//!!!DEBUGGING
+
+		SIFTMatchFilter::init();
 
 		DualGPU& dualGPU = DualGPU::get();	//needs to be called to initialize devices
 		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
@@ -229,6 +237,7 @@ int main(int argc, char** argv)
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
 		TimingLog::printAllTimings();
+		g_bundler->saveGlobalSiftManagerToFile("debug/global.sift");
 		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
 		g_bundler->saveCompleteTrajectory("trajectory.bin");
 		g_bundler->saveSiftTrajectory("siftTrajectory.bin");

@@ -64,6 +64,7 @@ struct EntryJ {
 class SIFTImageManager {
 public:
 	friend class SIFTMatchFilter;
+	friend class TestMatching;
 
 	SIFTImageManager(unsigned int submapSize, 
 		unsigned int maxImages = 500,

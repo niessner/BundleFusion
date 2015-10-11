@@ -196,13 +196,19 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 			siftManager->getNumRawMatchesDEBUG(_numRawMatches);
 			if (isLocal) printCurrentMatches("debug/rawMatches/", siftManager, cudaCache, false);
 			else printCurrentMatches("debug/rawMatchesGlobal/", siftManager, cudaCache, false);
+
+			if (!isLocal) printCurrentMatches("debug/", siftManager, cudaCache, false, 5);
 		}
 		//!!!
 
 		// --- filter matches
-		SIFTMatchFilter::filterKeyPointMatches(siftManager, siftIntrinsicsInv);
-		//const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
-		//siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, (_debugPrintMatches && !isLocal));
+		//!!!
+		//SIFTMatchFilter::ransacKeyPointMatches(siftManager, siftIntrinsicsInv, GlobalBundlingState::get().s_maxKabschResidual2, _debugPrintMatches && !isLocal);
+		//if (_debugPrintMatches && !isLocal) SIFTMatchFilter::ransacKeyPointMatches(siftManager, siftIntrinsicsInv, GlobalBundlingState::get().s_maxKabschResidual2);
+		//else SIFTMatchFilter::filterKeyPointMatches(siftManager, siftIntrinsicsInv);
+		//!!!
+		const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
+		siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, (_debugPrintMatches && !isLocal));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = timer.getElapsedTimeMS(); }
 
 		//!!!
@@ -238,9 +244,6 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 			siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
 			if (isLocal) printCurrentMatches("debug/filtMatches/", siftManager, cudaCache, true);
 			else printCurrentMatches("debug/filtMatchesGlobal/", siftManager, cudaCache, true);
-
-			if (!isLocal)
-				int a = 5;
 		}
 		//!!!
 
@@ -326,12 +329,15 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 		if (valid == 0) {
 			////!!!DEBUGGING
 			//_idxsLocalInvalidVerify.push_back(curLocalIdx);
-			//saveOptToPointCloud("debug/opt-" + std::to_string(curLocalIdx) + ".ply", m_nextLocalCache, m_nextLocal->getValidImages(), getLocalTrajectoryGPU(curLocalIdx), m_nextLocal->getNumImages());
+			saveOptToPointCloud("debug/opt-" + std::to_string(curLocalIdx) + ".ply", m_nextLocalCache, m_nextLocal->getValidImages(), getLocalTrajectoryGPU(curLocalIdx), m_nextLocal->getNumImages());
 			//std::cout << "SAVED " << curLocalIdx << std::endl;
 			////!!!DEBUGGING
 
 			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
+			//!!!
+			std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
 			//getchar();
+			//!!!
 			ret = false;
 		}
 		else
@@ -379,16 +385,18 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (m_global->getNumImages() > 1) {
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() >= 55) {
+			//if (m_global->getNumImages() == 7) {
 			//	setPrintMatchesDEBUG(true);
 			//	int a = 5;
 			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() >= 55) {
+			//if (m_global->getNumImages() == 7) {
 			//	setPrintMatchesDEBUG(false);
 			//	int a = 5;
+			//	std::cout << "waiting..." << std::endl;
+			//	getchar();
 			//}
 			//!!!DEBUGGING
 
@@ -398,7 +406,10 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			}
 			else {
 				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
+				//!!!
+				std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
 				//getchar();
+				//!!!
 				ret = 2;
 			}
 		}
@@ -546,7 +557,7 @@ void SubmapManager::saveVerifyDEBUG(const std::string& prefix) const
 }
 
 
-void SubmapManager::printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered) const
+void SubmapManager::printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered, int maxNumMatches) const
 {
 	// get data
 	std::vector<SIFTKeyPoint> keys;
@@ -568,10 +579,12 @@ void SubmapManager::printMatch(const SIFTImageManager* siftManager, const std::s
 	matchImage.copyIntoImage(im1, 0, 0);
 	matchImage.copyIntoImage(im2, image1.getWidth(), 0);
 
+	if (maxNumMatches < 0) maxNumMatches = (int)keyPointIndices.size();
+	else maxNumMatches = std::min((int)keyPointIndices.size(), maxNumMatches);
 	float maxMatchDistance = 0.0f;
 	RGBColor lowColor = ml::RGBColor::Blue;
 	RGBColor highColor = ml::RGBColor::Red;
-	for (unsigned int i = 0; i < keyPointIndices.size(); i++) {
+	for (int i = 0; i < maxNumMatches; i++) {
 		const SIFTKeyPoint& key1 = keys[keyPointIndices[i].x];
 		const SIFTKeyPoint& key2 = keys[keyPointIndices[i].y];
 		if (matchDistances[i] > maxMatchDistance) maxMatchDistance = matchDistances[i];
@@ -588,7 +601,7 @@ void SubmapManager::printMatch(const SIFTImageManager* siftManager, const std::s
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
-void SubmapManager::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache, bool filtered) const
+void SubmapManager::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache, bool filtered, int maxNumMatches /*= -1*/) const
 {
 	const unsigned int numFrames = siftManager->getNumImages();
 	if (numFrames <= 1) return;
@@ -615,6 +628,6 @@ void SubmapManager::printCurrentMatches(const std::string& outPath, const SIFTIm
 		prevImage.reSample(widthSIFT, heightSIFT);
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
-			prevImage, curImage, 0.7f, filtered);
+			prevImage, curImage, 0.7f, filtered, maxNumMatches);
 	}
 }
