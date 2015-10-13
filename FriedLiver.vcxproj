@@ -217,6 +217,7 @@
     <ClInclude Include="Source\stdafx.h" />
     <ClInclude Include="Source\StructureSensor.h" />
     <ClInclude Include="Source\SubmapManager.h" />
+    <ClInclude Include="Source\testMatching.h" />
     <ClInclude Include="Source\TimingLog.h" />
     <ClInclude Include="Source\TrajectoryManager.h" />
   </ItemGroup>
@@ -305,6 +306,7 @@
     </ClCompile>
     <ClCompile Include="Source\StructureSensor.cpp" />
     <ClCompile Include="Source\SubmapManager.cpp" />
+    <ClCompile Include="Source\testMatching.cpp" />
     <ClCompile Include="Source\TimingLog.cpp" />
     <ClCompile Include="Source\TrajectoryManager.cpp" />
     <ClCompile Include="Source\uplink.cpp" />

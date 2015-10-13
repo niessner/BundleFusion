@@ -88,6 +88,14 @@ public:
 	// ------- image-image matching (API for the Sift matcher)
 	ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, uint2& keyPointOffset);
 
+	ImagePairMatch& getImagePairMatchDEBUG(unsigned int prevImageIdx, unsigned int curImageIdx, uint2& keyPointOffset)
+	{
+		assert(prevImageIdx < getNumImages());
+		assert(curImageIdx < getNumImages());
+		keyPointOffset = make_uint2(m_numKeyPointsPerImagePrefixSum[prevImageIdx], m_numKeyPointsPerImagePrefixSum[curImageIdx]);
+		return m_currImagePairMatches[prevImageIdx];
+	}
+
 	//void resetImagePairMatches(unsigned int numImageMatches = (unsigned int)-1) {
 
 	//	if (numImageMatches == (unsigned int)-1) numImageMatches = m_maxNumImages;

@@ -217,14 +217,14 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 		std::vector<int> currNumFilteredMatchesPerImagePair(maxImageMatches);
 		std::vector<float> currFilteredMatchDistances(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 		std::vector<uint2> currFilteredMatchKeyPointIndices(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-		std::vector<uint2> currFilteredTransforms(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-		std::vector<uint2> currFilteredTransformsInv(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+		std::vector<float4x4> currFilteredTransforms(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+		std::vector<float4x4> currFilteredTransformsInv(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 
 		in.read((char*)currNumFilteredMatchesPerImagePair.data(), sizeof(int)*maxImageMatches);
 		in.read((char*)currFilteredMatchDistances.data(), sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 		in.read((char*)currFilteredMatchKeyPointIndices.data(), sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-		in.read((char*)currFilteredTransforms.data(), sizeof(float4x4)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-		in.read((char*)currFilteredTransformsInv.data(), sizeof(float4x4)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+		in.read((char*)currFilteredTransforms.data(), sizeof(float4x4)*maxImageMatches);
+		in.read((char*)currFilteredTransformsInv.data(), sizeof(float4x4)*maxImageMatches);
 
 		CUDA_SAFE_CALL(cudaMemcpy(d_currNumFilteredMatchesPerImagePair, currNumFilteredMatchesPerImagePair.data(), sizeof(int)*maxImageMatches, cudaMemcpyHostToDevice));
 		CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredMatchDistances, currFilteredMatchDistances.data(), sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyHostToDevice));

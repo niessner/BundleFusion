@@ -130,6 +130,7 @@
     </ClCompile>
     <ClCompile Include="Source\SubmapManager.cpp" />
     <ClCompile Include="Source\ConditionManager.cpp" />
+    <ClCompile Include="Source\testMatching.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -355,6 +356,7 @@
       <Filter>Sensors</Filter>
     </ClInclude>
     <ClInclude Include="Source\ConditionManager.h" />
+    <ClInclude Include="Source\testMatching.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

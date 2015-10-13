@@ -203,7 +203,22 @@ int main(int argc, char** argv)
 		//!!!DEBUGGING
 		{
 			TestMatching test;
-			test.load("debug/global");
+			//test.loadReferenceTrajectory("trajectory.bin", GlobalBundlingState::get().s_submapSize);
+			//test.saveReferenceTrajectory("debug/refTraj.bin");
+			test.loadReferenceTrajectory("debug/refTraj.bin");
+			test.loadColorImages("debug/colorImages.bin");
+			//test.load("debug/matchAll.bin", "debug/global.sift");
+			//test.loadColorImagesFromSensor("../data/student/2296_eroded.sensor", GlobalBundlingState::get().s_submapSize);
+			//test.loadColorImagesFromSensor("../data/testLost.sensor", GlobalBundlingState::get().s_submapSize);
+			//test.saveColorImages("debug/colorImages.bin");
+			test.loadIntrinsics("../data/debug45.sensor");
+			test.load("", "debug/global.sift");
+			test.test();
+			test.save("debug/filtered.bin");
+
+			std::cout << "done!" << std::endl;
+			getchar();
+			return 0;
 		}
 		//!!!DEBUGGING
 

@@ -1,4 +1,4 @@
-
+#pragma once
 
 #ifndef CUDA_KABSCH_REFERENCE_H
 #define CUDA_KABSCH_REFERENCE_H
