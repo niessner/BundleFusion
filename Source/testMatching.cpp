@@ -125,8 +125,8 @@ void TestMatching::save(const std::string& filename) const
 		{
 			const bool filtered = true;
 			std::vector<unsigned int> numMatchesPerImagePair(i);
-			std::vector<float> matchDistancesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
-			std::vector<vec2ui> matchKeyIndicesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
+			std::vector<float> matchDistancesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+			std::vector<vec2ui> matchKeyIndicesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatchesPerImagePair.data(), getNumMatchesCUDA(i, filtered), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDistancesPerImagePair.data(), getMatchDistsCUDA(i, filtered), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyDeviceToHost));
@@ -146,10 +146,16 @@ void TestMatching::test()
 		matchAll();
 		save("debug/matchAll.bin");
 	}
+
 	unsigned int numImages = m_siftManager->getNumImages();
 
 	std::vector<vec2ui> imagePairMatchesFiltered;
 	filter(imagePairMatchesFiltered);
+
+	//!!!DEBUGGING
+	//saveMatchToPLY("debug/", vec2ui(118, 135), true);
+	//!!!DEBUGGING
+
 	// compare to reference
 	std::vector<vec2ui> falsePositives, falseNegatives;
 	checkFiltered(imagePairMatchesFiltered, falsePositives, falseNegatives);
@@ -200,16 +206,11 @@ void TestMatching::matchAll()
 			siftMatcher->SetDescriptors(1, num2, (unsigned char*)curImage.d_keyPointDescs);
 			siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset, matchThresh, ratioMax);
 		}  // prev frames
+
 		// save
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(getNumMatchesCUDA(cur, filtered), m_siftManager->d_currNumMatchesPerImagePair, sizeof(int)*cur, cudaMemcpyDeviceToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchDistsCUDA(cur, filtered), m_siftManager->d_currMatchDistances, sizeof(float)*cur*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchKeyIndicesCUDA(cur, filtered), m_siftManager->d_currMatchKeyPointIndices, sizeof(uint2)*cur*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToDevice));
-
-		//if (cur == 4) { //3,4
-		//	std::vector<int> numMatches(cur);
-		//	std::vector<uint2> keyIndices(MAX_MATCHES_PER_IMAGE_PAIR_RAW);
-		//	int a = 5;
-		//}
 
 		std::vector<int> numMatches(cur);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatches.data(), getNumMatchesCUDA(cur, filtered), sizeof(int)*cur, cudaMemcpyDeviceToHost));
@@ -218,10 +219,6 @@ void TestMatching::matchAll()
 				m_origMatches.push_back(vec2ui(i, cur));
 			}
 		}
-
-		//!!!DEBUGGING 
-		//!!!DEBUGGING
-
 	} // cur frames
 	t.stop();
 	std::cout << "done! (" << t.getElapsedTimeMS() << " ms)" << std::endl;
@@ -252,8 +249,10 @@ void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 			std::vector<int> numMatches(cur);
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatches.data(), m_siftManager->d_currNumMatchesPerImagePair, sizeof(int)*cur, cudaMemcpyDeviceToHost));
 			for (unsigned int ii = 0; ii < cur; ii++) {
-				if (numMatches[ii] < 0 || numMatches[ii] > MAX_MATCHES_PER_IMAGE_PAIR_RAW)
+				if (numMatches[ii] < 0 || numMatches[ii] > MAX_MATCHES_PER_IMAGE_PAIR_RAW) {
+					std::cout << "ERROR NUM MATCHES FOR " << ii << ", " << cur << std::endl;
 					int a = 5;
+				}
 			}
 		}
 		//!!!DEBUGGING
@@ -302,27 +301,6 @@ void TestMatching::loadIntrinsics(const std::string& filename)
 
 void TestMatching::checkFiltered(const std::vector<vec2ui>& imagePairMatchesFiltered, std::vector<vec2ui>& falsePositives, std::vector<vec2ui>& falseNegatives) const
 {
-	//std::unordered_set<vec2ui> unsureMatches, closeMatches, badMatches;
-	//initDebugVerifyMatches(unsureMatches, closeMatches, badMatches);
-	//
-	//falsePositives.clear();
-	//falseNegatives.clear();
-	//std::unordered_set<vec2ui> filteredSet;
-	//for (unsigned int i = 0; i < imagePairMatchesFiltered.size(); i++) {
-	//	if (badMatches.find(imagePairMatchesFiltered[i]) != badMatches.end()) { // bad but found good
-	//		falsePositives.push_back(imagePairMatchesFiltered[i]);
-	//	}
-	//	filteredSet.insert(imagePairMatchesFiltered[i]);
-	//}
-
-	//for (unsigned int i = 0; i < m_origMatches.size(); i++) {
-	//	if (filteredSet.find(m_origMatches[i]) == filteredSet.end()) { // filtered out
-	//		if (badMatches.find(m_origMatches[i]) == badMatches.end()) { // not a bad match
-	//			falseNegatives.push_back(m_origMatches[i]);
-	//		}
-	//	}
-	//}
-
 	const float maxResidualThres2 = 0.05 * 0.05;
 
 	// get data
@@ -354,6 +332,8 @@ void TestMatching::checkFiltered(const std::vector<vec2ui>& imagePairMatchesFilt
 
 	for (unsigned int i = 0; i < m_origMatches.size(); i++) {
 		const vec2ui& imageIndices = m_origMatches[i];
+		MLIB_ASSERT(m_referenceTrajectory[imageIndices.x][0] != -std::numeric_limits<float>::infinity() &&
+			m_referenceTrajectory[imageIndices.y][0] != -std::numeric_limits<float>::infinity());
 		const mat4f transform = m_referenceTrajectory[imageIndices.y].getInverse() * m_referenceTrajectory[imageIndices.x]; // src to tgt
 
 		unsigned int idx = (imageIndices.y - 1) * imageIndices.y / 2 + imageIndices.x;
@@ -396,266 +376,6 @@ void TestMatching::checkFiltered(const std::vector<vec2ui>& imagePairMatchesFilt
 	}
 }
 
-void TestMatching::initDebugVerifyMatches(std::unordered_set<vec2ui>& unsureMatches, std::unordered_set<vec2ui>& closeMatches, std::unordered_set<vec2ui>& badMatches)
-{
-	unsureMatches.clear();
-	closeMatches.clear();
-	badMatches.clear();
-
-	//unsure
-	unsureMatches.insert(vec2ui(29, 227));
-	unsureMatches.insert(vec2ui(139, 179));
-	unsureMatches.insert(vec2ui(140, 179));
-	unsureMatches.insert(vec2ui(140, 181));
-	unsureMatches.insert(vec2ui(181, 197));
-
-	//close
-	closeMatches.insert(vec2ui(6, 221));
-	closeMatches.insert(vec2ui(75, 85));
-
-	//completely off
-	badMatches.insert(vec2ui(3, 57));
-	badMatches.insert(vec2ui(4, 63));
-	badMatches.insert(vec2ui(5, 63));
-	badMatches.insert(vec2ui(5, 130));
-	badMatches.insert(vec2ui(5, 208));
-	badMatches.insert(vec2ui(8, 19));
-	badMatches.insert(vec2ui(12, 68));
-	badMatches.insert(vec2ui(16, 35));
-	badMatches.insert(vec2ui(16, 43));
-	badMatches.insert(vec2ui(17, 73));
-	badMatches.insert(vec2ui(17, 89));
-	badMatches.insert(vec2ui(17, 183));
-	badMatches.insert(vec2ui(18, 68));
-	badMatches.insert(vec2ui(18, 73));
-	badMatches.insert(vec2ui(22, 29));
-	badMatches.insert(vec2ui(24, 114));
-	badMatches.insert(vec2ui(25, 33));
-	badMatches.insert(vec2ui(25, 139));
-	badMatches.insert(vec2ui(25, 140));
-	badMatches.insert(vec2ui(25, 179));
-	badMatches.insert(vec2ui(26, 184));
-	badMatches.insert(vec2ui(27, 141));
-	badMatches.insert(vec2ui(27, 185));
-	badMatches.insert(vec2ui(28, 45));
-	badMatches.insert(vec2ui(28, 64));
-	badMatches.insert(vec2ui(28, 140));
-	badMatches.insert(vec2ui(28, 141));
-	badMatches.insert(vec2ui(28, 183));
-	badMatches.insert(vec2ui(28, 184));
-	badMatches.insert(vec2ui(28, 185));
-	badMatches.insert(vec2ui(29, 140));
-	badMatches.insert(vec2ui(29, 141));
-	badMatches.insert(vec2ui(29, 153));
-	badMatches.insert(vec2ui(29, 179));
-	badMatches.insert(vec2ui(29, 181));
-	badMatches.insert(vec2ui(29, 182));
-	badMatches.insert(vec2ui(29, 185));
-	badMatches.insert(vec2ui(30, 105));
-	badMatches.insert(vec2ui(32, 180));
-	badMatches.insert(vec2ui(32, 183));
-	badMatches.insert(vec2ui(32, 184));
-	badMatches.insert(vec2ui(32, 185));
-	badMatches.insert(vec2ui(33, 141));
-	badMatches.insert(vec2ui(33, 142));
-	badMatches.insert(vec2ui(33, 180));
-	badMatches.insert(vec2ui(33, 181));
-	badMatches.insert(vec2ui(33, 182));
-	badMatches.insert(vec2ui(33, 183));
-	badMatches.insert(vec2ui(33, 184));
-	badMatches.insert(vec2ui(34, 162));
-	badMatches.insert(vec2ui(35, 182));
-	badMatches.insert(vec2ui(35, 184));
-	badMatches.insert(vec2ui(35, 185));
-	badMatches.insert(vec2ui(36, 185));
-	badMatches.insert(vec2ui(43, 181));
-	badMatches.insert(vec2ui(43, 228));
-	badMatches.insert(vec2ui(44, 185));
-	badMatches.insert(vec2ui(44, 228));
-	badMatches.insert(vec2ui(56, 92));
-	badMatches.insert(vec2ui(61, 168));
-	badMatches.insert(vec2ui(62, 70));
-	badMatches.insert(vec2ui(63, 70));
-	badMatches.insert(vec2ui(64, 85));
-	badMatches.insert(vec2ui(64, 97));
-	badMatches.insert(vec2ui(69, 77));
-	badMatches.insert(vec2ui(70, 102));
-	badMatches.insert(vec2ui(71, 130));
-	badMatches.insert(vec2ui(74, 142));
-	badMatches.insert(vec2ui(78, 184));
-	badMatches.insert(vec2ui(83, 119));
-	badMatches.insert(vec2ui(89, 103));
-	badMatches.insert(vec2ui(92, 162));
-	badMatches.insert(vec2ui(92, 168));
-	badMatches.insert(vec2ui(92, 172));
-	badMatches.insert(vec2ui(92, 175));
-	badMatches.insert(vec2ui(92, 176));
-	badMatches.insert(vec2ui(92, 177));
-	badMatches.insert(vec2ui(93, 162));
-	badMatches.insert(vec2ui(93, 177));
-	badMatches.insert(vec2ui(94, 163));
-	badMatches.insert(vec2ui(94, 166));
-	badMatches.insert(vec2ui(94, 169));
-	badMatches.insert(vec2ui(94, 171));
-	badMatches.insert(vec2ui(96, 163));
-	badMatches.insert(vec2ui(96, 166));
-	badMatches.insert(vec2ui(96, 171));
-	badMatches.insert(vec2ui(96, 173));
-	badMatches.insert(vec2ui(96, 174));
-	badMatches.insert(vec2ui(97, 162));
-	badMatches.insert(vec2ui(97, 168));
-	badMatches.insert(vec2ui(97, 169));
-	badMatches.insert(vec2ui(97, 172));
-	badMatches.insert(vec2ui(97, 173));
-	badMatches.insert(vec2ui(97, 174));
-	badMatches.insert(vec2ui(97, 176));
-	badMatches.insert(vec2ui(98, 128));
-	badMatches.insert(vec2ui(98, 162));
-	badMatches.insert(vec2ui(98, 171));
-	badMatches.insert(vec2ui(98, 173));
-	badMatches.insert(vec2ui(99, 162));
-	badMatches.insert(vec2ui(99, 168));
-	badMatches.insert(vec2ui(99, 176));
-	badMatches.insert(vec2ui(100, 122));
-	badMatches.insert(vec2ui(100, 162));
-	badMatches.insert(vec2ui(100, 168));
-	badMatches.insert(vec2ui(100, 176));
-	badMatches.insert(vec2ui(101, 120));
-	badMatches.insert(vec2ui(101, 172));
-	badMatches.insert(vec2ui(102, 118));
-	badMatches.insert(vec2ui(102, 176));
-	badMatches.insert(vec2ui(110, 142));
-	badMatches.insert(vec2ui(114, 186));
-	badMatches.insert(vec2ui(117, 149));
-	badMatches.insert(vec2ui(121, 215));
-	badMatches.insert(vec2ui(123, 148));
-	badMatches.insert(vec2ui(124, 207));
-	badMatches.insert(vec2ui(124, 221));
-	badMatches.insert(vec2ui(134, 208));
-	badMatches.insert(vec2ui(139, 174));
-	badMatches.insert(vec2ui(140, 228));
-	badMatches.insert(vec2ui(142, 228));
-	badMatches.insert(vec2ui(142, 229));
-	badMatches.insert(vec2ui(153, 184));
-	badMatches.insert(vec2ui(174, 183));
-	badMatches.insert(vec2ui(179, 229));
-	badMatches.insert(vec2ui(183, 229));
-
-	// new ones
-	badMatches.insert(vec2ui(7, 208));
-	badMatches.insert(vec2ui(10, 19));
-	badMatches.insert(vec2ui(15, 93));
-	badMatches.insert(vec2ui(16, 34));
-	badMatches.insert(vec2ui(17, 153));
-	badMatches.insert(vec2ui(19, 227));
-	badMatches.insert(vec2ui(22, 32));
-	badMatches.insert(vec2ui(22, 36));
-	badMatches.insert(vec2ui(24, 33));
-	badMatches.insert(vec2ui(24, 180));
-	badMatches.insert(vec2ui(24, 219));
-	badMatches.insert(vec2ui(25, 71));
-	badMatches.insert(vec2ui(25, 115));
-	badMatches.insert(vec2ui(25, 142));
-	badMatches.insert(vec2ui(25, 153));
-	badMatches.insert(vec2ui(25, 183));
-	badMatches.insert(vec2ui(25, 186));
-	badMatches.insert(vec2ui(25, 226));
-	badMatches.insert(vec2ui(27, 184));
-	badMatches.insert(vec2ui(27, 186));
-	badMatches.insert(vec2ui(28, 182));
-	badMatches.insert(vec2ui(29, 139));
-	badMatches.insert(vec2ui(29, 152));
-	badMatches.insert(vec2ui(29, 180));
-	badMatches.insert(vec2ui(29, 183));
-	badMatches.insert(vec2ui(32, 140));
-	badMatches.insert(vec2ui(32, 181));
-	badMatches.insert(vec2ui(33, 139));
-	badMatches.insert(vec2ui(33, 140));
-	badMatches.insert(vec2ui(33, 185));
-	badMatches.insert(vec2ui(34, 140));
-	badMatches.insert(vec2ui(34, 141));
-	badMatches.insert(vec2ui(34, 142));
-	badMatches.insert(vec2ui(34, 159));
-	badMatches.insert(vec2ui(35, 140));
-	badMatches.insert(vec2ui(35, 142));
-	badMatches.insert(vec2ui(35, 162));
-	badMatches.insert(vec2ui(35, 183));
-	badMatches.insert(vec2ui(36, 139));
-	badMatches.insert(vec2ui(36, 140));
-	badMatches.insert(vec2ui(36, 182));
-	badMatches.insert(vec2ui(36, 184));
-	badMatches.insert(vec2ui(39, 165));
-	badMatches.insert(vec2ui(43, 179));
-	badMatches.insert(vec2ui(43, 180));
-	badMatches.insert(vec2ui(43, 184));
-	badMatches.insert(vec2ui(44, 182));
-	badMatches.insert(vec2ui(44, 183));
-	badMatches.insert(vec2ui(44, 186));
-	badMatches.insert(vec2ui(44, 198));
-	badMatches.insert(vec2ui(55, 207));
-	badMatches.insert(vec2ui(57, 67));
-	badMatches.insert(vec2ui(59, 71));
-	badMatches.insert(vec2ui(60, 71));
-	badMatches.insert(vec2ui(63, 182));
-	badMatches.insert(vec2ui(64, 98));
-	badMatches.insert(vec2ui(64, 99));
-	badMatches.insert(vec2ui(65, 101));
-	badMatches.insert(vec2ui(66, 168));
-	badMatches.insert(vec2ui(66, 170));
-	badMatches.insert(vec2ui(67, 177));
-	badMatches.insert(vec2ui(70, 175));
-	badMatches.insert(vec2ui(72, 199));
-	badMatches.insert(vec2ui(76, 110));
-	badMatches.insert(vec2ui(78, 216));
-	//badMatches.insert(vec2ui(82, 111)); // close but not quite
-	badMatches.insert(vec2ui(85, 112));
-	badMatches.insert(vec2ui(85, 123));
-	badMatches.insert(vec2ui(85, 124));
-	badMatches.insert(vec2ui(85, 126));
-	badMatches.insert(vec2ui(86, 126));
-	badMatches.insert(vec2ui(87, 220));
-	badMatches.insert(vec2ui(90, 103));
-	badMatches.insert(vec2ui(93, 124));
-	badMatches.insert(vec2ui(93, 168));
-	badMatches.insert(vec2ui(93, 172));
-	badMatches.insert(vec2ui(94, 165));
-	badMatches.insert(vec2ui(95, 103));
-	badMatches.insert(vec2ui(96, 165));
-	badMatches.insert(vec2ui(96, 168));
-	badMatches.insert(vec2ui(96, 169));
-	badMatches.insert(vec2ui(96, 176));
-	badMatches.insert(vec2ui(98, 122));
-	badMatches.insert(vec2ui(98, 174));
-	badMatches.insert(vec2ui(99, 172));
-	badMatches.insert(vec2ui(101, 121));
-	badMatches.insert(vec2ui(105, 127));
-	badMatches.insert(vec2ui(110, 115));
-	badMatches.insert(vec2ui(114, 140));
-	badMatches.insert(vec2ui(116, 204));
-	badMatches.insert(vec2ui(117, 128)); // close but not quite
-	badMatches.insert(vec2ui(124, 132));
-	badMatches.insert(vec2ui(124, 177));
-	badMatches.insert(vec2ui(127, 185));
-	badMatches.insert(vec2ui(132, 146));
-	badMatches.insert(vec2ui(139, 181));
-	badMatches.insert(vec2ui(140, 186));
-	badMatches.insert(vec2ui(150, 204));
-	badMatches.insert(vec2ui(151, 182));
-	badMatches.insert(vec2ui(152, 182));
-	badMatches.insert(vec2ui(153, 199));
-	badMatches.insert(vec2ui(159, 174));
-	badMatches.insert(vec2ui(159, 221));
-	badMatches.insert(vec2ui(179, 228));
-	badMatches.insert(vec2ui(180, 213));
-	badMatches.insert(vec2ui(180, 228));
-	badMatches.insert(vec2ui(181, 229));
-	badMatches.insert(vec2ui(182, 228));
-	badMatches.insert(vec2ui(183, 228));
-	badMatches.insert(vec2ui(185, 229));
-	badMatches.insert(vec2ui(197, 229));
-	badMatches.insert(vec2ui(213, 222));
-}
-
 void TestMatching::printMatches(const std::string& outDir, const std::vector<vec2ui>& imagePairMatches, bool filtered) const
 {
 	if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
@@ -689,7 +409,6 @@ void TestMatching::printMatches(const std::string& outDir, const std::vector<vec
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchKeyIndices.data(), d_matchKeyIndicesPerImagePair, sizeof(uint2)*matchKeyIndices.size(), cudaMemcpyDeviceToHost));
 		OFFSET = MAX_MATCHES_PER_IMAGE_PAIR_RAW;
 	}
-	//TODO HERE
 	for (unsigned int i = 0; i < imagePairMatches.size(); i++) {
 		const vec2ui& imageIndices = imagePairMatches[i];
 		const ColorImageR8G8B8A8& image1 = m_debugColorImages[imageIndices.x];
@@ -706,6 +425,9 @@ void TestMatching::printMatches(const std::string& outDir, const std::vector<vec
 		matchImage.copyIntoImage(im1, 0, 0);
 		matchImage.copyIntoImage(im2, image1.getWidth(), 0);
 
+		const float scaleWidth = (float)m_debugColorImages[0].getWidth() / (float)GlobalBundlingState::get().s_widthSIFT;
+		const float scaleHeight = (float)m_debugColorImages[0].getHeight() / (float)GlobalBundlingState::get().s_heightSIFT;
+
 		float maxMatchDistance = 0.0f;
 		RGBColor lowColor = ml::RGBColor::Blue;
 		RGBColor highColor = ml::RGBColor::Red;
@@ -715,10 +437,13 @@ void TestMatching::printMatches(const std::string& outDir, const std::vector<vec
 			const SIFTKeyPoint& key2 = keys[matchKeyIndices[idx*OFFSET + i].y];
 			if (matchDists[idx*OFFSET + i] > maxMatchDistance) maxMatchDistance = matchDists[idx*OFFSET + i];
 
+			vec2f pf0(key1.pos.x * scaleWidth, key1.pos.y * scaleHeight);
+			vec2f pf1(key2.pos.x * scaleWidth, key2.pos.y * scaleHeight);
+
 			RGBColor c = RGBColor::interpolate(lowColor, highColor, matchDists[idx*OFFSET + i] / distMax);
 			vec3f color(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f);
-			vec2i p0 = ml::math::round(ml::vec2f(key1.pos.x, key1.pos.y));
-			vec2i p1 = ml::math::round(ml::vec2f(key2.pos.x + image1.getWidth(), key2.pos.y));
+			vec2i p0 = ml::math::round(ml::vec2f(pf0.x, pf0.y));
+			vec2i p1 = ml::math::round(ml::vec2f(pf1.x + image1.getWidth(), pf1.y));
 			ImageHelper::drawCircle(matchImage, p0, ml::math::round(key1.scale), color);
 			ImageHelper::drawCircle(matchImage, p1, ml::math::round(key2.scale), color);
 			ImageHelper::drawLine(matchImage, p0, p1, color);
@@ -728,79 +453,181 @@ void TestMatching::printMatches(const std::string& outDir, const std::vector<vec
 	}
 }
 
-void TestMatching::loadColorImagesFromSensor(const std::string& filename, unsigned int skip)
+void TestMatching::loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip)
 {
 	std::cout << "loading color images from sensor... ";
-	CalibratedSensorData cs;
-	BinaryDataStreamFile s(filename, false);
-	s >> cs;
-	s.closeStream();
-
+	CalibratedSensorData cs; std::vector<mat4f> refTrajectory;
+	{
+		BinaryDataStreamFile s(sensorFile, false);
+		s >> cs;
+	}
+	{
+		BinaryDataStreamFile s(trajectoryFile, false);
+		s >> refTrajectory;
+	}
 	m_debugColorImages.resize((cs.m_ColorNumFrames - 1) / skip + 1);
+	m_debugDepthImages.resize(m_debugColorImages.size());
+	m_referenceTrajectory.resize(m_debugColorImages.size());
 	MLIB_ASSERT((cs.m_ColorNumFrames - 1) / skip == m_debugColorImages.size() - 1);
 	for (unsigned int i = 0; i < cs.m_ColorNumFrames; i += skip) {
 		MLIB_ASSERT(i / skip < m_debugColorImages.size());
 		m_debugColorImages[i / skip] = ColorImageR8G8B8A8(cs.m_ColorImageWidth, cs.m_ColorImageHeight, cs.m_ColorImages[i]);
+		m_debugDepthImages[i / skip] = DepthImage32(cs.m_DepthImageWidth, cs.m_DepthImageHeight, cs.m_DepthImages[i]);
+		m_referenceTrajectory[i / skip] = refTrajectory[i];
 	}
+	m_depthIntrinsicsInv = cs.m_CalibrationDepth.m_IntrinsicInverse;
 	std::cout << "done! (" << m_debugColorImages.size() << " of " << cs.m_ColorNumFrames << ")" << std::endl;
 }
 
-void TestMatching::saveColorImages(const std::string& filename) const
+void TestMatching::saveImages(const std::string& filename) const
 {
-	if (m_debugColorImages.empty()) return;
-	std::cout << "saving color images... ";
+	if (m_debugColorImages.empty() || m_debugDepthImages.empty() || m_referenceTrajectory.empty()) return;
+	std::cout << "saving color/depth images and trajectory... ";
 
 	BinaryDataStreamFile s(filename, true);
 	s << m_debugColorImages.size();
 	for (unsigned int i = 0; i < m_debugColorImages.size(); i++) {
 		s << m_debugColorImages[i];
+		s << m_debugDepthImages[i];
 	}
+	s << m_referenceTrajectory;
+	s << m_depthIntrinsicsInv;
 	s.closeStream();
 	std::cout << "done!" << std::endl;
 }
 
-void TestMatching::loadColorImages(const std::string& filename)
+void TestMatching::loadImages(const std::string& filename)
 {
 	std::cout << "loading color images... ";
 
 	BinaryDataStreamFile s(filename, false);
-	size_t numColorImages;
-	s >> numColorImages;
-	m_debugColorImages.resize(numColorImages);
+	size_t numImages;
+	s >> numImages;
+	m_debugColorImages.resize(numImages);
+	m_debugDepthImages.resize(numImages);
 	for (unsigned int i = 0; i < m_debugColorImages.size(); i++) {
 		s >> m_debugColorImages[i];
+		s >> m_debugDepthImages[i];
 	}
-	s.closeStream();
-	std::cout << "done!" << std::endl;
-}
-
-void TestMatching::saveReferenceTrajectory(const std::string& filename) const
-{
-	if (m_referenceTrajectory.empty()) return;
-	std::cout << "saving reference trajectory... ";
-
-	BinaryDataStreamFile s(filename, true);
-	s << m_referenceTrajectory;
-	s.closeStream();
-	std::cout << "done!" << std::endl;
-}
-
-void TestMatching::loadReferenceTrajectory(const std::string& filename, unsigned int skip /*= 1*/)
-{
-	std::cout << "loading reference trajectory... ";
-
-	BinaryDataStreamFile s(filename, false);
 	s >> m_referenceTrajectory;
+	s >> m_depthIntrinsicsInv;
 	s.closeStream();
-	if (skip > 1) {
-		std::vector<mat4f> trajectory((m_referenceTrajectory.size() - 1) / skip + 1);
-		for (unsigned int i = 0; i < m_referenceTrajectory.size(); i += skip) {
-			trajectory[i / skip] = m_referenceTrajectory[i];
-		}
-		m_referenceTrajectory = trajectory;
+	std::cout << "done!" << std::endl;
+}
+
+void TestMatching::saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices /*= std::vector<unsigned int>()*/) const
+{
+	std::cout << "computing point cloud..." << std::endl;
+	std::vector<unsigned int> pointCloudFrameIndices;
+	if (frameIndices.empty()) {
+		for (unsigned int i = 0; i < m_debugColorImages.size(); i++) pointCloudFrameIndices.push_back(i);
+	}
+	else {
+		pointCloudFrameIndices = frameIndices;
 	}
 
+	PointCloudf pc;
+	unsigned int width = m_debugDepthImages[0].getWidth();
+	float scaleWidth = (float)m_debugColorImages[0].getWidth() / (float)m_debugDepthImages[0].getWidth();
+	float scaleHeight = (float)m_debugColorImages[0].getHeight() / (float)m_debugDepthImages[0].getHeight();
+	for (unsigned int k = 0; k < pointCloudFrameIndices.size(); k++) {
+		recordPointCloud(pc, pointCloudFrameIndices[k]);
+	} // frames
+	std::cout << "saving to file... ";
+	PointCloudIOf::saveToFile(filename, pc);
 	std::cout << "done!" << std::endl;
+}
+
+void TestMatching::recordPointCloud(PointCloudf& pc, unsigned int frame) const
+{
+	if (m_referenceTrajectory[frame][0] == -std::numeric_limits<float>::infinity()) {
+		std::cout << "warning: invalid frame " << frame << std::endl;
+		return;
+	}
+	unsigned int depthWidth = m_debugDepthImages[0].getWidth();
+	float scaleWidth = (float)m_debugColorImages[0].getWidth() / (float)m_debugDepthImages[0].getWidth();
+	float scaleHeight = (float)m_debugColorImages[0].getHeight() / (float)m_debugDepthImages[0].getHeight();
+
+	for (unsigned int p = 0; p < m_debugDepthImages[frame].getNumPixels(); p++) {
+		unsigned int x = p%depthWidth; unsigned int y = p/depthWidth;
+		float depth = m_debugDepthImages[frame](x, y);
+		if (depth != -std::numeric_limits<float>::infinity()) {
+			vec3f camPos = m_depthIntrinsicsInv * (depth * vec3f((float)x, (float)y, 1.0f));
+			pc.m_points.push_back(m_referenceTrajectory[frame] * camPos);
+			unsigned int cx = (unsigned int)math::round(x * scaleWidth);
+			unsigned int cy = (unsigned int)math::round(y * scaleHeight);
+			vec4uc c = m_debugColorImages[frame](cx, cy);
+			pc.m_colors.push_back(vec4f(c) / 255.0f);
+
+			vec3f wpos = m_referenceTrajectory[frame] * camPos;
+			if (isnan(wpos.x) || isnan(wpos.y) || isnan(wpos.z))
+				int a = 5;
+		} // valid depth
+	} // depth pixels
+}
+
+void TestMatching::saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const
+{
+	std::cout << "saving match " << imageIndices << "... ";
+	// frames
+	PointCloudf pc0, pc1;
+	recordPointCloud(pc0, imageIndices.x);
+	recordPointCloud(pc1, imageIndices.y);
+	PointCloudIOf::saveToFile(dir + std::to_string(imageIndices.x) + ".ply", pc0);
+	PointCloudIOf::saveToFile(dir + std::to_string(imageIndices.y) + ".ply", pc1);
+
+	// keys
+	vec4f red(1.0f, 0.0f, 0.0f, 1.0f);
+	vec4f green(0.0f, 1.0f, 0.0f, 1.0f);
+	MeshDataf keys0, keys1;
+	recordKeysMeshData(keys0, keys1, imageIndices, filtered, red, green);
+	MeshIOf::saveToFile(dir + std::to_string(imageIndices.x) + "-keys.ply", keys0);
+	MeshIOf::saveToFile(dir + std::to_string(imageIndices.y) + "-keys.ply", keys1);
+	std::cout << "done!" << std::endl;
+}
+
+void TestMatching::recordKeysMeshData(MeshDataf& keys0, MeshDataf& keys1, const vec2ui& imageIndices, bool filtered, const vec4f& color0, const vec4f& color1) const
+{
+	MLIB_ASSERT(m_referenceTrajectory[imageIndices.x][0] != -std::numeric_limits<float>::infinity() &&
+		m_referenceTrajectory[imageIndices.y][0] != -std::numeric_limits<float>::infinity());
+	const unsigned int matchIdx = ((imageIndices.y - 1) * imageIndices.y) / 2 + imageIndices.x;
+
+	std::vector<SIFTKeyPoint> keys;
+	m_siftManager->getSIFTKeyPointsDEBUG(keys);
+
+	const unsigned int OFFSET = filtered ? MAX_MATCHES_PER_IMAGE_PAIR_FILTERED : MAX_MATCHES_PER_IMAGE_PAIR_RAW;
+	unsigned int numMatches;
+	std::vector<float> matchDists;
+	std::vector<uint2> matchKeyIndices;
+	if (filtered) {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&numMatches, d_filtNumMatchesPerImagePair + matchIdx, sizeof(int), cudaMemcpyDeviceToHost));
+		MLIB_ASSERT(numMatches < MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+	}
+	else {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&numMatches, d_numMatchesPerImagePair + matchIdx, sizeof(int), cudaMemcpyDeviceToHost));
+		MLIB_ASSERT(numMatches < MAX_MATCHES_PER_IMAGE_PAIR_RAW);
+	}
+	if (numMatches == 0) {
+		std::cout << "error: no matches for images " << imageIndices << std::endl;
+		return;
+	}
+	matchDists.resize(numMatches); matchKeyIndices.resize(numMatches);
+	if (filtered) {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDists.data(), d_filtMatchDistancesPerImagePair + matchIdx*OFFSET, sizeof(float)*numMatches, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchKeyIndices.data(), d_filtMatchKeyIndicesPerImagePair + matchIdx*OFFSET, sizeof(uint2)*numMatches, cudaMemcpyDeviceToHost));
+	}
+	else {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDists.data(), d_matchDistancesPerImagePair + matchIdx*OFFSET, sizeof(float)*numMatches, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchKeyIndices.data(), d_matchKeyIndicesPerImagePair + matchIdx*OFFSET, sizeof(uint2)*numMatches, cudaMemcpyDeviceToHost));
+	}
+
+	const float radius = 0.02f;
+	std::vector<vec3f> srcPts(numMatches), tgtPts(numMatches);
+	getSrcAndTgtPts(keys.data(), matchKeyIndices.data(), numMatches, (float3*)srcPts.data(), (float3*)tgtPts.data(), MatrixConversion::toCUDA(m_siftIntrinsicsInv));
+	for (unsigned int i = 0; i < numMatches; i++) {
+		keys0.merge(Shapesf::sphere(radius, m_referenceTrajectory[imageIndices.x] * srcPts[i], 10, 10, color0).getMeshData());
+		keys1.merge(Shapesf::sphere(radius, m_referenceTrajectory[imageIndices.y] * tgtPts[i], 10, 10, color1).getMeshData());
+	}
 }
 
 

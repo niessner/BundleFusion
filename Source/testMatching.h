@@ -25,18 +25,17 @@ public:
 
 	//! debug hack
 	void loadIntrinsics(const std::string& filename);
-	void loadColorImagesFromSensor(const std::string& filename, unsigned int skip);
-	void saveColorImages(const std::string& filename) const;
-	void loadColorImages(const std::string& filename);
-	void saveReferenceTrajectory(const std::string& filename) const;
-	void loadReferenceTrajectory(const std::string& filename, unsigned int skip = 1);
+	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip);
+	void saveImages(const std::string& filename) const;
+	void loadImages(const std::string& filename);
 
 	void save(const std::string& filename) const;
 	void load(const std::string& filename, const std::string siftFile);
 
 	void test();
 
-	static void initDebugVerifyMatches(std::unordered_set<vec2ui>& unsureMatches, std::unordered_set<vec2ui>& closeMatches, std::unordered_set<vec2ui>& badMatches);
+	void saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices = std::vector<unsigned int>()) const;
+	void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
 
 private:
 	int* getNumMatchesCUDA(unsigned int curFrame, bool filtered) {
@@ -85,6 +84,9 @@ private:
 		}
 	}
 
+	void recordPointCloud(PointCloudf& pc, unsigned int frame) const;
+	void recordKeysMeshData(MeshDataf& keys0, MeshDataf& keys1, const vec2ui& imageIndices, bool filtered, const vec4f& color0, const vec4f& color1) const;
+
 	SIFTImageManager* m_siftManager;
 
 	std::vector<vec2ui> m_origMatches;
@@ -102,5 +104,7 @@ private:
 	bool	m_bHasMatches;
 
 	std::vector<ColorImageR8G8B8A8> m_debugColorImages;
+	std::vector<DepthImage32>		m_debugDepthImages;
+	mat4f							m_depthIntrinsicsInv;
 	std::vector<mat4f>				m_referenceTrajectory;
 };
