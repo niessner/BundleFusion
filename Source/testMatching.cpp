@@ -257,8 +257,13 @@ void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 		}
 		//!!!DEBUGGING
 
-		SIFTMatchFilter::filterKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv));
-		//SIFTMatchFilter::ransacKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, false);
+		bool debugPrint = false;//cur == 1;
+		//SIFTMatchFilter::filterKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
+		SIFTMatchFilter::ransacKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
+		if (debugPrint){
+			std::cout << "waiting..." << std::endl;
+			getchar();
+		}
 
 		std::vector<unsigned int> numMatches(cur);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatches.data(), m_siftManager->d_currNumFilteredMatchesPerImagePair, sizeof(int)*cur, cudaMemcpyDeviceToHost));
@@ -498,7 +503,7 @@ void TestMatching::saveImages(const std::string& filename) const
 
 void TestMatching::loadImages(const std::string& filename)
 {
-	std::cout << "loading color images... ";
+	std::cout << "loading images... ";
 
 	BinaryDataStreamFile s(filename, false);
 	size_t numImages;

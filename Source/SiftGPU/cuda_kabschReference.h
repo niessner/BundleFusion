@@ -16,11 +16,11 @@ __host__ __device__ void getKeySourceAndTargetPointsForIndex(const SIFTKeyPoint*
 	unsigned int index, float3* srcPt, float3* tgtPt, const float4x4& colorIntrinsicsInv)
 {
 	// source points
-	const SIFTKeyPoint& key0 = keyPoints[index];
+	const SIFTKeyPoint& key0 = keyPoints[keyIndices[index].x];
 	srcPt[0] = colorIntrinsicsInv * (key0.depth * make_float3(key0.pos.x, key0.pos.y, 1.0f));
 
 	// target points
-	const SIFTKeyPoint& key1 = keyPoints[index];
+	const SIFTKeyPoint& key1 = keyPoints[keyIndices[index].y];
 	tgtPt[0] = colorIntrinsicsInv * (key1.depth * make_float3(key1.pos.x, key1.pos.y, 1.0f));
 }
 
@@ -427,10 +427,8 @@ __host__ __device__ bool ComputeReprojectionReference(float3* srcPts, float3* tg
 
 //! assumes sorted by distance, ascending
 __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoint* keyPoints,
-	/*volatile*/ uint2* keyPointIndices, /*volatile*/ float* matchDistances, unsigned int numRawMatches, float4x4& transformEstimate, const float4x4& colorIntrinsicsInv)
+	/*volatile*/ uint2* keyPointIndices, /*volatile*/ float* matchDistances, unsigned int numRawMatches, float4x4& transformEstimate, const float4x4& colorIntrinsicsInv, float maxResThresh2, bool printDebug)
 {
-	const float maxResThresh = MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
-
 	bool done = false;
 	unsigned int idx = 0;
 	unsigned int curNumMatches = 0;
@@ -448,7 +446,8 @@ __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoi
 
 	while (!done) {
 		if (idx == numRawMatches || curNumMatches >= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) {
-			if (curNumMatches < MIN_NUM_MATCHES_FILTERED || curMaxResidual >= maxResThresh || !validTransform) { // invalid
+			if (printDebug) printf("done: #matches = %d, maxRes = %f, validTransform = %d\n", curNumMatches, curMaxResidual, validTransform);
+			if (curNumMatches < MIN_NUM_MATCHES_FILTERED || curMaxResidual >= maxResThresh2 || !validTransform) { // invalid
 				curNumMatches = 0;
 			}
 			done = true;
@@ -460,6 +459,8 @@ __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoi
 			curMatchDistances[curNumMatches] = matchDistances[idx];
 			curNumMatches++;
 
+			if (printDebug) printf("added %d\n", idx);
+
 			// check geometric consistency
 			if (curNumMatches >= 3) {
 				getKeySourceAndTargetPointsReference(keyPoints, curKeyIndices, curNumMatches, srcPts, tgtPts, colorIntrinsicsInv);
@@ -468,7 +469,8 @@ __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoi
 				bool b = validTransform;
 				float4x4 prevTransform = transformEstimate;
 				curMaxResidual = residuals[curNumMatches - 1];
-				if (curMaxResidual > maxResThresh) { // some bad matches
+				if (printDebug) printf("\tmax res = %f, valid = %d\n", curMaxResidual, validTransform);
+				if (curMaxResidual > maxResThresh2) { // some bad matches
 					float lastRes = -1;
 					int startIdx = (int)curNumMatches - 1;
 					for (int i = startIdx; i >= 3; i--) { // remove until max < maxResThresh
@@ -476,7 +478,8 @@ __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoi
 						curNumMatches--;
 						validTransform = ComputeReprojectionReference(srcPts, tgtPts, curNumMatches, residuals, transformEstimate, curKeyIndices, curMatchDistances);
 						curMaxResidual = residuals[curNumMatches - 1];
-						if (curNumMatches == 3 && (curMaxResidual > maxResThresh || b && !validTransform)) {
+						if (printDebug) printf("\tRemoved: max res = %f, valid = %d\n", curMaxResidual, validTransform);
+						if (curNumMatches == 3 && (curMaxResidual > maxResThresh2 || b && !validTransform)) {
 							curNumMatches++; // removing made it worse... continue
 							curMaxResidual = lastRes;
 							validTransform = b;
@@ -484,7 +487,7 @@ __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoi
 							break;
 						}
 						// check if good
-						if (curMaxResidual < maxResThresh) break;
+						if (curMaxResidual < maxResThresh2) break;
 					} // removing
 				}
 			} // enough matches to check geo consistency

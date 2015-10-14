@@ -11,7 +11,7 @@ public:
 	SIFTMatchFilter() {}
 	~SIFTMatchFilter() {}
 
-	static void filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv)
+	static void filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool printDebug)
 	{
 		const unsigned int numImages = siftManager->getNumImages();
 		if (numImages <= 1) return;
@@ -30,7 +30,7 @@ public:
 
 			float4x4 transform;
 			unsigned int newNumMatches =
-				filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv);
+				filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, maxResThresh2, printDebug);
 			//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
 
 			if (newNumMatches > 0) {
@@ -139,7 +139,7 @@ private:
 	static unsigned int filterImagePairKeyPointMatchesRANSAC(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2,
 		unsigned int k, const std::vector<std::vector<unsigned int>>& combinations, bool debugPrint);
 
-	static unsigned int filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv);
+	static unsigned int filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool printDebug);
 	static bool filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices, const float4x4& siftIntrinsicsInv);
 	// depth0 -> src, depth1 -> tgt
 	static bool filterImagePairByDenseVerify(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,

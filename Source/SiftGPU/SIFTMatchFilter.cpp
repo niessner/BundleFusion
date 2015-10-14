@@ -54,7 +54,7 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const
 
 		float4x4 transform;
 		unsigned int newNumMatches =
-			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv);
+			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, GlobalBundlingState::get().s_maxKabschResidual2, false);
 		//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
 
 		if (newNumMatches > 0) {
@@ -77,24 +77,13 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const
 	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
 }
 
-unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv)
+unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool printDebug)
 {
 	unsigned int numRawMatches = (unsigned int)keyPointIndices.size();
 	if (numRawMatches < MIN_NUM_MATCHES_FILTERED) return 0;
 
-	//std::vector<SIFTKeyPoint> copy_keys0 = keys0;
-	//std::vector<SIFTKeyPoint> copy_keys1 = keys1;
-	//std::vector<uint2> copy_keyPointIndices = keyPointIndices;
-	//std::vector<float> copy_matchDistances = matchDistances;
-	//float4x4 copy_transform = transform;
-	//unsigned int numTry = ::filterKeyPointMatches(keys0.data(),keys1.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform);
-	//unsigned int numRef = filterKeyPointMatchesReference(copy_keys0.data(), copy_keys1.data(), copy_keyPointIndices.data(), copy_matchDistances.data(), numRawMatches, copy_transform);
-
-	unsigned int numRef = filterKeyPointMatchesReference(keys.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform, siftIntrinsicsInv);
+	unsigned int numRef = filterKeyPointMatchesReference(keys.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform, siftIntrinsicsInv, maxResThresh2, printDebug);
 	return numRef;
-
-	//unsigned int numTry = ::filterKeyPointMatches(keys.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform);
-	//return numTry;
 }
 
 void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& siftIntrinsicsInv)
@@ -618,6 +607,7 @@ void SIFTMatchFilter::ransacKeyPointMatches(SIFTImageManager* siftManager, const
 	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
 }
 
+#define REFINE_RANSAC
 unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances,
 	float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2,
 	unsigned int k, const std::vector<std::vector<unsigned int>>& combinations, bool debugPrint)
@@ -672,13 +662,25 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 			if (marker[m]) continue;
 
 			getKeySourceAndTargetPointsForIndex(keys.data(), keyPointIndices.data(), m, srcPts.data() + curNumMatches, tgtPts.data() + curNumMatches, siftIntrinsicsInv);
-			float3 d = transformEstimate * srcPts[curNumMatches] - tgtPts[curNumMatches]; //TODO recompute kabsch with new?? (refine transform)
+#ifdef REFINE_RANSAC
+			// refine transform
+			float curRes2 = computeKabschReprojError(srcPts.data(), tgtPts.data(), curNumMatches + 1, eigenvalues, transformEstimate);
+#else 
+			float3 d = transformEstimate * srcPts[curNumMatches] - tgtPts[curNumMatches];
 			float curRes2 = dot(d, d);
+#endif
+			//if (debugPrint && c == 0) {
+			//	std::cout << "m = " << m << ", cur # matches = " << curNumMatches << ", new res = " << std::sqrt(curRes2) << std::endl;
+			//}
 
 			if (curRes2 <= maxResThresh2) { // inlier
 				curNumMatches++;
 				indices.push_back(m);
+#ifdef REFINE_RANSAC
+				curMaxResidual = curRes2;
+#else
 				if (curRes2 > curMaxResidual) curMaxResidual = curRes2;
+#endif
 			}
 		}
 		if (curNumMatches > maxNumInliers || (curNumMatches == maxNumInliers && curMaxResidual < bestMaxResidual)) {
@@ -688,7 +690,10 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 		}
 	}
 
-	if (debugPrint) std::cout << "#valid com = " << numValidCombs << ", #valid starts = " << numValidStarts << " (" << numRawMatches << ", " << maxNumInliers << ")" << std::endl;
+	if (debugPrint) {
+		std::cout << "#valid com = " << numValidCombs << ", #valid starts = " << numValidStarts << std::endl;
+		std::cout << "#raw matches = " << numRawMatches << ", max # inliers = " << maxNumInliers << std::endl;
+	}
 
 	if (maxNumInliers >= MIN_NUM_MATCHES_FILTERED) {
 		std::vector<float3> srcPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED), tgtPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
