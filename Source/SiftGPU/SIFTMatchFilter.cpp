@@ -636,7 +636,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 	for (unsigned int c = 0; c < combinations.size(); c++) {
 		std::vector<unsigned int> indices = combinations[c];
 
-		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 1 && indices[2] == 2 && indices[3] == 4;
+		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 1 && indices[2] == 2 && indices[3] == 3;
 		if (_DEBUGCOMB) std::cout << "combination at " << c << std::endl;
 
 		// check if has combination
@@ -655,14 +655,14 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 		unsigned int curNumMatches = k;
 		float3 eigenvalues; float4x4 transformEstimate;
 		float curMaxResidual = computeKabschReprojError(srcPts.data(), tgtPts.data(), curNumMatches, eigenvalues, transformEstimate);
-		//if (_DEBUGCOMB) {
-		//	std::cout << "src pts:" << std::endl;
-		//	for (unsigned int i = 0; i < curNumMatches; i++) std::cout << "\t" << srcPts[i].x << " " << srcPts[i].y << " " << srcPts[i].z << std::endl;
-		//	std::cout << "tgt pts:" << std::endl;
-		//	for (unsigned int i = 0; i < curNumMatches; i++) std::cout << "\t" << tgtPts[i].x << " " << tgtPts[i].y << " " << tgtPts[i].z << std::endl;
-		//	std::cout << "max res = " << curMaxResidual << std::endl;
-		//	getchar();
-		//}
+		if (_DEBUGCOMB) {
+			std::cout << "src pts:" << std::endl;
+			for (unsigned int i = 0; i < curNumMatches; i++) std::cout << "\t" << srcPts[i].x << " " << srcPts[i].y << " " << srcPts[i].z << std::endl;
+			std::cout << "tgt pts:" << std::endl;
+			for (unsigned int i = 0; i < curNumMatches; i++) std::cout << "\t" << tgtPts[i].x << " " << tgtPts[i].y << " " << tgtPts[i].z << std::endl;
+			std::cout << "max res = " << curMaxResidual <<  "(cond = " << eigenvalues.x / eigenvalues.y << ")" << std::endl;
+			getchar();
+		}
 
 		numValidStarts++;
 
@@ -677,14 +677,15 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 #ifdef REFINE_RANSAC
 			// refine transform
 			float curRes2 = computeKabschReprojError(srcPts.data(), tgtPts.data(), curNumMatches + 1, eigenvalues, transformEstimate);
-			//if (_DEBUGCOMB) {
-			//	std::cout << "src pts:" << std::endl;
-			//	for (unsigned int i = 0; i < curNumMatches + 1; i++) std::cout << "\t" << srcPts[i].x << " " << srcPts[i].y << " " << srcPts[i].z << std::endl;
-			//	std::cout << "tgt pts:" << std::endl;
-			//	for (unsigned int i = 0; i < curNumMatches + 1; i++) std::cout << "\t" << tgtPts[i].x << " " << tgtPts[i].y << " " << tgtPts[i].z << std::endl;
-			//	std::cout << "max res = " << curRes2 <<  "(cond = " << eigenvalues.x / eigenvalues.y << ")" << std::endl;
-			//	getchar();
-			//}
+			if (_DEBUGCOMB) {
+				std::cout << m << std::endl;
+				std::cout << "src pts:" << std::endl;
+				for (unsigned int i = 0; i < curNumMatches + 1; i++) std::cout << "\t" << srcPts[i].x << " " << srcPts[i].y << " " << srcPts[i].z << std::endl;
+				std::cout << "tgt pts:" << std::endl;
+				for (unsigned int i = 0; i < curNumMatches + 1; i++) std::cout << "\t" << tgtPts[i].x << " " << tgtPts[i].y << " " << tgtPts[i].z << std::endl;
+				std::cout << "max res = " << curRes2 << "(cond = " << eigenvalues.x / eigenvalues.y << ")" << std::endl;
+				getchar();
+			}
 #else 
 			float3 d = transformEstimate * srcPts[curNumMatches] - tgtPts[curNumMatches];
 			float curRes2 = dot(d, d);
@@ -703,8 +704,6 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 #endif
 			}
 		}
-		if (_DEBUGCOMB)
-			int a = 5;
 		if (curNumMatches > maxNumInliers || (curNumMatches == maxNumInliers && curMaxResidual < bestMaxResidual)) {
 			maxNumInliers = curNumMatches;
 			bestCombinationIndices = indices;
@@ -723,12 +722,17 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 		float3 eigenvalues;
 		transform = kabschReference(srcPts.data(), tgtPts.data(), maxNumInliers, eigenvalues);
 
-		//if (debugPrint) {
-		//	std::cout << "final transform estimate:" << std::endl;
-		//	transform.print();
-		//	std::cout << "final cond = " << eigenvalues.x / eigenvalues.y << std::endl;
-		//	getchar();
-		//}
+		if (debugPrint) {
+			std::cout << "potential indices: "; for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) std::cout << bestCombinationIndices[i] << " "; std::cout << std::endl;
+			//std::cout << "final transform estimate:" << std::endl;
+			//transform.print();
+			//std::cout << "final cond = " << eigenvalues.x / eigenvalues.y << std::endl;
+			std::cout << "key indices:" << std::endl;
+			for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) {
+				std::cout << "\t" << keyPointIndices[bestCombinationIndices[i]].x << " " << keyPointIndices[bestCombinationIndices[i]].y << std::endl;
+			}
+			getchar();
+		}
 
 		float c1 = eigenvalues.x / eigenvalues.y; // ok if coplanar
 		eigenvalues = covarianceSVDReference(srcPts.data(), maxNumInliers);
@@ -752,13 +756,14 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 			if (debugPrint) {
 				std::cout << "max index = " << maxBestComboIndex << std::endl;
 				std::cout << "\t#inliers = " << maxNumInliers << ", max res = " << bestMaxResidual << std::endl;
+				std::cout << "final indices: "; for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) std::cout << bestCombinationIndices[i] << " "; std::cout << std::endl;
 			}
 
 			uint2 newKeyIndices[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];
 			float newMatchDists[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED]; //TODO don't actually need this now
 			for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) {
-				newKeyIndices[i] = keyPointIndices[i];
-				newMatchDists[i] = matchDistances[i];
+				newKeyIndices[i] = keyPointIndices[bestCombinationIndices[i]];
+				newMatchDists[i] = matchDistances[bestCombinationIndices[i]];
 			}
 			for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) {
 				keyPointIndices[i] = newKeyIndices[i];
@@ -795,7 +800,7 @@ void SIFTMatchFilter::ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		//!!!DEBUGGING
-		//if (curFrame == 2 && i == 0)
+		//if (curFrame == 98 && i == 94)
 		//	debugPrint = true;
 		//else debugPrint = false;
 		//!!!DEBUGGING
@@ -843,7 +848,7 @@ void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		//!!!DEBUGGING
-		//if (curFrame == 2 && i == 0)
+		//if (curFrame == 98 && i == 94)
 		//	printDebug = true;
 		//else printDebug = false;
 		//!!!DEBUGGING

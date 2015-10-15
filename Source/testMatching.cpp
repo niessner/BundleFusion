@@ -157,7 +157,12 @@ void TestMatching::test()
 	filter(imagePairMatchesFiltered);
 
 	//!!!DEBUGGING
+	//std::vector<vec2ui> matches = { vec2ui(94, 98), vec2ui(118, 119), vec2ui(118, 121), vec2ui(118, 133), vec2ui(118, 134), vec2ui(152, 155), vec2ui(156, 157), vec2ui(161, 163), vec2ui(165, 171), vec2ui(165, 174) };
+	//std::vector<vec2ui> matches = { vec2ui(94, 98) };
+	//printMatches("debug/", matches, true);
 	//saveMatchToPLY("debug/", vec2ui(118, 135), true);
+	//std::cout << "waiting..." << std::endl;
+	//getchar();
 	//!!!DEBUGGING
 
 	// compare to reference
@@ -247,19 +252,6 @@ void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_siftManager->d_currNumMatchesPerImagePair, getNumMatchesCUDA(cur, false), sizeof(int)*cur, cudaMemcpyDeviceToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_siftManager->d_currMatchDistances, getMatchDistsCUDA(cur, false), sizeof(float)*cur*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_siftManager->d_currMatchKeyPointIndices, getMatchKeyIndicesCUDA(cur, false), sizeof(uint2)*cur*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToDevice));
-
-		//!!!DEBUGGING
-		{
-			std::vector<int> numMatches(cur);
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatches.data(), m_siftManager->d_currNumMatchesPerImagePair, sizeof(int)*cur, cudaMemcpyDeviceToHost));
-			for (unsigned int ii = 0; ii < cur; ii++) {
-				if (numMatches[ii] < 0 || numMatches[ii] > MAX_MATCHES_PER_IMAGE_PAIR_RAW) {
-					std::cout << "ERROR NUM MATCHES FOR " << ii << ", " << cur << std::endl;
-					int a = 5;
-				}
-			}
-		}
-		//!!!DEBUGGING
 
 		bool debugPrint = false;//(cur == 8);
 		//SIFTMatchFilter::filterKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
@@ -449,6 +441,8 @@ void TestMatching::printMatches(const std::string& outDir, const std::vector<vec
 
 			vec2f pf0(key1.pos.x * scaleWidth, key1.pos.y * scaleHeight);
 			vec2f pf1(key2.pos.x * scaleWidth, key2.pos.y * scaleHeight);
+
+			//std::cout << "[" << i << "] (" << matchKeyIndices[idx*OFFSET + i].x << ", " << matchKeyIndices[idx*OFFSET + i].y << ") " << pf0 << " | " << pf1 << std::endl;
 
 			RGBColor c = RGBColor::interpolate(lowColor, highColor, matchDists[idx*OFFSET + i] / distMax);
 			vec3f color(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f);
