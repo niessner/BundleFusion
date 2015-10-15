@@ -146,6 +146,10 @@ void TestMatching::test()
 		matchAll();
 		save("debug/matchAll.bin");
 	}
+	//!!!DEBUGGING
+	//std::vector<vec2ui> matches = { vec2ui(0, 2) };
+	//printMatches("debug/", matches, false);
+	//!!!DEBUGGING
 
 	unsigned int numImages = m_siftManager->getNumImages();
 
@@ -257,11 +261,11 @@ void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 		}
 		//!!!DEBUGGING
 
-		bool debugPrint = false;//cur == 1;
+		bool debugPrint = false;//(cur == 8);
 		//SIFTMatchFilter::filterKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
 		SIFTMatchFilter::ransacKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
 		if (debugPrint){
-			std::cout << "waiting..." << std::endl;
+			std::cout << "debug print waiting..." << std::endl;
 			getchar();
 		}
 
@@ -436,7 +440,8 @@ void TestMatching::printMatches(const std::string& outDir, const std::vector<vec
 		float maxMatchDistance = 0.0f;
 		RGBColor lowColor = ml::RGBColor::Blue;
 		RGBColor highColor = ml::RGBColor::Red;
-		unsigned int numMatchesToPrint = filtered ? numMatches[idx] : std::min(GlobalBundlingState::get().s_minNumMatchesGlobal, (unsigned int)numMatches[idx]);
+		//unsigned int numMatchesToPrint = filtered ? numMatches[idx] : std::min(GlobalBundlingState::get().s_minNumMatchesGlobal, (unsigned int)numMatches[idx]);
+		unsigned int numMatchesToPrint = numMatches[idx];
 		for (unsigned int i = 0; i < numMatchesToPrint; i++) {
 			const SIFTKeyPoint& key1 = keys[matchKeyIndices[idx*OFFSET + i].x];
 			const SIFTKeyPoint& key2 = keys[matchKeyIndices[idx*OFFSET + i].y];

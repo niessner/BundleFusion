@@ -564,8 +564,10 @@ void SIFTMatchFilter::ransacKeyPointMatches(SIFTImageManager* siftManager, const
 	if (numImages <= 1) return;
 
 	if (!s_bInit) {
-		std::cout << "warining: initialzing combinations" << std::endl;
+		std::cout << "warning: initializing combinations" << std::endl;
+		Timer t;
 		init();
+		std::cout << "init: " << t.getElapsedTimeMS() << " ms" << std::endl;
 	}
 
 	// current data
@@ -634,6 +636,9 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 	for (unsigned int c = 0; c < combinations.size(); c++) {
 		std::vector<unsigned int> indices = combinations[c];
 
+		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 1 && indices[2] == 2 && indices[3] == 4;
+		if (_DEBUGCOMB) std::cout << "combination at " << c << std::endl;
+
 		// check if has combination
 		bool validCombination = true;
 		for (unsigned int i = 0; i < indices.size(); i++) {
@@ -650,7 +655,14 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 		unsigned int curNumMatches = k;
 		float3 eigenvalues; float4x4 transformEstimate;
 		float curMaxResidual = computeKabschReprojError(srcPts.data(), tgtPts.data(), curNumMatches, eigenvalues, transformEstimate);
-		if (curMaxResidual > maxResThresh2) continue;
+		//if (_DEBUGCOMB) {
+		//	std::cout << "src pts:" << std::endl;
+		//	for (unsigned int i = 0; i < curNumMatches; i++) std::cout << "\t" << srcPts[i].x << " " << srcPts[i].y << " " << srcPts[i].z << std::endl;
+		//	std::cout << "tgt pts:" << std::endl;
+		//	for (unsigned int i = 0; i < curNumMatches; i++) std::cout << "\t" << tgtPts[i].x << " " << tgtPts[i].y << " " << tgtPts[i].z << std::endl;
+		//	std::cout << "max res = " << curMaxResidual << std::endl;
+		//	getchar();
+		//}
 
 		numValidStarts++;
 
@@ -665,6 +677,14 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 #ifdef REFINE_RANSAC
 			// refine transform
 			float curRes2 = computeKabschReprojError(srcPts.data(), tgtPts.data(), curNumMatches + 1, eigenvalues, transformEstimate);
+			//if (_DEBUGCOMB) {
+			//	std::cout << "src pts:" << std::endl;
+			//	for (unsigned int i = 0; i < curNumMatches + 1; i++) std::cout << "\t" << srcPts[i].x << " " << srcPts[i].y << " " << srcPts[i].z << std::endl;
+			//	std::cout << "tgt pts:" << std::endl;
+			//	for (unsigned int i = 0; i < curNumMatches + 1; i++) std::cout << "\t" << tgtPts[i].x << " " << tgtPts[i].y << " " << tgtPts[i].z << std::endl;
+			//	std::cout << "max res = " << curRes2 <<  "(cond = " << eigenvalues.x / eigenvalues.y << ")" << std::endl;
+			//	getchar();
+			//}
 #else 
 			float3 d = transformEstimate * srcPts[curNumMatches] - tgtPts[curNumMatches];
 			float curRes2 = dot(d, d);
@@ -683,6 +703,8 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 #endif
 			}
 		}
+		if (_DEBUGCOMB)
+			int a = 5;
 		if (curNumMatches > maxNumInliers || (curNumMatches == maxNumInliers && curMaxResidual < bestMaxResidual)) {
 			maxNumInliers = curNumMatches;
 			bestCombinationIndices = indices;
@@ -697,9 +719,16 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 
 	if (maxNumInliers >= MIN_NUM_MATCHES_FILTERED) {
 		std::vector<float3> srcPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED), tgtPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-		getKeySourceAndTargetPointsByIndices(keys.data(), keyPointIndices.data(), bestCombinationIndices.data(), k, srcPts.data(), tgtPts.data(), siftIntrinsicsInv);
+		getKeySourceAndTargetPointsByIndices(keys.data(), keyPointIndices.data(), bestCombinationIndices.data(), maxNumInliers, srcPts.data(), tgtPts.data(), siftIntrinsicsInv);
 		float3 eigenvalues;
 		transform = kabschReference(srcPts.data(), tgtPts.data(), maxNumInliers, eigenvalues);
+
+		//if (debugPrint) {
+		//	std::cout << "final transform estimate:" << std::endl;
+		//	transform.print();
+		//	std::cout << "final cond = " << eigenvalues.x / eigenvalues.y << std::endl;
+		//	getchar();
+		//}
 
 		float c1 = eigenvalues.x / eigenvalues.y; // ok if coplanar
 		eigenvalues = covarianceSVDReference(srcPts.data(), maxNumInliers);
@@ -739,4 +768,107 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 		}
 	}
 	return 0;
+}
+
+void SIFTMatchFilter::ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool debugPrint)
+{
+	const unsigned int numImages = siftManager->getNumImages();
+	if (numImages <= 1) return;
+
+	if (!s_bInit) {
+		std::cout << "warning: initializing combinations" << std::endl;
+		Timer t;
+		init();
+		std::cout << "init: " << t.getElapsedTimeMS() << " ms" << std::endl;
+	}
+
+	// current data
+	std::vector<SIFTKeyPoint> keyPoints;
+	siftManager->getSIFTKeyPointsDEBUG(keyPoints);
+	std::vector<float4x4> transforms(curFrame);
+	std::vector<float4x4> transformsInv(curFrame);
+
+	for (unsigned int i = 0; i < curFrame; i++) { // previous frames
+
+		std::vector<uint2> keyPointIndices;
+		std::vector<float> matchDistances;
+		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
+
+		//!!!DEBUGGING
+		//if (curFrame == 2 && i == 0)
+		//	debugPrint = true;
+		//else debugPrint = false;
+		//!!!DEBUGGING
+		if (debugPrint) std::cout << "(" << i << ", " << curFrame << ")" << std::endl;
+		float4x4 transform;
+		unsigned int newNumMatches =
+			filterImagePairKeyPointMatchesRANSAC(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, maxResThresh2,
+			(unsigned int)s_combinations[0].size(), s_combinations, debugPrint);
+
+		if (newNumMatches > 0) {
+			transforms[i] = transform;
+			transformsInv[i] = transform.getInverse();
+		}
+		else {
+			transforms[i].setValue(0.0f);
+			transformsInv[i].setValue(0.0f);
+		}
+
+		// copy back
+		cutilSafeCall(cudaMemcpy(siftManager->d_currNumFilteredMatchesPerImagePair + i, &newNumMatches, sizeof(unsigned int), cudaMemcpyHostToDevice));
+		if (newNumMatches > 0) {
+			cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredMatchKeyPointIndices + i * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, keyPointIndices.data(), sizeof(uint2) * newNumMatches, cudaMemcpyHostToDevice));
+			cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredMatchDistances + i * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, matchDistances.data(), sizeof(float) * newNumMatches, cudaMemcpyHostToDevice));
+		}
+	}
+	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransforms, transforms.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
+	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
+}
+
+void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool printDebug)
+{
+	const unsigned int numImages = siftManager->getNumImages();
+	if (numImages <= 1) return;
+
+	// current data
+	std::vector<SIFTKeyPoint> keyPoints;
+	siftManager->getSIFTKeyPointsDEBUG(keyPoints);
+	std::vector<float4x4> transforms(curFrame);
+	std::vector<float4x4> transformsInv(curFrame);
+
+	for (unsigned int i = 0; i < curFrame; i++) { // previous frames
+
+		std::vector<uint2> keyPointIndices;
+		std::vector<float> matchDistances;
+		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
+
+		//!!!DEBUGGING
+		//if (curFrame == 2 && i == 0)
+		//	printDebug = true;
+		//else printDebug = false;
+		//!!!DEBUGGING
+
+		float4x4 transform;
+		unsigned int newNumMatches =
+			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, maxResThresh2, printDebug);
+		//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
+
+		if (newNumMatches > 0) {
+			transforms[i] = transform;
+			transformsInv[i] = transform.getInverse();
+		}
+		else {
+			transforms[i].setValue(0.0f);
+			transformsInv[i].setValue(0.0f);
+		}
+
+		// copy back
+		cutilSafeCall(cudaMemcpy(siftManager->d_currNumFilteredMatchesPerImagePair + i, &newNumMatches, sizeof(unsigned int), cudaMemcpyHostToDevice));
+		if (newNumMatches > 0) {
+			cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredMatchKeyPointIndices + i * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, keyPointIndices.data(), sizeof(uint2) * newNumMatches, cudaMemcpyHostToDevice));
+			cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredMatchDistances + i * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, matchDistances.data(), sizeof(float) * newNumMatches, cudaMemcpyHostToDevice));
+		}
+	}
+	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransforms, transforms.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
+	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
 }
