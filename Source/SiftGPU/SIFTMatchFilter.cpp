@@ -636,7 +636,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 	for (unsigned int c = 0; c < combinations.size(); c++) {
 		std::vector<unsigned int> indices = combinations[c];
 
-		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 1 && indices[2] == 2 && indices[3] == 3;
+		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 2 && indices[2] == 4 && indices[3] == 5;
 		if (_DEBUGCOMB) std::cout << "combination at " << c << std::endl;
 
 		// check if has combination
@@ -703,6 +703,17 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 				if (curRes2 > curMaxResidual) curMaxResidual = curRes2;
 #endif
 			}
+		}
+		if (_DEBUGCOMB) {
+			std::cout << "cur #matches = " << curNumMatches << " vs cur max inliers = " << maxNumInliers << std::endl;
+			std::cout << "cur max res = " << curMaxResidual << " vs cur best res = " << bestMaxResidual << std::endl;
+			std::cout << "cur indices:";
+			for (unsigned int i = 0; i < indices.size(); i++) std::cout << " " << indices[i];
+			std::cout << std::endl;
+			std::cout << "best indices:";
+			for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) std::cout << " " << bestCombinationIndices[i];
+			std::cout << std::endl;
+
 		}
 		if (curNumMatches > maxNumInliers || (curNumMatches == maxNumInliers && curMaxResidual < bestMaxResidual)) {
 			maxNumInliers = curNumMatches;
@@ -800,9 +811,9 @@ void SIFTMatchFilter::ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		//!!!DEBUGGING
-		//if (curFrame == 98 && i == 94)
-		//	debugPrint = true;
-		//else debugPrint = false;
+		if (curFrame == 125 && i == 104)
+			debugPrint = true;
+		else debugPrint = false;
 		//!!!DEBUGGING
 		if (debugPrint) std::cout << "(" << i << ", " << curFrame << ")" << std::endl;
 		float4x4 transform;
@@ -848,9 +859,9 @@ void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		//!!!DEBUGGING
-		//if (curFrame == 98 && i == 94)
-		//	printDebug = true;
-		//else printDebug = false;
+		if (curFrame == 125 && i == 104)
+			printDebug = true;
+		else printDebug = false;
 		//!!!DEBUGGING
 
 		float4x4 transform;

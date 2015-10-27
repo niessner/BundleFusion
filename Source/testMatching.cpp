@@ -161,8 +161,8 @@ void TestMatching::test()
 	//std::vector<vec2ui> matches = { vec2ui(94, 98) };
 	//printMatches("debug/", matches, true);
 	//saveMatchToPLY("debug/", vec2ui(118, 135), true);
-	//std::cout << "waiting..." << std::endl;
-	//getchar();
+	std::cout << "waiting..." << std::endl;
+	getchar();
 	//!!!DEBUGGING
 
 	// compare to reference
@@ -254,8 +254,8 @@ void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_siftManager->d_currMatchKeyPointIndices, getMatchKeyIndicesCUDA(cur, false), sizeof(uint2)*cur*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToDevice));
 
 		bool debugPrint = false;//(cur == 8);
-		//SIFTMatchFilter::filterKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
-		SIFTMatchFilter::ransacKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
+		SIFTMatchFilter::filterKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
+		//SIFTMatchFilter::ransacKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
 		if (debugPrint){
 			std::cout << "debug print waiting..." << std::endl;
 			getchar();

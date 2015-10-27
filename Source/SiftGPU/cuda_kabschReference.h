@@ -497,6 +497,15 @@ __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoi
 	} // while (!done)
 
 	if (curNumMatches > 0) {
+		if (printDebug) {
+			std::cout << "indices found:" << std::endl;
+			for (unsigned int i = 0; i < curNumMatches; i++)
+				std::cout << "\t" << curKeyIndices[i].x << " " << curKeyIndices[i].y << std::endl;
+			std::cout << "orig indices:" << std::endl;
+			for (unsigned int i = 0; i < numRawMatches; i++)
+				std::cout << "\t" << keyPointIndices[i].x << " " << keyPointIndices[i].y << std::endl;
+		}
+
 		// copy back
 		for (unsigned int i = 0; i < curNumMatches; i++) {
 			keyPointIndices[i] = curKeyIndices[i];
