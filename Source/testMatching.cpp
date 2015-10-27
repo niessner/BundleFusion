@@ -101,6 +101,7 @@ void TestMatching::load(const std::string& filename, const std::string siftFile)
 
 void TestMatching::save(const std::string& filename) const
 {
+	std::cout << "saving orig matches... ";
 	BinaryDataStreamFile s(filename, true);
 	unsigned int numImages = m_siftManager->getNumImages();
 	s << numImages;
@@ -138,6 +139,7 @@ void TestMatching::save(const std::string& filename) const
 		}
 	}
 	s.closeStream();
+	std::cout << "done!" << std::endl;
 }
 
 void TestMatching::test()
@@ -149,6 +151,8 @@ void TestMatching::test()
 	//!!!DEBUGGING
 	//std::vector<vec2ui> matches = { vec2ui(0, 2) };
 	//printMatches("debug/", matches, false);
+	//std::cout << "waiting..." << std::endl;
+	//getchar();
 	//!!!DEBUGGING
 
 	unsigned int numImages = m_siftManager->getNumImages();
@@ -158,8 +162,8 @@ void TestMatching::test()
 
 	//!!!DEBUGGING
 	//std::vector<vec2ui> matches = { vec2ui(94, 98), vec2ui(118, 119), vec2ui(118, 121), vec2ui(118, 133), vec2ui(118, 134), vec2ui(152, 155), vec2ui(156, 157), vec2ui(161, 163), vec2ui(165, 171), vec2ui(165, 174) };
-	//std::vector<vec2ui> matches = { vec2ui(94, 98) };
-	//printMatches("debug/", matches, true);
+	std::vector<vec2ui> matches = { vec2ui(104, 125) };
+	printMatches("debug/", matches, true);
 	//saveMatchToPLY("debug/", vec2ui(118, 135), true);
 	std::cout << "waiting..." << std::endl;
 	getchar();
@@ -231,6 +235,7 @@ void TestMatching::matchAll()
 	} // cur frames
 	t.stop();
 	std::cout << "done! (" << t.getElapsedTimeMS() << " ms)" << std::endl;
+	std::cout << "#orig matches = " << m_origMatches.size() << std::endl;
 
 	SAFE_DELETE(siftMatcher);
 }
@@ -240,12 +245,13 @@ void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 	const float maxResThresh2 = GlobalBundlingState::get().s_maxKabschResidual2;
 
 	imagePairMatchesFiltered.clear();
-	std::cout << "filtering... ";
+	std::cout << "filtering... " << std::endl;
 	Timer t;
 
 	unsigned int numImages = m_siftManager->getNumImages();
 	const std::vector<int>& valid = m_siftManager->getValidImages();
 	for (unsigned int cur = 1; cur < numImages; cur++) {
+		std::cout << cur << " ";
 		if (valid[cur] == 0) continue;
 
 		// copy respective matches
@@ -273,7 +279,7 @@ void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 	} // cur frames
 
 	t.stop();
-	std::cout << "done! (" << t.getElapsedTimeMS() << " ms)" << std::endl;
+	std::cout << std::endl << "done! (" << t.getElapsedTimeMS() << " ms)" << std::endl;
 }
 
 void TestMatching::loadIntrinsics(const std::string& filename)
@@ -335,6 +341,10 @@ void TestMatching::checkFiltered(const std::vector<vec2ui>& imagePairMatchesFilt
 		const vec2ui& imageIndices = m_origMatches[i];
 		MLIB_ASSERT(m_referenceTrajectory[imageIndices.x][0] != -std::numeric_limits<float>::infinity() &&
 			m_referenceTrajectory[imageIndices.y][0] != -std::numeric_limits<float>::infinity());
+		if (m_referenceTrajectory[imageIndices.x][0] == -std::numeric_limits<float>::infinity() ||
+			m_referenceTrajectory[imageIndices.y][0] == -std::numeric_limits<float>::infinity()) {
+			std::cout << "warning: no reference trajectory for " << imageIndices << std::endl;
+		}
 		const mat4f transform = m_referenceTrajectory[imageIndices.y].getInverse() * m_referenceTrajectory[imageIndices.x]; // src to tgt
 
 		unsigned int idx = (imageIndices.y - 1) * imageIndices.y / 2 + imageIndices.x;

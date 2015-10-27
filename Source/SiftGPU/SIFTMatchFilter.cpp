@@ -636,7 +636,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 	for (unsigned int c = 0; c < combinations.size(); c++) {
 		std::vector<unsigned int> indices = combinations[c];
 
-		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 2 && indices[2] == 4 && indices[3] == 5;
+		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 1 && indices[2] == 2 && indices[3] == 4;
 		if (_DEBUGCOMB) std::cout << "combination at " << c << std::endl;
 
 		// check if has combination
@@ -673,6 +673,22 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 			if (curNumMatches == MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) break;
 			if (marker[m]) continue;
 
+			// don't add if within +/- 5 pix
+			const float2& potential0 = keys[keyPointIndices[m].x].pos;
+			const float2& potential1 = keys[keyPointIndices[m].y].pos;
+			bool add = true;
+			for (unsigned int p = 0; p < curNumMatches; p++) {
+				if (length(potential0 - keys[keyPointIndices[indices[p]].x].pos) <= 5.0f ||
+					length(potential1 - keys[keyPointIndices[indices[p]].y].pos) <= 5.0f) {
+					add = false;
+					break;
+				}
+			}
+			if (!add) {
+				if (_DEBUGCOMB) printf("match %d too close to previous\n", m);
+				continue;
+			}
+
 			getKeySourceAndTargetPointsForIndex(keys.data(), keyPointIndices.data(), m, srcPts.data() + curNumMatches, tgtPts.data() + curNumMatches, siftIntrinsicsInv);
 #ifdef REFINE_RANSAC
 			// refine transform
@@ -694,6 +710,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 			//	std::cout << "m = " << m << ", cur # matches = " << curNumMatches << ", new res = " << std::sqrt(curRes2) << std::endl;
 			//}
 
+			//if (eigenvalues.x / eigenvalues.y <= KABSCH_CONDITION_THRESH && curRes2 <= maxResThresh2) { // inlier
 			if (curRes2 <= maxResThresh2) { // inlier
 				curNumMatches++;
 				indices.push_back(m);
@@ -705,20 +722,20 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 			}
 		}
 		if (_DEBUGCOMB) {
-			std::cout << "cur #matches = " << curNumMatches << " vs cur max inliers = " << maxNumInliers << std::endl;
-			std::cout << "cur max res = " << curMaxResidual << " vs cur best res = " << bestMaxResidual << std::endl;
-			std::cout << "cur indices:";
-			for (unsigned int i = 0; i < indices.size(); i++) std::cout << " " << indices[i];
-			std::cout << std::endl;
-			std::cout << "best indices:";
-			for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) std::cout << " " << bestCombinationIndices[i];
-			std::cout << std::endl;
-
+			printf("%d vs %d, %f vs %f\n", curNumMatches, maxNumInliers, curMaxResidual, bestMaxResidual);
 		}
 		if (curNumMatches > maxNumInliers || (curNumMatches == maxNumInliers && curMaxResidual < bestMaxResidual)) {
 			maxNumInliers = curNumMatches;
 			bestCombinationIndices = indices;
 			bestMaxResidual = curMaxResidual;
+
+			if (_DEBUGCOMB) std::cout << "POTENTIAL MATCH" << std::endl;
+			if (debugPrint) {
+				std::cout << "adding potential match (" << curNumMatches << ") res " << curMaxResidual << ", cond " << (eigenvalues.x / eigenvalues.y) << std::endl;
+				std::cout << "\t";
+				for (unsigned int i = 0; i < indices.size(); i++) std::cout << " " << indices[i];
+				std::cout << std::endl;
+			}
 		}
 	}
 
@@ -768,6 +785,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 				std::cout << "max index = " << maxBestComboIndex << std::endl;
 				std::cout << "\t#inliers = " << maxNumInliers << ", max res = " << bestMaxResidual << std::endl;
 				std::cout << "final indices: "; for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) std::cout << bestCombinationIndices[i] << " "; std::cout << std::endl;
+				getchar();
 			}
 
 			uint2 newKeyIndices[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];
@@ -859,8 +877,9 @@ void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		//!!!DEBUGGING
-		if (curFrame == 125 && i == 104)
+		if (curFrame == 125 && i == 104) {
 			printDebug = true;
+		}
 		else printDebug = false;
 		//!!!DEBUGGING
 

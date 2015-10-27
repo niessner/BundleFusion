@@ -26,26 +26,44 @@ public:
 	static void init() {
 		if (s_bInit) return;
 		generateKCombinations(20, 4, s_combinations);
+		//generateRandKCombinations(16, 4, 128, s_combinations);
+		//generateKCombinations(20, 4, s_combinations, 128);
 		s_bInit = true;
 	}
 private:
 	static bool s_bInit;
 	static std::vector<std::vector<unsigned int>> s_combinations;
 
-	static void generateKCombinations(unsigned int n, unsigned int k, std::vector<std::vector<unsigned int>>& combinations) {
+	static void generateRandKCombinations(unsigned int n, unsigned int k, unsigned int numGen, std::vector<std::vector<unsigned int>>& combinations) {
+		MLIB_ASSERT(k <= n);
+		combinations.clear();
+		std::vector<unsigned int> indices(n);
+		for (unsigned int i = 0; i < n; i++) indices[i] = i;
+
+		combinations.resize(numGen);
+		for (unsigned int i = 0; i < numGen; i++) {
+			std::random_shuffle(indices.begin(), indices.end());
+			combinations[i].resize(k);
+			for (unsigned int j = 0; j < k; j++) combinations[i][j] = indices[j];
+		}
+	}
+
+	static void generateKCombinations(unsigned int n, unsigned int k, std::vector<std::vector<unsigned int>>& combinations, unsigned int maxNumGen = (unsigned int)-1) {
 		MLIB_ASSERT(k <= n);
 		combinations.clear();
 		std::vector<unsigned int> current;
-		generateKCombinationsInternal(0, k, n, current, combinations);
+		generateKCombinationsInternal(0, k, n, current, combinations, maxNumGen);
 	}
-	static void generateKCombinationsInternal(unsigned int offset, unsigned int k, unsigned int n, std::vector<unsigned int>& current, std::vector<std::vector<unsigned int>>& combinations) {
+	static void generateKCombinationsInternal(unsigned int offset, unsigned int k, unsigned int n, std::vector<unsigned int>& current, std::vector<std::vector<unsigned int>>& combinations, unsigned int maxNumGen) {
 		if (k == 0) {
+			if (combinations.size() == maxNumGen) return;
 			combinations.push_back(current);
 			return;
 		}
 		for (unsigned int i = offset; i <= n - k; i++) {
+			if (combinations.size() == maxNumGen) return;
 			current.push_back(i);
-			generateKCombinationsInternal(i + 1, k - 1, n, current, combinations);
+			generateKCombinationsInternal(i + 1, k - 1, n, current, combinations, maxNumGen);
 			current.pop_back();
 		}
 	}

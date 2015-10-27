@@ -362,10 +362,11 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// fuse to global
 		Timer timer;
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
-		SIFTImageGPU& curGlobalImage = m_global->createSIFTImageGPU();
-		unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, getLocalTrajectoryGPU(lastLocalSolved),
-			siftIntrinsics, siftIntrinsicsInv);
-		m_global->finalizeSIFTImageGPU(numGlobalKeys);
+		//SIFTImageGPU& curGlobalImage = m_global->createSIFTImageGPU();
+		//unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, getLocalTrajectoryGPU(lastLocalSolved),
+		//	siftIntrinsics, siftIntrinsicsInv);
+		//m_global->finalizeSIFTImageGPU(numGlobalKeys);
+		local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = timer.getElapsedTimeMS(); }
 
 		const std::vector<int>& validImagesLocal = local->getValidImages();

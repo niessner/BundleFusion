@@ -207,7 +207,7 @@ public:
 
 
 	//!!!TODO where to put transforms
-	void fuseToGlobal(SIFTImageManager* global, const float4x4* transforms, unsigned int numTransforms) const;
+	void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms) const;
 
 	static void TestSVDDebugCU(const float3x3& m);
 

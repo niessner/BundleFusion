@@ -211,6 +211,7 @@ int main(int argc, char** argv)
 			//getchar();
 
 			test.loadImages("debug/images.bin");
+			//test.load("", "debug/global.sift"); test.loadIntrinsics("../data/debug45.sensor");
 			test.load("debug/matchAll.bin", "debug/global.sift");
 			test.test();
 			test.save("debug/filtered.bin");

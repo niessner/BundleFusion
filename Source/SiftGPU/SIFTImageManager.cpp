@@ -361,7 +361,7 @@ void SIFTImageManager::initializeMatching()
 	}
 }
 
-void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4* transforms, unsigned int numTransforms) const
+void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms) const
 {
 	//const unsigned int overlapImageIndex = getNumImages() - 1; // overlap frame
 
@@ -369,6 +369,8 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4* tr
 	cutilSafeCall(cudaMemcpy(correspondences.data(), d_globMatches, sizeof(EntryJ) * m_globNumResiduals, cudaMemcpyDeviceToHost));
 	std::vector<uint2> correspondenceKeyIndices(m_globNumResiduals);
 	cutilSafeCall(cudaMemcpy(correspondenceKeyIndices.data(), d_globMatchesKeyPointIndices, sizeof(uint2) * m_globNumResiduals, cudaMemcpyDeviceToHost));
+	std::vector<float4x4> transforms(getNumImages());
+	cutilSafeCall(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*transforms.size(), cudaMemcpyDeviceToHost));
 
 	std::vector<SIFTKeyPoint> allKeys;
 	getSIFTKeyPointsDEBUG(allKeys);
@@ -376,14 +378,11 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4* tr
 	getSIFTKeyPointDescsDEBUG(allDesc);
 	std::vector<bool> keyMarker(allKeys.size(), false);
 
-	//!!!TODO camera stuff
-	const float _colorIntrinsics[16] = {
-		1180.31299f, 0.0f, 649.0f, 0.0f,
-		0.0f, 1175.45569f, 483.5f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	};
-	const float4x4 colorIntrinsics(_colorIntrinsics);
+	const unsigned int widthSIFT = GlobalBundlingState::get().s_widthSIFT;
+	const unsigned int heightSIFT = GlobalBundlingState::get().s_heightSIFT;
+	const unsigned int padding = 3;
+	const unsigned int pixelDistThresh = 3;
+	std::vector<bool> imageMarker(padding * widthSIFT * padding * heightSIFT, false);
 
 	std::vector<SIFTKeyPoint> curKeys;
 	std::vector<SIFTKeyPointDesc> curDesc;
@@ -400,14 +399,22 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4* tr
 				// project to first frame
 				float3 pos = colorIntrinsics * (transforms[k0.x] * corr.pos_i);
 				float2 loc = make_float2(pos.x / pos.z, pos.y / pos.z);
-				SIFTKeyPoint key;
-				key.pos = loc;
-				key.scale = allKeys[k0.y].scale;
-				key.depth = pos.z;
-				curKeys.push_back(key);
-				// desc
-				curDesc.push_back(allDesc[k0.y]);
-				keyMarker[k0.y] = true;
+
+				int2 pixLocDiscretized = make_int2((int)round((loc.x + widthSIFT) / (float)pixelDistThresh), (int)round((loc.y + heightSIFT) / (float)pixelDistThresh));
+				int linIdx = pixLocDiscretized.y * (widthSIFT * padding) + pixLocDiscretized.x;
+				if (linIdx >= 0 && linIdx < imageMarker.size() && !imageMarker[linIdx]) {
+
+					SIFTKeyPoint key;
+					key.pos = loc;
+					key.scale = allKeys[k0.y].scale;
+					key.depth = pos.z;
+					curKeys.push_back(key);
+					// desc
+					curDesc.push_back(allDesc[k0.y]);
+					keyMarker[k0.y] = true;
+
+					imageMarker[linIdx] = true;
+				}
 			} // not already found
 		}// valid corr
 	} // correspondences/residual
