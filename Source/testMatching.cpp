@@ -4,9 +4,14 @@
 #include "SiftGPU/SiftMatch.h"
 #include "SiftGPU/SiftMatchFilter.h"
 #include "SiftGPU/MatrixConversion.h"
+#include "SiftVisualization.h"
 #include "ImageHelper.h"
+#include "GlobalAppState.h"
+#include "SiftGPU/SiftCameraParams.h"
 
 #include "testMatching.h"
+
+extern "C" void updateConstantSiftCameraParams(const SiftCameraParams& params);
 
 TestMatching::TestMatching()
 {
@@ -47,6 +52,159 @@ TestMatching::~TestMatching()
 	MLIB_CUDA_SAFE_FREE(d_filtNumMatchesPerImagePair);
 	MLIB_CUDA_SAFE_FREE(d_filtMatchDistancesPerImagePair);
 	MLIB_CUDA_SAFE_FREE(d_filtMatchKeyIndicesPerImagePair);
+}
+
+void TestMatching::match(const std::string& outDir, const std::string& sensorFile, unsigned int numFrames /*= (unsigned int)-1*/) const
+{
+	std::vector<ColorImageR8G8B8A8> colorImages;
+	std::vector<DepthImage32> depthImages;
+	CalibrationData depthCalibration, colorCalibration;
+
+	{
+		CalibratedSensorData cs;
+		BinaryDataStreamFile s(sensorFile, false);
+		s >> cs;
+		s.closeStream();
+		if (numFrames == (unsigned int)-1) numFrames = cs.m_ColorNumFrames;
+		colorImages.resize(numFrames);
+		depthImages.resize(numFrames);
+		for (unsigned int i = 0; i < numFrames; i++) {
+			colorImages[i] = ColorImageR8G8B8A8(cs.m_ColorImageWidth, cs.m_ColorImageHeight, cs.m_ColorImages[i]);
+			depthImages[i] = DepthImage32(cs.m_DepthImageWidth, cs.m_DepthImageHeight, cs.m_DepthImages[i]);
+		}
+		depthCalibration = cs.m_CalibrationDepth;
+		colorCalibration = cs.m_CalibrationColor;
+		
+		//debug save
+		if (true && numFrames != cs.m_ColorNumFrames) {
+			std::cout << "saving debug " << numFrames << " sensor file... ";
+			cs.m_ColorImages.erase(cs.m_ColorImages.begin() + numFrames, cs.m_ColorImages.end());
+			cs.m_DepthImages.erase(cs.m_DepthImages.begin() + numFrames, cs.m_DepthImages.end());
+			if (!cs.m_trajectory.empty()) cs.m_trajectory.erase(cs.m_trajectory.begin() + numFrames, cs.m_trajectory.end());
+			cs.m_ColorNumFrames = numFrames;
+			cs.m_DepthNumFrames = numFrames;
+			BinaryDataStreamFile ofs("debug/debug" + std::to_string(numFrames) + ".sensor", true);
+			ofs << cs;
+			std::cout << "done!" << std::endl;
+		}
+	}
+	unsigned int widthSift = colorImages.front().getWidth(); unsigned int heightSift = colorImages.front().getHeight();
+	unsigned int widthDepth = depthImages.front().getWidth(); unsigned int heightDepth = depthImages.front().getHeight();
+
+	bool printColorImages = true;
+	if (printColorImages) {
+		const std::string colorDir = "debug/color/"; if (!util::directoryExists(colorDir)) util::makeDirectory(colorDir);
+		for (unsigned int i = 0; i < numFrames; i++)
+			FreeImageWrapper::saveImage(colorDir + std::to_string(i) + ".png", colorImages[i]);
+	}
+
+	SIFTImageManager siftManager(GlobalBundlingState::get().s_submapSize, numFrames, GlobalBundlingState::get().s_maxNumKeysPerImage);
+
+	// init sift camera constant params
+	SiftCameraParams siftCameraParams;
+	siftCameraParams.m_depthWidth = widthDepth;
+	siftCameraParams.m_depthHeight = heightDepth;
+	siftCameraParams.m_intensityWidth = widthSift;
+	siftCameraParams.m_intensityHeight = heightSift;
+	siftCameraParams.m_siftIntrinsics = MatrixConversion::toCUDA(colorCalibration.m_Intrinsic);
+	siftCameraParams.m_siftIntrinsicsInv = MatrixConversion::toCUDA(colorCalibration.m_IntrinsicInverse);
+	siftCameraParams.m_minKeyScale = GlobalBundlingState::get().s_minKeyScale;
+	updateConstantSiftCameraParams(siftCameraParams);
+
+	// detect keypoints
+	{
+		std::cout << "detecting keypoints... ";
+		SiftGPU* sift = new SiftGPU;
+		sift->SetParams(widthSift, heightSift, false, 150, GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
+		sift->InitSiftGPU();
+
+		float *d_intensity = NULL, *d_depth = NULL;
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensity, sizeof(float)*widthSift*heightSift));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depth, sizeof(float)*widthDepth*heightDepth));
+		for (unsigned int f = 0; f < numFrames; f++) {
+			ColorImageR32 intensity = colorImages[f].convertToGrayscale();
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_intensity, intensity.getPointer(), sizeof(float)*widthSift*heightSift, cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, depthImages[f].getPointer(), sizeof(float)*widthDepth*heightDepth, cudaMemcpyHostToDevice));
+			// run sift
+			SIFTImageGPU& cur = siftManager.createSIFTImageGPU();
+			int success = sift->RunSIFT(d_intensity, d_depth);
+			if (!success) throw MLIB_EXCEPTION("Error running SIFT detection");
+			unsigned int numKeypoints = sift->GetKeyPointsAndDescriptorsCUDA(cur, d_depth);
+			siftManager.finalizeSIFTImageGPU(numKeypoints);
+			std::cout << "\t" << f << ": " << numKeypoints << " keys" << std::endl;
+		}
+
+		MLIB_CUDA_SAFE_FREE(d_intensity);
+		MLIB_CUDA_SAFE_FREE(d_depth);
+		SAFE_DELETE(sift);
+		std::cout << "done!" << std::endl;
+	}
+
+	bool printKeys = true;
+	if (printKeys) {
+		const std::string keysDir = "debug/keys/"; if (!util::directoryExists(keysDir)) util::makeDirectory(keysDir);
+		for (unsigned int i = 0; i < numFrames; i++)
+			SiftVisualization::printKey(keysDir + std::to_string(i) + ".png", colorImages[i], &siftManager, i);
+	}
+
+	// match
+	{
+		std::cout << "matching... ";
+		SiftMatchGPU* siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
+		siftMatcher->InitSiftMatch();
+		const float ratioMax = GlobalBundlingState::get().s_siftMatchRatioMaxGlobal;
+		const float matchThresh = GlobalBundlingState::get().s_siftMatchThresh;
+		unsigned int numImages = siftManager.getNumImages();
+		const bool filtered = false;
+		const unsigned int minNumMatches = GlobalBundlingState::get().s_minNumMatchesGlobal;
+
+		for (unsigned int cur = 1; cur < numImages; cur++) {
+
+			SIFTImageGPU& curImage = siftManager.getImageGPU(cur);
+			int num2 = (int)siftManager.getNumKeyPointsPerImage(cur);
+			if (num2 == 0) {
+				MLIB_CUDA_SAFE_CALL(cudaMemset(siftManager.d_currNumMatchesPerImagePair, 0, sizeof(int) * cur));
+				continue;
+			}
+
+			// match to all previous
+			for (unsigned int prev = 0; prev < cur; prev++) {
+				SIFTImageGPU& prevImage = siftManager.getImageGPU(prev);
+				int num1 = (int)siftManager.getNumKeyPointsPerImage(prev);
+				if (num1 == 0) {
+					unsigned int num = 0;
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(siftManager.d_currNumMatchesPerImagePair + prev, &num, sizeof(int), cudaMemcpyHostToDevice));
+					continue;
+				}
+
+				uint2 keyPointOffset = make_uint2(0, 0);
+				ImagePairMatch& imagePairMatch = siftManager.getImagePairMatchDEBUG(prev, cur, keyPointOffset);
+
+				siftMatcher->SetDescriptors(0, num1, (unsigned char*)prevImage.d_keyPointDescs);
+				siftMatcher->SetDescriptors(1, num2, (unsigned char*)curImage.d_keyPointDescs);
+				siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset, matchThresh, ratioMax);
+
+				//!!!DEBUGGING
+				unsigned int numMatches;
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(&numMatches, imagePairMatch.d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+				int a = 5;
+				//!!!DEBUGGING
+			}  // prev frames
+
+			// print matches
+			SiftVisualization::printMatches(outDir, &siftManager, colorImages, cur, false);
+
+			// filter matches
+			SIFTMatchFilter::ransacKeyPointMatchesDEBUG(cur, &siftManager, siftCameraParams.m_siftIntrinsicsInv, 
+				minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
+			//siftManager.FilterMatchesBySurfaceAreaCU(cur, siftCameraParams.m_siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
+			//siftManager.FilterMatchesByDenseVerifyCU(cur)
+
+		} // cur frames
+		std::cout << "done!" << std::endl;
+
+		SAFE_DELETE(siftMatcher);
+	}
 }
 
 void TestMatching::load(const std::string& filename, const std::string siftFile)
@@ -242,6 +400,7 @@ void TestMatching::matchAll()
 
 void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 {
+	unsigned int minNumMatches = GlobalBundlingState::get().s_minNumMatchesGlobal;
 	const float maxResThresh2 = GlobalBundlingState::get().s_maxKabschResidual2;
 
 	imagePairMatchesFiltered.clear();
@@ -260,8 +419,8 @@ void TestMatching::filter(std::vector<vec2ui>& imagePairMatchesFiltered)
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_siftManager->d_currMatchKeyPointIndices, getMatchKeyIndicesCUDA(cur, false), sizeof(uint2)*cur*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToDevice));
 
 		bool debugPrint = false;//(cur == 8);
-		SIFTMatchFilter::filterKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
-		//SIFTMatchFilter::ransacKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), maxResThresh2, debugPrint);
+		SIFTMatchFilter::filterKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), minNumMatches, maxResThresh2, debugPrint);
+		//SIFTMatchFilter::ransacKeyPointMatchesDEBUG(cur, m_siftManager, MatrixConversion::toCUDA(m_siftIntrinsicsInv), minNumMatches, maxResThresh2, debugPrint);
 		if (debugPrint){
 			std::cout << "debug print waiting..." << std::endl;
 			getchar();

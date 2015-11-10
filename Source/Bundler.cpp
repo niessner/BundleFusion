@@ -223,30 +223,6 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 
 }
 
-void Bundler::printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame) const
-{
-	//TODO get color cpu for these functions
-	CUDAImageManager::ManagedRGBDInputFrame& integrateFrame = m_CudaImageManager->getIntegrateFrame(allFrame);
-
-	ColorImageR8G8B8A8 im(m_CudaImageManager->getIntegrationWidth(), m_CudaImageManager->getIntegrationHeight());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(im.getPointer(), integrateFrame.getColorFrameGPU(), sizeof(uchar4) * m_CudaImageManager->getIntegrationWidth() * m_CudaImageManager->getIntegrationHeight(), cudaMemcpyDeviceToHost));
-	im.reSample(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
-
-	std::vector<SIFTKeyPoint> keys(siftManager->getNumKeyPointsPerImage(frame));
-	const SIFTImageGPU& cur = siftManager->getImageGPU(frame);
-	cutilSafeCall(cudaMemcpy(keys.data(), cur.d_keyPoints, sizeof(SIFTKeyPoint) * keys.size(), cudaMemcpyDeviceToHost));
-
-	for (unsigned int i = 0; i < keys.size(); i++) {
-		const SIFTKeyPoint& key = keys[i];
-		RGBColor c = RGBColor::randomColor();
-		vec4uc color(c.r, c.g, c.b, c.a);
-		vec2i p0 = math::round(vec2f(key.pos.x, key.pos.y));
-		ImageHelper::drawCircle(im, p0, math::round(key.scale), color);
-	}
-	FreeImageWrapper::saveImage(filename, im);
-}
-
-
 void Bundler::saveCompleteTrajectory(const std::string& filename) const
 {
 	m_SubmapManager.saveCompleteTrajectory(filename, m_currentState.m_numCompleteTransforms);

@@ -23,6 +23,9 @@ public:
 	TestMatching();
 	~TestMatching();
 
+	// match within first numFrames of sensorFile
+	void match(const std::string& outDir, const std::string& sensorFile, unsigned int numFrames = (unsigned int)-1) const;
+
 	//! debug hack
 	void loadIntrinsics(const std::string& filename);
 	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip);

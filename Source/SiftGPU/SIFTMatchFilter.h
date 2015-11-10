@@ -11,15 +11,17 @@ public:
 	SIFTMatchFilter() {}
 	~SIFTMatchFilter() {}
 
-	static void filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool printDebug);
-	static void ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool debugPrint);
+	static void filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2, bool printDebug);
+	static void ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2, bool debugPrint);
 
-	static void ransacKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool debugPrint);
-	static void filterKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv);
+	static void ransacKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2, bool debugPrint);
+	static void filterKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches);
 
-	static void filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& siftIntrinsicsInv);
+	static void filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches);
 
-	static void filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames);
+	static void filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, float depthMin, float depthMax);
+
+	static void visualizeProjError(SIFTImageManager* siftManager, const vec2ui& imageIndices, const std::vector<CUDACachedFrame>& cachedFrames, float depthMin, float depthMax);
 
 	static void filterFrames(SIFTImageManager* siftManager);
 
@@ -68,21 +70,21 @@ private:
 		}
 	}
 
-	static unsigned int filterImagePairKeyPointMatchesRANSAC(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2,
+	static unsigned int filterImagePairKeyPointMatchesRANSAC(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2,
 		unsigned int k, const std::vector<std::vector<unsigned int>>& combinations, bool debugPrint);
 
-	static unsigned int filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool printDebug);
-	static bool filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices, const float4x4& siftIntrinsicsInv);
+	static unsigned int filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2, bool printDebug);
+	static bool filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches);
 	// depth0 -> src, depth1 -> tgt
 	static bool filterImagePairByDenseVerify(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,
 		const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const uchar4* modelColor, const float4x4& transform,
-		unsigned int width, unsigned int height);
+		unsigned int width, unsigned int height, float depthMin, float depthMax);
 
 	static float2 computeSurfaceArea(const SIFTKeyPoint* keys, const uint2* keyPointIndices, float* depth0, float* depth1, unsigned int numMatches, const float4x4& siftIntrinsicsInv);
 
 	static float2 computeProjectiveError(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,
 		const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const uchar4* modelColor,
-		const float4x4& transform, unsigned int width, unsigned int height);
+		const float4x4& transform, unsigned int width, unsigned int height, float depthMin, float depthMax);
 
 	// subsamples (change in size)
 	static void computeCameraSpacePositions(const float* depth, unsigned int width, unsigned int height, float4* out);
@@ -99,9 +101,8 @@ private:
 	//!!!TODO CAMERA INFO
 	static float2 cameraToDepth(const float4& pos);
 	static float cameraToDepthZ(const float4& pos);
-	static inline float cameraToKinectProjZ(float z) {
-		//!!!TODO PARAMS depthmin depthmax
-		return (z - 0.1f) / (5.0f - 0.1f);
+	static inline float cameraToKinectProjZ(float z, float depthMin, float depthMax) {
+		return (z - depthMin) / (depthMax - depthMin);
 	}
 
 
@@ -118,7 +119,76 @@ private:
 		const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
 		const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor,
 		const float4x4& transform, float distThres, float normalThres, float colorThresh, unsigned int level,
+		float depthMin, float depthMax,
 		float& sumResidual, float& sumWeight, unsigned int& numCorr);
+
+	static void computeCorrespondencesDEBUG(unsigned int width, unsigned int height,
+		const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
+		const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor,
+		const float4x4& transform, float distThres, float normalThres, float colorThresh, unsigned int level,
+		float depthMin, float depthMax, float& sumResidual, float& sumWeight, unsigned int& numCorr)
+	{
+		s_debugCorr.allocate(width, height);
+		s_debugCorr.setPixels(-std::numeric_limits<float>::infinity());
+
+		const float INVALID = -std::numeric_limits<float>::infinity();
+		sumResidual = 0.0f;
+		sumWeight = 0.0f;
+		numCorr = 0;
+
+		float levelFactor = (float)(1 << level);
+		//mean = vec3f(0.0f, 0.0f, 0.0f);
+		//meanStDev = 1.0f;
+		for (unsigned int y = 0; y < height; y++) {
+			for (unsigned int x = 0; x < width; x++) {
+
+				const unsigned int idx = y * width + x;
+
+				float4 pInput = input[idx]; // point
+				float4 nInput = inputNormals[idx]; nInput.w = 0.0f; // vector
+				uchar4 cInput = inputColor[idx];
+
+				if (pInput.x != INVALID && nInput.x != INVALID) {
+					const float4 pTransInput = transform * pInput;
+					const float4 nTransInput = transform * nInput;
+
+					float2 screenPosf = cameraToDepth(pTransInput);
+					//int2 screenPos = make_int2((int)(round(screenPosf.x) / levelFactor), (int)(round(screenPosf.y) / levelFactor)); // subsampled space
+					int2 screenPos = make_int2((int)round(screenPosf.x / levelFactor), (int)round(screenPosf.y / levelFactor)); // subsampled space
+
+					if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)width && screenPos.y < (int)height) {
+						float4 pTarget; float4 nTarget; uchar4 cTarget;
+						getBestCorrespondence1x1(screenPos, pTarget, nTarget, cTarget, model, modelNormals, modelColor, width);
+
+						if (pTarget.x != INVALID && nTarget.x != INVALID) {
+							float d = length(pTransInput - pTarget);
+							float dNormal = dot(make_float3(nTransInput.x, nTransInput.y, nTransInput.z), make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
+							//float c = length(make_float3((cInput.x - cTarget.x) / 255.0f, (cInput.y - cTarget.y) / 255.0f, (cInput.z - cTarget.z) / 255.0f));
+
+							float projInputDepth = pTransInput.z;//cameraToDepthZ(pTransInput);
+							float tgtDepth = modelDepth[screenPos.y * width + screenPos.x];
+
+							bool b = ((tgtDepth != INVALID && projInputDepth < tgtDepth) && d > distThres); // bad matches that are known
+							if ((dNormal >= normalThres && d <= distThres /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
+								const float weight = std::max(0.0f, 0.5f*((1.0f - d / distThres) + (1.0f - cameraToKinectProjZ(pTransInput.z, depthMin, depthMax)))); // for weighted ICP;
+
+								sumResidual += length(pTransInput - pTarget);	//residual
+								sumWeight += weight;			//corr weight
+								numCorr++;					//corr number
+
+								s_debugCorr(x, y) = length(pTransInput - pTarget);
+							}
+						} // projected to valid depth
+					} // inside image
+				}
+			} // x
+		} // y
+
+	}
+
+private:
+	//! debug
+	static DepthImage32 s_debugCorr;
 };
 
 template<typename T>

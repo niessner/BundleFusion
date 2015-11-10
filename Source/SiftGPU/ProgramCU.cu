@@ -642,13 +642,13 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 	{
 		d_key[index] = make_float4(result, dx, dy, ds);
 		// check if has valid depth
-		float dx = (keyLocScale * (float)col + keyLocOffset) * (float)depthWidth / (float)c_siftCameraParams.m_intensityWidth;
-		float dy = (keyLocScale * (float)row + keyLocOffset) * (float)depthHeight / (float)c_siftCameraParams.m_intensityHeight;
-		if (dx < 0 || dx >= depthWidth || dy < 0 || dy >= depthHeight) return;
+		float depthx = (keyLocScale * (float)col + keyLocOffset) * (float)depthWidth / (float)c_siftCameraParams.m_intensityWidth;
+		float depthy = (keyLocScale * (float)row + keyLocOffset) * (float)depthHeight / (float)c_siftCameraParams.m_intensityHeight;
+		if (depthx < 0 || depthx >= depthWidth || depthy < 0 || depthy >= depthHeight) return;
 		//float depth = bilinearInterpolationFloat(dx, dy, d_depthData, 640, 480);
-		int dxi = round(dx);
-		int dyi = round(dy);
-		float depth = d_depthData[dyi * depthWidth + dxi];
+		int depthxi = round(depthx);
+		int depthyi = round(depthy);
+		float depth = d_depthData[depthyi * depthWidth + depthxi];
 
 		if (depth == MINF || depth < siftDepthMin || depth > siftDepthMax) return;
 

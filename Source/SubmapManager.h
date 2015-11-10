@@ -184,10 +184,6 @@ private:
 	//! assumes nextlocal locked
 	void saveOptToPointCloud(const std::string& filename, const CUDACache* cudaCache, const std::vector<int>& valid, const float4x4* d_transforms, unsigned int numFrames);
 
-	void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache, bool filtered, int maxNumMatches = -1) const;
-	void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
-		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered, int maxNumMatches) const;
-
 	//*********** SIFT *******************
 	SiftGPU*				m_sift;
 	SiftMatchGPU*			m_siftMatcher;

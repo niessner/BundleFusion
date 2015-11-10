@@ -418,9 +418,10 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 
 	float4 pInput = d_inputCamPos[idx]; // point
 	float4 nInput = d_inputNormal[idx]; nInput.w = 0.0f; // vector
+	float dInput = d_inputDepth[idx];
 	//uchar4 cInput = d_inputColor[idx];
 
-	if (pInput.x != MINF && nInput.x != MINF) {
+	if (pInput.x != MINF && nInput.x != MINF && dInput >= sensorDepthMin && dInput <= sensorDepthMax) {
 		const float4 pTransInput = transform * pInput;
 		const float4 nTransInput = transform * nInput;
 
@@ -439,19 +440,22 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 				float dNormal = dot(make_float3(nTransInput.x, nTransInput.y, nTransInput.z), make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
 				//float c = length(make_float3((cInput.x - cTarget.x) / 255.0f, (cInput.y - cTarget.y) / 255.0f, (cInput.z - cTarget.z) / 255.0f));
 
-				float projInputDepth = (intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z)).z;
+				//float projInputDepth = (intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z)).z;
+				float projInputDepth = pTransInput.z;
 				float tgtDepth = d_modelDepth[screenPos.y * imageWidth + screenPos.x];
 
-				bool b = ((tgtDepth != MINF && projInputDepth < tgtDepth) && d > distThresh); // bad matches that are known
-				if ((dNormal >= normalThresh && d <= distThresh /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
+				if (tgtDepth >= sensorDepthMin && tgtDepth <= sensorDepthMax) {
+					bool b = ((tgtDepth != MINF && projInputDepth < tgtDepth) && d > distThresh); // bad matches that are known
+					if ((dNormal >= normalThresh && d <= distThresh /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
 
-					const float cameraToKinectProjZ = (pTransInput.z - 0.1f) / (3.0f - 0.1f); //TODO PARAMS HERE
-					const float weight = max(0.0f, 0.5f*((1.0f - d / distThresh) + (1.0f - cameraToKinectProjZ))); // for weighted ICP;
+						const float cameraToKinectProjZ = (pTransInput.z - sensorDepthMin) / (sensorDepthMax - sensorDepthMin);
+						const float weight = max(0.0f, 0.5f*((1.0f - d / distThresh) + (1.0f - cameraToKinectProjZ))); // for weighted ICP;
 
-					out.x = length(pTransInput - pTarget);	//residual
-					out.y = weight;							//corr weight
-					out.z = 1.0f;
-				}
+						out.x = length(pTransInput - pTarget);	//residual
+						out.y = weight;							//corr weight
+						out.z = 1.0f;
+					}
+				} // target depth within sensor min/max
 			} // projected to valid depth
 		} // inside image
 	}
@@ -1111,7 +1115,7 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, int* d_validIm
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
 
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
-			//printf("VERIFY LOCAL SUBMAP[%d-%d]: %f %f\n", img0, img1, err, corr);
+			printf("VERIFY LOCAL SUBMAP[%d-%d]: %f %f\n", img0, img1, err, corr);
 			d_validOpt[0] = 0;
 		}
 	}
@@ -1148,3 +1152,5 @@ int SIFTImageManager::VerifyTrajectoryCU(unsigned int numImages, float4x4* d_tra
 
 	return valid;
 }
+
+

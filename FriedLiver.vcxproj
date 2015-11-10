@@ -208,6 +208,7 @@
     <ClInclude Include="Source\SiftGPU\SiftMatch.h" />
     <ClInclude Include="Source\SiftGPU\SIFTMatchFilter.h" />
     <ClInclude Include="Source\SiftGPU\SiftPyramid.h" />
+    <ClInclude Include="Source\SiftVisualization.h" />
     <ClInclude Include="Source\Solver\CUDASolverBundling.h" />
     <ClInclude Include="Source\Solver\ICPUtil.h" />
     <ClInclude Include="Source\Solver\SolverBundlingEquations.h" />
@@ -299,6 +300,7 @@
     <ClCompile Include="Source\SiftGPU\SiftMatch.cpp" />
     <ClCompile Include="Source\SiftGPU\SIFTMatchFilter.cpp" />
     <ClCompile Include="Source\SiftGPU\SiftPyramid.cpp" />
+    <ClCompile Include="Source\SiftVisualization.cpp" />
     <ClCompile Include="Source\Solver\CUDASolverBundling.cpp" />
     <ClCompile Include="Source\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

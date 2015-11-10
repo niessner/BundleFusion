@@ -8,6 +8,9 @@
 std::vector<std::vector<unsigned int>> SIFTMatchFilter::s_combinations;
 bool SIFTMatchFilter::s_bInit;
 
+// debug variables
+DepthImage32 SIFTMatchFilter::s_debugCorr;
+
 void SIFTMatchFilter::filterFrames(SIFTImageManager* siftManager)
 {
 	const unsigned int numImages = siftManager->getNumImages();
@@ -34,7 +37,7 @@ void SIFTMatchFilter::filterFrames(SIFTImageManager* siftManager)
 	cutilSafeCall(cudaMemcpy(siftManager->d_validImages + curFrame, &connected, sizeof(int), cudaMemcpyHostToDevice));
 }
 
-void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv)
+void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -54,7 +57,8 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const
 
 		float4x4 transform;
 		unsigned int newNumMatches =
-			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, GlobalBundlingState::get().s_maxKabschResidual2, false);
+			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv,
+			minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
 		//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
 
 		if (newNumMatches > 0) {
@@ -77,16 +81,19 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const
 	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
 }
 
-unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool printDebug)
+unsigned int SIFTMatchFilter::filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform,
+	const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2, bool printDebug)
 {
 	unsigned int numRawMatches = (unsigned int)keyPointIndices.size();
-	if (numRawMatches < MIN_NUM_MATCHES_FILTERED) return 0;
+	if (numRawMatches < minNumMatches) return 0;
 
-	unsigned int numRef = filterKeyPointMatchesReference(keys.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform, siftIntrinsicsInv, maxResThresh2, printDebug);
+	unsigned int numRef = filterKeyPointMatchesReference(keys.data(), keyPointIndices.data(), matchDistances.data(), numRawMatches, transform,
+		siftIntrinsicsInv, minNumMatches, maxResThresh2, printDebug);
 	return numRef;
 }
 
-void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& siftIntrinsicsInv)
+void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames,
+	const float4x4& siftIntrinsicsInv, unsigned int minNumMatches)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -111,7 +118,7 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 
 		//std::cout << "(" << i << ", " << curFrame << "): ";
 		bool valid =
-			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices, siftIntrinsicsInv);
+			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices, siftIntrinsicsInv, minNumMatches);
 
 		if (!valid) {
 			// invalidate
@@ -121,9 +128,10 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 	}
 }
 
-bool SIFTMatchFilter::filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices, const float4x4& siftIntrinsicsInv)
+bool SIFTMatchFilter::filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices,
+	const float4x4& siftIntrinsicsInv, unsigned int minNumMatches)
 {
-	if (keyPointIndices.size() < MIN_NUM_MATCHES_FILTERED) return false;
+	if (keyPointIndices.size() < minNumMatches) return false;
 
 	const float minSurfaceAreaPca = 0.032f;
 	float2 areas = computeSurfaceArea(keys.data(), keyPointIndices.data(), depth0, depth1, (unsigned int)keyPointIndices.size(), siftIntrinsicsInv);
@@ -167,82 +175,14 @@ float2 SIFTMatchFilter::computeSurfaceArea(const SIFTKeyPoint* keys, const uint2
 		tgtPtsProj[i] = ml::vec2f(t | tgtAxes[0].first, t | tgtAxes[1].first); // projected point (2d plane basis)
 	}
 
-	////!!!TODO PARAMS
-	//const ml::mat4f depthIntrinsicsInverse(
-	//	0.0017152658f, 0.0f, -0.548885047f, 0.0f,
-	//	0.0f, 0.0017152658f, -0.4116638f, 0.0f,
-	//	0.0f, 0.0f, 1.0f, 0.0f,
-	//	0.0f, 0.0f, 0.0f, 1.0f);
-	//const unsigned int depthWidth = 640;
-	//const unsigned int depthHeight = 480;
-	//const unsigned int subDepthWidth = GlobalBundlingState::get().s_downsampledWidth;
-	//const unsigned int subDepthHeight = GlobalBundlingState::get().s_downsampledHeight;
-	//const float depthMin = 0.1f;
-	//const float depthMax = 3.0f;
-	//const unsigned int subSampleFactor = 2; 
-
-	//const unsigned int newWidth = subDepthWidth / subSampleFactor;
-	//const unsigned int newHeight = subDepthHeight / subSampleFactor;
-	//const unsigned int numSampledPoints = newWidth * newHeight;
-	//const float widthFactor = (float)depthWidth / (float)subDepthWidth;
-	//const float heightFactor = (float)depthHeight / (float)subDepthHeight;
-	////const ml::vec2f defaultSrcPt = srcPtsProj[0];// if invalid fill with this for pca... //!!!TODO check
-	////const ml::vec2f defaultTgtPt = tgtPtsProj[0];// if invalid fill with this for pca... //!!!TODO check
-
-	//const float maxDepth = 1.0f;
-
-	//// all points projected (subsampled)
-	//std::vector<ml::vec2f> allPointsSrc;//(numSampledPoints);
-	//std::vector<ml::vec2f> allPointsTgt;//(numSampledPoints);
-	//for (unsigned int y = 0; y < subDepthHeight; y += subSampleFactor) {
-	//	for (unsigned int x = 0; x < subDepthWidth; x += subSampleFactor) {
-	//		//const unsigned int idx = (y / subSampleFactor) * newWidth + (x / subSampleFactor);
-	//		unsigned int yi = math::round(y * heightFactor);
-	//		unsigned int xi = math::round(x * widthFactor);
-
-	//		float sdepth = depth0[y * subDepthWidth + x];
-	//		if (sdepth != -std::numeric_limits<float>::infinity() && sdepth >= depthMin && sdepth <= depthMax) {
-	//			if (sdepth > maxDepth) sdepth = maxDepth;
-	//			// depth to camera
-	//			ml::vec3f cSrc = depthIntrinsicsInverse * (sdepth * ml::vec3f((float)xi, (float)yi, 1.0f));
-	//			ml::vec3f cProj3dSrc = cSrc - (srcNormal | (cSrc - srcMean)) * srcNormal;
-	//			ml::vec3f s = cProj3dSrc - srcMean;
-	//			//allPointsSrc[idx] = ml::vec2f(s | srcAxes[0].first, s | srcAxes[1].first);
-	//			allPointsSrc.push_back(ml::vec2f(s | srcAxes[0].first, s | srcAxes[1].first));
-	//		}
-	//		//else 
-	//		//	allPointsSrc[idx] = defaultSrcPt;
-	//		float tdepth = depth1[y * subDepthWidth + x];
-	//		if (tdepth != -std::numeric_limits<float>::infinity() && tdepth >= depthMin && tdepth <= depthMax) {
-	//			if (tdepth > maxDepth) tdepth = maxDepth;
-	//			ml::vec3f cTgt = depthIntrinsicsInverse * (tdepth * ml::vec3f((float)xi, (float)yi, 1.0f));
-	//			ml::vec3f cProj3dTgt = cTgt - (tgtNormal | (cTgt - tgtMean)) * tgtNormal;
-	//			ml::vec3f s = cProj3dTgt - tgtMean;
-	//			//allPointsTgt[idx] = ml::vec2f(s | tgtAxes[0].first, s | tgtAxes[1].first);
-	//			allPointsTgt.push_back(ml::vec2f(s | tgtAxes[0].first, s | tgtAxes[1].first));
-	//		}
-	//		//else
-	//		//	allPointsTgt[idx] = defaultTgtPt;
-	//	}
-	//}
-
 	// compute areas
 	ml::OBB2f srcOBB(srcPtsProj);
 	ml::OBB2f tgtOBB(tgtPtsProj);
 	area = ml::vec2f((float)srcOBB.getArea(), (float)tgtOBB.getArea());
-
-	//ml::OBB2f srcAllOBB(allPointsSrc);
-	//ml::OBB2f tgtAllOBB(allPointsTgt);
-	//totalAreas = ml::vec2f((float)srcAllOBB.getArea(), (float)tgtAllOBB.getArea());
-
-	//totalAreas = ml::math::max(totalAreas, 0.001f);
-	////std::cout << "total areas = " << totalAreas.x << " " << totalAreas.y << std::endl;
-
-	//return make_float2(area.x / totalAreas.x, area.y / totalAreas.y);
 	return make_float2(area.x, area.y);
 }
 
-void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames)
+void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, float depthMin, float depthMax)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -283,7 +223,7 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 		bool valid =
 			filterImagePairByDenseVerify(prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(),
 			curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(),
-			transforms[i], downSampWidth, downSampHeight);
+			transforms[i], downSampWidth, downSampHeight, depthMin, depthMax);
 		//if (valid) std::cout << "VALID" << std::endl;
 		//else std::cout << "INVALID" << std::endl;
 
@@ -297,13 +237,13 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 
 bool SIFTMatchFilter::filterImagePairByDenseVerify(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,
 	const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const uchar4* modelColor,
-	const float4x4& transform, unsigned int width, unsigned int height)
+	const float4x4& transform, unsigned int width, unsigned int height, float depthMin, float depthMax)
 {
 
-	//!!!TODO PARAMS
-	const float verifySiftErrThresh = 0.075f;
-	const float verifySiftCorrThresh = 0.02f;
-	float2 projErrors = computeProjectiveError(inputDepth, inputCamPos, inputNormals, inputColor, modelDepth, modelCamPos, modelNormals, modelColor, transform, width, height);
+	const float verifySiftErrThresh = GlobalBundlingState::get().s_verifySiftErrThresh;
+	const float verifySiftCorrThresh = GlobalBundlingState::get().s_verifySiftCorrThresh;
+	float2 projErrors = computeProjectiveError(inputDepth, inputCamPos, inputNormals, inputColor, modelDepth, modelCamPos, modelNormals, modelColor,
+		transform, width, height, depthMin, depthMax);
 
 	//std::cout << "proj errors = " << projErrors.x << " " << projErrors.y << std::endl;
 	if (projErrors.x == -std::numeric_limits<float>::infinity() || (projErrors.x > verifySiftErrThresh) || (projErrors.y < verifySiftCorrThresh)) { // tracking lost or bad match
@@ -316,7 +256,7 @@ bool SIFTMatchFilter::filterImagePairByDenseVerify(const float* inputDepth, cons
 
 float2 SIFTMatchFilter::computeProjectiveError(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,
 	const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const uchar4* modelColor,
-	const float4x4& transform, unsigned int width, unsigned int height)
+	const float4x4& transform, unsigned int width, unsigned int height, float depthMin, float depthMax)
 {
 	const unsigned int level = 2;
 	const unsigned int subsampleFactor = 1 << level;
@@ -337,7 +277,7 @@ float2 SIFTMatchFilter::computeProjectiveError(const float* inputDepth, const fl
 	computeCorrespondences(width, height, inputDepth, inputCamPos, inputNormals, inputColor,
 		modelDepth, modelCamPos, modelNormals, modelColor,
 		transformEstimate, distThres, normalThres, colorThresh, level,
-		sumResidual0, sumWeight0, numCorr0);
+		depthMin, depthMax,	sumResidual0, sumWeight0, numCorr0);
 
 	// model -> input
 	transformEstimate = transform.getInverse();
@@ -345,7 +285,7 @@ float2 SIFTMatchFilter::computeProjectiveError(const float* inputDepth, const fl
 	computeCorrespondences(width, height, modelDepth, modelCamPos, modelNormals, modelColor,
 		inputDepth, inputCamPos, inputNormals, inputColor,
 		transformEstimate, distThres, normalThres, colorThresh, level,
-		sumResidual1, sumWeight1, numCorr1);
+		depthMin, depthMax, sumResidual1, sumWeight1, numCorr1);
 
 	float sumRes = (sumResidual0 + sumResidual1) * 0.5f;
 	float sumWeight = (sumWeight0 + sumWeight1) * 0.5f;
@@ -356,6 +296,8 @@ float2 SIFTMatchFilter::computeProjectiveError(const float* inputDepth, const fl
 
 void SIFTMatchFilter::computeCameraSpacePositions(const float* depth, unsigned int width, unsigned int height, float4* out)
 {
+	std::cout << "ERROR hard-coded depth params in " << __FUNCTION__ << std::endl;
+	getchar();
 	//!!!TODO PARAMS
 	const ml::mat4f depthIntrinsicsInverse(
 		0.0017152658f, 0.0f, -0.548885047f, 0.0f,
@@ -503,6 +445,7 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 	const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
 	const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor,
 	const float4x4& transform, float distThres, float normalThres, float colorThresh, unsigned int level,
+	float depthMin, float depthMax,
 	float& sumResidual, float& sumWeight, unsigned int& numCorr)
 {
 	const float INVALID = -std::numeric_limits<float>::infinity();
@@ -539,12 +482,12 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 						float dNormal = dot(make_float3(nTransInput.x, nTransInput.y, nTransInput.z), make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
 						//float c = length(make_float3((cInput.x - cTarget.x) / 255.0f, (cInput.y - cTarget.y) / 255.0f, (cInput.z - cTarget.z) / 255.0f));
 
-						float projInputDepth = cameraToDepthZ(pTransInput);
+						float projInputDepth = pTransInput.z;//cameraToDepthZ(pTransInput);
 						float tgtDepth = modelDepth[screenPos.y * width + screenPos.x];
 
 						bool b = ((tgtDepth != INVALID && projInputDepth < tgtDepth) && d > distThres); // bad matches that are known
 						if ((dNormal >= normalThres && d <= distThres /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
-							const float weight = std::max(0.0f, 0.5f*((1.0f - d / distThres) + (1.0f - cameraToKinectProjZ(pTransInput.z)))); // for weighted ICP;
+							const float weight = std::max(0.0f, 0.5f*((1.0f - d / distThres) + (1.0f - cameraToKinectProjZ(pTransInput.z, depthMin, depthMax)))); // for weighted ICP;
 
 							sumResidual += length(pTransInput - pTarget);	//residual
 							sumWeight += weight;			//corr weight
@@ -558,7 +501,7 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 
 }
 
-void SIFTMatchFilter::ransacKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool debugPrint)
+void SIFTMatchFilter::ransacKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2, bool debugPrint)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -586,8 +529,8 @@ void SIFTMatchFilter::ransacKeyPointMatches(SIFTImageManager* siftManager, const
 		if (debugPrint) std::cout << "(" << i << ", " << curFrame << ")" << std::endl;
 		float4x4 transform;
 		unsigned int newNumMatches =
-			filterImagePairKeyPointMatchesRANSAC(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, maxResThresh2,
-			(unsigned int)s_combinations[0].size(), s_combinations, debugPrint);
+			filterImagePairKeyPointMatchesRANSAC(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, minNumMatches,
+			maxResThresh2, (unsigned int)s_combinations[0].size(), s_combinations, debugPrint);
 
 		if (newNumMatches > 0) {
 			transforms[i] = transform;
@@ -611,11 +554,11 @@ void SIFTMatchFilter::ransacKeyPointMatches(SIFTImageManager* siftManager, const
 
 #define REFINE_RANSAC
 unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances,
-	float4x4& transform, const float4x4& siftIntrinsicsInv, float maxResThresh2,
+	float4x4& transform, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2,
 	unsigned int k, const std::vector<std::vector<unsigned int>>& combinations, bool debugPrint)
 {
 	unsigned int numRawMatches = (unsigned int)keyPointIndices.size();
-	if (numRawMatches < MIN_NUM_MATCHES_FILTERED) return 0;
+	if (numRawMatches < minNumMatches) return 0;
 
 	//const unsigned int ransacMax = 100;
 	//std::vector<float> errors(ransacMax);
@@ -636,7 +579,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 	for (unsigned int c = 0; c < combinations.size(); c++) {
 		std::vector<unsigned int> indices = combinations[c];
 
-		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 1 && indices[2] == 2 && indices[3] == 4;
+		bool _DEBUGCOMB = debugPrint && indices[0] == 0 && indices[1] == 2 && indices[2] == 4 && indices[3] == 5;
 		if (_DEBUGCOMB) std::cout << "combination at " << c << std::endl;
 
 		// check if has combination
@@ -722,7 +665,9 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 			}
 		}
 		if (_DEBUGCOMB) {
-			printf("%d vs %d, %f vs %f\n", curNumMatches, maxNumInliers, curMaxResidual, bestMaxResidual);
+			printf("cur #matches %d vs %d, cur res %f vs %f\n", curNumMatches, maxNumInliers, curMaxResidual, bestMaxResidual);
+			printf("cur match set:"); for (unsigned int i = 0; i < curNumMatches; i++) printf(" %d", indices[i]); printf("\n");
+			printf("cur best match set:"); for (unsigned int i = 0; i < bestCombinationIndices.size(); i++) printf(" %d", bestCombinationIndices[i]); printf("\n");
 		}
 		if (curNumMatches > maxNumInliers || (curNumMatches == maxNumInliers && curMaxResidual < bestMaxResidual)) {
 			maxNumInliers = curNumMatches;
@@ -731,7 +676,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 
 			if (_DEBUGCOMB) std::cout << "POTENTIAL MATCH" << std::endl;
 			if (debugPrint) {
-				std::cout << "adding potential match (" << curNumMatches << ") res " << curMaxResidual << ", cond " << (eigenvalues.x / eigenvalues.y) << std::endl;
+				std::cout << "adding potential match set (" << curNumMatches << ") res " << curMaxResidual << ", cond " << (eigenvalues.x / eigenvalues.y) << std::endl;
 				std::cout << "\t";
 				for (unsigned int i = 0; i < indices.size(); i++) std::cout << " " << indices[i];
 				std::cout << std::endl;
@@ -744,7 +689,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 		std::cout << "#raw matches = " << numRawMatches << ", max # inliers = " << maxNumInliers << std::endl;
 	}
 
-	if (maxNumInliers >= MIN_NUM_MATCHES_FILTERED) {
+	if (maxNumInliers >= minNumMatches) {
 		std::vector<float3> srcPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED), tgtPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 		getKeySourceAndTargetPointsByIndices(keys.data(), keyPointIndices.data(), bestCombinationIndices.data(), maxNumInliers, srcPts.data(), tgtPts.data(), siftIntrinsicsInv);
 		float3 eigenvalues;
@@ -804,7 +749,8 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 	return 0;
 }
 
-void SIFTMatchFilter::ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool debugPrint)
+void SIFTMatchFilter::ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv,
+	unsigned int minNumMatches, float maxResThresh2, bool debugPrint)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -829,15 +775,15 @@ void SIFTMatchFilter::ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		//!!!DEBUGGING
-		if (curFrame == 125 && i == 104)
-			debugPrint = true;
-		else debugPrint = false;
+		//if (curFrame == 125 && i == 104)
+		//	debugPrint = true;
+		//else debugPrint = false;
 		//!!!DEBUGGING
 		if (debugPrint) std::cout << "(" << i << ", " << curFrame << ")" << std::endl;
 		float4x4 transform;
 		unsigned int newNumMatches =
-			filterImagePairKeyPointMatchesRANSAC(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, maxResThresh2,
-			(unsigned int)s_combinations[0].size(), s_combinations, debugPrint);
+			filterImagePairKeyPointMatchesRANSAC(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv,
+			minNumMatches, maxResThresh2, (unsigned int)s_combinations[0].size(), s_combinations, debugPrint);
 
 		if (newNumMatches > 0) {
 			transforms[i] = transform;
@@ -859,7 +805,8 @@ void SIFTMatchFilter::ransacKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
 }
 
-void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, float maxResThresh2, bool printDebug)
+void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv,
+	unsigned int minNumMatches, float maxResThresh2, bool printDebug)
 {
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
@@ -877,15 +824,15 @@ void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		//!!!DEBUGGING
-		if (curFrame == 125 && i == 104) {
-			printDebug = true;
-		}
-		else printDebug = false;
+		//if (curFrame == 125 && i == 104) {
+		//	printDebug = true;
+		//}
+		//else printDebug = false;
 		//!!!DEBUGGING
 
 		float4x4 transform;
 		unsigned int newNumMatches =
-			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, maxResThresh2, printDebug);
+			filterImagePairKeyPointMatches(keyPoints, keyPointIndices, matchDistances, transform, siftIntrinsicsInv, minNumMatches, maxResThresh2, printDebug);
 		//std::cout << "(" << curFrame << ", " << i << "): " << newNumMatches << std::endl; 
 
 		if (newNumMatches > 0) {
@@ -906,4 +853,82 @@ void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 	}
 	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransforms, transforms.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
 	cutilSafeCall(cudaMemcpy(siftManager->d_currFilteredTransformsInv, transformsInv.data(), sizeof(float4x4) * curFrame, cudaMemcpyHostToDevice));
+}
+
+
+void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const vec2ui& imageIndices, const std::vector<CUDACachedFrame>& cachedFrames, float depthMin, float depthMax)
+{
+	const unsigned int numImages = siftManager->getNumImages();
+	MLIB_ASSERT(imageIndices.x < numImages && imageIndices.y < numImages);
+
+	const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth;
+	const unsigned int downSampHeight = GlobalBundlingState::get().s_downsampledHeight;
+
+	// current data
+	ml::DepthImage32 curDepth(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(curDepth.getPointer(), cachedFrames[imageIndices.y].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR8G8B8A8 curColor(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(curColor.getPointer(), cachedFrames[imageIndices.y].d_colorDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR32G32B32A32 curCamPos(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(curCamPos.getPointer(), cachedFrames[imageIndices.y].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR32G32B32A32 curNormals(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(curNormals.getPointer(), cachedFrames[imageIndices.y].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+
+	// transforms
+	float4x4 transform;
+	cutilSafeCall(cudaMemcpy(&transform, siftManager->d_currFilteredTransforms + imageIndices.x, sizeof(float4x4), cudaMemcpyDeviceToHost));
+
+	// prev data
+	ml::DepthImage32 prvDepth(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(prvDepth.getPointer(), cachedFrames[imageIndices.x].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR8G8B8A8 prvColor(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(prvColor.getPointer(), cachedFrames[imageIndices.x].d_colorDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR32G32B32A32 prvCamPos(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(prvCamPos.getPointer(), cachedFrames[imageIndices.x].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR32G32B32A32 prvNormals(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(prvNormals.getPointer(), cachedFrames[imageIndices.x].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+
+	std::vector<uint2> keyPointIndices;
+	siftManager->getFiltKeyPointIndicesDEBUG(imageIndices.x, keyPointIndices);
+
+	const float verifyOptErrThresh = GlobalBundlingState::get().s_verifyOptErrThresh;
+	const float verifyOptCorrThresh = GlobalBundlingState::get().s_verifyOptCorrThresh;
+
+	//!!!TODO PARAMS
+	const float distThres = 0.15f;
+	const float normalThres = 0.97f;
+	const float colorThresh = 0.1f;
+	const unsigned int level = 2;
+
+	//TODO HERE
+	// input -> model
+	float4x4 transformEstimate = transform;
+	float sumResidual0, sumWeight0; unsigned int numCorr0;
+	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(),
+		prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(),
+		transformEstimate, distThres, normalThres, colorThresh, level,
+		depthMin, depthMax, sumResidual0, sumWeight0, numCorr0);
+
+	FreeImageWrapper::saveImage("debug/projCorr-0.png", ColorImageR32G32B32(s_debugCorr));
+
+	// model -> input
+	transformEstimate = transform.getInverse();
+	float sumResidual1, sumWeight1; unsigned int numCorr1;
+	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(),
+		curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(),
+		transformEstimate, distThres, normalThres, colorThresh, level,
+		depthMin, depthMax, sumResidual1, sumWeight1, numCorr1);
+
+	FreeImageWrapper::saveImage("debug/projCorr-1.png", ColorImageR32G32B32(s_debugCorr));
+
+	float sumRes = (sumResidual0 + sumResidual1) * 0.5f;
+	float sumWeight = (sumWeight0 + sumWeight1) * 0.5f;
+	unsigned int numCorr = (numCorr0 + numCorr1) / 2;
+
+	float2 projErrors = make_float2(sumRes / sumWeight, (float)numCorr / (float)(downSampWidth * downSampHeight));
+
+	bool valid = true;
+	if (projErrors.x == -std::numeric_limits<float>::infinity() || (projErrors.x > verifyOptErrThresh) || (projErrors.y < verifyOptCorrThresh)) { // tracking lost or bad match
+		valid = false; // invalid
+	}
 }

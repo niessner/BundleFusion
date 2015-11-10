@@ -175,8 +175,8 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			fileNameDescGlobalApp = "zParametersDefault.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			//fileNameDescGlobalApp = "zParametersDefault.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 
 			//fileNameDescGlobalApp = "zParametersMedium.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
@@ -184,8 +184,8 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersHigh.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
 
-			//fileNameDescGlobalApp = "zParametersKinect.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
+			fileNameDescGlobalApp = "zParametersKinect.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -201,7 +201,7 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		{
+		if (false) {
 			TestMatching test;
 			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);
 			//test.saveImages("debug/images.bin");
@@ -210,11 +210,13 @@ int main(int argc, char** argv)
 			//std::cout << "waiting..." << std::endl;
 			//getchar();
 
-			test.loadImages("debug/images.bin");
-			//test.load("", "debug/global.sift"); test.loadIntrinsics("../data/debug45.sensor");
-			test.load("debug/matchAll.bin", "debug/global.sift");
-			test.test();
-			test.save("debug/filtered.bin");
+			//test.loadImages("debug/images.bin");
+			//test.load("debug/matchAll.bin", "debug/global.sift");
+			//test.test();
+			//test.save("debug/filtered.bin");
+
+			//test.match("debug/matches/", "../data/sun3d/harvard_c8_3.sensor", 11);
+			test.match("debug/matches/", "debug/debug11.sensor", 11);
 
 			std::cout << "done!" << std::endl;
 			getchar();

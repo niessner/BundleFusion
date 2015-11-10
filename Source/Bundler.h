@@ -142,7 +142,6 @@ public:
 	}
 
 	//! debug vis functions
-	void printKey(const std::string& filename, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame) const;
 	void saveDEBUG();
 
 	//! debug functions only call at end

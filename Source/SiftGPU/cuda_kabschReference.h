@@ -317,8 +317,8 @@ __host__ __device__ float computeKabschReprojError(float3* srcPts, float3* tgtPt
 }
 
 //!!!todo params or defines???
-#define MAX_KABSCH_RESIDUAL_THRESH 0.03f
-#define MIN_NUM_MATCHES_FILTERED 4
+//#define MAX_KABSCH_RESIDUAL_THRESH 0.03f
+//#define MIN_NUM_MATCHES_FILTERED 4
 #define MATCH_FILTER_PIXEL_DIST_THRESH 5
 #define KABSCH_CONDITION_THRESH 100.0f
 
@@ -427,7 +427,8 @@ __host__ __device__ bool ComputeReprojectionReference(float3* srcPts, float3* tg
 
 //! assumes sorted by distance, ascending
 __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoint* keyPoints,
-	/*volatile*/ uint2* keyPointIndices, /*volatile*/ float* matchDistances, unsigned int numRawMatches, float4x4& transformEstimate, const float4x4& colorIntrinsicsInv, float maxResThresh2, bool printDebug)
+	/*volatile*/ uint2* keyPointIndices, /*volatile*/ float* matchDistances, unsigned int numRawMatches, float4x4& transformEstimate,
+	const float4x4& colorIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2, bool printDebug)
 {
 	bool done = false;
 	unsigned int idx = 0;
@@ -447,7 +448,7 @@ __host__ __device__ unsigned int filterKeyPointMatchesReference(const SIFTKeyPoi
 	while (!done) {
 		if (idx == numRawMatches || curNumMatches >= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) {
 			if (printDebug) printf("done: #matches = %d, maxRes = %f, validTransform = %d\n", curNumMatches, curMaxResidual, validTransform);
-			if (curNumMatches < MIN_NUM_MATCHES_FILTERED || curMaxResidual >= maxResThresh2 || !validTransform) { // invalid
+			if (curNumMatches < minNumMatches || curMaxResidual >= maxResThresh2 || !validTransform) { // invalid
 				curNumMatches = 0;
 			}
 			done = true;

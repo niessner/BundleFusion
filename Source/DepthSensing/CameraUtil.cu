@@ -140,11 +140,11 @@ __global__ void convertColorRawToFloatDevice(float4* d_output, BYTE* d_input, un
 	if(x >= width || y >= height) return;
 	
 	uchar4 c = make_uchar4(d_input[4*(y*width+x)+0], d_input[4*(y*width+x)+1], d_input[4*(y*width+x)+2], d_input[4*(y*width+x)+3]);
-	if (c.x == 0 && c.y == 0 && c.z == 0) {
-		d_output[y*width+x] = make_float4(MINF, MINF, MINF, MINF);
-	} else {
+	//if (c.x == 0 && c.y == 0 && c.z == 0) { // NO INVALID COLORS!
+	//	d_output[y*width+x] = make_float4(MINF, MINF, MINF, MINF); 
+	//} else {
 		d_output[y*width+x] = make_float4(c.x/255.0f, c.y/255.0f, c.z/255.0f, c.w/255);	
-	}
+	//}
 }
 
 extern "C" void convertColorRawToFloat4(float4* d_output, BYTE* d_input, unsigned int width, unsigned int height)
