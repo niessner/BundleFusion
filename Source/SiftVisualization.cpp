@@ -152,6 +152,7 @@ void SiftVisualization::printMatches(const std::string& outPath, const SIFTImage
 	if (numFrames <= 1) return;
 
 	const std::string dir = util::directoryFromPath(outPath);
+	if (!util::directoryExists(dir)) util::makeDirectory(dir);
 	MLIB_ASSERT(util::directoryExists(dir));
 
 	// get images

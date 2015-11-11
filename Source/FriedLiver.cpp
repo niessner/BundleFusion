@@ -201,11 +201,9 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (false) {
+		if (true) {
 			TestMatching test;
 			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);
-			//test.saveImages("debug/images.bin");
-			//test.loadIntrinsics("../data/debug45.sensor");
 			//test.load("", "debug/global.sift");
 			//std::cout << "waiting..." << std::endl;
 			//getchar();
@@ -216,7 +214,7 @@ int main(int argc, char** argv)
 			//test.save("debug/filtered.bin");
 
 			//test.match("debug/matches/", "../data/sun3d/harvard_c8_3.sensor", 11);
-			test.match("debug/matches/", "debug/debug11.sensor", 11);
+			test.match("debug/matches/", "debug/debug.sensor");
 
 			std::cout << "done!" << std::endl;
 			getchar();

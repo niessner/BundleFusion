@@ -24,13 +24,10 @@ public:
 	~TestMatching();
 
 	// match within first numFrames of sensorFile
-	void match(const std::string& outDir, const std::string& sensorFile, unsigned int numFrames = (unsigned int)-1) const;
+	void match(const std::string& outDir, const std::string& sensorFile, unsigned int numFrames = (unsigned int)-1);
 
 	//! debug hack
-	void loadIntrinsics(const std::string& filename);
-	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip);
-	void saveImages(const std::string& filename) const;
-	void loadImages(const std::string& filename);
+	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, unsigned int numFrames = (unsigned int)-1);
 
 	void save(const std::string& filename) const;
 	void load(const std::string& filename, const std::string siftFile);
@@ -41,6 +38,11 @@ public:
 	void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
 
 private:
+	// for global offline matching
+	void detectKeys(const std::vector<ColorImageR8G8B8A8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager) const;
+	void initSiftParams(unsigned int widthDepth, unsigned int heightDepth, unsigned int widthColor, unsigned int heightColor);
+
+
 	int* getNumMatchesCUDA(unsigned int curFrame, bool filtered) {
 		return const_cast<int*>(static_cast<const TestMatching*>(this)->getNumMatchesCUDA(curFrame, filtered));
 	}
@@ -69,8 +71,8 @@ private:
 		else return d_matchKeyIndicesPerImagePair + offset * MAX_MATCHES_PER_IMAGE_PAIR_RAW;
 	}
 
-	void matchAll();
-	void filter(std::vector<vec2ui>& imagePairMatchesFiltered);
+	void matchAll(bool print = false, const std::string outDir = "");
+	void filterImagePairMatches(std::vector<vec2ui>& imagePairMatchesFiltered, bool print = false, const std::string& outDir = "");
 	void checkFiltered(const std::vector<vec2ui>& imagePairMatchesFiltered, std::vector<vec2ui>& falsePositives, std::vector<vec2ui>& falseNegatives) const;
 	void printMatches(const std::string& outDir, const std::vector<vec2ui>& imagePairMatches, bool filtered) const;
 
@@ -102,12 +104,19 @@ private:
 	float*	d_filtMatchDistancesPerImagePair;
 	uint2*	d_filtMatchKeyIndicesPerImagePair;
 
-	mat4f	m_siftIntrinsics;
-	mat4f	m_siftIntrinsicsInv;
+	bool	m_bInit;
 	bool	m_bHasMatches;
 
-	std::vector<ColorImageR8G8B8A8> m_debugColorImages;
-	std::vector<DepthImage32>		m_debugDepthImages;
-	mat4f							m_depthIntrinsicsInv;
+	// params
+	unsigned int m_widthSift;
+	unsigned int m_heightSift;
+	unsigned int m_widthDepth;
+	unsigned int m_heightDepth;
+	CalibrationData m_colorCalibration;
+	CalibrationData m_depthCalibration;
+
+	//! debug stuff
+	std::vector<ColorImageR8G8B8A8> m_colorImages;
+	std::vector<DepthImage32>		m_depthImages;
 	std::vector<mat4f>				m_referenceTrajectory;
 };
