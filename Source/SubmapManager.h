@@ -183,6 +183,7 @@ private:
 	}
 	//! assumes nextlocal locked
 	void saveOptToPointCloud(const std::string& filename, const CUDACache* cudaCache, const std::vector<int>& valid, const float4x4* d_transforms, unsigned int numFrames);
+	void saveImPairToPointCloud(const std::string& prefix, const CUDACache* cudaCache, const float4x4* d_transforms, const vec2ui& imageIndices) const;
 
 	//*********** SIFT *******************
 	SiftGPU*				m_sift;

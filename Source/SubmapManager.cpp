@@ -194,24 +194,30 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		std::vector<unsigned int> _numRawMatches; 
 		if (_debugPrintMatches) {
 			siftManager->getNumRawMatchesDEBUG(_numRawMatches);
-			if (isLocal) SiftVisualization::printCurrentMatches("debug/rawMatches/", siftManager, cudaCache, false);
-			else SiftVisualization::printCurrentMatches("debug/rawMatchesGlobal/", siftManager, cudaCache, false);
+			if (isLocal)
+				SiftVisualization::printCurrentMatches("debug/rawMatches/", siftManager, cudaCache, false);
+			else
+				;//SiftVisualization::printCurrentMatches("debug/rawMatchesGlobal/", siftManager, cudaCache, false);
 
-			if (!isLocal) SiftVisualization::printCurrentMatches("debug/", siftManager, cudaCache, false, 5);
+			//if (!isLocal) SiftVisualization::printCurrentMatches("debug/", siftManager, cudaCache, false, 5);
 		}
 		//!!!DEBUGGING
 
 		// --- filter matches
 		const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
 		//!!!DEBUGGING
-		SIFTMatchFilter::ransacKeyPointMatches(siftManager, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
+		//SIFTMatchFilter::ransacKeyPointMatches(siftManager, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
 		//!!!DEBUGGING
-		//siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, (_debugPrintMatches && !isLocal));
+		siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, (_debugPrintMatches && !isLocal));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = timer.getElapsedTimeMS(); }
 
 		//!!!DEBUGGING
 		std::vector<unsigned int> _numFiltMatches;
-		if (_debugPrintMatches) siftManager->getNumFiltMatchesDEBUG(_numFiltMatches);
+		if (_debugPrintMatches) {
+			siftManager->getNumFiltMatchesDEBUG(_numFiltMatches);
+			if (isLocal)
+				SiftVisualization::printCurrentMatches("debug/matchesKeyFilt/", siftManager, cudaCache, false);
+		}
 		//!!!DEBUGGING
 
 		// --- surface area filter
@@ -223,8 +229,17 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 
 		//!!!DEBUGGING
 		std::vector<unsigned int> _numFiltMatchesSA;
-		if (_debugPrintMatches) siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesSA);
+		if (_debugPrintMatches) {
+			siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesSA);
+			if (isLocal)
+				SiftVisualization::printCurrentMatches("debug/matchesSAFilt/", siftManager, cudaCache, false);
+		}
 		//!!!DEBUGGING
+
+		if (_debugPrintMatches && isLocal) {
+			for (unsigned int p = 0; p < curFrame; p++)
+				saveImPairToPointCloud("debug/", cudaCache, siftManager->getFiltTransformsDEBUG(), vec2ui(p, curFrame));
+		}
 
 		// --- dense verify filter
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
@@ -241,8 +256,10 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		std::vector<unsigned int> _numFiltMatchesDV;
 		if (_debugPrintMatches) {
 			siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
-			if (isLocal) SiftVisualization::printCurrentMatches("debug/filtMatches/", siftManager, cudaCache, true);
-			else SiftVisualization::printCurrentMatches("debug/filtMatchesGlobal/", siftManager, cudaCache, true);
+			if (isLocal)
+				SiftVisualization::printCurrentMatches("debug/filtMatches/", siftManager, cudaCache, true);
+			else
+				;//SiftVisualization::printCurrentMatches("debug/filtMatchesGlobal/", siftManager, cudaCache, true);
 		}
 		//!!!DEBUGGING
 
@@ -269,9 +286,17 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 
 bool SubmapManager::isCurrentLocalValidChunk()
 {
-	bool valid = false;
-	if (m_currentLocal->getValidImages()[1] != 0) valid = true;
-	return valid;
+	// whether has >1 valid frame
+	const std::vector<int>& valid = m_currentLocal->getValidImages();
+	const unsigned int numImages = m_currentLocal->getNumImages();
+	unsigned int count = 0;
+	for (unsigned int i = 0; i < numImages; i++) {
+		if (valid[i] != 0) {
+			count++;
+			if (count > 1) return true;
+		}
+	}
+	return false;
 }
 
 unsigned int SubmapManager::getNumNextLocalFrames()
@@ -305,15 +330,15 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 	CUDACache* cudaCache = m_nextLocalCache;
 
 	MLIB_ASSERT(m_nextLocal->getNumImages() > 1);
-	bool useVerify = true;
+	bool useVerify = GlobalBundlingState::get().s_useLocalVerify;
 	m_SparseBundler.align(siftManager, getLocalTrajectoryGPU(curLocalIdx), numNonLinIterations, numLinIterations,
 		useVerify, true, false, true, true, false);
 	// still need this for global key fuse
 
 	//!!!DEBUGGING
-	//if (curLocalIdx >= 20) {
-	//	saveOptToPointCloud("debug/local-" + std::to_string(curLocalIdx) + ".ply", m_nextLocalCache, m_nextLocal->getValidImages(), getLocalTrajectoryGPU(curLocalIdx), m_nextLocal->getNumImages());
-	//}
+	if (curLocalIdx >= 14) {
+		saveOptToPointCloud("debug/local-" + std::to_string(curLocalIdx) + ".ply", m_nextLocalCache, m_nextLocal->getValidImages(), getLocalTrajectoryGPU(curLocalIdx), m_nextLocal->getNumImages());
+	}
 	//!!!DEBUGGING
 
 	// verify
@@ -327,6 +352,16 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 			0.1f, 3.0f);
 
 		if (valid == 0) {
+			vec2ui imageIndices(0, 9);
+			float4x4 transformCur; MLIB_CUDA_SAFE_CALL(cudaMemcpy(&transformCur, getLocalTrajectoryGPU(curLocalIdx) + imageIndices.y, sizeof(float4x4), cudaMemcpyDeviceToHost));
+			float4x4 transformPrv; MLIB_CUDA_SAFE_CALL(cudaMemcpy(&transformPrv, getLocalTrajectoryGPU(curLocalIdx) + imageIndices.x, sizeof(float4x4), cudaMemcpyDeviceToHost));
+			float4x4 transformCurToPrv = transformPrv.getInverse() * transformCur;
+			saveImPairToPointCloud("debug/", cudaCache, getLocalTrajectoryGPU(curLocalIdx), imageIndices);
+			SIFTMatchFilter::visualizeProjError(siftManager, imageIndices, cudaCache->getCacheFrames(),
+				MatrixConversion::toCUDA(cudaCache->getIntrinsics()), transformCurToPrv, 0.1f, 3.0f);
+			std::cout << "waiting..." << std::endl;
+			getchar();
+
 			////!!!DEBUGGING
 			//_idxsLocalInvalidVerify.push_back(curLocalIdx);
 			saveOptToPointCloud("debug/opt-" + std::to_string(curLocalIdx) + ".ply", m_nextLocalCache, m_nextLocal->getValidImages(), getLocalTrajectoryGPU(curLocalIdx), m_nextLocal->getNumImages());
@@ -386,14 +421,14 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (m_global->getNumImages() > 1) {
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() == 7) {
+			//if (m_global->getNumImages() == 15) {
 			//	setPrintMatchesDEBUG(true);
 			//	int a = 5;
 			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() == 7) {
+			//if (m_global->getNumImages() == 15) {
 			//	setPrintMatchesDEBUG(false);
 			//	int a = 5;
 			//	std::cout << "waiting..." << std::endl;
@@ -445,10 +480,10 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 	if (isEnd) {
 		//!!!DEBUGGING
 		//const std::vector<int> _valid = m_global->getValidImages();
-		//if (numFrames >= 200) {
-			//saveOptToPointCloud("debug/global-" + std::to_string(getCurrLocal(numFrames)) + ".ply", m_globalCache, m_global->getValidImages(), d_globalTrajectory, m_global->getNumImages());
-		//	int a = 5;
-		//}
+		if (numFrames >= 140) {
+			saveOptToPointCloud("debug/global-" + std::to_string(getCurrLocal(numFrames)) + ".ply", m_globalCache, m_global->getValidImages(), d_globalTrajectory, m_global->getNumImages());
+			//int a = 5;
+		}
 		//!!!DEBUGGING
 
 		// may invalidate already invalidated images
@@ -502,6 +537,8 @@ void SubmapManager::saveOptToPointCloud(const std::string& filename, const CUDAC
 	const std::vector<CUDACachedFrame>& cacheFrames = cudaCache->getCacheFrames();
 
 	bool saveFrameByFrame = true;
+	const std::string outFrameByFrame = "debug/frames/";
+	if (saveFrameByFrame && !util::directoryExists(outFrameByFrame)) util::makeDirectory(outFrameByFrame);
 
 	PointCloudf pc;
 	for (unsigned int f = 0; f < numFrames; f++) {
@@ -526,7 +563,7 @@ void SubmapManager::saveOptToPointCloud(const std::string& filename, const CUDAC
 			}
 		}
 		if (saveFrameByFrame) {
-			PointCloudIOf::saveToFile("debug/frames/" + std::to_string(f) + ".ply", framePc);
+			PointCloudIOf::saveToFile(outFrameByFrame + std::to_string(f) + ".ply", framePc);
 		}
 	}
 	PointCloudIOf::saveToFile(filename, pc);
@@ -555,5 +592,57 @@ void SubmapManager::saveVerifyDEBUG(const std::string& prefix) const
 				s << _idxsGlobalOptimized[i] << std::endl;
 			s.close();
 		}
+}
+
+void SubmapManager::saveImPairToPointCloud(const std::string& prefix, const CUDACache* cudaCache, const float4x4* d_transforms, const vec2ui& imageIndices) const
+{
+	// local transforms: d_transforms = getLocalTrajectoryGPU(localIdx);
+	// local cudaCache: cudaCache = m_nextLocalCache
+	// global transforms: d_transforms = d_globalTrajectory;
+	// global cudaCache: cudaCache = m_globalCache
+
+	//transforms
+	std::vector<mat4f> transforms(std::max(imageIndices.x, imageIndices.y) + 1);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*transforms.size(), cudaMemcpyDeviceToHost));
+	//frames
+	ColorImageR32G32B32A32 camPosition;
+	ColorImageR8G8B8A8 color;
+	camPosition.allocate(cudaCache->getWidth(), cudaCache->getHeight());
+	color.allocate(cudaCache->getWidth(), cudaCache->getHeight());
+	const std::vector<CUDACachedFrame>& cacheFrames = cudaCache->getCacheFrames();
+
+	bool saveFrameByFrame = true;
+	const std::string dir = util::directoryFromPath(prefix);
+	if (saveFrameByFrame && !util::directoryExists(dir)) util::makeDirectory(dir);
+
+	mat4f transformCurToPrv = transforms[imageIndices.x].getInverse() * transforms[imageIndices.y];
+
+	PointCloudf pc;
+	for (unsigned int i = 0; i < 2; i++) {
+		mat4f transform = (i == 0) ? mat4f::identity() : transformCurToPrv;
+		unsigned int f = imageIndices[i];
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getPointer(), cacheFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), cacheFrames[f].d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+
+		PointCloudf framePc;
+
+		for (unsigned int i = 0; i < camPosition.getNumPixels(); i++) {
+			const vec4f& p = camPosition.getPointer()[i];
+			if (p.x != -std::numeric_limits<float>::infinity()) {
+				pc.m_points.push_back(transform * p.getVec3());
+				const vec4uc& c = color.getPointer()[i];
+				pc.m_colors.push_back(vec4f(c.x, c.y, c.z, c.w) / 255.f);
+
+				if (saveFrameByFrame) {
+					framePc.m_points.push_back(transforms[f] * p.getVec3());
+					framePc.m_colors.push_back(pc.m_colors.back());
+				}
+			}
+		}
+		if (saveFrameByFrame) {
+			PointCloudIOf::saveToFile(dir + std::to_string(f) + ".ply", framePc);
+		}
+	}
+	PointCloudIOf::saveToFile(prefix + "_" + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y) + ".ply", pc);
 }
 

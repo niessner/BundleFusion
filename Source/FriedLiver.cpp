@@ -201,7 +201,7 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (true) {
+		if (false) { 
 			TestMatching test;
 			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);
 			//test.load("", "debug/global.sift");
@@ -213,8 +213,8 @@ int main(int argc, char** argv)
 			//test.test();
 			//test.save("debug/filtered.bin");
 
-			//test.match("debug/matches/", "../data/sun3d/harvard_c8_3.sensor", 11);
-			test.match("debug/matches/", "debug/debug.sensor");
+			test.match("", "debug/matches/", "../data/sun3d/harvard_c8_3.sensor", vec2ui(140, 151));
+			//test.match("", "debug/matches/", "debug/debug.sensor");
 
 			std::cout << "done!" << std::endl;
 			getchar();

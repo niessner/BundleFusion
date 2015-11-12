@@ -100,7 +100,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	if (numFrames <= 1) return;
 
 	const std::string dir = util::directoryFromPath(outPath);
-	MLIB_ASSERT(util::directoryExists(dir));
+	if (!util::directoryExists(dir)) util::makeDirectory(dir);
 
 	const unsigned int widthSIFT = GlobalBundlingState::get().s_widthSIFT;
 	const unsigned int heightSIFT = GlobalBundlingState::get().s_heightSIFT;

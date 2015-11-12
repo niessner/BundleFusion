@@ -204,6 +204,7 @@ public:
 	}
 	EntryJ* getGlobalCorrespondencesDEBUG() { return d_globMatches; }
 	unsigned int getNumGlobalCorrespondences() const { return m_globNumResiduals; }
+	const float4x4* getFiltTransformsDEBUG() const { return d_currFilteredTransforms; }
 
 
 	//!!!TODO where to put transforms

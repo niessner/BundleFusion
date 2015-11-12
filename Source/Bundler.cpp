@@ -90,19 +90,19 @@ void Bundler::processInput()
 	// match with every other local
 	m_currentState.m_bLastFrameValid = 1;
 	if (curLocalFrame > 0) {
-		//if (curFrame >= 81 && curFrame <= 90) {
-		//	m_SubmapManager.setPrintMatchesDEBUG(true);
-		//	int a = 5;
-		//}
+		const bool debugLocalMatching = false;
+		const unsigned int stop = 140;
+		if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
+			m_SubmapManager.setPrintMatchesDEBUG(true);
+		}
 		m_currentState.m_bLastFrameValid = m_SubmapManager.localMatchAndFilter(MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
-		//if (curFrame >= 81 && curFrame <= 90) {
-		//	m_SubmapManager.setPrintMatchesDEBUG(false);
-		//	int a = 5;
-		//}
-		//if (curFrame == 90) {
-		//	std::cout << "waiting..." << std::endl;
-		//	getchar();
-		//}
+		if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
+			m_SubmapManager.setPrintMatchesDEBUG(false);
+			if (curFrame == stop + m_submapSize) {
+				std::cout << "waiting..." << std::endl;
+				getchar();
+			}
+		}
 
 		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}

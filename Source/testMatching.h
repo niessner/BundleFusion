@@ -20,14 +20,24 @@ struct std::hash<vec2ui> : public std::unary_function < vec2ui, size_t > {
 
 class TestMatching {
 public:
+	enum STAGE {
+		NONE,
+		INITIALIZED,
+		HAS_MATCHES,
+		FILTERED_IMPAIR_MATCHES,
+		FILTERED_SA,
+		FILTERED_DV,
+		NUM_STAGES
+	};
+
 	TestMatching();
 	~TestMatching();
 
 	// match within first numFrames of sensorFile
-	void match(const std::string& outDir, const std::string& sensorFile, unsigned int numFrames = (unsigned int)-1);
+	void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));
 
 	//! debug hack
-	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, unsigned int numFrames = (unsigned int)-1);
+	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames = vec2ui((unsigned int)-1));
 
 	void save(const std::string& filename) const;
 	void load(const std::string& filename, const std::string siftFile);
@@ -92,6 +102,10 @@ private:
 	void recordPointCloud(PointCloudf& pc, unsigned int frame) const;
 	void recordKeysMeshData(MeshDataf& keys0, MeshDataf& keys1, const vec2ui& imageIndices, bool filtered, const vec4f& color0, const vec4f& color1) const;
 
+	void filterBySurfaceArea(bool print = false, const std::string& outDir = "");
+	void filterByDenseVerify(bool print = false, const std::string& outDir = "");
+	void createCachedFrames();
+
 	SIFTImageManager* m_siftManager;
 
 	std::vector<vec2ui> m_origMatches;
@@ -104,8 +118,7 @@ private:
 	float*	d_filtMatchDistancesPerImagePair;
 	uint2*	d_filtMatchKeyIndicesPerImagePair;
 
-	bool	m_bInit;
-	bool	m_bHasMatches;
+	STAGE	m_stage;
 
 	// params
 	unsigned int m_widthSift;
@@ -119,4 +132,7 @@ private:
 	std::vector<ColorImageR8G8B8A8> m_colorImages;
 	std::vector<DepthImage32>		m_depthImages;
 	std::vector<mat4f>				m_referenceTrajectory;
+
+	std::vector<CUDACachedFrame> m_cachedFrames;
+	mat4f m_intrinsicsDownsampled;
 };

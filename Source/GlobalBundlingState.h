@@ -45,7 +45,8 @@
 	X(float, s_minKeyScale) \
 	X(float, s_siftMatchThresh) \
 	X(float, s_siftMatchRatioMaxLocal) \
-	X(float, s_siftMatchRatioMaxGlobal)
+	X(float, s_siftMatchRatioMaxGlobal) \
+	X(bool, s_useLocalVerify)
 
 using namespace ml;
 
