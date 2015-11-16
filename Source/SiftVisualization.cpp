@@ -166,3 +166,123 @@ void SiftVisualization::printMatches(const std::string& outPath, const SIFTImage
 			prevImage, curImage, 0.7f, filtered, maxNumMatches);
 	}
 }
+
+void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const std::vector<CUDACachedFrame>& cachedFrames,
+	unsigned int cacheWidth, unsigned int cacheHeight, const vec2ui& imageIndices, const mat4f& transformPrvToCur)
+{
+	//transforms
+	std::vector<mat4f> transforms = { transformPrvToCur, mat4f::identity() };
+
+	//frames
+	ColorImageR32G32B32A32 camPosition;
+	ColorImageR8G8B8A8 color;
+	camPosition.allocate(cacheWidth, cacheHeight);
+	color.allocate(cacheWidth, cacheHeight);
+
+	bool saveFrameByFrame = true;
+	const std::string dir = util::directoryFromPath(prefix);
+	if (saveFrameByFrame && !util::directoryExists(dir)) util::makeDirectory(dir);
+
+	PointCloudf pc;
+	for (unsigned int i = 0; i < 2; i++) {
+		mat4f transform = transforms[i];
+		unsigned int f = imageIndices[i];
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getPointer(), cachedFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), cachedFrames[f].d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+
+		//DepthImage32 dImage(cacheWidth, cacheHeight);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(dImage.getPointer(), cachedFrames[f].d_depthDownsampled, sizeof(float)*dImage.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/testDepth.png", ColorImageR32G32B32(dImage));
+		//FreeImageWrapper::saveImage("debug/test.png", camPosition);
+		//{
+		//	PointCloudf wtf;
+		//	for (unsigned int i = 0; i < dImage.getNumPixels(); i++) {
+		//		float d = dImage.getPointer()[i];
+		//		if (d != -std::numeric_limits<float>::infinity()) {
+		//			//vec3f p = 
+		//		}
+		//	}
+		//}
+
+		PointCloudf framePc;
+
+		for (unsigned int i = 0; i < camPosition.getNumPixels(); i++) {
+			const vec4f& p = camPosition.getPointer()[i];
+			if (p.x != -std::numeric_limits<float>::infinity()) {
+				pc.m_points.push_back(transform * p.getVec3());
+				const vec4uc& c = color.getPointer()[i];
+				pc.m_colors.push_back(vec4f(c.x, c.y, c.z, c.w) / 255.f);
+
+				if (saveFrameByFrame) {
+					framePc.m_points.push_back(pc.m_points.back());
+					framePc.m_colors.push_back(pc.m_colors.back());
+				}
+			}
+		}
+		if (saveFrameByFrame) {
+			PointCloudIOf::saveToFile(dir + std::to_string(f) + ".ply", framePc);
+		}
+	}
+	PointCloudIOf::saveToFile(prefix + "_" + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y) + ".ply", pc);
+}
+
+ml::vec3f SiftVisualization::depthToCamera(const mat4f& depthIntrinsincsinv, const float* depth, unsigned int width, unsigned int height, unsigned int x, unsigned int y)
+{
+	float d = depth[y*width + x];
+	if (d == -std::numeric_limits<float>::infinity()) return vec3f(-std::numeric_limits<float>::infinity());
+	else return depthIntrinsincsinv * (d * vec3f((float)x, (float)y, 1.0f));
+}
+
+ml::vec3f SiftVisualization::getNormal(const float* depth, unsigned int width, unsigned int height, const mat4f& depthIntrinsicsInv, unsigned int x, unsigned int y)
+{
+	vec3f ret(-std::numeric_limits<float>::infinity());
+	if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+		vec3f cc = depthToCamera(depthIntrinsicsInv, depth, width, height, x, y);
+		vec3f pc = depthToCamera(depthIntrinsicsInv, depth, width, height, x + 1, y + 0);
+		vec3f cp = depthToCamera(depthIntrinsicsInv, depth, width, height, x + 0, y + 1);
+		vec3f mc = depthToCamera(depthIntrinsicsInv, depth, width, height, x - 1, y + 0);
+		vec3f cm = depthToCamera(depthIntrinsicsInv, depth, width, height, x + 0, y - 1);
+
+		if (cc.x != -std::numeric_limits<float>::infinity() && pc.x != -std::numeric_limits<float>::infinity() && cp.x != -std::numeric_limits<float>::infinity() && mc.x != -std::numeric_limits<float>::infinity() && cm.x != -std::numeric_limits<float>::infinity())
+		{
+			vec3f n = (pc - mc) ^ (cp - cm);
+			float l = n.length();
+			if (l > 0.0f) {
+				ret = n / -l;
+			}
+		}
+	}
+	return ret;
+}
+
+void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, unsigned int depthWidth, unsigned int depthHeight, const vec4uc* color, unsigned int colorWidth, unsigned int colorHeight, const mat4f& depthIntrinsicsInv, const mat4f& transform)
+{
+	for (unsigned int y = 0; y < depthHeight; y++) {
+		for (unsigned int x = 0; x < depthWidth; x++) {
+			vec3f p = depthToCamera(depthIntrinsicsInv, depth, depthWidth, depthHeight, x, y);
+			if (p.x != -std::numeric_limits<float>::infinity()) {
+
+				vec3f n = getNormal(depth, depthWidth, depthHeight, depthIntrinsicsInv, x, y);
+				if (n.x != -std::numeric_limits<float>::infinity()) {
+					unsigned int cx = (unsigned int)math::round((float)x * (float)colorWidth / (float)depthWidth);
+					unsigned int cy = (unsigned int)math::round((float)y * (float)colorHeight / (float)depthHeight);
+					vec3f c = vec3f(color[cy * colorWidth + cx].getVec3()) / 255.0f;
+					if (!(c.x == 0 && c.y == 0 && c.z == 0)) {
+						pc.m_points.push_back(vec3f(p));
+						pc.m_normals.push_back(vec3f(n));
+						pc.m_colors.push_back(vec4f(c.x, c.y, c.z, 1.0f));
+					}
+				} // valid normal
+			} // valid depth
+		} // x
+	} // y
+
+	for (auto& p : pc.m_points) {
+		p = transform * p;
+	}
+	mat3f invTranspose = transform.getRotation();
+	for (auto& n : pc.m_normals) {
+		n = invTranspose * n;
+		//n.normalize();
+	}
+}

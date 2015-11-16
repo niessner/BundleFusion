@@ -275,7 +275,6 @@ __host__ __device__ float3 covarianceSVD(volatile float3* source, unsigned numPo
 }
 
 //!!!todo params or defines???
-#define MAX_KABSCH_RESIDUAL_THRESH 0.03f
 #define MATCH_FILTER_PIXEL_DIST_THRESH 5
 #define KABSCH_CONDITION_THRESH 100.0f
 

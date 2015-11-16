@@ -676,7 +676,7 @@ void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 		siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(i, keyPointIndices, matchDistances);
 
 		//!!!DEBUGGING
-		//if (curFrame == 125 && i == 104) {
+		//if (i == 0 && curFrame == 1) {
 		//	printDebug = true;
 		//}
 		//else printDebug = false;
@@ -841,9 +841,15 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 
 								s_debugCorr(x, y) = length(pTransInput - pTarget);
 								pcSrc.m_points.push_back(vec3f(pTransInput.x, pTransInput.y, pTransInput.z));
-								pcSrc.m_colors.push_back(vec4f(cInput.x, cInput.y, cInput.z, cInput.w) / 255.f);
 								pcTgt.m_points.push_back(vec3f(pTarget.x, pTarget.y, pTarget.z));
-								pcTgt.m_colors.push_back(vec4f(cTarget.x, cTarget.y, cTarget.z, cTarget.w) / 255.f);
+								if (d > distThres) {
+									pcSrc.m_colors.push_back(vec4f(1.0f, 0.0f, 0.0f, 1.0f));
+									pcTgt.m_colors.push_back(vec4f(0.0f, 1.0f, 0.0f, 1.0f));
+								}
+								else {
+									pcSrc.m_colors.push_back(vec4f(cInput.x, cInput.y, cInput.z, cInput.w) / 255.f);
+									pcTgt.m_colors.push_back(vec4f(cTarget.x, cTarget.y, cTarget.z, cTarget.w) / 255.f);
+								}
 							}
 						} // target depth within depth min/max
 					} // projected to valid depth
@@ -855,5 +861,7 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 
 	PointCloudIOf::saveToFile("debug/src.ply", pcSrc);
 	PointCloudIOf::saveToFile("debug/tgt.ply", pcTgt);
+	std::cout << "press key" << std::endl;
+	getchar();
 	int a = 5;
 }

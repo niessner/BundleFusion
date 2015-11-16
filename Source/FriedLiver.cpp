@@ -95,7 +95,7 @@ void bundlingOptimizationThreadFunc() {
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 
 	//for (unsigned int i = 0; i < 10; i++) {
-		bundlingOptimization();
+	bundlingOptimization();
 	//}
 }
 
@@ -184,8 +184,11 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersHigh.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
 
-			fileNameDescGlobalApp = "zParametersKinect.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
+			fileNameDescGlobalApp = "zParametersTUM.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
+
+			//fileNameDescGlobalApp = "zParametersKinect.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -201,7 +204,37 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (false) { 
+		if (false) {
+			CalibratedSensorData cs;
+			{
+				BinaryDataStreamFile s("../data/tum/fr2_xyz.sensor", false);
+				s >> cs;
+			}
+			unsigned int splitFrame = 2080;
+			bool useFirst = true;
+			if (useFirst) {	// [0, splitFrame)
+				cs.m_ColorImages.erase(cs.m_ColorImages.begin() + splitFrame, cs.m_ColorImages.end());
+				cs.m_DepthImages.erase(cs.m_DepthImages.begin() + splitFrame, cs.m_DepthImages.end());
+				cs.m_trajectory.erase(cs.m_trajectory.begin() + splitFrame, cs.m_trajectory.end());
+			}
+			else { // [splitFrame, end)	
+				cs.m_ColorImages.erase(cs.m_ColorImages.begin(), cs.m_ColorImages.begin() + splitFrame);
+				cs.m_DepthImages.erase(cs.m_DepthImages.begin(), cs.m_DepthImages.begin() + splitFrame);
+				cs.m_trajectory.erase(cs.m_trajectory.begin(), cs.m_trajectory.begin() + splitFrame);
+			}
+			cs.m_ColorNumFrames = (unsigned int)cs.m_ColorImages.size();
+			cs.m_DepthNumFrames = (unsigned int)cs.m_DepthImages.size();
+
+			std::string which = useFirst ? "to" : "from";
+			const std::string outFile = "debug/" + which + std::to_string(splitFrame) + ".sensor";
+			{
+				BinaryDataStreamFile s(outFile, true);
+				s << cs;
+			}
+			std::cout << "DONE" << std::endl;
+			getchar();
+		}
+		if (false) {
 			TestMatching test;
 			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);
 			//test.load("", "debug/global.sift");
@@ -213,8 +246,11 @@ int main(int argc, char** argv)
 			//test.test();
 			//test.save("debug/filtered.bin");
 
-			test.match("", "debug/matches/", "../data/sun3d/harvard_c8_3.sensor", vec2ui(140, 151));
+			//test.match("", "debug/matches/", "../data/sun3d/harvard_c8_3.sensor", vec2ui(140, 151));
 			//test.match("", "debug/matches/", "debug/debug.sensor");
+			test.loadFromSensor("debug/to2080.sensor", "", GlobalBundlingState::get().s_submapSize);
+			test.load("", "debug/test208.sift");
+			test.matchFrame(207, true);
 
 			std::cout << "done!" << std::endl;
 			getchar();
@@ -234,20 +270,20 @@ int main(int argc, char** argv)
 		if (g_RGBDSensor == NULL) throw MLIB_EXCEPTION("No RGBD sensor specified");
 		g_RGBDSensor->createFirstConnected();
 
-		
+
 		g_imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, g_RGBDSensor, false);
 
 		//std::thread(bundlingThreadFunc).detach();
 		std::thread bundlingThread(bundlingThreadFunc);
-		
+
 
 		//waiting until bundler is initialized
 		while (!g_bundler)	Sleep(0);
 
 
 		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
-	
+
 		//start depthSensing render loop
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
@@ -260,7 +296,7 @@ int main(int argc, char** argv)
 		//g_bundler->saveDEBUG();
 
 		g_bundler->exitBundlingThread();
-		
+
 		g_imageManager->setBundlingFrameRdy();			//release all bundling locks
 		g_bundler->confirmProcessedInputFrame();		//release all bundling locks
 		ConditionManager::release(ConditionManager::Recon); // release bundling locks
@@ -268,7 +304,7 @@ int main(int argc, char** argv)
 		if (bundlingThread.joinable())	bundlingThread.join();	//wait for the bundling thread to return;
 		SAFE_DELETE(g_bundler);
 		SAFE_DELETE(g_imageManager);
-		
+
 		//ConditionManager::DEBUGRELEASE();
 
 		std::cout << "DONE! <<press key to exit program>>" << std::endl;

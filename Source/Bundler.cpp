@@ -163,9 +163,6 @@ void Bundler::processGlobal()
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) TimingLog::addGlobalFrameTiming();
 	if (m_currentState.m_bProcessGlobal == BundlerState::PROCESS) {
-		// cache
-		m_SubmapManager.copyToGlobalCache(); 
-
 		m_currentState.m_bOptimizeGlobal = (BundlerState::PROCESS_STATE)m_SubmapManager.computeAndMatchGlobalKeys(m_currentState.m_lastLocalSolved,
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 
@@ -248,21 +245,21 @@ void Bundler::getCurrentFrame()
 	CUDAImageUtil::resampleToIntensity(m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT,
 		m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
 
-	if (GlobalBundlingState::get().s_erodeSIFTdepth) {
-		unsigned int numIter = 2;
+	//if (GlobalBundlingState::get().s_erodeSIFTdepth) {
+	//	unsigned int numIter = 2;
 
-		numIter = 2 * ((numIter + 1) / 2);
-		for (unsigned int i = 0; i < numIter; i++) {
-			if (i % 2 == 0) {
-				CUDAImageUtil::erodeDepthMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth, 3,
-					m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, 0.05f, 0.3f);
-			}
-			else {
-				CUDAImageUtil::erodeDepthMap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper, 3,
-					m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, 0.05f, 0.3f);
-			}
-		}
-	}
+	//	numIter = 2 * ((numIter + 1) / 2);
+	//	for (unsigned int i = 0; i < numIter; i++) {
+	//		if (i % 2 == 0) {
+	//			CUDAImageUtil::erodeDepthMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth, 3,
+	//				m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, 0.05f, 0.3f);
+	//		}
+	//		else {
+	//			CUDAImageUtil::erodeDepthMap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper, 3,
+	//				m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, 0.05f, 0.3f);
+	//		}
+	//	}
+	//}
 	if (m_bundlerInputData.m_bFilterDepthValues) {
 		CUDAImageUtil::gaussFilterFloatMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth,
 			m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,

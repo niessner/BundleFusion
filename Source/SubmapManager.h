@@ -182,8 +182,8 @@ private:
 		//optLocalCache->reset();
 	}
 	//! assumes nextlocal locked
-	void saveOptToPointCloud(const std::string& filename, const CUDACache* cudaCache, const std::vector<int>& valid, const float4x4* d_transforms, unsigned int numFrames);
-	void saveImPairToPointCloud(const std::string& prefix, const CUDACache* cudaCache, const float4x4* d_transforms, const vec2ui& imageIndices) const;
+	void saveOptToPointCloud(const std::string& filename, const CUDACache* cudaCache, const std::vector<int>& valid, const float4x4* d_transforms, unsigned int numFrames, bool saveFrameByFrame = false);
+	void saveImPairToPointCloud(const std::string& prefix, const CUDACache* cudaCache, const float4x4* d_transforms, const vec2ui& imageIndices, const mat4f& transformCurToPrv = mat4f::zero()) const;
 
 	//*********** SIFT *******************
 	SiftGPU*				m_sift;

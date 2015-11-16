@@ -36,6 +36,8 @@ public:
 	// match within first numFrames of sensorFile
 	void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));
 
+	void matchFrame(unsigned int frame, bool print);
+
 	//! debug hack
 	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames = vec2ui((unsigned int)-1));
 
@@ -106,6 +108,25 @@ private:
 	void filterByDenseVerify(bool print = false, const std::string& outDir = "");
 	void createCachedFrames();
 
+	void freeCachedFrames() {
+		for (CUDACachedFrame& f : m_cachedFrames) {
+			f.free();
+		}
+		m_cachedFrames.clear();
+
+		MLIB_CUDA_SAFE_FREE(d_cachedFrames);
+	}
+	void allocCachedFrames(unsigned int num, unsigned int width, unsigned int height) {
+		freeCachedFrames();
+		m_cachedFrames.resize(num);
+		for (CUDACachedFrame& f : m_cachedFrames) {
+			f.alloc(width, height);
+		}
+
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_cachedFrames, sizeof(CUDACachedFrame)*num));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_cachedFrames, m_cachedFrames.data(), sizeof(CUDACachedFrame)*num, cudaMemcpyHostToDevice));
+	}
+
 	SIFTImageManager* m_siftManager;
 
 	std::vector<vec2ui> m_origMatches;
@@ -133,6 +154,7 @@ private:
 	std::vector<DepthImage32>		m_depthImages;
 	std::vector<mat4f>				m_referenceTrajectory;
 
+	CUDACachedFrame*			 d_cachedFrames;
 	std::vector<CUDACachedFrame> m_cachedFrames;
 	mat4f m_intrinsicsDownsampled;
 };

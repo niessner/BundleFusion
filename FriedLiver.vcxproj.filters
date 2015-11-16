@@ -132,6 +132,9 @@
     <ClCompile Include="Source\ConditionManager.cpp" />
     <ClCompile Include="Source\testMatching.cpp" />
     <ClCompile Include="Source\SiftVisualization.cpp" />
+    <ClCompile Include="Source\PrimeSenseSensor.cpp">
+      <Filter>Sensors</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -359,6 +362,9 @@
     <ClInclude Include="Source\ConditionManager.h" />
     <ClInclude Include="Source\testMatching.h" />
     <ClInclude Include="Source\SiftVisualization.h" />
+    <ClInclude Include="Source\PrimeSenseSensor.h">
+      <Filter>Sensors</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

@@ -183,8 +183,10 @@ public:
 		cutilSafeCall(cudaMemcpy(&numMatches, d_currNumMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
 		keyPointIndices.resize(numMatches);
 		matchDistances.resize(numMatches);
-		cutilSafeCall(cudaMemcpy(keyPointIndices.data(), d_currMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_RAW, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
-		cutilSafeCall(cudaMemcpy(matchDistances.data(), d_currMatchDistances + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_RAW, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
+		if (numMatches > 0) {
+			cutilSafeCall(cudaMemcpy(keyPointIndices.data(), d_currMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_RAW, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
+			cutilSafeCall(cudaMemcpy(matchDistances.data(), d_currMatchDistances + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_RAW, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
+		}
 	}
 	void getFiltKeyPointIndicesAndMatchDistancesDEBUG(unsigned int imagePairIndex, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances) const
 	{
@@ -192,8 +194,10 @@ public:
 		cutilSafeCall(cudaMemcpy(&numMatches, d_currNumFilteredMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
 		keyPointIndices.resize(numMatches);
 		matchDistances.resize(numMatches);
-		cutilSafeCall(cudaMemcpy(keyPointIndices.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
-		cutilSafeCall(cudaMemcpy(matchDistances.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
+		if (numMatches > 0) {
+			cutilSafeCall(cudaMemcpy(keyPointIndices.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
+			cutilSafeCall(cudaMemcpy(matchDistances.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
+		}
 	}
 	void getFiltKeyPointIndicesDEBUG(unsigned int imagePairIndex, std::vector<uint2>& keyPointIndices) const
 	{

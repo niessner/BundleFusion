@@ -379,6 +379,7 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	if (threadIdx.x == 0) {
 		//printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
 		if (area0 < areaThresh && area1 < areaThresh) {
+			//if (imagePairIdx > 40) printf("INVALID AREA [%d %d] (%f %f)\n", imagePairIdx, gridDim.x, area0, area1);
 			d_numFilteredMatchesPerImagePair[imagePairIdx] = 0;
 		}
 	}
@@ -445,7 +446,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 				float tgtDepth = d_modelDepth[screenPos.y * imageWidth + screenPos.x];
 
 				if (tgtDepth >= sensorDepthMin && tgtDepth <= sensorDepthMax) {
-					bool b = ((tgtDepth != MINF && projInputDepth < tgtDepth) && d > distThresh); // bad matches that are known
+					bool b = ((tgtDepth != MINF && projInputDepth < tgtDepth) && d > distThresh); // bad matches that are known 
 					if ((dNormal >= normalThresh && d <= distThresh /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
 
 						const float cameraToKinectProjZ = (pTransInput.z - sensorDepthMin) / (sensorDepthMax - sensorDepthMin);
@@ -472,7 +473,10 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 	const unsigned int curImageIdx = gridDim.x;
 	const unsigned int imagePairIdx = blockIdx.x; // prev image idx
 	const unsigned int numMatches = d_currNumFilteredMatchesPerImagePair[imagePairIdx];
-	if (numMatches == 0)	return;
+	if (numMatches == 0) {
+		//if (threadIdx.x == 0 && threadIdx.y == 0) printf("no matches between %d, %d\n", imagePairIdx, curImageIdx); 
+		return;
+	}
 
 	const float*  d_inputDepth = d_cachedFrames[imagePairIdx].d_depthDownsampled;
 	const float4* d_inputCamPos = d_cachedFrames[imagePairIdx].d_cameraposDownsampled;
@@ -541,11 +545,12 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 	if (threadIdx.x == 0 && threadIdx.y == 0) {
 		float err = sumResidual / sumWeight;
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
-		//printf("[%d-%d]: %f %f\n", imagePairIdx, curImageIdx, err, corr);
 
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
+			//printf("[%d-%d]: %f %f INVALID\n", imagePairIdx, curImageIdx, err, corr);
 			d_currNumFilteredMatchesPerImagePair[imagePairIdx] = 0;
 		}
+		//else printf("[%d-%d]: %f %f\n", imagePairIdx, curImageIdx, err, corr);
 	}
 }
 

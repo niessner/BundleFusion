@@ -1022,6 +1022,16 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		exit(1);
 	}
 
+	//if (g_CudaImageManager->getCurrFrameNumber() == 2000) {
+	//	g_depthSensingRGBDSensor->stopReceivingFrames();
+	//	std::vector<mat4f> trajectory;
+	//	g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+	//	g_depthSensingRGBDSensor->saveRecordedFramesToFile(GlobalAppState::getInstance().s_recordDataFile, trajectory);
+	//	std::cout << "waiting..." << std::endl;
+	//	getchar();
+	//}
+	
+
 	DXUT_EndPerfEvent();
 }
 

@@ -18,6 +18,7 @@
 //#include "mLibZlib.h"
 #include "mLibLodePNG.h"
 
+//#include "mLibEigen.h"
 
 //move this to mlib (it's currently local)
 #include "mLibCuda.h"
