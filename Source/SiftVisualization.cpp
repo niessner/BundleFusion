@@ -286,3 +286,25 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, u
 		//n.normalize();
 	}
 }
+
+void SiftVisualization::saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages, const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv)
+{
+	MLIB_ASSERT(depthImages.size() > 0 && depthImages.size() == colorImages.size() && depthImages.size() == trajectory.size());
+	const unsigned int depthWidth = depthImages.front().getWidth();
+	const unsigned int depthHeight = depthImages.front().getHeight();
+	const unsigned int colorWidth = colorImages.front().getWidth();
+	const unsigned int colorHeight = colorImages.front().getHeight();
+
+	std::list<PointCloudf> pcs;
+	for (unsigned int i = 0; i < depthImages.size(); i++) {
+		pcs.push_back(PointCloudf());
+		computePointCloud(pcs.back(), depthImages[i].getPointer(), depthWidth, depthHeight, colorImages[i].getPointer(), colorWidth, colorHeight, depthIntrinsicsInv, trajectory[i]);
+	}
+	PointCloudf pc;
+	for (const auto& p : pcs) {
+		pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
+		pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
+		pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
+	}
+	PointCloudIOf::saveToFile(filename, pc);
+}

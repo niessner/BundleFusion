@@ -34,5 +34,8 @@ public:
 	static void computePointCloud(PointCloudf& pc, const float* depth, unsigned int depthWidth, unsigned int depthHeight,
 		const vec4uc* color, unsigned int colorWidth, unsigned int colorHeight,
 		const mat4f& depthIntrinsicsInv, const mat4f& transform);
+
+	static void saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
+		const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv);
 private:
 };

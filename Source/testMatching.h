@@ -36,7 +36,9 @@ public:
 	// match within first numFrames of sensorFile
 	void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));
 
-	void matchFrame(unsigned int frame, bool print);
+	void matchFrame(unsigned int frame, bool print, bool checkReference);
+	// matches last frame and optimizes
+	void debugOptimizeGlobal();
 
 	//! debug hack
 	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames = vec2ui((unsigned int)-1));

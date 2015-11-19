@@ -204,29 +204,28 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (false) {
+		if (true) {
 			CalibratedSensorData cs;
 			{
 				BinaryDataStreamFile s("../data/tum/fr2_xyz.sensor", false);
 				s >> cs;
 			}
-			unsigned int splitFrame = 2080;
-			bool useFirst = true;
-			if (useFirst) {	// [0, splitFrame)
-				cs.m_ColorImages.erase(cs.m_ColorImages.begin() + splitFrame, cs.m_ColorImages.end());
-				cs.m_DepthImages.erase(cs.m_DepthImages.begin() + splitFrame, cs.m_DepthImages.end());
-				cs.m_trajectory.erase(cs.m_trajectory.begin() + splitFrame, cs.m_trajectory.end());
+			unsigned int startFrame = 2000;
+			unsigned int endFrame = 2080;
+			if (endFrame < cs.m_ColorNumFrames) { // [splitFrame, end)	
+				cs.m_ColorImages.erase(cs.m_ColorImages.begin() + endFrame, cs.m_ColorImages.end());
+				cs.m_DepthImages.erase(cs.m_DepthImages.begin() + endFrame, cs.m_DepthImages.end());
+				cs.m_trajectory.erase(cs.m_trajectory.begin() + endFrame, cs.m_trajectory.end());;
 			}
-			else { // [splitFrame, end)	
-				cs.m_ColorImages.erase(cs.m_ColorImages.begin(), cs.m_ColorImages.begin() + splitFrame);
-				cs.m_DepthImages.erase(cs.m_DepthImages.begin(), cs.m_DepthImages.begin() + splitFrame);
-				cs.m_trajectory.erase(cs.m_trajectory.begin(), cs.m_trajectory.begin() + splitFrame);
+			if (startFrame > 0) { // [start, splitFrame)
+				cs.m_ColorImages.erase(cs.m_ColorImages.begin(), cs.m_ColorImages.begin() + startFrame);
+				cs.m_DepthImages.erase(cs.m_DepthImages.begin(), cs.m_DepthImages.begin() + startFrame);
+				cs.m_trajectory.erase(cs.m_trajectory.begin(), cs.m_trajectory.begin() + startFrame);
 			}
 			cs.m_ColorNumFrames = (unsigned int)cs.m_ColorImages.size();
 			cs.m_DepthNumFrames = (unsigned int)cs.m_DepthImages.size();
 
-			std::string which = useFirst ? "to" : "from";
-			const std::string outFile = "debug/" + which + std::to_string(splitFrame) + ".sensor";
+			const std::string outFile = "debug/" + std::to_string(startFrame) + "-" + std::to_string(endFrame) + ".sensor";
 			{
 				BinaryDataStreamFile s(outFile, true);
 				s << cs;
@@ -240,7 +239,7 @@ int main(int argc, char** argv)
 			//test.load("", "debug/global.sift");
 			//std::cout << "waiting..." << std::endl;
 			//getchar();
-
+			
 			//test.loadImages("debug/images.bin");
 			//test.load("debug/matchAll.bin", "debug/global.sift");
 			//test.test();
@@ -250,7 +249,8 @@ int main(int argc, char** argv)
 			//test.match("", "debug/matches/", "debug/debug.sensor");
 			test.loadFromSensor("debug/to2080.sensor", "", GlobalBundlingState::get().s_submapSize);
 			test.load("", "debug/test208.sift");
-			test.matchFrame(207, true);
+			//test.matchFrame(207, true, true);
+			test.debugOptimizeGlobal();
 
 			std::cout << "done!" << std::endl;
 			getchar();

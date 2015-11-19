@@ -425,22 +425,30 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (m_global->getNumImages() > 1) {
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() > 206) {
-			//	std::cout << "saving " << m_global->getNumImages() << " global to file... ";
-			//	m_global->saveToFile("debug/test" + std::to_string(m_global->getNumImages()) + ".sift");
-			//	std::cout << "done!" << std::endl;
+			//if (m_global->getNumImages() == 60) {
+			//	setPrintMatchesDEBUG(true);
 			//}
-			if (m_global->getNumImages() == 60) {
-				setPrintMatchesDEBUG(true);
-			}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			if (m_global->getNumImages() == 60) {
-				setPrintMatchesDEBUG(false);
-				std::cout << "waiting..." << std::endl;
-				getchar();
-			}
+			//if (m_global->getNumImages() == 60) {
+			//	setPrintMatchesDEBUG(false);
+			//	std::cout << "waiting..." << std::endl;
+			//	getchar();
+			//}
+			//if (m_global->getNumImages() > 206) {
+			//	std::cout << "saving " << m_global->getNumImages() << " global to file... ";
+			//	m_global->saveToFile("debug/test" + std::to_string(m_global->getNumImages()) + ".sift");
+			//	// save global trajectory
+			//	std::vector<mat4f> globalTrajectory(m_global->getNumImages());
+			//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(globalTrajectory.data(), d_globalTrajectory, sizeof(mat4f)*globalTrajectory.size(), cudaMemcpyDeviceToHost));
+			//	BinaryDataStreamFile _s("debug/test" + std::to_string(m_global->getNumImages()) + ".trajectory", true);
+			//	_s << globalTrajectory;
+			//	_s.closeStream();
+			//	std::cout << "done!" << std::endl;
+			//	std::cout << "waiting..." << std::endl;
+			//	getchar();
+			//}
 			//!!!DEBUGGING
 
 			if (m_global->getValidImages()[m_global->getNumImages() - 1]) {
