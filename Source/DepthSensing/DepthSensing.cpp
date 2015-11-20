@@ -911,9 +911,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////
 	// Read Input
 	///////////////////////////////////////
+#ifdef RUN_MULTITHREADED
 	ConditionManager::lockImageManagerFrameReady(ConditionManager::Recon);
 	while (g_CudaImageManager->hasBundlingFrameRdy()) ConditionManager::waitImageManagerFrameReady(ConditionManager::Recon);
-	//while (g_CudaImageManager->hasBundlingFrameRdy()) Sleep(0);		//previous frame was not processed by bundling yet
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
 		g_CudaImageManager->setBundlingFrameRdy();					//ready for bundling thread
@@ -925,7 +925,10 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		g_depthSensingBundler->confirmProcessedInputFrame();	// let bundling still optimize after scanning done
 		ConditionManager::notifyBundlerProcessedInput();
 	}
-
+#else
+	bool bGotDepth = g_CudaImageManager->process();
+	g_depthSensingBundler->processInput();
+#endif
 
 	///////////////////////////////////////
 	// Fix old frames
@@ -937,11 +940,13 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	
 	//wait until the bundling thread is done with: sift extraction, sift matching, and key point filtering
+#ifdef RUN_MULTITHREADED
 	if (bGotDepth) {
 		ConditionManager::lockBundlerProcessedInput(ConditionManager::Recon);
 		while (!g_depthSensingBundler->hasProcssedInputFrame()) ConditionManager::waitBundlerProcessedInput(ConditionManager::Recon);
 		//while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
 	}	
+#endif
 	
 	const bool outputDebug = false;//g_CudaImageManager->getCurrFrameNumber() >= 2078; //debug hack output to stderr
 
@@ -953,10 +958,11 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	if (bGotDepth) {
 		mat4f transformation = mat4f::zero();
 		unsigned int frameIdx;
-		validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);		
+		validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);	
+#ifdef RUN_MULTITHREADED
 		g_depthSensingBundler->confirmProcessedInputFrame();
 		ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Recon);
-
+#endif
 		if (outputDebug) std::cerr << "[ frame " << frameIdx << "]: sift transform " << PoseHelper::MatrixToPose(transformation) << std::endl;
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
@@ -986,10 +992,10 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	}
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeReconstruct = t.getElapsedTimeMS(); }
 
-	//if (validTransform && isnan(g_lastRigidTransform[0])) {
-	//	std::cout << "ERROR WITH TRANSFORM" << std::endl;
-	//	getchar();
-	//}
+	if (validTransform && isnan(g_lastRigidTransform[0])) {
+		std::cout << "ERROR WITH TRANSFORM" << std::endl;
+		getchar();
+	}
 
 	///////////////////////////////////////
 	// Render with view of current frame
@@ -1003,10 +1009,11 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////////
 	////// Bundling Optimization
 	///////////////////////////////////////////
-	//g_depthSensingBundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-	//g_depthSensingBundler->processGlobal();
-	//g_depthSensingBundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
-
+#ifndef RUN_MULTITHREADED
+	g_depthSensingBundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+	g_depthSensingBundler->processGlobal();
+	g_depthSensingBundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+#endif
 
 	// Stop Timing
 	if (GlobalBundlingState::get().s_enablePerFrameTimings) { 

@@ -2,6 +2,7 @@
 #pragma once
 
 #include <condition_variable>
+#include "GlobalAppState.h"
 
 class ConditionManager {
 public:
@@ -45,6 +46,7 @@ public:
 			std::cout << "ERROR: CONDITION MANAGER: BUNDLE STILL OWNS LOCK" << std::endl;
 	}
 
+#ifdef RUN_MULTITHREADED
 	static void lockImageManagerFrameReady(THREAD_NAME type) {
 		s_lockImageManagerFrameReady[type].lock();
 	}
@@ -69,6 +71,16 @@ public:
 	static void notifyBundlerProcessedInput() {
 		s_cvBundlerProcessedCheck.notify_one();
 	}
+#else 
+	static void lockImageManagerFrameReady(THREAD_NAME type) {}
+	static void waitImageManagerFrameReady(THREAD_NAME type) {}
+	static void unlockAndNotifyImageManagerFrameReady(THREAD_NAME type) {}
+
+	static void lockBundlerProcessedInput(THREAD_NAME type) {}
+	static void waitBundlerProcessedInput(THREAD_NAME type) {}
+	static void unlockAndNotifyBundlerProcessedInput(THREAD_NAME type) {}
+	static void notifyBundlerProcessedInput() {}
+#endif
 
 private:
 	static std::mutex s_mutexImageManagerHasFrameReady;

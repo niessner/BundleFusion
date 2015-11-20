@@ -8,9 +8,7 @@
 //#define REAL_SENSE
 //#define STRUCTURE_SENSOR
 
-//#define OBJECT_SENSING
-
-//#include "Eigen.h"
+//#define RUN_MULTITHREADED
 
 #include "stdafx.h"
 

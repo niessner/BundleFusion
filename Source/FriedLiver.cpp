@@ -85,11 +85,12 @@ Bundler* g_bundler = NULL;
 
 
 void bundlingOptimization() {
-	//g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-	//g_bundler->processGlobal();
-	//g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+	g_bundler->processGlobal();
+	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 
-	g_bundler->resetDEBUG();
+	// for no opt
+	//g_bundler->resetDEBUG();
 }
 
 void bundlingOptimizationThreadFunc() {
@@ -279,12 +280,14 @@ int main(int argc, char** argv)
 		g_imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, g_RGBDSensor, false);
 
+#ifdef RUN_MULTITHREADED
 		std::thread bundlingThread(bundlingThreadFunc);
-
 
 		//waiting until bundler is initialized
 		while (!g_bundler)	Sleep(0);
-
+#else
+		g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
+#endif
 
 		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
 
@@ -299,6 +302,7 @@ int main(int argc, char** argv)
 		g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
 		//g_bundler->saveDEBUG();
 
+#ifdef RUN_MULTITHREADED
 		g_bundler->exitBundlingThread();
 
 		g_imageManager->setBundlingFrameRdy();			//release all bundling locks
@@ -306,6 +310,7 @@ int main(int argc, char** argv)
 		ConditionManager::release(ConditionManager::Recon); // release bundling locks
 
 		if (bundlingThread.joinable())	bundlingThread.join();	//wait for the bundling thread to return;
+#endif
 		SAFE_DELETE(g_bundler);
 		SAFE_DELETE(g_imageManager);
 
