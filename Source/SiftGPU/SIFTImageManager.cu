@@ -322,6 +322,10 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	const unsigned int imagePairIdx = blockIdx.x;
 	//const unsigned int tidx = threadIdx.x;
 
+	//!!!DEBUGGING
+	const bool debug = imagePairIdx == 53 && gridDim.x == 206;
+	//!!!DEBUGGING
+
 	const unsigned int numMatches = d_numFilteredMatchesPerImagePair[imagePairIdx];
 	if (numMatches == 0)	return;
 	const uint2* d_keyPointMatchIndices = d_filteredMatchKeyPointIndicesGlobal + imagePairIdx * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED;
@@ -377,7 +381,7 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	}
 
 	if (threadIdx.x == 0) {
-		//printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
+		if (debug) printf("[%d] areas %f %f\n", imagePairIdx, area0, area1);
 		if (area0 < areaThresh && area1 < areaThresh) {
 			//if (imagePairIdx > 40) printf("INVALID AREA [%d %d] (%f %f)\n", imagePairIdx, gridDim.x, area0, area1);
 			d_numFilteredMatchesPerImagePair[imagePairIdx] = 0;
@@ -477,6 +481,9 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 		//if (threadIdx.x == 0 && threadIdx.y == 0) printf("no matches between %d, %d\n", imagePairIdx, curImageIdx); 
 		return;
 	}
+	//!!!DEBUGGING
+	const bool debug = imagePairIdx == 53 && curImageIdx == 206;
+	//!!!DEBUGGING
 
 	const float*  d_inputDepth = d_cachedFrames[imagePairIdx].d_depthDownsampled;
 	const float4* d_inputCamPos = d_cachedFrames[imagePairIdx].d_cameraposDownsampled;
@@ -546,6 +553,7 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 		float err = sumResidual / sumWeight;
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
 
+		if (debug) printf("[%d-%d]: %f %f\n", imagePairIdx, curImageIdx, err, corr);
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
 			//printf("[%d-%d]: %f %f INVALID\n", imagePairIdx, curImageIdx, err, corr);
 			d_currNumFilteredMatchesPerImagePair[imagePairIdx] = 0;
@@ -721,30 +729,18 @@ void SIFTImageManager::InvalidateImageToImageCU(const uint2& imageToImageIdx) {
 void __global__ CheckForInvalidFramesCU_Kernel(const int* d_varToCorrNumEntriesPerRow, int* d_validImages, unsigned int numVars,
 	EntryJ* d_globMatches, unsigned int numGlobResiduals)
 {
-	//const unsigned int idx = blockDim.x*blockIdx.x + threadIdx.x;
-
-	//if (idx < numVars) {
-	//	if (d_varToCorrNumEntriesPerRow[idx] == 0) { // no connections!
-	//		//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
-	//		d_validImages[idx] = 0;
-	//	}
-	//}
-
-	//if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0 && threadIdx.y == 0) {
-	//	printf("(vars) blockDim = %d %d, (res)gridDim = %d %d\n", blockDim.x, blockDim.y, gridDim.x, gridDim.y);
-	//}
 	const unsigned int resIdx = blockDim.x*blockIdx.x + blockIdx.y;
 	const unsigned int varIdx = gridDim.x*threadIdx.x + threadIdx.y;
-
-	//printf("%d,%d | %d,%d -> (v %d, r %d) (%d, %d)\n", blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, varIdx, resIdx, numVars, numGlobResiduals);
 
 	if (varIdx < numVars && resIdx < numGlobResiduals) {
 		if (d_varToCorrNumEntriesPerRow[varIdx] == 0) { // no connections!
 			if (d_globMatches[resIdx].isValid() && (d_globMatches[resIdx].imgIdx_i == varIdx || d_globMatches[resIdx].imgIdx_j == varIdx)) { // invalidate residuals
 				d_globMatches[resIdx].setInvalid();
 			}
-			//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
-			if (d_validImages[varIdx] != 0) d_validImages[varIdx] = 0;
+			if (d_validImages[varIdx] != 0) {
+				printf("[CheckForInvalidFramesCU] invalidating frame %d\n", varIdx); //todo remove debug print
+				d_validImages[varIdx] = 0;
+			}
 		}
 	}
 

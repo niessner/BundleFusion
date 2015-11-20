@@ -135,6 +135,7 @@
     <ClCompile Include="Source\PrimeSenseSensor.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
+    <ClCompile Include="Source\SBALie.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -365,6 +366,7 @@
     <ClInclude Include="Source\PrimeSenseSensor.h">
       <Filter>Sensors</Filter>
     </ClInclude>
+    <ClInclude Include="Source\SBALie.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

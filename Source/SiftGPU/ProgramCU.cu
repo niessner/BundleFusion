@@ -615,7 +615,9 @@ void ProgramCU::ComputeDOG(CuTexImage* gus, CuTexImage* dog, CuTexImage* got)
 
 void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowmax,
 	float dog_threshold0, float dog_threshold, float edge_threshold, int subpixel_localization,
-	int4* d_featureList, int* d_featureCount, unsigned int featureOctLevelidx, float keyLocScale, float keyLocOffset, const float* d_depthData, float siftDepthMin, float siftDepthMax)
+	int4* d_featureList, int* d_featureCount, unsigned int featureOctLevelidx, float keyLocScale, float keyLocOffset, const float* d_depthData, float siftDepthMin, float siftDepthMax
+	, unsigned int maxNumFeatures
+	)
 {
 	const unsigned int depthWidth = c_siftCameraParams.m_depthWidth;
 	const unsigned int depthHeight = c_siftCameraParams.m_depthHeight;
@@ -637,7 +639,7 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 #ifdef KEY_OFFSET_ONE
 	if(row < rowmax && col < colmax)
 #else
-	if (row > 0 && col > 0 && row < rowmax && col < colmax)
+	if (row > 0 && col > 0 && row < rowmax-1 && col < colmax-1)
 #endif
 	{
 		d_key[index] = make_float4(result, dx, dy, ds);
@@ -651,9 +653,14 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 		float depth = d_depthData[depthyi * depthWidth + depthxi];
 
 		if (depth == MINF || depth < siftDepthMin || depth > siftDepthMax) return;
-
 		data[1][1] = v = tex1Dfetch(texC, idx[1]);
 		if (fabs(v) <= dog_threshold0) return; // if pixel value less than dog thresh
+
+		//!!!DEBUGGING
+		//if (idx[1] < 0 || idx[1] >= rowmax * colmax ||
+		//	idx[1] - 1 < 0 || idx[1] - 1 >= rowmax * colmax ||
+		//	idx[1] + 1 < 0 || idx[1] + 1 >= rowmax * colmax) printf("ERROR idx[1] indexing (%d)\n", idx[1]);
+		//!!!DEBUGGING
 
 		data[1][0] = tex1Dfetch(texC, idx[1] - 1); // current(row, col-1)
 		data[1][2] = tex1Dfetch(texC, idx[1] + 1); // current(row, col+1)
@@ -661,7 +668,14 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 		nmin = min(data[1][0], data[1][2]);
 
 		if (v <= nmax && v >= nmin) return; // not a min or a max already
-		//if((v > nmax && v < 0 )|| (v < nmin && v > 0)) goto key_finish;
+		//!!!DEBUGGING
+		//if (idx[0] < 0 || idx[0] >= rowmax * colmax ||
+		//	idx[0] - 1 < 0 || idx[0] - 1 >= rowmax * colmax ||
+		//	idx[0] + 1 < 0 || idx[0] + 1 >= rowmax * colmax) printf("ERROR idx[0] indexing (%d)\n", idx[0]);
+		//if (idx[2] < 0 || idx[2] >= rowmax * colmax ||
+		//	idx[2] - 1 < 0 || idx[2] - 1 >= rowmax * colmax ||
+		//	idx[2] + 1 < 0 || idx[2] + 1 >= rowmax * colmax) printf("ERROR idx[2] indexing (%d)\n", idx[2]);
+		//!!!DEBUGGING
 		READ_CMP_DOG_DATA(data[0], texC, idx[0]); // current (row-1, col-1) (row-1, col) (row-1, col+1)
 		READ_CMP_DOG_DATA(data[2], texC, idx[2]); // current (row+1, col-1) (row+1, col) (row+1, col+1)
 
@@ -688,6 +702,7 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 
 		if (subpixel_localization)
 		{
+			printf("ERROR should not get to subpixel localization\n");
 			//subpixel localization
 			float fx = 0.5f * (data[1][2] - data[1][0]);
 			float fy = 0.5f * (data[2][1] - data[0][1]);
@@ -741,9 +756,11 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 		}
 		if (offset_test_passed) {
 			result = v > nmax ? 1.0f : -1.0f;
-			int addr = atomicAdd(&d_featureCount[featureOctLevelidx], 1);
-			d_featureList[addr] = make_int4(col, row, 0, 0);
-			d_key[index] = make_float4(result, dx, dy, ds);
+			int addr = atomicAdd(d_featureCount + featureOctLevelidx, 1);
+			if (addr < maxNumFeatures) {
+				d_featureList[addr] = make_int4(col, row, 0, 0);
+				d_key[index] = make_float4(result, dx, dy, ds);
+			}
 		}
 	}
 }
@@ -771,7 +788,9 @@ void ProgramCU::ComputeKEY(CuTexImage* dog, CuTexImage* key, float Tdog, float T
 	ComputeKEY_Kernel << <grid, block >> >((float4*)key->_cuData, width,
 		width - 1, height - 1, Tdog1, Tdog, Tedge, GlobalUtil::_SubpixelLocalization,
 		(int4*)featureList->_cuData, d_featureCount, featureOctLevelidx,
-		keyLocScale, keyLocOffset, d_depthData, siftDepthMin, siftDepthMax);
+		keyLocScale, keyLocOffset, d_depthData, siftDepthMin, siftDepthMax
+		, featureList->GetImgWidth()* featureList->GetImgHeight()
+		);
 
 	ProgramCU::CheckErrorCUDA("ComputeKEY");
 }

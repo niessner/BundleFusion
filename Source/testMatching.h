@@ -39,6 +39,9 @@ public:
 	void matchFrame(unsigned int frame, bool print, bool checkReference);
 	// matches last frame and optimizes
 	void debugOptimizeGlobal();
+	void checkCorrespondences();
+	void printKeys();
+	void debugMatchInfo();
 
 	//! debug hack
 	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames = vec2ui((unsigned int)-1));

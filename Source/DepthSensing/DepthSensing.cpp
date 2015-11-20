@@ -835,6 +835,11 @@ void reintegrate()
 	const unsigned int maxPerFrameFixes = GlobalAppState::get().s_maxFrameFixes;
 	TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
 
+	//!!!TODO REMOVE
+	const bool outputDebug = false;//g_CudaImageManager->getCurrFrameNumber() >= 2078; //debug hack output to stderr
+	if (outputDebug) std::cerr << "frame " << g_CudaImageManager->getCurrFrameNumber() << std::endl;
+	//!!!TODO REMOVE
+
 	if (tm->getNumActiveOperations() < maxPerFrameFixes) {
 		//Timer t;
 		tm->generateUpdateLists(); 
@@ -844,6 +849,7 @@ void reintegrate()
 			}
 		}
 		//std::cout << "generateUpdateList " << t.getElapsedTimeMS() << " [ms] " << std::endl;
+		if (outputDebug) std::cerr << "\tgenerated update lists" << std::endl;
 	}
 
 	for (unsigned int fixes = 0; fixes < maxPerFrameFixes; fixes++) {
@@ -856,6 +862,7 @@ void reintegrate()
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 			MLIB_ASSERT(!isnan(oldTransform[0]));
+			if (outputDebug) std::cerr << "\tdeintegrate " << frameIdx << "\t" << PoseHelper::MatrixToPose(oldTransform) << std::endl;
 			deIntegrate(depthCameraData, oldTransform);
 			continue;
 		}
@@ -863,6 +870,7 @@ void reintegrate()
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 			MLIB_ASSERT(!isnan(newTransform[0]));
+			if (outputDebug) std::cerr << "\tintegrate " << frameIdx << "\t" << PoseHelper::MatrixToPose(newTransform) << std::endl;
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
 			continue;
@@ -871,6 +879,10 @@ void reintegrate()
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 			MLIB_ASSERT(!isnan(oldTransform[0]) && !isnan(newTransform[0]));
+			if (outputDebug) {
+				std::cerr << "\treintegrate(de) " << frameIdx << "\t" << PoseHelper::MatrixToPose(oldTransform) << std::endl;
+				std::cerr << "\treintegrate(re) " << frameIdx << "\t" << PoseHelper::MatrixToPose(newTransform) << std::endl;
+			}
 			deIntegrate(depthCameraData, oldTransform);
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
@@ -931,7 +943,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		//while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
 	}	
 	
-
+	const bool outputDebug = false;//g_CudaImageManager->getCurrFrameNumber() >= 2078; //debug hack output to stderr
 
 	///////////////////////////////////////
 	// Reconstruction of current frame
@@ -944,6 +956,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);		
 		g_depthSensingBundler->confirmProcessedInputFrame();
 		ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Recon);
+
+		if (outputDebug) std::cerr << "[ frame " << frameIdx << "]: sift transform " << PoseHelper::MatrixToPose(transformation) << std::endl;
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
 			//overwrite transform and use given trajectory in this case

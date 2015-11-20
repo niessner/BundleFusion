@@ -188,6 +188,12 @@ public:
 		m_bIsScanDoneGlobalOpt = true;
 	}
 
+	//! fake finish local opt without actually optimizing anything
+	void resetDEBUG() {
+		m_currentState.m_localToSolve = -1;
+		m_SubmapManager.resetDEBUG();
+	}
+
 private:
 	bool m_bHasProcessedInputFrame;
 	bool m_bExitBundlingThread;

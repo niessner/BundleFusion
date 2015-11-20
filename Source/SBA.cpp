@@ -70,13 +70,20 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 
 	if (remove) {
 		if (GlobalBundlingState::get().s_verbose) std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
-		//getchar();
+
+		//!!!TODO REMOVE
+		const bool _debug = false;//numImages >= 200;
+		if (_debug) std::cout << "[#images = " << numImages << "] removing " << imageIndices << " (" << m_maxResidual << ")" << std::endl;
+		//!!!TODO REMOVE
+
 		// invalidate correspondence
 		siftManager->InvalidateImageToImageCU(make_uint2(imageIndices.x, imageIndices.y));
 		if (m_bUseComprehensiveFrameInvalidation)
 			siftManager->CheckForInvalidFramesCU(m_solver->getVarToCorrNumEntriesPerRow(), numImages); // need to re-adjust for removed matches
 		else
 			siftManager->CheckForInvalidFramesSimpleCU(m_solver->getVarToCorrNumEntriesPerRow(), numImages); // faster but not completely accurate
+
+		if (_debug) getchar();
 		return true;
 	}
 	//else std::cout << "\thighest residual " << m_maxResidual << " from images (" << imageIndices << ")" << std::endl;

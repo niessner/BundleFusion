@@ -451,8 +451,10 @@ unsigned int filterKeyPointMatches(
 	while (!done) {
 		if (idx == numRawMatches || curNumMatches >= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) {
 			if (curNumMatches < minNumMatches || curMaxResidual >= maxResThresh || !validTransform) { // invalid
+				if (printDebug) printf("INVALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
 				curNumMatches = 0;
 			}
+			else if (printDebug) printf("VALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
 			done = true;
 			break;
 		}
@@ -470,10 +472,6 @@ unsigned int filterKeyPointMatches(
 				bool b = validTransform;
 				float4x4 prevTransform = transformEstimate;
 				curMaxResidual = residuals[curNumMatches - 1];
-
-				//!!!DEBUGGING
-				if (printDebug) printf("%d: max res = %f, %d\n", curNumMatches, curMaxResidual, validTransform);
-				//!!!DEBUGGING
 
 				if (curMaxResidual > maxResThresh) { // some bad matches
 					float lastRes = -1;

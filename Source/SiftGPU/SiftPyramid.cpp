@@ -126,6 +126,21 @@ void SiftPyramid::BuildPyramid(float* d_data)
 		}
 	}
 
+	{ // resize the feature images
+		unsigned int idx = 0;
+		for (i = 0; i < _octave_num; i++) {
+			CuTexImage * tex = GetBaseLevel(i + _octave_min);
+			int fmax = int(tex->GetImgWidth() * tex->GetImgHeight()*GlobalUtil::_MaxFeaturePercent);
+			//
+			if (fmax > GlobalUtil::_MaxLevelFeatureNum) fmax = GlobalUtil::_MaxLevelFeatureNum;
+			else if (fmax < 32) fmax = 32;	//give it at least a space of 32 feature
+
+			for (j = 0; j < param._dog_level_num; j++, idx++) {
+				_featureTexRaw[idx].InitTexture(fmax, 1, 4);
+			}
+		}
+	}
+
 	ProgramCU::CheckErrorCUDA(__FUNCTION__);
 }
 
@@ -373,6 +388,7 @@ void SiftPyramid::DetectKeypoints(const float* d_depthData)
 	cutilSafeCall(cudaMemcpy(_levelFeatureNum, d_featureCount, sizeof(int) * _octave_num * param._dog_level_num, cudaMemcpyDeviceToHost));
 	_featureNum = 0;
 	for (int i = 0; i < _octave_num * param._dog_level_num; i++) {
+		_levelFeatureNum[i] = std::min(_levelFeatureNum[i], _featureTexRaw[i].GetImgWidth() * _featureTexRaw[i].GetImgHeight());
 		_featureTexRaw[i].SetImageSize(_levelFeatureNum[i], 1);
 		_featureNum += _levelFeatureNum[i];
 	}

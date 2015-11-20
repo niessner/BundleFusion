@@ -536,10 +536,11 @@ void TestMatching::loadFromSensor(const std::string& sensorFile, const std::stri
 	m_referenceTrajectory.resize(numFrames);
 	MLIB_ASSERT((cs.m_ColorNumFrames - 1) / skip == numFrames - 1);
 	for (unsigned int i = startEnd.x; i < startEnd.y; i += skip) {
-		MLIB_ASSERT(i / skip < m_colorImages.size());
-		m_colorImages[(i - startEnd.x) / skip] = ColorImageR8G8B8A8(cs.m_ColorImageWidth, cs.m_ColorImageHeight, cs.m_ColorImages[i]);
-		m_depthImages[(i - startEnd.x) / skip] = DepthImage32(cs.m_DepthImageWidth, cs.m_DepthImageHeight, cs.m_DepthImages[i]);
-		m_referenceTrajectory[(i - startEnd.x) / skip] = refTrajectory[i];
+		const unsigned int newIndex = (i - startEnd.x) / skip;
+		MLIB_ASSERT(newIndex < m_colorImages.size());
+		m_colorImages[newIndex] = ColorImageR8G8B8A8(cs.m_ColorImageWidth, cs.m_ColorImageHeight, cs.m_ColorImages[i]);
+		m_depthImages[newIndex] = DepthImage32(cs.m_DepthImageWidth, cs.m_DepthImageHeight, cs.m_DepthImages[i]);
+		m_referenceTrajectory[newIndex] = refTrajectory[i];
 	}
 	m_depthCalibration = cs.m_CalibrationDepth;
 	m_colorCalibration = cs.m_CalibrationColor;
@@ -1027,8 +1028,6 @@ void TestMatching::debugOptimizeGlobal()
 	unsigned int numFrames = m_siftManager->getNumImages();
 	unsigned int lastFrame = numFrames - 1;
 
-	matchFrame(lastFrame, false, false);
-
 	const std::string initialTrajectoryFile = "debug/test208.trajectory";
 	std::cout << "using initial trajectory: " << initialTrajectoryFile << std::endl;
 	std::vector<mat4f> globTrajectory;
@@ -1043,9 +1042,9 @@ void TestMatching::debugOptimizeGlobal()
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globalTrajectory, sizeof(float4x4)*m_siftManager->getNumImages()));
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory, globTrajectory.data(), sizeof(float4x4)*globTrajectory.size(), cudaMemcpyHostToDevice));
 
-	std::cout << "saving init to point cloud... ";
-	SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
-	std::cout << "done!" << std::endl;
+	//std::cout << "saving init to point cloud... ";
+	//SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
+	//std::cout << "done!" << std::endl;
 
 	const unsigned int numNonLinIters = 4;
 	const unsigned int numLinIters = 100;
@@ -1058,22 +1057,136 @@ void TestMatching::debugOptimizeGlobal()
 	bool isStart = true;
 	bool isEnd = true;
 	bool isScanDone = false;
-	for (unsigned int i = 0; i < 100; i++) {
+	for (unsigned int i = 0; i < 10; i++) {
 		bundler.align(m_siftManager, d_globalTrajectory, numNonLinIters, numLinIters,
 			useVerify, false, false, isStart, isEnd, isScanDone);
 
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globTrajectory.data(), d_globalTrajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
 
-		if (i % 10 == 0) {
+		//if (i % 10 == 0) {
 			std::cout << "saving opt " << i << " to point cloud... ";
 			SiftVisualization::saveToPointCloud("debug/opt" + std::to_string(i) + ".ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
 			std::cout << "done!" << std::endl;
-		}
+		//}
 	}
 
 	MLIB_CUDA_SAFE_FREE(d_globalTrajectory);
 
 	int a = 5;
+}
+
+void TestMatching::checkCorrespondences()
+{
+	MLIB_ASSERT(!m_referenceTrajectory.empty());
+	const std::string outDir = "debug/_checkCorr/"; if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+	const std::string inspectDir = "debug/_checkCorr/inspect/"; if (!util::directoryExists(inspectDir)) util::makeDirectory(inspectDir);
+
+	// debug hack
+	m_siftManager->AddCurrToResidualsCU(m_siftManager->getNumImages() - 1, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse));
+
+	std::cout << "CHECKING MATCHES WITH REFERENCE TRAJECTORY..." << std::endl;
+	// check with trajectory
+	const float maxResidualThres2 = 0.05f * 0.05f;
+	const float inspectMaxResThresh2 = 0.1f * 0.1f;
+	const unsigned int numImages = m_siftManager->getNumImages();
+
+	// get data
+	unsigned int numCorr = m_siftManager->getNumGlobalCorrespondences();
+	std::vector<EntryJ> correspondences(numCorr);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), m_siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ)*numCorr, cudaMemcpyDeviceToHost));
+	std::cout << "#corr = " << numCorr << std::endl;
+
+	unsigned int badCount = 0;
+
+	// compare to reference trajectory
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (!corr.isValid()) continue;
+
+		const vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
+		bool ok = true;
+		if (m_referenceTrajectory[imageIndices.x][0] == -std::numeric_limits<float>::infinity() ||
+			m_referenceTrajectory[imageIndices.y][0] == -std::numeric_limits<float>::infinity()) {
+			std::cout << "warning: no reference trajectory for " << imageIndices << std::endl;
+			ok = false; // just classify as bad
+		}
+		else {
+			const mat4f refTransform = m_referenceTrajectory[imageIndices.y].getInverse() * m_referenceTrajectory[imageIndices.x]; // src to tgt
+
+			vec3f src(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z);
+			vec3f tgt(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+			vec3f d = refTransform * src - tgt;
+			float res = d | d;
+
+			if (res > maxResidualThres2) { // bad
+				const std::string dir = (res > inspectMaxResThresh2) ? inspectDir : outDir;
+				SiftVisualization::printMatch(dir + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y) + ".png",
+					corr, m_colorImages[imageIndices.x], m_colorImages[imageIndices.y], m_colorCalibration.m_Intrinsic);
+				ok = false;
+			}
+		}
+		if (!ok) badCount++;
+	}
+	std::cout << "found " << badCount << " bad correspondences" << std::endl;
+
+	// check if missing links
+	std::vector<unsigned int> numMatchesToPrev(numImages, 0);
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (!corr.isValid()) continue;
+		MLIB_ASSERT(corr.imgIdx_i < corr.imgIdx_j);
+		numMatchesToPrev[corr.imgIdx_i]++;
+	}
+	for (unsigned int i = 1; i < numMatchesToPrev.size(); i++) {
+		if (numMatchesToPrev[i] == 0) {
+			std::cout << "image " << i << " has no matches to previous!" << std::endl;
+		}
+	}
+	std::cout << "DONE" << std::endl;
+}
+
+void TestMatching::printKeys()
+{
+	const std::string outDir = "debug/keys/"; if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+	const unsigned int numImages = m_siftManager->getNumImages();
+
+	for (unsigned int i = 0; i < numImages; i++) {
+		SiftVisualization::printKey(outDir + std::to_string(i) + ".png", m_colorImages[i], m_siftManager, i);
+	}
+	std::cout << "DONE" << std::endl;
+}
+
+void TestMatching::debugMatchInfo()
+{
+	const std::string outDir = "debug/_checkCorr/inspect/full/";
+	if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+
+	const std::vector<vec2ui> imagePairs = { vec2ui(39, 207), vec2ui(53, 206), vec2ui(55, 206), vec2ui(58, 206), vec2ui(59, 207) };
+	std::unordered_map<vec2ui, unsigned int> imagePairSet;
+	for (unsigned int i = 0; i < imagePairs.size(); i++) imagePairSet[imagePairs[i]] = i;
+
+	std::vector<std::vector<float3>> imPairSrcPts(imagePairs.size());
+	std::vector<std::vector<float3>> imPairTgtPts(imagePairs.size());
+
+	// collect matches for image pairs from corr array
+	unsigned int numCorr = m_siftManager->getNumGlobalCorrespondences();
+	std::vector<EntryJ> correspondences(numCorr);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), m_siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ)*numCorr, cudaMemcpyDeviceToHost));
+	std::cout << "#corr = " << numCorr << std::endl;
+
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (!corr.isValid()) continue;
+		vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
+		auto a = imagePairSet.find(imageIndices);
+		if (a != imagePairSet.end()) {
+			unsigned int index = a->second;
+			imPairSrcPts[index].push_back(corr.pos_i);
+			imPairTgtPts[index].push_back(corr.pos_j);
+		}
+	}
+
+	// todo fix this hack
 }
 
 

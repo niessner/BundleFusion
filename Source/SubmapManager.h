@@ -156,6 +156,13 @@ public:
 	void setPrintMatchesDEBUG(bool b) { _debugPrintMatches = b; }
 	void saveGlobalSiftManagerToFile(const std::string& filename) const { m_global->saveToFile(filename); }
 
+	// to fake opt finish when no opt
+	void resetDEBUG() {
+		mutex_nextLocal.lock();
+		finishLocalOpt();
+		mutex_nextLocal.unlock();
+	}
+
 private:
 
 	//! sift matching

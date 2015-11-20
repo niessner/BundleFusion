@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CUDACacheUtil.h"
+#include "SIFTImageManager.h"
 
-class SIFTImageManager;
 class CUDACache;
 class CUDAImageManager;
 
@@ -22,6 +22,9 @@ public:
 
 	static void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered, int maxNumMatches);
+
+	static void printMatch(const std::string& filename, const EntryJ& correspondence,
+		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics);
 
 
 	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<CUDACachedFrame>& cachedFrames, unsigned int cacheWidth, unsigned int cacheHeight,

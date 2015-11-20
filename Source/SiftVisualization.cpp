@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "SiftVisualization.h"
 #include "ImageHelper.h"
-#include "SIFTImageManager.h"
 #include "CUDACache.h"
 #include "GlobalBundlingState.h"
 #include "CUDAImageManager.h"
@@ -94,6 +93,40 @@ void SiftVisualization::printMatch(const SIFTImageManager* siftManager, const st
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
+void SiftVisualization::printMatch(const std::string& filename, const EntryJ& correspondence, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics)
+{
+	ColorImageR32G32B32 matchImage;
+	if (!util::fileExists(filename)) {
+		matchImage.allocate(image1.getWidth() * 2, image1.getHeight());
+		ColorImageR32G32B32 im1(image1);
+		ColorImageR32G32B32 im2(image2);
+		matchImage.copyIntoImage(im1, 0, 0);
+		matchImage.copyIntoImage(im2, image1.getWidth(), 0);
+	}
+	else {
+		FreeImageWrapper::loadImage(filename, matchImage);
+	}
+
+	const vec3f color = vec3f(0.0f, 0.0f, 1.0f); // blue
+
+	vec3f camPos0(correspondence.pos_i.x, correspondence.pos_i.y, correspondence.pos_i.z);
+	vec3f camPos1(correspondence.pos_j.x, correspondence.pos_j.y, correspondence.pos_j.z);
+
+	// project to image
+	vec3f projPos0 = colorIntrinsics * camPos0;
+	vec2i p0 = math::round(vec2f(projPos0.x / projPos0.z, projPos0.y / projPos0.z));
+	vec3f projPos1 = colorIntrinsics * camPos1;
+	vec2i p1 = math::round(vec2f(projPos1.x / projPos1.z, projPos1.y / projPos1.z));
+
+	p1 += vec2i(image1.getWidth(), 0);
+
+	const int radius = 3;
+	ImageHelper::drawCircle(matchImage, p0, radius, color);
+	ImageHelper::drawCircle(matchImage, p1, radius, color);
+	ImageHelper::drawLine(matchImage, p0, p1, color);
+	FreeImageWrapper::saveImage(filename, matchImage);
+}
+
 void SiftVisualization::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache, bool filtered, int maxNumMatches /*= -1*/)
 {
 	const unsigned int numFrames = siftManager->getNumImages();
@@ -134,7 +167,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	MLIB_ASSERT(util::directoryExists(dir));
 
 	// get images
-	unsigned int curFrame = numFrames - 1; 
+	unsigned int curFrame = numFrames - 1;
 	const ColorImageR8G8B8A8& curImage = colorImages[curFrame];
 
 	//print out images

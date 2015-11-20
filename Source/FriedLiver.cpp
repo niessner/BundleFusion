@@ -85,9 +85,11 @@ Bundler* g_bundler = NULL;
 
 
 void bundlingOptimization() {
-	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-	g_bundler->processGlobal();
-	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+	//g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
+	//g_bundler->processGlobal();
+	//g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+
+	g_bundler->resetDEBUG();
 }
 
 void bundlingOptimizationThreadFunc() {
@@ -204,13 +206,13 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (true) {
+		if (false) {
 			CalibratedSensorData cs;
 			{
 				BinaryDataStreamFile s("../data/tum/fr2_xyz.sensor", false);
 				s >> cs;
 			}
-			unsigned int startFrame = 2000;
+			unsigned int startFrame = 1000;
 			unsigned int endFrame = 2080;
 			if (endFrame < cs.m_ColorNumFrames) { // [splitFrame, end)	
 				cs.m_ColorImages.erase(cs.m_ColorImages.begin() + endFrame, cs.m_ColorImages.end());
@@ -251,6 +253,9 @@ int main(int argc, char** argv)
 			test.load("", "debug/test208.sift");
 			//test.matchFrame(207, true, true);
 			test.debugOptimizeGlobal();
+			
+			//test.debugMatchInfo();
+			//test.checkCorrespondences();
 
 			std::cout << "done!" << std::endl;
 			getchar();
@@ -274,7 +279,6 @@ int main(int argc, char** argv)
 		g_imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, g_RGBDSensor, false);
 
-		//std::thread(bundlingThreadFunc).detach();
 		std::thread bundlingThread(bundlingThreadFunc);
 
 

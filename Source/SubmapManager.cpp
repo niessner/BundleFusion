@@ -125,6 +125,29 @@ SubmapManager::~SubmapManager()
 
 unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth, unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor, unsigned int colorWidth, unsigned int colorHeight)
 {
+	{//!!!DEBUGGING
+		DepthImage32 _dImage(depthWidth, depthHeight);
+		ColorImageR32 _iImage(colorWidth, colorHeight);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(_dImage.getPointer(), d_inputDepth, sizeof(float)*depthWidth*depthHeight, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(_iImage.getPointer(), d_intensitySIFT, sizeof(float)*colorWidth*colorHeight, cudaMemcpyDeviceToHost));
+		for (unsigned int p = 0; p < _dImage.getNumPixels(); p++) {
+			float _d = _dImage.getPointer()[p];
+			if (_d != -std::numeric_limits<float>::infinity()) {
+				if (_d < 0.1f || _d > 12.0f) {
+					std::cout << "ERROR: image " << curFrame << " px" << p << " has depth " << _d << std::endl;
+					getchar();
+				}
+			}
+		}
+		for (unsigned int p = 0; p < _iImage.getNumPixels(); p++) {
+			float _i = _iImage.getPointer()[p];
+			if (_i < 0 || _i > 1.0f) {
+				std::cout << "ERROR: image " << curFrame << " px" << p << " has intensity " << _i << std::endl;
+				getchar();
+			}
+		}
+	}//!!!DEBUGGING
+
 	SIFTImageGPU& curImage = m_currentLocal->createSIFTImageGPU();
 	int success = m_sift->RunSIFT(d_intensitySIFT, d_inputDepth);
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection");
@@ -209,9 +232,9 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		//SIFTMatchFilter::filterKeyPointMatches(siftManager, siftIntrinsicsInv, minNumMatches);
 		//SIFTMatchFilter::filterKeyPointMatchesDEBUG(siftManager->getNumImages() - 1, siftManager, siftIntrinsicsInv, minNumMatches,
 		//	GlobalBundlingState::get().s_maxKabschResidual2, false);
-		siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
+		//siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
 		//!!!DEBUGGING
-		//siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, (_debugPrintMatches && !isLocal));
+		siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, (_debugPrintMatches && !isLocal));
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = timer.getElapsedTimeMS(); }
 
 		//!!!DEBUGGING
@@ -425,13 +448,13 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (m_global->getNumImages() > 1) {
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() == 60) {
+			//if (m_global->getNumImages() == 207) {
 			//	setPrintMatchesDEBUG(true);
 			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() == 60) {
+			//if (m_global->getNumImages() == 207) {
 			//	setPrintMatchesDEBUG(false);
 			//	std::cout << "waiting..." << std::endl;
 			//	getchar();
