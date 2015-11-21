@@ -157,8 +157,27 @@ public:
 	void saveGlobalSiftManagerToFile(const std::string& filename) const { m_global->saveToFile(filename); }
 
 	// to fake opt finish when no opt
-	void resetDEBUG() {
+	void resetDEBUG(bool initNextGlobal, int numLocalSolved, unsigned int curFrame) { //numLocalSolved == numGlobalFrames
 		mutex_nextLocal.lock();
+		if (initNextGlobal) {
+			if (numLocalSolved >= 0) {
+				float4x4 relativeTransform;
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(&relativeTransform, getLocalTrajectoryGPU(numLocalSolved) + m_submapSize, sizeof(float4x4), cudaMemcpyDeviceToHost));
+				float4x4 prevTransform;
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(&prevTransform, d_globalTrajectory + numLocalSolved, sizeof(float4x4), cudaMemcpyDeviceToHost));
+				float4x4 newTransform = prevTransform * relativeTransform;
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numLocalSolved + 1, &newTransform, sizeof(float4x4), cudaMemcpyHostToDevice));
+			}
+			if (numLocalSolved > 0) {
+				// update trajectory
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
+
+				updateTrajectoryCU(d_globalTrajectory, numLocalSolved,
+					d_completeTrajectory, curFrame,
+					d_localTrajectories, m_submapSize + 1, numLocalSolved,
+					d_imageInvalidateList);
+			}
+		}
 		finishLocalOpt();
 		mutex_nextLocal.unlock();
 	}

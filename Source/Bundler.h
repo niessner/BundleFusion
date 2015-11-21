@@ -85,11 +85,13 @@ public:
 		int						m_lastLocalSolved; // to check if can fuse to global
 		PROCESS_STATE			m_bOptimizeGlobal; // ready to optimize global
 
-		unsigned int			m_lastNumLocalFrames;
+		//unsigned int			m_lastNumLocalFrames;
 		unsigned int			m_numCompleteTransforms;
 		unsigned int			m_lastValidCompleteTransform;
 
 		PROCESS_STATE			m_bProcessGlobal;
+
+		unsigned int			m_totalNumOptLocalFrames;
 
 		//shared but constant
 		static int				s_markOffset;
@@ -101,10 +103,12 @@ public:
 
 			m_lastFrameProcessed = 0;
 			m_bLastFrameValid = false;
-			m_lastNumLocalFrames = 0;
+			//m_lastNumLocalFrames = 0;
 			m_numCompleteTransforms = 0;
 			m_lastValidCompleteTransform = 0;
 			m_bProcessGlobal = DO_NOTHING;
+
+			m_totalNumOptLocalFrames = 0;
 		}
 	};
 
@@ -189,9 +193,10 @@ public:
 	}
 
 	//! fake finish local opt without actually optimizing anything
-	void resetDEBUG() {
+	void resetDEBUG(bool updateTrajectory, bool validLocalSolve) {
 		m_currentState.m_localToSolve = -1;
-		m_SubmapManager.resetDEBUG();
+		unsigned int curFrame = (m_currentState.m_lastLocalSolved < 0) ? (unsigned int)-1 : m_currentState.m_totalNumOptLocalFrames;
+		m_SubmapManager.resetDEBUG(updateTrajectory && validLocalSolve, m_currentState.m_lastLocalSolved, curFrame);
 	}
 
 private:

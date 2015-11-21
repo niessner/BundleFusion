@@ -62,7 +62,14 @@ Bundler::~Bundler()
 void Bundler::processInput()
 {
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
-	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame) {
+	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame) { // special case the last local solve (needs to run once)
+#ifdef RUN_MULTITHREADED
+		if (!m_RGBDSensor->isReceivingFrames()) { //debugging
+			std::cout << "WHY IS processInput called on same frame but still receiving frames???" << std::endl;
+			getchar();
+		}
+		MLIB_ASSERT(!m_RGBDSensor->isReceivingFrames());
+#endif
 		static bool processLastFrame = true;
 		if (processLastFrame && m_currentState.m_localToSolve == -1) {
 			if (!m_SubmapManager.isLastLocalFrame(curFrame)) prepareLocalSolve(curFrame, true);
@@ -135,7 +142,8 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 		return; // nothing to solve
 	}
 
-	m_currentState.m_lastNumLocalFrames = m_SubmapManager.getNumNextLocalFrames();
+	unsigned int curNumLocalFrames = m_SubmapManager.getNumNextLocalFrames();
+	//m_currentState.m_lastNumLocalFrames = m_SubmapManager.getNumNextLocalFrames();
 	m_currentState.m_bProcessGlobal = BundlerState::DO_NOTHING;
 	unsigned int currLocalIdx;
 	if (m_currentState.m_localToSolve >= 0) {
@@ -151,6 +159,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 	}
 	m_currentState.m_localToSolve = -1;
 	m_currentState.m_lastLocalSolved = currLocalIdx;
+	m_currentState.m_totalNumOptLocalFrames = m_submapSize * m_currentState.m_lastLocalSolved + curNumLocalFrames; //last local solved is 0-indexed so this doesn't overcount
 }
 
 
@@ -178,7 +187,7 @@ void Bundler::processGlobal()
 		m_currentState.m_bOptimizeGlobal = BundlerState::INVALIDATE;
 
 		//getchar();
-		m_SubmapManager.invalidateImages(m_submapSize * m_currentState.m_lastLocalSolved, m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames);
+		m_SubmapManager.invalidateImages(m_submapSize * m_currentState.m_lastLocalSolved, m_currentState.m_totalNumOptLocalFrames);
 		//add invalidated (fake) global frame
 		m_SubmapManager.addInvalidGlobalKey();
 	}
@@ -193,7 +202,8 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 		return; // nothing to solve
 	}
 
-	unsigned int numFrames = m_submapSize * m_currentState.m_lastLocalSolved + m_currentState.m_lastNumLocalFrames;
+	MLIB_ASSERT(m_currentState.m_lastLocalSolved >= 0);
+	unsigned int numFrames = m_currentState.m_totalNumOptLocalFrames;
 
 	if (m_currentState.m_bOptimizeGlobal == BundlerState::PROCESS) {
 		bool valid = m_SubmapManager.optimizeGlobal(numFrames, numNonLinIterations, numLinIterations, isStart, isEnd, m_bIsScanDoneGlobalOpt);
@@ -201,18 +211,17 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 		if (isEnd) {
 			m_SubmapManager.updateTrajectory(numFrames);
 			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.getCompleteTrajectory(), numFrames);
-			m_currentState.m_numCompleteTransforms = numFrames;
+			m_currentState.m_numCompleteTransforms = numFrames; 
 			if (valid) m_currentState.m_lastValidCompleteTransform = m_submapSize * m_currentState.m_lastLocalSolved; //TODO over-conservative but easier
-
 			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}
 	}
 	else {
 		if (isStart) {
 			m_SubmapManager.invalidateLastGlobalFrame();
-			m_currentState.m_numCompleteTransforms = numFrames;
-			m_SubmapManager.updateTrajectory(m_currentState.m_numCompleteTransforms);
-			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.getCompleteTrajectory(), m_currentState.m_numCompleteTransforms);
+			m_SubmapManager.updateTrajectory(numFrames);
+			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.getCompleteTrajectory(), numFrames);
+			m_currentState.m_numCompleteTransforms = numFrames; 
 
 			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}
@@ -294,6 +303,7 @@ void Bundler::prepareLocalSolve(unsigned int curFrame, bool isLastFrame /*= fals
 		m_currentState.m_localToSolve = -((int)curLocalIdx + m_currentState.s_markOffset);
 		if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << std::endl;
 	}
+
 	// switch local submaps
 	m_SubmapManager.switchLocal();
 }
