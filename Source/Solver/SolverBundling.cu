@@ -574,10 +574,10 @@ __global__ void BuildVariablesToCorrespondencesTableDevice(EntryJ* d_corresponde
 	if (x < N) {
 		const EntryJ& corr = d_correspondences[x];
 		if (corr.isValid()) {
-			int offset = atomicAdd(&d_numEntriesPerRow[corr.imgIdx_i], 1);
+			int offset = atomicAdd(&d_numEntriesPerRow[corr.imgIdx_i], 1); // may overflow - need to check when read
 			if (offset < maxNumCorrespondencesPerImage)	d_variablesToCorrespondences[corr.imgIdx_i * maxNumCorrespondencesPerImage + offset] = x;
 
-			offset = atomicAdd(&d_numEntriesPerRow[corr.imgIdx_j], 1);
+			offset = atomicAdd(&d_numEntriesPerRow[corr.imgIdx_j], 1); // may overflow - need to check when read
 			if (offset < maxNumCorrespondencesPerImage)	d_variablesToCorrespondences[corr.imgIdx_j * maxNumCorrespondencesPerImage + offset] = x;
 		}
 	}

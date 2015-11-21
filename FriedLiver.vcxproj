@@ -190,6 +190,8 @@
     <ClInclude Include="Source\RGBDSensor.h" />
     <ClInclude Include="Source\SBA.h" />
     <ClInclude Include="Source\SBALie.h" />
+    <ClInclude Include="Source\SBA_CPU.h" />
+    <ClInclude Include="Source\SBA_param.h" />
     <ClInclude Include="Source\SiftGPU\CUDATimer.h" />
     <ClInclude Include="Source\SiftGPU\cudaUtil.h" />
     <ClInclude Include="Source\SiftGPU\cuda_EigenValue.h" />
@@ -297,6 +299,7 @@
     <ClCompile Include="Source\RGBDSensor.cpp" />
     <ClCompile Include="Source\SBA.cpp" />
     <ClCompile Include="Source\SBALie.cpp" />
+    <ClCompile Include="Source\SBA_CPU.cpp" />
     <ClCompile Include="Source\SiftGPU\CuTexImage.cpp" />
     <ClCompile Include="Source\SiftGPU\GlobalUtil.cpp" />
     <ClCompile Include="Source\SiftGPU\SiftGPU.cpp" />

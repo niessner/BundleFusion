@@ -1,6 +1,8 @@
 #pragma once
 
+#include "SBA_param.h"
 
+#ifdef USE_GPU_SOLVE
 #include "SiftGPU/cudaUtil.h"
 #include "SiftGPU/SIFTImageManager.h"
 #include "PoseHelper.h"
@@ -75,3 +77,4 @@ private:
 	static Timer s_timer;
 };
 
+#endif

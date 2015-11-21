@@ -68,7 +68,7 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 	state.d_deltaTrans[variableIdx] = make_float3(0.0f, 0.0f, 0.0f);
 
 	// Compute -JTF here
-	int N = input.d_numEntriesPerRow[variableIdx];
+	int N = min(input.d_numEntriesPerRow[variableIdx], input.maxCorrPerImage);
 
 	const float3&  oldAngles0 = state.d_xRot[variableIdx]; // get angles
 	const float3x3 R_dAlpha = evalR_dAlpha(oldAngles0);
@@ -141,7 +141,7 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 //	const float3x3 R_dBeta  = evalR_dBeta (oldAngles0);
 //	const float3x3 R_dGamma = evalR_dGamma(oldAngles0);
 //
-//	int N = input.d_numEntriesPerRow[variableIdx];
+//	int N = min(input.d_numEntriesPerRow[variableIdx], input.maxCorrPerImage);
 //
 //	for (int i = lane; i < N; i+=WARP_SIZE)
 //	{
@@ -175,7 +175,7 @@ __inline__ __device__ void applyJTDevice(unsigned int variableIdx, SolverInput& 
 	const float3x3 R_dBeta  = evalR_dBeta (oldAngles0);
 	const float3x3 R_dGamma = evalR_dGamma(oldAngles0);
 
-	int N = input.d_numEntriesPerRow[variableIdx];
+	int N = min(input.d_numEntriesPerRow[variableIdx], input.maxCorrPerImage);
 
 	for (int i = threadIdx; i < N; i += THREADS_PER_BLOCK_JT)
 	{
