@@ -69,8 +69,9 @@ bool BinaryDumpReader::processDepth()
 	{
 		GlobalAppState::get().s_playData = false;
 		//std::cout << "binary dump sequence complete - press space to run again" << std::endl;
-		//m_CurrFrame = 0;
 		stopReceivingFrames();
+		std::cout << "binary dump sequence complete - stopped receiving frames" << std::endl;
+		m_CurrFrame = 0;
 	}
 
 	if(GlobalAppState::get().s_playData) {

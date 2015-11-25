@@ -8,7 +8,7 @@
 //#define REAL_SENSE
 //#define STRUCTURE_SENSOR
 
-//#define RUN_MULTITHREADED
+#define RUN_MULTITHREADED
 
 #include "stdafx.h"
 

@@ -131,12 +131,12 @@ public:
 	void FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv, float areaThresh);
 
 	void FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
-		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+		const float4x4& intrinsics, const CUDACachedFrame* d_cachedFrames,
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax);
 
 	int VerifyTrajectoryCU(unsigned int numImages, float4x4* d_trajectory,
 		unsigned int imageWidth, unsigned int imageHeight,
-		const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+		const float4x4& intrinsics, const CUDACachedFrame* d_cachedFrames,
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
 		float sensorDepthMin, float sensorDepthMax);
 
@@ -211,8 +211,9 @@ public:
 	const float4x4* getFiltTransformsDEBUG() const { return d_currFilteredTransforms; }
 
 
-	//!!!TODO where to put transforms
-	void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms) const;
+	//TODO where to put transforms
+	void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
+		const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& colorIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const;
 
 	static void TestSVDDebugCU(const float3x3& m);
 
@@ -240,6 +241,11 @@ private:
 	void alloc();
 	void free();
 	void initializeMatching();
+
+	//TODO also try letting bundling thread keep a copy of a the current local depth images (at original res) - instead of using the downsampled versions
+	void fuseLocalKeyDepths(std::vector<SIFTKeyPoint>& globalKeys, const std::vector<CUDACachedFrame>& cachedFrames,
+		const std::vector<float4x4>& transforms, const std::vector<float4x4>& transformsInv, 
+		const float4x4& siftIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const;
 
 	// keypoints & descriptors
 	std::vector<SIFTImageGPU>	m_SIFTImagesGPU;			// TODO if we ever do a global multi-match kernel, then we need this array on the GPU

@@ -189,7 +189,7 @@ private:
 
 	void initSIFT(unsigned int widthSift, unsigned int heightSift);
 	//! called when global locked
-	void initializeNextGlobalTransform(bool useIdentity = false) {
+	void initializeNextGlobalTransform(bool useIdentity) {
 		const unsigned int numGlobalFrames = m_global->getNumImages();
 		MLIB_ASSERT(numGlobalFrames >= 1);
 		if (useIdentity) {

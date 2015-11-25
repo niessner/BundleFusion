@@ -361,7 +361,8 @@ void SIFTImageManager::initializeMatching()
 	}
 }
 
-void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms) const
+void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
+	const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& colorIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const
 {
 	//const unsigned int overlapImageIndex = getNumImages() - 1; // overlap frame
 
@@ -419,6 +420,13 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 		}// valid corr
 	} // correspondences/residual
 
+	//TODO fuse depth values
+	std::vector<float4x4> transformsInv(transforms.size());
+	for (unsigned int i = 0; i < transforms.size(); i++) {
+		transformsInv[i] = transforms[i].getInverse();
+	}
+	fuseLocalKeyDepths(curKeys, cachedFrames, transforms, transformsInv, colorIntrinsicsInv, downSampIntrinsics, downSampIntrinsicsInv);
+
 	unsigned int numKeys = (unsigned int)curKeys.size();
 	SIFTImageGPU& cur = global->createSIFTImageGPU();
 	cutilSafeCall(cudaMemcpy(cur.d_keyPoints, curKeys.data(), sizeof(SIFTKeyPoint) * numKeys, cudaMemcpyHostToDevice));
@@ -446,6 +454,57 @@ void SIFTImageManager::filterFrames(unsigned int numCurrImagePairs)
 		std::cout << "frame " << numCurrImagePairs << " not connected to previous!" << std::endl;
 
 	m_validImages[numCurrImagePairs] = connected;
+}
+
+void SIFTImageManager::fuseLocalKeyDepths(std::vector<SIFTKeyPoint>& globalKeys, const std::vector<CUDACachedFrame>& cachedFrames,
+	const std::vector<float4x4>& transforms, const std::vector<float4x4>& transformsInv,
+	const float4x4& siftIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const
+{
+	const float depthDiffThresh = 0.05f;
+
+	// copy depth frames to CPU
+	std::vector<DepthImage32> depthImages(getNumImages());
+	unsigned int depthWidth = GlobalBundlingState::get().s_downsampledWidth;
+	unsigned int depthHeight = GlobalBundlingState::get().s_downsampledHeight;
+	for (unsigned int i = 0; i < depthImages.size(); i++) {
+		depthImages[i].allocate(depthWidth, depthHeight);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImages[i].getPointer(), cachedFrames[i].d_depthDownsampled, sizeof(float) * depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost));
+	}
+
+	for (unsigned int i = 0; i < globalKeys.size(); i++) {
+		SIFTKeyPoint& key = globalKeys[i];
+		// camera space
+		float3 keyCamPos = siftIntrinsicsInv * (key.depth * make_float3(key.pos.x, key.pos.y, 1.0f));
+
+		float sumDepth = key.depth; // first frame
+		unsigned int numDepth = 1;
+
+		// project to all frames, then to first frame
+		for (unsigned int j = 1; j < depthImages.size(); j++) {
+			float3 curCamPos = transformsInv[j] * keyCamPos;
+			float3 p = downSampIntrinsics * curCamPos; // first frame to cam pos of frame j
+			float2 loc = make_float2(p.x / p.z, p.y / p.z);
+			int2 iloc = make_int2((int)round(loc.x), (int)round(loc.y));
+			if (iloc.x >= 0 && iloc.y >= 0 && iloc.x < (int)depthWidth && iloc.y < (int)depthHeight) {
+				float d = depthImages[j](iloc.x, iloc.y);
+				if (d != -std::numeric_limits<float>::infinity() && fabs(d - curCamPos.z) < depthDiffThresh) { // project to first frame
+					float3 firstCamPos = transforms[j] * (downSampIntrinsicsInv * (d * make_float3(loc.x, loc.y, 1.0f)));
+					sumDepth += firstCamPos.z;
+					numDepth++;
+				}
+			}
+		}
+		//!!!DEBUGGING
+		float ff = sumDepth / numDepth;
+		if (fabs(key.depth - ff) > 0.03f) {
+			std::cout << "warning: original depth " << key.depth << ", new fused depth " << ff << std::endl;
+			getchar();
+		}
+		//!!!DEBUGGING
+
+		// compute average
+		key.depth = sumDepth / numDepth;
+	}
 }
 
 

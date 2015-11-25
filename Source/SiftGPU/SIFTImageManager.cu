@@ -553,9 +553,8 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 	}
 }
 
-//TODO camera stuff here
 void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
-	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+	const float4x4& intrinsics, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax)
 {
 	if (numCurrImagePairs == 0) return;
@@ -729,7 +728,7 @@ void __global__ CheckForInvalidFramesCU_Kernel(const int* d_varToCorrNumEntriesP
 				d_globMatches[resIdx].setInvalid();
 			}
 			if (d_validImages[varIdx] != 0) {
-				//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", varIdx); //todo remove debug print
+				//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", varIdx);
 				d_validImages[varIdx] = 0;
 			}
 		}
@@ -766,7 +765,7 @@ void __global__ CheckForInvalidFramesSimpleCU_Kernel(const int* d_varToCorrNumEn
 
 	if (idx < numVars) {
 		if (d_varToCorrNumEntriesPerRow[idx] == 0) { // no connections!
-			//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); //TODO remove debug print
+			//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", idx); 
 			d_validImages[idx] = 0;
 		}
 	}
@@ -1115,7 +1114,7 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, int* d_validIm
 
 int SIFTImageManager::VerifyTrajectoryCU(unsigned int numImages, float4x4* d_trajectory,
 	unsigned int imageWidth, unsigned int imageHeight,
-	const float4x4 intrinsics, const CUDACachedFrame* d_cachedFrames,
+	const float4x4& intrinsics, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
 	float sensorDepthMin, float sensorDepthMax)
 {

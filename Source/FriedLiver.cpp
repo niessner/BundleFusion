@@ -213,8 +213,8 @@ int main(int argc, char** argv)
 				BinaryDataStreamFile s("../data/tum/fr2_xyz.sensor", false);
 				s >> cs;
 			}
-			unsigned int startFrame = 1000;
-			unsigned int endFrame = 2080;
+			unsigned int startFrame = 0;
+			unsigned int endFrame = 55;
 			if (endFrame < cs.m_ColorNumFrames) { // [splitFrame, end)	
 				cs.m_ColorImages.erase(cs.m_ColorImages.begin() + endFrame, cs.m_ColorImages.end());
 				cs.m_DepthImages.erase(cs.m_DepthImages.begin() + endFrame, cs.m_DepthImages.end());

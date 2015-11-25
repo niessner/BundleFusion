@@ -63,8 +63,8 @@ void Bundler::processInput()
 {
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
 	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame) { // special case the last local solve (needs to run once)
-#ifdef RUN_MULTITHREADED
-		if (!m_RGBDSensor->isReceivingFrames()) { //debugging
+#ifdef RUN_MULTITHREADED 
+		if (m_RGBDSensor->isReceivingFrames()) { //debugging
 			std::cout << "WHY IS processInput called on same frame but still receiving frames???" << std::endl;
 			getchar();
 		}
@@ -87,29 +87,23 @@ void Bundler::processInput()
 	const unsigned int curLocalFrame = m_SubmapManager.runSIFT(curFrame, m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepth,
 		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
-
-	//if (curFrame >= 160 && curFrame < 170) {
-	//	printKey("debug/key" + std::to_string(curFrame) + ".png", curFrame, m_SubmapManager.getCurrentLocalDEBUG(), curLocalFrame);
-	//}
-	//if (curFrame == 170)
-	//	int a = 5;
 	
 	// match with every other local
 	m_currentState.m_bLastFrameValid = 1;
 	if (curLocalFrame > 0) {
-		const bool debugLocalMatching = false;
-		const unsigned int stop = 140;
-		if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
-			m_SubmapManager.setPrintMatchesDEBUG(true);
-		}
+		//const bool debugLocalMatching = false;
+		//const unsigned int stop = 140;
+		//if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
+		//	m_SubmapManager.setPrintMatchesDEBUG(true);
+		//}
 		m_currentState.m_bLastFrameValid = m_SubmapManager.localMatchAndFilter(MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
-		if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
-			m_SubmapManager.setPrintMatchesDEBUG(false);
-			if (curFrame == stop + m_submapSize) {
-				std::cout << "waiting..." << std::endl;
-				getchar();
-			}
-		}
+		//if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
+		//	m_SubmapManager.setPrintMatchesDEBUG(false);
+		//	if (curFrame == stop + m_submapSize) {
+		//		std::cout << "waiting..." << std::endl;
+		//		getchar();
+		//	}
+		//}
 
 		m_SubmapManager.computeCurrentSiftTransform(curFrame, curLocalFrame, m_currentState.m_lastValidCompleteTransform);
 	}
@@ -174,12 +168,7 @@ void Bundler::processGlobal()
 	if (m_currentState.m_bProcessGlobal == BundlerState::PROCESS) {
 		m_currentState.m_bOptimizeGlobal = (BundlerState::PROCESS_STATE)m_SubmapManager.computeAndMatchGlobalKeys(m_currentState.m_lastLocalSolved,
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
-
-		//!!!DEBUGGING
 		//printKey("debug/keysGlobal/key" + std::to_string(m_currentState.m_lastLocalSolved) + ".png", m_currentState.m_lastLocalSolved*m_submapSize, m_SubmapManager.getGlobalDEBUG(), m_currentState.m_lastLocalSolved);
-		if (m_currentState.m_bOptimizeGlobal == BundlerState::INVALIDATE)
-			int a = 5;
-		//!!!DEBUGGING
 	}
 	else {
 		// cache

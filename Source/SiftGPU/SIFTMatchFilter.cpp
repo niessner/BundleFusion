@@ -788,9 +788,7 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 	const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor, const float4x4& transform, float distThres, float normalThres, float colorThresh,
 	const float4x4& depthIntrinsics, float depthMin, float depthMax, float& sumResidual, float& sumWeight, unsigned int& numCorr)
 {
-	//!!!DEBUGGING
 	PointCloudf pcSrc, pcTgt;
-	//!!!DEBUGGING
 
 	s_debugCorr.allocate(width, height);
 	s_debugCorr.setPixels(-std::numeric_limits<float>::infinity());

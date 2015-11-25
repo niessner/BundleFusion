@@ -1011,7 +1011,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	///////////////////////////////////////////
 #ifndef RUN_MULTITHREADED
 	g_depthSensingBundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-	//g_depthSensingBundler->resetDEBUG(true, true); //!!!DEBUGGING TODO remove //whatever just
 	g_depthSensingBundler->processGlobal();
 	g_depthSensingBundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 #endif

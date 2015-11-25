@@ -397,9 +397,6 @@ void TestMatching::checkFiltered(const std::vector<vec2ui>& imagePairMatchesFilt
 				if (res > maxRes) maxRes = res;
 			}
 			if (maxRes > maxResidualThres2) { // bad
-				//!!!DEBUGGING
-				float m = std::sqrt(maxRes);
-				//!!!DEBUGGING
 				falsePositives.push_back(imageIndices);
 			}
 		}
@@ -413,9 +410,6 @@ void TestMatching::checkFiltered(const std::vector<vec2ui>& imagePairMatchesFilt
 				if (res > maxRes) maxRes = res;
 			}
 			if (maxRes <= maxResidualThres2) { // good
-				//!!!DEBUGGING
-				float m = std::sqrt(maxRes);
-				//!!!DEBUGGING
 				falseNegatives.push_back(imageIndices);
 			}
 		}

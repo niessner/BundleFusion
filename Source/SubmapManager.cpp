@@ -125,29 +125,6 @@ SubmapManager::~SubmapManager()
 
 unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth, unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor, unsigned int colorWidth, unsigned int colorHeight)
 {
-	{//!!!DEBUGGING
-		DepthImage32 _dImage(depthWidth, depthHeight);
-		ColorImageR32 _iImage(colorWidth, colorHeight);
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(_dImage.getPointer(), d_inputDepth, sizeof(float)*depthWidth*depthHeight, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(_iImage.getPointer(), d_intensitySIFT, sizeof(float)*colorWidth*colorHeight, cudaMemcpyDeviceToHost));
-		for (unsigned int p = 0; p < _dImage.getNumPixels(); p++) {
-			float _d = _dImage.getPointer()[p];
-			if (_d != -std::numeric_limits<float>::infinity()) {
-				if (_d < 0.1f || _d > 12.0f) {
-					std::cout << "ERROR: image " << curFrame << " px" << p << " has depth " << _d << std::endl;
-					getchar();
-				}
-			}
-		}
-		for (unsigned int p = 0; p < _iImage.getNumPixels(); p++) {
-			float _i = _iImage.getPointer()[p];
-			if (_i < 0 || _i > 1.0f) {
-				std::cout << "ERROR: image " << curFrame << " px" << p << " has intensity " << _i << std::endl;
-				getchar();
-			}
-		}
-	}//!!!DEBUGGING
-
 	SIFTImageGPU& curImage = m_currentLocal->createSIFTImageGPU();
 	int success = m_sift->RunSIFT(d_intensitySIFT, d_inputDepth);
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection");
@@ -290,12 +267,8 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 
 		// --- filter frames
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
-		//!!!DEBUGGING
-		//SIFTMatchFilter::filterFrames(siftManager);
 		siftManager->filterFrames(curFrame);
-		//!!!DEBUGGING
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeFilterFrames = timer.getElapsedTimeMS(); }
-		//if (print) SiftVisualization::printCurrentMatches("debug/filt", siftManager, true, frameStart, frameSkip);
 
 		// --- add to global correspondences
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
@@ -377,6 +350,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 			0.1f, 3.0f);
 
 		if (valid == 0) {
+			////!!!DEBUGGING
 			//vec2ui imageIndices(0, 9);
 			//float4x4 transformCur; MLIB_CUDA_SAFE_CALL(cudaMemcpy(&transformCur, getLocalTrajectoryGPU(curLocalIdx) + imageIndices.y, sizeof(float4x4), cudaMemcpyDeviceToHost));
 			//float4x4 transformPrv; MLIB_CUDA_SAFE_CALL(cudaMemcpy(&transformPrv, getLocalTrajectoryGPU(curLocalIdx) + imageIndices.x, sizeof(float4x4), cudaMemcpyDeviceToHost));
@@ -387,9 +361,8 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 			//std::cout << "waiting..." << std::endl;
 			//getchar();
 
-			////!!!DEBUGGING
 			//_idxsLocalInvalidVerify.push_back(curLocalIdx);
-			saveOptToPointCloud("debug/opt-" + std::to_string(curLocalIdx) + ".ply", m_nextLocalCache, m_nextLocal->getValidImages(), getLocalTrajectoryGPU(curLocalIdx), m_nextLocal->getNumImages());
+			//saveOptToPointCloud("debug/opt-" + std::to_string(curLocalIdx) + ".ply", m_nextLocalCache, m_nextLocal->getValidImages(), getLocalTrajectoryGPU(curLocalIdx), m_nextLocal->getNumImages());
 			//std::cout << "SAVED " << curLocalIdx << std::endl;
 			////!!!DEBUGGING
 
@@ -428,7 +401,8 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		//unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, getLocalTrajectoryGPU(lastLocalSolved),
 		//	siftIntrinsics, siftIntrinsicsInv);
 		//m_global->finalizeSIFTImageGPU(numGlobalKeys);
-		local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved));
+		local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved), m_nextLocalCache->getCacheFrames(),
+			siftIntrinsicsInv, MatrixConversion::toCUDA(m_nextLocalCache->getIntrinsics()), MatrixConversion::toCUDA(m_nextLocalCache->getIntrinsicsInv())); //TODO need GPU version of this
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = timer.getElapsedTimeMS(); }
 
 		const std::vector<int>& validImagesLocal = local->getValidImages();
@@ -506,8 +480,6 @@ void SubmapManager::addInvalidGlobalKey()
 
 bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone)
 {
-	//_idxsGlobalOptimized.push_back(m_global->getNumImages() - 1);
-
 	bool ret = false;
 	const unsigned int numGlobalFrames = m_global->getNumImages();
 
@@ -517,7 +489,6 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 
 	if (isEnd) {
 		//!!!DEBUGGING
-		//const std::vector<int> _valid = m_global->getValidImages();
 		//if (numFrames >= 400) {
 		//	saveOptToPointCloud("debug/global-" + std::to_string(getCurrLocal(numFrames)) + ".ply", m_globalCache, m_global->getValidImages(), d_globalTrajectory, m_global->getNumImages());
 		//}
