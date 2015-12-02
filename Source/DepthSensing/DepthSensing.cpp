@@ -920,8 +920,10 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
 	}
 	if (!g_depthSensingRGBDSensor->isReceivingFrames()) {
-		g_CudaImageManager->setBundlingFrameRdy();				// let bundling still optimize after scanning done
-		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
+		if (!bGotDepth) {
+			g_CudaImageManager->setBundlingFrameRdy();				// let bundling still optimize after scanning done
+			ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
+		}
 		g_depthSensingBundler->confirmProcessedInputFrame();	// let bundling still optimize after scanning done
 		ConditionManager::notifyBundlerProcessedInput();
 	}
@@ -991,11 +993,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		}
 	}
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeReconstruct = t.getElapsedTimeMS(); }
-
-	if (validTransform && isnan(g_lastRigidTransform[0])) {
-		std::cout << "ERROR WITH TRANSFORM" << std::endl;
-		getchar();
-	}
 
 	///////////////////////////////////////
 	// Render with view of current frame
