@@ -233,6 +233,10 @@ public:
 	// already in processDepth
 	bool processColor() { return true; }
 
+	std::string getSensorName() const {
+		return "StructureSensor";
+	}
+
 	void startReceivingFrames() { m_bIsReceivingFrames = true; m_server.startReceiving(); }
 	void stopReceivingFrames() { m_bIsReceivingFrames = false; m_server.stopReceiving(); }
 

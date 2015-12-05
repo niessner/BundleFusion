@@ -43,7 +43,7 @@
 //TODO add other sensors here
 #include "PrimeSenseSensor.h"
 #include "StructureSensor.h"
-
+#include "SensorDataReader.h"
 
 #include "GlobalBundlingState.h"
 #include "TimingLog.h"

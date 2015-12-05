@@ -2,11 +2,12 @@
 
 //#define KINECT
 //#define KINECT_ONE
-#define OPEN_NI
+//#define OPEN_NI
 #define BINARY_DUMP_READER
 //#define INTEL_SENSOR
 //#define REAL_SENSE
-//#define STRUCTURE_SENSOR
+#define STRUCTURE_SENSOR
+#define SENSOR_DATA_READER
 
 #define RUN_MULTITHREADED
 
@@ -89,6 +90,7 @@
 	X(unsigned int, s_recordDataWidth) \
 	X(unsigned int, s_recordDataHeight) \
 	X(bool, s_recordData) \
+	X(bool, s_recordCompression) \
 	X(std::string, s_recordDataFile) \
 	X(bool, s_reconstructionEnabled) \
 	X(bool, s_generateVideo) \

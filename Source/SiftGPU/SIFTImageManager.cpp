@@ -495,11 +495,11 @@ void SIFTImageManager::fuseLocalKeyDepths(std::vector<SIFTKeyPoint>& globalKeys,
 			}
 		}
 		//!!!DEBUGGING
-		float ff = sumDepth / numDepth;
-		if (fabs(key.depth - ff) > 0.03f) {
-			std::cout << "warning: original depth " << key.depth << ", new fused depth " << ff << std::endl;
-			getchar();
-		}
+		//float ff = sumDepth / numDepth;
+		//if (fabs(key.depth - ff) > 0.03f) {
+		//	std::cout << "warning: original depth " << key.depth << ", new fused depth " << ff << std::endl;
+		//	getchar();
+		//}
 		//!!!DEBUGGING
 
 		// compute average

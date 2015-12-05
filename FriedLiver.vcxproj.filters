@@ -143,6 +143,9 @@
     <ClCompile Include="Source\SBALie.cpp">
       <Filter>SBA</Filter>
     </ClCompile>
+    <ClCompile Include="Source\SensorDataReader.cpp">
+      <Filter>Sensors</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -383,6 +386,9 @@
     </ClInclude>
     <ClInclude Include="Source\SBA_param.h">
       <Filter>SBA</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SensorDataReader.h">
+      <Filter>Sensors</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

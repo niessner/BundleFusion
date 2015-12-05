@@ -5,6 +5,12 @@
 
 #include "mLib.h"
 
+namespace ml {
+	class SensorData;
+	class RGBDFrameCacheWrite;
+}
+
+
 class RGBDSensor
 {
 public:
@@ -23,6 +29,9 @@ public:
 
 	//! Processes the color data
 	virtual bool processColor() = 0;
+
+	//! Returns the sensor name
+	virtual std::string getSensorName() const = 0;
 
 	//! Get the intrinsic camera matrix of the depth sensor
 	const mat4f& getDepthIntrinsics() const;
@@ -128,8 +137,14 @@ private:
 	mat4f m_recordIntrinsics;
 	mat4f m_recordIntrinsicsInv;
 
+	bool m_bUseModernSensFilesForRecording;
+
 	std::list<float*> m_recordedDepthData;
 	std::list<vec4uc*>	m_recordedColorData;
 
 	std::vector<PointCloudf> m_recordedPoints;
+
+	//new recording version
+	ml::SensorData* m_recordedData;
+	ml::RGBDFrameCacheWrite* m_recordedDataCache;
 };
