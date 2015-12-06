@@ -43,7 +43,6 @@ public:
 	void invalidateImages(unsigned int startFrame, unsigned int endFrame = -1) {
 		//std::cout << "invalidating images (" << startFrame << ", " << endFrame << ")" << std::endl;
 		//getchar();
-
 		if (endFrame == -1) m_invalidImagesList[startFrame] = 0;
 		else {
 			for (unsigned int i = startFrame; i < endFrame; i++)
@@ -52,26 +51,6 @@ public:
 	}
 
 	void switchLocal() {
-
-		//optLocal->lock();	//wait until optimizer has released its lock on opt local
-
-		//SIFTImageManager* oldCurrentLocal = currentLocal;
-		//SIFTImageManager* oldOptLocal = optLocal;
-		//SIFTImageManager* oldNextLocal = nextLocal;		
-		//currentLocal = oldNextLocal;
-		//optLocal = oldCurrentLocal;
-		//nextLocal = oldOptLocal;
-
-
-		//CUDACache* oldCurrentLocalCache = currentLocalCache;
-		//CUDACache* oldOptLocalCache = optLocalCache;
-		//CUDACache* oldNextLocalCache = nextLocalCache;
-		//currentLocalCache = oldNextLocalCache;
-		//optLocalCache = oldCurrentLocalCache;
-		//nextLocalCache = oldOptLocalCache;
-
-		//oldOptLocal->unlock();
-
 		mutex_nextLocal.lock();
 		std::swap(m_currentLocal, m_nextLocal);
 		std::swap(m_currentLocalCache, m_nextLocalCache);
@@ -250,6 +229,11 @@ private:
 	unsigned int m_submapSize;
 
 	//!!!DEBUGGING
+	std::vector<float*> m_fuseDepthImages; // vector of depth images (device) from local to use for global key fuse
+	mat4f m_fuseDepthIntrinsics;
+	mat4f m_fuseDepthIntrinsicsInv;
+	unsigned int m_fuseDepthWidth, m_fuseDepthHeight;
+
 	std::vector<unsigned int> _idxsLocalOptimized;
 	std::vector<unsigned int> _idxsLocalInvalidVerify;
 	std::vector<unsigned int> _idxsGlobalOptimized;

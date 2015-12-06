@@ -211,9 +211,11 @@ public:
 	const float4x4* getFiltTransformsDEBUG() const { return d_currFilteredTransforms; }
 
 
-	//TODO where to put transforms
+	//void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
+	//	const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& colorIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const;
 	void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
-		const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& colorIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const;
+		const std::vector<float*>& depthFrames, unsigned int depthWidth, unsigned int depthHeight,
+		const float4x4& colorIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const;
 
 	static void TestSVDDebugCU(const float3x3& m);
 
@@ -242,10 +244,11 @@ private:
 	void free();
 	void initializeMatching();
 
-	//TODO also try letting bundling thread keep a copy of a the current local depth images (at original res) - instead of using the downsampled versions
-	void fuseLocalKeyDepths(std::vector<SIFTKeyPoint>& globalKeys, const std::vector<CUDACachedFrame>& cachedFrames,
+	void fuseLocalKeyDepths(std::vector<SIFTKeyPoint>& globalKeys, const std::vector<float*>& depthFrames,
+	//void fuseLocalKeyDepths(std::vector<SIFTKeyPoint>& globalKeys, const std::vector<CUDACachedFrame>& cachedFrames,
+		unsigned int depthWidth, unsigned int depthHeight,
 		const std::vector<float4x4>& transforms, const std::vector<float4x4>& transformsInv, 
-		const float4x4& siftIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const;
+		const float4x4& siftIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const;
 
 	// keypoints & descriptors
 	std::vector<SIFTImageGPU>	m_SIFTImagesGPU;			// TODO if we ever do a global multi-match kernel, then we need this array on the GPU

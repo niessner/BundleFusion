@@ -48,7 +48,8 @@ void SubmapManager::initSIFT(unsigned int widthSift, unsigned int heightSift)
 	m_siftMatcher->InitSiftMatch();
 }
 
-void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage, unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames /*= (unsigned int)-1*/)
+void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage, unsigned int submapSize,
+	const CUDAImageManager* imageManager, unsigned int numTotalFrames /*= (unsigned int)-1*/)
 {
 	initSIFT(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
@@ -97,6 +98,16 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 	m_currIntegrateTransform[0].setIdentity();
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_imageInvalidateList, sizeof(int) * maxNumGlobalImages * maxNumLocalImages));
+
+	// local depth image cache (for global key fuse)
+	m_fuseDepthImages.resize(m_submapSize + 1, NULL); //TODO turn on for global average fuse
+	//m_fuseDepthWidth = sensor->getDepthWidth();
+	//m_fuseDepthHeight = sensor->getDepthHeight();
+	//for (unsigned int i = 0; i < m_fuseDepthImages.size(); i++) {
+	//	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_fuseDepthImages[i], sizeof(float) * m_fuseDepthWidth * m_fuseDepthHeight));
+	//}
+	//m_fuseDepthIntrinsics = sensor->getDepthIntrinsics();
+	//m_fuseDepthIntrinsicsInv = sensor->getDepthIntrinsicsInv();
 }
 
 SubmapManager::~SubmapManager()
@@ -121,6 +132,10 @@ SubmapManager::~SubmapManager()
 	MLIB_CUDA_SAFE_FREE(d_imageInvalidateList);
 	MLIB_CUDA_SAFE_FREE(d_siftTrajectory);
 	MLIB_CUDA_SAFE_FREE(d_currIntegrateTransform);
+
+	for (unsigned int i = 0; i < m_fuseDepthImages.size(); i++) {
+		MLIB_CUDA_SAFE_FREE(m_fuseDepthImages[i]);
+	}
 }
 
 unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth, unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor, unsigned int colorWidth, unsigned int colorHeight)
@@ -134,6 +149,8 @@ unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIF
 	// process cuda cache
 	const unsigned int curLocalFrame = m_currentLocal->getNumImages() - 1;
 	m_currentLocalCache->storeFrame(d_inputDepth, depthWidth, depthHeight, d_inputColor, colorWidth, colorHeight);
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_fuseDepthImages[curLocalFrame], d_inputDepth, sizeof(float)*depthWidth*depthHeight, cudaMemcpyDeviceToDevice));
+	//if (curLocalFrame == 1 && curFrame > 1) std::swap(m_fuseDepthImages[0], m_fuseDepthImages[m_submapSize]); // init next
 
 	// init next
 	if (isLastLocalFrame(curFrame)) {
@@ -368,8 +385,8 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 
 			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
 			//!!!
-			//std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
-			//getchar();
+			std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
+			getchar();
 			//!!!
 			ret = false;
 		}
@@ -401,8 +418,12 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		//unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, getLocalTrajectoryGPU(lastLocalSolved),
 		//	siftIntrinsics, siftIntrinsicsInv);
 		//m_global->finalizeSIFTImageGPU(numGlobalKeys);
-		local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved), m_nextLocalCache->getCacheFrames(),
-			siftIntrinsicsInv, MatrixConversion::toCUDA(m_nextLocalCache->getIntrinsics()), MatrixConversion::toCUDA(m_nextLocalCache->getIntrinsicsInv())); //TODO need GPU version of this
+		//using downsamp depth
+		//local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved), m_nextLocalCache->getCacheFrames(),
+		//	siftIntrinsicsInv, MatrixConversion::toCUDA(m_nextLocalCache->getIntrinsics()), MatrixConversion::toCUDA(m_nextLocalCache->getIntrinsicsInv())); //TODO need GPU version of this
+		//using cached depth at orig res
+		local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved), m_fuseDepthImages, m_fuseDepthWidth, m_fuseDepthHeight,
+			siftIntrinsicsInv, MatrixConversion::toCUDA(m_fuseDepthIntrinsics), MatrixConversion::toCUDA(m_fuseDepthIntrinsicsInv)); //TODO need GPU version of this
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = timer.getElapsedTimeMS(); }
 
 		const std::vector<int>& validImagesLocal = local->getValidImages();
@@ -455,8 +476,8 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			else {
 				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
 				//!!!
-				//std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
-				//getchar();
+				std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
+				getchar();
 				//!!!
 				ret = 2;
 			}

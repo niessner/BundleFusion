@@ -30,7 +30,8 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_bundlerInputData.alloc(m_RGBDSensor);
 
 	m_submapSize = GlobalBundlingState::get().s_submapSize;
-	m_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, m_submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage, m_submapSize, m_CudaImageManager);
+	m_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, m_submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage,
+		m_submapSize, m_CudaImageManager);
 	//TODO fix
 	if (GlobalAppState::get().s_sensorIdx == 3) {
 		m_SubmapManager.setTotalNumFrames(((BinaryDumpReader*)m_RGBDSensor)->getNumTotalFrames());
