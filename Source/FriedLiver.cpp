@@ -232,37 +232,12 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (false) {
-			CalibratedSensorData cs;
-			{
-				BinaryDataStreamFile s("../data/tum/fr2_xyz.sensor", false);
-				s >> cs;
-			}
-			unsigned int startFrame = 0;
-			unsigned int endFrame = 55;
-			if (endFrame < cs.m_ColorNumFrames) { // [splitFrame, end)	
-				cs.m_ColorImages.erase(cs.m_ColorImages.begin() + endFrame, cs.m_ColorImages.end());
-				cs.m_DepthImages.erase(cs.m_DepthImages.begin() + endFrame, cs.m_DepthImages.end());
-				cs.m_trajectory.erase(cs.m_trajectory.begin() + endFrame, cs.m_trajectory.end());;
-			}
-			if (startFrame > 0) { // [start, splitFrame)
-				cs.m_ColorImages.erase(cs.m_ColorImages.begin(), cs.m_ColorImages.begin() + startFrame);
-				cs.m_DepthImages.erase(cs.m_DepthImages.begin(), cs.m_DepthImages.begin() + startFrame);
-				cs.m_trajectory.erase(cs.m_trajectory.begin(), cs.m_trajectory.begin() + startFrame);
-			}
-			cs.m_ColorNumFrames = (unsigned int)cs.m_ColorImages.size();
-			cs.m_DepthNumFrames = (unsigned int)cs.m_DepthImages.size();
-
-			const std::string outFile = "debug/" + std::to_string(startFrame) + "-" + std::to_string(endFrame) + ".sensor";
-			{
-				BinaryDataStreamFile s(outFile, true);
-				s << cs;
-			}
-			std::cout << "DONE" << std::endl;
-			getchar();
-		}
-		if (false) {
+		if (true) {
 			TestMatching test;
+			test.loadFromSensor("debug/2.sensor", "", 1);
+			//test.loadFromSensor("debug/11noise.sensor", "");
+			test.runOpt();
+
 			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);
 			//test.load("", "debug/global.sift");
 			//std::cout << "waiting..." << std::endl;
@@ -274,11 +249,10 @@ int main(int argc, char** argv)
 			//test.save("debug/filtered.bin");
 
 			//test.match("", "debug/matches/", "../data/sun3d/harvard_c8_3.sensor", vec2ui(140, 151));
-			//test.match("", "debug/matches/", "debug/debug.sensor");
-			test.loadFromSensor("debug/to2080.sensor", "", GlobalBundlingState::get().s_submapSize);
-			test.load("", "debug/test208.sift");
+			//test.loadFromSensor("debug/to2080.sensor", "", GlobalBundlingState::get().s_submapSize);
+			//test.load("", "debug/test208.sift");
 			//test.matchFrame(207, true, true);
-			test.debugOptimizeGlobal();
+			//test.debugOptimizeGlobal();
 			
 			//test.debugMatchInfo();
 			//test.checkCorrespondences();

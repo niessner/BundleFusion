@@ -1052,7 +1052,7 @@ void TestMatching::debugOptimizeGlobal()
 	bool isEnd = true;
 	bool isScanDone = false;
 	for (unsigned int i = 0; i < 10; i++) {
-		bundler.align(m_siftManager, d_globalTrajectory, numNonLinIters, numLinIters,
+		bundler.align(m_siftManager, NULL, d_globalTrajectory, numNonLinIters, numLinIters,
 			useVerify, false, false, isStart, isEnd, isScanDone);
 
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globTrajectory.data(), d_globalTrajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
@@ -1181,6 +1181,82 @@ void TestMatching::debugMatchInfo()
 	}
 
 	// todo fix this hack
+}
+
+void TestMatching::runOpt()
+{
+	MLIB_ASSERT(!m_colorImages.empty() && !m_cachedFrames.empty());
+
+	float weightSparse = 0.0f;
+	float weightDense = 1.0f;
+	const unsigned int numImages = (unsigned int)m_colorImages.size();
+
+	//TODO sparse stuff here
+	SIFTImageManager siftManager(GlobalBundlingState::get().s_submapSize, numImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
+	if (weightSparse > 0.0f) {
+		
+	}
+	else {
+		// fake images
+		for (unsigned int i = 0; i < numImages; i++) {
+			SIFTImageGPU& cur = siftManager.createSIFTImageGPU();
+			siftManager.finalizeSIFTImageGPU(0);
+		}
+	}
+
+	//dense stuff here (create cache)
+	CUDACache cudaCache(GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight, numImages, m_intrinsicsDownsampled);
+	cudaCache.setCachedFrames(m_cachedFrames);
+
+	////!!!Debugging print frames
+	//DepthImage32 depthImage(cudaCache.getWidth(), cudaCache.getHeight());
+	//ColorImageR32G32B32A32 pointImage(cudaCache.getWidth(), cudaCache.getHeight());
+	//const CUDACachedFrame* d_frames = cudaCache.getCacheFramesGPU();
+	//std::vector<CUDACachedFrame> h_frames(numImages);
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(h_frames.data(), d_frames, sizeof(CUDACachedFrame)*numImages, cudaMemcpyDeviceToHost));
+	//for (unsigned int i = 0; i < numImages; i++) {
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), h_frames[i].d_depthDownsampled, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
+	//	FreeImageWrapper::saveImage("debug/depth" + std::to_string(i) + ".png", ColorImageR32G32B32(depthImage));
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(pointImage.getPointer(), h_frames[i].d_cameraposDownsampled, sizeof(float4)*pointImage.getNumPixels(), cudaMemcpyDeviceToHost));
+	//	FreeImageWrapper::saveImage("debug/campos" + std::to_string(i) + ".png", pointImage);
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(pointImage.getPointer(), h_frames[i].d_normalsDownsampled, sizeof(float4)*pointImage.getNumPixels(), cudaMemcpyDeviceToHost));
+	//	FreeImageWrapper::saveImage("debug/normal" + std::to_string(i) + ".png", pointImage);
+	//}
+	////!!!Debugging
+
+	// run opt
+	SBA sba;
+	sba.init(numImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
+	sba.setWeights(weightSparse, weightDense);
+	// params
+	const unsigned int maxNumIters = 8;
+	const unsigned int numPCGIts = 50;
+	const bool useVerify = true;
+	const bool isLocal = true;
+
+	// initial transforms
+	std::vector<mat4f> transforms(numImages, mat4f::identity());
+	// rand init
+	RNG::global.init(0, 1, 2, 3);
+	for (unsigned int i = 1; i < transforms.size(); i++) {
+		float tx = RNG::global.uniform(0.0f, 0.1f); if (RNG::global.uniform(0, 1) == 0) tx = -tx;
+		float ty = RNG::global.uniform(0.0f, 0.1f); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
+		float tz = RNG::global.uniform(0.0f, 0.1f); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
+		float rx = RNG::global.uniform(0.0f, 7.0f); if (RNG::global.uniform(0, 1) == 0) rx = -rx;
+		float ry = RNG::global.uniform(0.0f, 7.0f); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
+		float rz = RNG::global.uniform(0.0f, 7.0f); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
+		transforms[i] = mat4f::translation(tx, ty, tz) * mat4f::rotationZ(rz) * mat4f::rotationY(ry) * mat4f::rotationX(rx);
+	}
+	SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, transforms, m_depthCalibration.m_IntrinsicInverse);
+
+	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, transforms.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
+	sba.align(&siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+	SiftVisualization::saveToPointCloud("debug/opt.ply", m_depthImages, m_colorImages, transforms, m_depthCalibration.m_IntrinsicInverse);
+
+	MLIB_CUDA_SAFE_FREE(d_transforms);
 }
 
 

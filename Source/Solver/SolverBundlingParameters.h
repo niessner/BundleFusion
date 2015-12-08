@@ -10,6 +10,16 @@ struct SolverParameters
 
 	float verifyOptDistThresh; // for verifying local 
 	float verifyOptPercentThresh;
+
+	// dense depth corr
+	float denseDepthDistThresh;
+	float denseDepthNormalThresh;
+	//float denseDepthColorThresh;
+	float denseDepthMin;
+	float denseDepthMax;
+
+	float weightSparse;
+	float weightDenseDepth;
 };
 
 #endif

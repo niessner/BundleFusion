@@ -95,6 +95,17 @@ public:
 		s.closeStream();
 	}
 
+	//!debugging only
+	void setCachedFrames(const std::vector<CUDACachedFrame> cachedFrames) {
+		MLIB_ASSERT(cachedFrames.size() <= m_cache.size());
+		for (unsigned int i = 0; i < cachedFrames.size(); i++) {
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_depthDownsampled, cachedFrames[i].d_depthDownsampled, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_colorDownsampled, cachedFrames[i].d_colorDownsampled, sizeof(uchar4) * m_width * m_height, cudaMemcpyDeviceToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_cameraposDownsampled, cachedFrames[i].d_cameraposDownsampled, sizeof(float4) * m_width * m_height, cudaMemcpyDeviceToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_normalsDownsampled, cachedFrames[i].d_normalsDownsampled, sizeof(float4) * m_width * m_height, cudaMemcpyDeviceToDevice));
+		}
+	}
+
 private:
 
 	void alloc() {

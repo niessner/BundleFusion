@@ -264,7 +264,7 @@ __global__ void computeNormals_Kernel(float4* d_output, float4* d_input, unsigne
 
 			if(l > 0.0f)
 			{
-				d_output[y*width+x] = make_float4(n/-l, 1.0f);
+				d_output[y*width+x] = make_float4(n/-l, 0.0f);
 			}
 		}
 	}

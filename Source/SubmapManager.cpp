@@ -346,7 +346,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 
 	MLIB_ASSERT(m_nextLocal->getNumImages() > 1);
 	bool useVerify = GlobalBundlingState::get().s_useLocalVerify;
-	m_SparseBundler.align(siftManager, getLocalTrajectoryGPU(curLocalIdx), numNonLinIterations, numLinIterations,
+	m_SparseBundler.align(siftManager, cudaCache, getLocalTrajectoryGPU(curLocalIdx), numNonLinIterations, numLinIterations,
 		useVerify, true, false, true, true, false);
 	// still need this for global key fuse
 
@@ -505,7 +505,7 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 	const unsigned int numGlobalFrames = m_global->getNumImages();
 
 	const bool useVerify = false;
-	m_SparseBundler.align(m_global, d_globalTrajectory, numNonLinIterations, numLinIterations,
+	m_SparseBundler.align(m_global, NULL, d_globalTrajectory, numNonLinIterations, numLinIterations,
 		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, isScanDone);
 
 	if (isEnd) {

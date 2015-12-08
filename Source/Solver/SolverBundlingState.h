@@ -5,6 +5,7 @@
 
 #include <cuda_runtime.h> 
 #include "../SiftGPU/SIFTImageManager.h"
+#include "../CUDACacheUtil.h"
 
 struct SolverInput
 {	
@@ -17,6 +18,11 @@ struct SolverInput
 
 	unsigned int maxNumberOfImages;
 	unsigned int maxCorrPerImage;
+
+	const CUDACachedFrame* d_depthFrames;
+	unsigned int denseDepthWidth;
+	unsigned int denseDepthHeight;
+	float4x4 depthIntrinsics;		//TODO constant buffer for this + siftimagemanger stuff?
 };
 
 // State of the GN Solver
@@ -43,14 +49,13 @@ struct SolverState
 	float3*	d_Ap_XTrans;				// Cache values for next kernel call after A = J^T x J x p
 
 	float*	d_scanAlpha;				// Tmp memory for alpha scan
-	//float*	d_scanBeta;					// Tmp memory for beta scan
 
 	float*	d_rDotzOld;					// Old nominator (denominator) of alpha (beta)
 	
 	float3*	d_precondionerRot;			// Preconditioner for linear system
 	float3*	d_precondionerTrans;		// Preconditioner for linear system
 
-	float*	d_sumResidual;				// sum of the squared residuals
+	float*	d_sumResidual;				// sum of the squared residuals //debug
 	
 	// residual pruning
 	int*	d_maxResidualIndex;
@@ -69,6 +74,10 @@ struct SolverState
 		cudaMemcpy(&residual, d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost);
 		return residual;
 	}
+
+	// for dense depth term
+	float* d_depthJtJ;
+	float* d_depthJtr;
 };
 
 #endif
