@@ -27,7 +27,7 @@ public:
 		m_bUseComprehensiveFrameInvalidation = false;
 
 		m_weightSparse = 1.0f;
-		m_weightDense = 1.0f;
+		m_weightDenseInit = 1.0f;
 	}
 	void init(unsigned int maxImages, unsigned int maxNumCorrPerImage) {
 		unsigned int maxNumImages = maxImages;
@@ -57,9 +57,10 @@ public:
 	}
 	void printConvergence(const std::string& filename) const;
 
-	void setWeights(float ws, float wd) {
+	void setWeights(float ws, float wd, float wdl) {
 		m_weightSparse = ws;
-		m_weightDense = wd;
+		m_weightDenseInit = wd;
+		m_weightDenseLinFactor = wdl;
 	}
 
 private:
@@ -73,7 +74,8 @@ private:
 	unsigned int	m_numCorrespondences;
 
 	float			m_weightSparse;
-	float			m_weightDense;
+	float			m_weightDenseInit;
+	float			m_weightDenseLinFactor;
 
 	CUDASolverBundling* m_solver;
 

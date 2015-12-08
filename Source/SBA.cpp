@@ -40,7 +40,10 @@ void SBA::align(SIFTImageManager* siftManager, CUDACache* cudaCache, float4x4* d
 		curIt++;
 	} while (removed && curIt < maxIts);
 
-	if (useVerify) m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesDEBUG(), siftManager->getNumGlobalCorrespondences());
+	if (useVerify) {
+		if (m_weightSparse > 0)	m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesDEBUG(), siftManager->getNumGlobalCorrespondences());
+		else m_bVerify = true; //TODO for debugging only???
+	}
 
 	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
 	
@@ -55,12 +58,17 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, CUDACache* cudaCache, unsigne
 	// transforms
 	unsigned int numImages = siftManager->getNumImages();
 
-	float weightDense = (cudaCache == NULL) ? 0.0f : m_weightDense;
+	float weightDense = m_weightDenseInit;
+	float weightDenseLinFactor = m_weightDenseLinFactor;
+	if (cudaCache == NULL) {
+		weightDense = 0.0f;
+		weightDenseLinFactor = 0.0f;
+	}
 	m_solver->solve(d_correspondences, m_numCorrespondences, numImages, numNonLinearIterations, numLinearIterations,
-		cudaCache, m_weightSparse, weightDense, d_xRot, d_xTrans, isStart, isEnd);
+		cudaCache, m_weightSparse, weightDense, weightDenseLinFactor, d_xRot, d_xTrans, isStart, isEnd);
 
 	bool removed = false; 
-	if (isEnd) {
+	if (isEnd && m_weightSparse > 0) {
 		removed = removeMaxResidualCUDA(siftManager, numImages);
 	}
 

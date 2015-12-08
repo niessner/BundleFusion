@@ -20,6 +20,8 @@ struct SolverParameters
 
 	float weightSparse;
 	float weightDenseDepth;
+	float weightDenseDepthInit;
+	float weightDenseDepthLinFactor;
 };
 
 #endif

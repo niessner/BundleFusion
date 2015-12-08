@@ -97,8 +97,8 @@ __global__ void resampleFloat_Kernel(float* d_output, unsigned int outputWidth, 
 
 	if (x < outputWidth && y < outputHeight)
 	{
-		const float scaleWidth = (float)(inputWidth - 1) / (float)(outputWidth - 1);
-		const float scaleHeight = (float)(inputHeight - 1) / (float)(outputHeight - 1);
+		const float scaleWidth = (float)inputWidth / (float)outputWidth;
+		const float scaleHeight = (float)inputHeight / (float)outputHeight;
 
 		const unsigned int xInput = (unsigned int)(x*scaleWidth + 0.5f);
 		const unsigned int yInput = (unsigned int)(y*scaleHeight + 0.5f);
@@ -131,8 +131,8 @@ __global__ void resampleUCHAR4_Kernel(uchar4* d_output, unsigned int outputWidth
 
 	if (x < outputWidth && y < outputHeight)
 	{
-		const float scaleWidth = (float)(inputWidth - 1) / (float)(outputWidth - 1);
-		const float scaleHeight = (float)(inputHeight - 1) / (float)(outputHeight - 1);
+		const float scaleWidth = (float)inputWidth / (float)outputWidth;
+		const float scaleHeight = (float)inputHeight / (float)outputHeight;
 
 		const unsigned int xInput = (unsigned int)(x*scaleWidth + 0.5f);
 		const unsigned int yInput = (unsigned int)(y*scaleHeight + 0.5f);

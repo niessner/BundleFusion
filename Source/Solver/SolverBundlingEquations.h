@@ -16,6 +16,8 @@
 
 #include "ICPUtil.h"
 
+// residual functions only for sparse!
+
 // not squared!
 __inline__ __device__ float evalResidualDeviceFloat3(unsigned int corrIdx, unsigned int componentIdx, SolverInput& input, SolverState& state, SolverParameters& parameters)
 {
@@ -57,14 +59,14 @@ __inline__ __device__ float evalFDevice(unsigned int corrIdx, SolverInput& input
 
 __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, SolverParameters& parameters, float3& resRot, float3& resTrans)
 {
-	float3 rRot   = make_float3(0.0f, 0.0f, 0.0f);
+	float3 rRot = make_float3(0.0f, 0.0f, 0.0f);
 	float3 rTrans = make_float3(0.0f, 0.0f, 0.0f);
 
-	float3 pRot   = make_float3(0.0f, 0.0f, 0.0f);
+	float3 pRot = make_float3(0.0f, 0.0f, 0.0f);
 	float3 pTrans = make_float3(0.0f, 0.0f, 0.0f);
 
 	// Reset linearized update vector
-	state.d_deltaRot[variableIdx]   = make_float3(0.0f, 0.0f, 0.0f);
+	state.d_deltaRot[variableIdx] = make_float3(0.0f, 0.0f, 0.0f);
 	state.d_deltaTrans[variableIdx] = make_float3(0.0f, 0.0f, 0.0f);
 
 	// Compute -JTF here
@@ -103,18 +105,36 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 		}
 	}
 
-	resRot	 = -rRot;
-	resTrans = -rTrans;
+	resRot = -parameters.weightSparse * rRot;
+	resTrans = -parameters.weightSparse * rTrans;
+	pRot *= parameters.weightSparse;
+	pTrans *= parameters.weightSparse;
+
+	// add dense term
+	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
+	uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
+	resRot -= parameters.weightDenseDepth * make_float3(state.d_depthJtr[rotIndices.x], state.d_depthJtr[rotIndices.y], state.d_depthJtr[rotIndices.z]); //minus since -Jtf
+	resTrans -= parameters.weightDenseDepth * make_float3(state.d_depthJtr[transIndices.x], state.d_depthJtr[transIndices.y], state.d_depthJtr[transIndices.z]); //minus since -Jtf
+	//TODO uncomment try preconditioner //!!!DEBUGGING
+	//pRot += parameters.weightDenseDepth * make_float3(
+	//	state.d_depthJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
+	//	state.d_depthJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
+	//	state.d_depthJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
+	//pTrans += parameters.weightDenseDepth * make_float3(
+	//	state.d_depthJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
+	//	state.d_depthJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
+	//	state.d_depthJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
+	// end dense part
 
 	// Preconditioner depends on last solution P(input.d_x)
-	if (pRot.x > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].x   = 1.0f/pRot.x;
-	else					      state.d_precondionerRot[variableIdx].x   = 1.0f;
+	if (pRot.x > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].x = 1.0f / pRot.x;
+	else					      state.d_precondionerRot[variableIdx].x = 1.0f;
 
-	if (pRot.y > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].y   = 1.0f/pRot.y;
-	else					      state.d_precondionerRot[variableIdx].y   = 1.0f;
+	if (pRot.y > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].y = 1.0f / pRot.y;
+	else					      state.d_precondionerRot[variableIdx].y = 1.0f;
 
-	if (pRot.z > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].z   = 1.0f/pRot.z;
-	else						  state.d_precondionerRot[variableIdx].z   = 1.0f;
+	if (pRot.z > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].z = 1.0f / pRot.z;
+	else						  state.d_precondionerRot[variableIdx].z = 1.0f;
 
 	if (pTrans.x > FLOAT_EPSILON) state.d_precondionerTrans[variableIdx].x = 1.0f / pTrans.x;
 	else					      state.d_precondionerTrans[variableIdx].x = 1.0f;
@@ -164,15 +184,16 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 //	outTrans.x = warpReduce(outTrans.x); outTrans.y = warpReduce(outTrans.y); outTrans.z = warpReduce(outTrans.z);
 //}
 
-__inline__ __device__ void applyJTDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters, float3& outRot, float3& outTrans, unsigned int threadIdx, unsigned int lane)
+__inline__ __device__ void applyJTDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,
+	float3& outRot, float3& outTrans, unsigned int threadIdx, unsigned int lane)
 {
 	// Compute J^T*d_Jp here
-	outRot	 = make_float3(0.0f, 0.0f, 0.0f);
+	outRot = make_float3(0.0f, 0.0f, 0.0f);
 	outTrans = make_float3(0.0f, 0.0f, 0.0f);
 
 	const float3&  oldAngles0 = state.d_xRot[variableIdx]; // get angles
 	const float3x3 R_dAlpha = evalR_dAlpha(oldAngles0);
-	const float3x3 R_dBeta  = evalR_dBeta (oldAngles0);
+	const float3x3 R_dBeta = evalR_dBeta(oldAngles0);
 	const float3x3 R_dGamma = evalR_dGamma(oldAngles0);
 
 	int N = min(input.d_numEntriesPerRow[variableIdx], input.maxCorrPerImage);
@@ -194,8 +215,10 @@ __inline__ __device__ void applyJTDevice(unsigned int variableIdx, SolverInput& 
 			outTrans += variableSign * state.d_Jp[corrIdx];
 		}
 	}
+	outRot *= parameters.weightSparse;
+	outTrans *= parameters.weightSparse;
 
-	outRot.x   = warpReduce(outRot.x);	 outRot.y   = warpReduce(outRot.y);	  outRot.z   = warpReduce(outRot.z);
+	outRot.x = warpReduce(outRot.x);	 outRot.y = warpReduce(outRot.y);	  outRot.z = warpReduce(outRot.z);
 	outTrans.x = warpReduce(outTrans.x); outTrans.y = warpReduce(outTrans.y); outTrans.z = warpReduce(outTrans.z);
 }
 
@@ -204,7 +227,7 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 	// Compute Jp here
 	float3 b = make_float3(0.0f, 0.0f, 0.0f);
 	const EntryJ& corr = input.d_correspondences[corrIdx];
-	
+
 	if (corr.isValid()) {
 		if (corr.imgIdx_i > 0)	// get transform 0
 		{
@@ -225,8 +248,75 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 			const float3  pp1 = state.d_pRot[corr.imgIdx_j];
 			b -= dAlpha1*pp1.x + dBeta1*pp1.y + dGamma1*pp1.z + state.d_pTrans[corr.imgIdx_j];
 		}
+		b *= parameters.weightSparse;
 	}
 	return b;
 }
+
+////////////////////////////////////////
+// dense depth term
+////////////////////////////////////////
+
+__inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,
+	float3& outRot, float3& outTrans)
+{
+	// Compute J^T*d_Jp here
+	int N = input.numberOfImages;
+	const int dim = 6 * N;
+
+	unsigned int baseVarIdx = variableIdx * 6;
+	for (int i = 0; i < N; i++) // iterate through (6) row(s) of JtJ and all of p
+	{
+		// (row, col) = vars, i
+		int baseIdx = 6 * i;
+
+		float3x3 block00(
+			state.d_depthJtJ[(baseVarIdx + 0)* dim + baseIdx + 0], state.d_depthJtJ[(baseVarIdx + 0)* dim + baseIdx + 1], state.d_depthJtJ[(baseVarIdx + 0)* dim + baseIdx + 2],
+			state.d_depthJtJ[(baseVarIdx + 1)* dim + baseIdx + 0], state.d_depthJtJ[(baseVarIdx + 1)* dim + baseIdx + 1], state.d_depthJtJ[(baseVarIdx + 1)* dim + baseIdx + 2],
+			state.d_depthJtJ[(baseVarIdx + 2)* dim + baseIdx + 0], state.d_depthJtJ[(baseVarIdx + 2)* dim + baseIdx + 1], state.d_depthJtJ[(baseVarIdx + 2)* dim + baseIdx + 2]);
+		float3x3 block01(
+			state.d_depthJtJ[(baseVarIdx + 0)* dim + baseIdx + 3], state.d_depthJtJ[(baseVarIdx + 0)* dim + baseIdx + 4], state.d_depthJtJ[(baseVarIdx + 0)* dim + baseIdx + 5],
+			state.d_depthJtJ[(baseVarIdx + 1)* dim + baseIdx + 3], state.d_depthJtJ[(baseVarIdx + 1)* dim + baseIdx + 4], state.d_depthJtJ[(baseVarIdx + 1)* dim + baseIdx + 5],
+			state.d_depthJtJ[(baseVarIdx + 2)* dim + baseIdx + 3], state.d_depthJtJ[(baseVarIdx + 2)* dim + baseIdx + 4], state.d_depthJtJ[(baseVarIdx + 2)* dim + baseIdx + 5]);
+		float3x3 block10(
+			state.d_depthJtJ[(baseVarIdx + 3)* dim + baseIdx + 0], state.d_depthJtJ[(baseVarIdx + 3)* dim + baseIdx + 1], state.d_depthJtJ[(baseVarIdx + 3)* dim + baseIdx + 2],
+			state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 0], state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 1], state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 2],
+			state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 0], state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 1], state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 2]);
+		float3x3 block11(
+			state.d_depthJtJ[(baseVarIdx + 3)* dim + baseIdx + 3], state.d_depthJtJ[(baseVarIdx + 3)* dim + baseIdx + 4], state.d_depthJtJ[(baseVarIdx + 3)* dim + baseIdx + 5],
+			state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 3], state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 4], state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 5],
+			state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 3], state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 4], state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 5]);
+
+		outRot = block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
+		outTrans = block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
+	}
+}
+//__inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,
+//	float3& outRot, float3& outTrans, unsigned int threadIdx)
+//{
+//	// Compute J^T*d_Jp here
+//	//outRot = make_float3(0.0f, 0.0f, 0.0f); // add to existing
+//	//outTrans = make_float3(0.0f, 0.0f, 0.0f);
+//
+//	int N = input.numberOfImages;
+//
+//	for (int i = threadIdx; i < N; i += THREADS_PER_BLOCK_JT)
+//	{
+//		//(row,col) = (variableIdx + (3/3), i + (3/3))
+//		float3 rotPart = make_float3(
+//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 0],
+//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 1],
+//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 2]);
+//		float3 transPart = make_float3(
+//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 3],
+//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 4],
+//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 5]);
+//		outRot += dot(rotPart, state.d_pRot[i]);
+//		outTrans += dot(transPart, state.d_pTrans[i]);
+//	}
+//
+//	outRot.x = warpReduce(outRot.x);	 outRot.y = warpReduce(outRot.y);	  outRot.z = warpReduce(outRot.z);
+//	outTrans.x = warpReduce(outTrans.x); outTrans.y = warpReduce(outTrans.y); outTrans.z = warpReduce(outTrans.z);
+//}
 
 #endif

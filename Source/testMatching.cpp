@@ -1188,8 +1188,13 @@ void TestMatching::runOpt()
 	MLIB_ASSERT(!m_colorImages.empty() && !m_cachedFrames.empty());
 
 	float weightSparse = 0.0f;
-	float weightDense = 1.0f;
+	float weightDenseInit = 1.0f;
+	float weightDenseLinFactor = 0.0f;
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
+
+	std::vector<mat4f> referenceTrajectory = m_referenceTrajectory;
+	mat4f offset = referenceTrajectory.front().getInverse();
+	for (unsigned int i = 0; i < referenceTrajectory.size(); i++) referenceTrajectory[i] = offset * referenceTrajectory[i];
 
 	//TODO sparse stuff here
 	SIFTImageManager siftManager(GlobalBundlingState::get().s_submapSize, numImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
@@ -1227,7 +1232,7 @@ void TestMatching::runOpt()
 	// run opt
 	SBA sba;
 	sba.init(numImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
-	sba.setWeights(weightSparse, weightDense);
+	sba.setWeights(weightSparse, weightDenseInit, weightDenseLinFactor);
 	// params
 	const unsigned int maxNumIters = 8;
 	const unsigned int numPCGIts = 50;
@@ -1257,6 +1262,25 @@ void TestMatching::runOpt()
 	SiftVisualization::saveToPointCloud("debug/opt.ply", m_depthImages, m_colorImages, transforms, m_depthCalibration.m_IntrinsicInverse);
 
 	MLIB_CUDA_SAFE_FREE(d_transforms);
+
+	// compare to reference trajectory
+	float rotErr = 0.0f, transErr = 0.0f;
+	for (unsigned int i = 1; i < transforms.size(); i++) {
+		mat3f refRot = referenceTrajectory[i].getRotation();
+		mat3f optRot = transforms[i].getRotation();
+		mat4f diffRot = mat4f::identity(); diffRot.setRotation(refRot.getTranspose() * optRot);
+		Pose rot = PoseHelper::MatrixToPose(diffRot);
+		rotErr += rot.getVec3().lengthSq();
+
+		vec3f refTrans = referenceTrajectory[i].getTranslation();
+		vec3f optTrans = transforms[i].getTranslation();
+		transErr += (refTrans - optTrans).lengthSq();
+	}
+	rotErr = std::sqrt(rotErr); transErr = std::sqrt(transErr);
+	std::cout << "*********************************" << std::endl;
+	std::cout << "trans err = " << transErr << std::endl;
+	std::cout << "rot err = " << rotErr << std::endl;
+	std::cout << "*********************************" << std::endl;
 }
 
 
