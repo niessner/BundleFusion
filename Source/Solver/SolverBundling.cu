@@ -96,11 +96,11 @@ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned int dim, c
 __device__ bool findDenseDepthCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, /*float colorThresh,*/ const float4x4& transform, const float4x4& intrinsics,
 	const float4* tgtCamPos, const float4* tgtNormals, const float4* srcCamPos, const float4* srcNormals, float depthMin, float depthMax,
-	float4& camPosSrcToTgt, float4& camPosTgt, float4& normalTgt,
-	bool debugPrint)
+	float4& camPosSrcToTgt, float4& camPosTgt, float4& normalTgt
+	, bool debugPrint)
 {
 	//!!!DEBUGGING
-	const unsigned int x = idx % imageWidth; const unsigned int y = idx / imageHeight;
+	//bool debugPrint = false;
 	//!!!DEBUGGING
 	const float4& cposj = srcCamPos[idx];
 	if (debugPrint) printf("cam pos j = %f %f %f\n", cposj.x, cposj.y, cposj.z);
@@ -172,17 +172,18 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 		float4 camPosSrcToTgt, camPosTgt, normalTgt;
 		if (findDenseDepthCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDepthDistThresh, parameters.denseDepthNormalThresh, transform, input.depthIntrinsics,
-			input.d_depthFrames[i].d_cameraposDownsampled, input.d_depthFrames[i].d_normalsDownsampled,
-			input.d_depthFrames[j].d_cameraposDownsampled, input.d_depthFrames[j].d_normalsDownsampled,
+			input.d_depthFrames[i].d_cameraposDownsampled, input.d_depthFrames[i].d_normalsDownsampled, //target
+			input.d_depthFrames[j].d_cameraposDownsampled, input.d_depthFrames[j].d_normalsDownsampled, //source
 			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, camPosTgt, normalTgt
-			, (i == 0 && j == 2 && x == 44 && y == 20)
+			//,(i == 0 && j == 1 && x == 47 && y == 53)
+			, false
 			)) { //i tgt, j src
 			// residual
 			float4 diff = camPosTgt - camPosSrcToTgt;
 			float res = dot(diff, normalTgt);
 
 			// jacobian
-			const float4& camPosSrc = input.d_depthFrames[i].d_cameraposDownsampled[gidx];
+			const float4& camPosSrc = input.d_depthFrames[j].d_cameraposDownsampled[gidx];
 			matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
 			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
 			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
@@ -192,27 +193,31 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 				jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight
 				, state.d_sumResidual);
 			atomicAdd(state.d_corrCount, 1);
-			if (i == 0 && j == 2) state.d_corrImage[y*input.denseDepthWidth + x] = 1;
+			if (i == 0 && j == 1) state.d_corrImage[y*input.denseDepthWidth + x] = 1;
 
 			//!!!debugging
-			if (i == 0 && j == 2 && x == 44 && y == 20) {
-				printf("-----------\n");
-				printf("(%d, %d)\n", x, y);
-				printf("transform i:\n"); transform_i.print();
-				printf("inv transform i:\n"); invTransform_i.print();
-				printf("transform j:\n"); transform_j.print();
-				printf("transform:\n"); transform.print();
-				printf("cam pos src: %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z);
-				printf("cam pos src to tgt: %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
-				printf("cam pos tgt: %f %f %f\n", camPosTgt.x, camPosTgt.y, camPosTgt.z);
-				printf("normal tgt: %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z);
-				printf("diff = %f %f %f %f\n", diff.x, diff.y, diff.z, diff.w);
-				printf("res = %f\n", res);
-				printf("weight = %f\n", parameters.weightDenseDepth * weight);
-				printf("jac i %f %f %f %f %f %f\n", jacobianBlockRow_i(0), jacobianBlockRow_i(1), jacobianBlockRow_i(2),
-					jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5));
-				printf("jac j %f %f %f %f %f %f\n", jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
-					jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
+			//if (i == 0 && j == 1 && x == 47 && y == 53) {
+			if (isnan(jacobianBlockRow_i(0)) || isnan(jacobianBlockRow_i(1)) || isnan(jacobianBlockRow_i(2)) || isnan(jacobianBlockRow_i(3)) || isnan(jacobianBlockRow_i(4)) || isnan(jacobianBlockRow_i(5))
+				|| isnan(jacobianBlockRow_j(0)) || isnan(jacobianBlockRow_j(1)) || isnan(jacobianBlockRow_j(2)) || isnan(jacobianBlockRow_j(3)) || isnan(jacobianBlockRow_j(4)) || isnan(jacobianBlockRow_j(5))
+				|| isnan(res) || isnan(weight)) {
+				printf("ERROR NaN\n");
+			//	printf("-----------\n");
+			//	printf("images (%d, %d) at (%d, %d)\n", i, j, x, y);
+			//	//printf("transform i:\n"); transform_i.print();
+			//	//printf("inv transform i:\n"); invTransform_i.print();
+			//	//printf("transform j:\n"); transform_j.print();
+			//	//printf("transform:\n"); transform.print();
+			//	printf("cam pos src: %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z);
+			//	printf("cam pos src to tgt: %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
+			//	printf("cam pos tgt: %f %f %f\n", camPosTgt.x, camPosTgt.y, camPosTgt.z);
+			//	printf("normal tgt: %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z);
+			//	printf("diff = %f %f %f %f\n", diff.x, diff.y, diff.z, diff.w);
+			//	printf("res = %f\n", res);
+			//	printf("weight = %f\n", parameters.weightDenseDepth * weight);
+			//	printf("jac i %f %f %f %f %f %f\n", jacobianBlockRow_i(0), jacobianBlockRow_i(1), jacobianBlockRow_i(2),
+			//		jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5));
+			//	printf("jac j %f %f %f %f %f %f\n", jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
+			//		jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
 			}
 			//!!!debugging
 		} // found correspondence
@@ -265,7 +270,7 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 #ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
-#endif	
+#endif
 
 		//!!!debugging
 		bool debugPrint = false;

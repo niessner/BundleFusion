@@ -776,24 +776,62 @@ void TestMatching::createCachedFrames()
 
 	allocCachedFrames((unsigned int)m_colorImages.size(), width, height);
 
-	float* d_depth = NULL; uchar4* d_color = NULL;
+	float* d_depth = NULL; uchar4* d_color = NULL; float* d_depthErodeHelper = NULL;
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depth, sizeof(float) * m_widthDepth * m_heightDepth));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_color, sizeof(uchar4) * m_widthSift * m_heightSift));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthErodeHelper, sizeof(float) * m_widthDepth * m_heightDepth));
+
+	//!!!DEBUGGING
+	//DepthImage32 origDepth(m_widthDepth, m_heightDepth);
+	//DepthImage32 subDepth(width, height);
+	//ColorImageR32G32B32A32 subCamPos(width, height);
+	//!!!DEBUGGING
 
 	for (unsigned int i = 0; i < m_colorImages.size(); i++) {
+		//origDepth = m_depthImages[i]; FreeImageWrapper::saveImage("debug/_orig.png", ColorImageR32G32B32(origDepth));
+
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, m_depthImages[i].getPointer(), sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyHostToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, m_colorImages[i].getPointer(), sizeof(uchar4) * m_colorImages[i].getNumPixels(), cudaMemcpyHostToDevice));
+		//erode and smooth depth
+		bool erode = true; bool smooth = true;
+		if (erode) {
+			unsigned int numIter = 2; numIter = 2 * ((numIter + 1) / 2);
+			for (unsigned int i = 0; i < numIter; i++) {
+				if (i % 2 == 0) {
+					CUDAImageUtil::erodeDepthMap(d_depthErodeHelper, d_depth, 3, m_widthDepth, m_heightDepth, 0.05f, 0.3f);
+				}
+				else {
+					CUDAImageUtil::erodeDepthMap(d_depth, d_depthErodeHelper, 3, m_widthDepth, m_heightDepth, 0.05f, 0.3f);
+				}
+			}
+		}
+		if (smooth) {
+			CUDAImageUtil::gaussFilterFloatMap(d_depthErodeHelper, d_depth, 2.0f, 0.05f, m_widthDepth, m_heightDepth);
+			std::swap(d_depth, d_depthErodeHelper);
+		}
+
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(origDepth.getPointer(), d_depth, sizeof(float)*origDepth.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/_procDepth.png", ColorImageR32G32B32(origDepth));
+
 		CUDACachedFrame& frame = m_cachedFrames[i];
 		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, width, height, d_color, m_widthSift, m_heightSift);
 
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(subDepth.getPointer(), frame.d_depthDownsampled, sizeof(float)*subDepth.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/_subDepth.png", ColorImageR32G32B32(subDepth));
+
 		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(frame.d_cameraposDownsampled, frame.d_depthDownsampled,
 			MatrixConversion::toCUDA(m_intrinsicsDownsampled.getInverse()), width, height);
 		CUDAImageUtil::computeNormals(frame.d_normalsDownsampled, frame.d_cameraposDownsampled, width, height);
+
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(subCamPos.getPointer(), frame.d_cameraposDownsampled, sizeof(float4)*subCamPos.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/_subCamPos.png", subCamPos);
+		//int a = 5;
 	}
 
 	MLIB_CUDA_SAFE_FREE(d_depth);
 	MLIB_CUDA_SAFE_FREE(d_color);
+	MLIB_CUDA_SAFE_FREE(d_depthErodeHelper);
 	std::cout << "done!" << std::endl;
 }
 
@@ -1281,6 +1319,49 @@ void TestMatching::runOpt()
 	std::cout << "trans err = " << transErr << std::endl;
 	std::cout << "rot err = " << rotErr << std::endl;
 	std::cout << "*********************************" << std::endl;
+}
+
+void TestMatching::printCacheFrames(const std::string& dir) const
+{
+	if (m_cachedFrames.empty()) {
+		std::cout << "no cached frames to print!" << std::endl;
+		return;
+	}
+
+	unsigned int width = GlobalBundlingState::get().s_downsampledWidth;
+	unsigned int height = GlobalBundlingState::get().s_downsampledHeight;
+	DepthImage32 depthImage(width, height); ColorImageR8G8B8A8 colorImage(width, height);
+	ColorImageR32G32B32A32 camPosImage(width, height), normalImage(width, height);
+	for (unsigned int i = 0; i < m_cachedFrames.size(); i++) {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), m_cachedFrames[i].d_depthDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), m_cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getPointer(), m_cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(colorImage.getPointer(), m_cachedFrames[i].d_colorDownsampled, sizeof(uchar4)*width*height, cudaMemcpyDeviceToHost));
+		
+		//debug check, save to point cloud
+		for (unsigned int k = 0; k < width*height; k++) {
+			normalImage.getPointer()[k].w = 1.0f; // make visible
+
+			const float d = depthImage.getPointer()[k];
+			const vec4f& c = camPosImage.getPointer()[k];
+			const vec4f& n = normalImage.getPointer()[k];
+			if (d != -std::numeric_limits<float>::infinity() && (d < 0.1f || d > 12.0f))
+				int a = 5;
+			if (c.x != -std::numeric_limits<float>::infinity() && (isnan(c.y) || isnan(c.z))) 
+				int a = 5;
+			if (n.x != -std::numeric_limits<float>::infinity() && (isnan(n.y) || isnan(n.z)))
+				int a = 5;
+			if (n.x != -std::numeric_limits<float>::infinity() && fabs(n.getVec3().length() - 1) > 0.0001f)
+				int a = 5;
+		}
+		PointCloudf pc;
+		SiftVisualization::computePointCloud(pc, colorImage, camPosImage, normalImage, mat4f::identity());
+		PointCloudIOf::saveToFile(dir + "frame-" + std::to_string(i) + ".ply", pc);
+
+		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_depth.png", ColorImageR32G32B32(depthImage));
+		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_camPos.png", camPosImage);
+		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_normal.png", normalImage);
+	}
 }
 
 

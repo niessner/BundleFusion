@@ -40,5 +40,7 @@ public:
 
 	static void saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
 		const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv);
+
+	static void computePointCloud(PointCloudf& pc, const ColorImageR8G8B8A8& color, const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal, const mat4f& transform);
 private:
 };

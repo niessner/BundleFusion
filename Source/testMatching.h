@@ -57,6 +57,8 @@ public:
 	void saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices = std::vector<unsigned int>()) const;
 	void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
 
+	void printCacheFrames(const std::string& dir) const;
+
 private:
 	// for global offline matching
 	void detectKeys(const std::vector<ColorImageR8G8B8A8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager) const;
