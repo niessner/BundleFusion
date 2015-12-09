@@ -234,7 +234,7 @@ int main(int argc, char** argv)
 		//!!!DEBUGGING
 		if (true) {
 			TestMatching test;
-			test.loadFromSensor("debug/2.sensor", "", 1);
+			test.loadFromSensor("debug/5.sensor", "", 1);
 			//test.loadFromSensor("debug/11noise.sensor", "");
 			test.runOpt();
 

@@ -60,6 +60,9 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtr, sizeof(float) * 6 * numberOfVariables));
+
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCount, sizeof(int)));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrImage, sizeof(int)*160*120));
 }
 
 CUDASolverBundling::~CUDASolverBundling()
@@ -67,34 +70,37 @@ CUDASolverBundling::~CUDASolverBundling()
 	if (m_timer) delete m_timer;
 
 	// State
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_deltaRot));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_deltaTrans));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_rRot));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_rTrans));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_zRot));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_zTrans));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_pRot));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_pTrans));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_Jp));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_Ap_XRot));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_Ap_XTrans));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_scanAlpha));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_rDotzOld));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_precondionerRot));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_precondionerTrans));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_sumResidual));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_maxResidual));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_maxResidualIndex));
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_deltaRot);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_deltaTrans);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_rRot);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_rTrans);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_zRot);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_zTrans);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_pRot);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_pTrans);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_Jp);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_Ap_XRot);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_Ap_XTrans);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_scanAlpha);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_rDotzOld);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_precondionerRot);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_precondionerTrans);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_sumResidual);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_maxResidual);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_maxResidualIndex);
 	SAFE_DELETE_ARRAY(m_solverState.h_maxResidual);
 	SAFE_DELETE_ARRAY(m_solverState.h_maxResidualIndex);
 
-	MLIB_CUDA_SAFE_CALL(cudaFree(d_variablesToCorrespondences));
-	MLIB_CUDA_SAFE_CALL(cudaFree(d_numEntriesPerRow));
-
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_countHighResidual));
+	MLIB_CUDA_SAFE_FREE(d_variablesToCorrespondences);
+	MLIB_CUDA_SAFE_FREE(d_numEntriesPerRow);
 	
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_depthJtJ));
-	MLIB_CUDA_SAFE_CALL(cudaFree(m_solverState.d_depthJtr));
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_countHighResidual);
+	
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtJ);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtr);
+
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrImage);
 }
 
 void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages,
@@ -143,6 +149,22 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	solverInput.denseDepthWidth = 160; //TODO params - constant buffer?
 	solverInput.denseDepthHeight = 120;
 	solverInput.depthIntrinsics = MatrixConversion::toCUDA(cudaCache->getIntrinsics());
+
+	//!!!DEBUGGING
+	//parameters.weightDenseDepth = parameters.weightDenseDepthInit;
+	//BuildDenseDepthSystem(solverInput, m_solverState, parameters, NULL);
+	//std::vector<int> corrs(solverInput.denseDepthWidth*solverInput.denseDepthHeight);
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), m_solverState.d_corrImage, sizeof(int)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyDeviceToHost));
+	//ColorImageR8G8B8 im(solverInput.denseDepthWidth, solverInput.denseDepthHeight); im.setPixels(vec3uc(0, 0, 0));
+	//unsigned int count = 0;
+	//for (unsigned int i = 0; i < corrs.size(); i++) {
+	//	if (corrs[i] > 0) {
+	//		count++;
+	//		im.getPointer()[i] = vec3uc(255, 255, 255);
+	//	}
+	//}
+	//FreeImageWrapper::saveImage("debug/corr.png", im);
+	//!!!DEBUGGING
 
 	if (rebuildJT) {
 		buildVariablesToCorrespondencesTable(d_correspondences, numberOfCorrespondences);

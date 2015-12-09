@@ -78,6 +78,10 @@ struct SolverState
 	// for dense depth term
 	float* d_depthJtJ;
 	float* d_depthJtr;
+
+	//!!!DEBUGGING
+	int* d_corrCount;
+	int* d_corrImage;
 };
 
 #endif

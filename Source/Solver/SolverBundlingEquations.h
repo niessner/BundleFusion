@@ -261,6 +261,9 @@ __inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverI
 	float3& outRot, float3& outTrans)
 {
 	// Compute J^T*d_Jp here
+	outRot = make_float3(0.0f, 0.0f, 0.0f);
+	outTrans = make_float3(0.0f, 0.0f, 0.0f);
+
 	int N = input.numberOfImages;
 	const int dim = 6 * N;
 
@@ -287,16 +290,16 @@ __inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverI
 			state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 3], state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 4], state.d_depthJtJ[(baseVarIdx + 4)* dim + baseIdx + 5],
 			state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 3], state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 4], state.d_depthJtJ[(baseVarIdx + 5)* dim + baseIdx + 5]);
 
-		outRot = block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
-		outTrans = block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
+		outRot += block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
+		outTrans += block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
 	}
 }
 //__inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,
 //	float3& outRot, float3& outTrans, unsigned int threadIdx)
 //{
 //	// Compute J^T*d_Jp here
-//	//outRot = make_float3(0.0f, 0.0f, 0.0f); // add to existing
-//	//outTrans = make_float3(0.0f, 0.0f, 0.0f);
+//	outRot = make_float3(0.0f, 0.0f, 0.0f);
+//	outTrans = make_float3(0.0f, 0.0f, 0.0f);
 //
 //	int N = input.numberOfImages;
 //

@@ -52,33 +52,37 @@ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, const float
 	dx.setFloat3x3(evalR_dGamma(angles));
 	jacBlockRow(2) = -dot(invTransform_i * dx * camPosSrc, normalTgt);
 	//x
-	float4 dt = make_float4(1.0f, 0.0f, 0.0f, 0.0f);
+	float4 dt = make_float4(1.0f, 0.0f, 0.0f, 1.0f);
 	jacBlockRow(3) = -dot(invTransform_i * dt, normalTgt);
 	//y
-	dt = make_float4(0.0f, 1.0f, 0.0f, 0.0f);
+	dt = make_float4(0.0f, 1.0f, 0.0f, 1.0f);
 	jacBlockRow(4) = -dot(invTransform_i * dt, normalTgt);
 	//z
-	dt = make_float4(0.0f, 0.0f, 1.0f, 0.0f);
+	dt = make_float4(0.0f, 0.0f, 1.0f, 1.0f);
 	jacBlockRow(5) = -dot(invTransform_i * dt, normalTgt);
 }
 __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
 	unsigned int vi, unsigned int vj, float residual, float weight
 	, float* d_sumResidual)
 {
+	//vi < vj, fill in x > y
 	for (unsigned int i = 0; i < 6; i++) {
 		for (unsigned int j = i; j < 6; j++) {
 			if (vi > 0) {
 				float dii = jacobianBlockRow_i(i) * jacobianBlockRow_i(j) * weight;
-				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
+				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii); //top half
 			}
 			if (vj > 0) {
 				float djj = jacobianBlockRow_j(i) * jacobianBlockRow_j(j) * weight;
-				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
+				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj); //top half
 			}
 			if (vi > 0 && vj > 0) {
 				float dij = jacobianBlockRow_i(i) * jacobianBlockRow_j(j) * weight;
-				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
-				atomicAdd(&d_JtJ[(vi * 6 + i)*dim + (vj * 6 + j)], dij);
+				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij); //top half
+				if (i != j)	{
+					float dji = jacobianBlockRow_i(j) * jacobianBlockRow_j(i) * weight;
+					atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji); //top half
+				}
 			}
 		}
 		if (vi > 0) atomicAdd(&d_Jtr[vi * 6 + i], jacobianBlockRow_i(i) * residual * weight);
@@ -92,11 +96,11 @@ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned int dim, c
 __device__ bool findDenseDepthCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, /*float colorThresh,*/ const float4x4& transform, const float4x4& intrinsics,
 	const float4* tgtCamPos, const float4* tgtNormals, const float4* srcCamPos, const float4* srcNormals, float depthMin, float depthMax,
-	float4& camPosSrcToTgt, float4& camPosTgt, float4& normalTgt)
+	float4& camPosSrcToTgt, float4& camPosTgt, float4& normalTgt,
+	bool debugPrint)
 {
 	//!!!DEBUGGING
 	const unsigned int x = idx % imageWidth; const unsigned int y = idx / imageHeight;
-	bool debugPrint = false;//(x == 34 && y == 110);
 	//!!!DEBUGGING
 	const float4& cposj = srcCamPos[idx];
 	if (debugPrint) printf("cam pos j = %f %f %f\n", cposj.x, cposj.y, cposj.z);
@@ -110,6 +114,7 @@ __device__ bool findDenseDepthCorr(unsigned int idx, unsigned int imageWidth, un
 			int2 screenPos = make_int2((int)roundf(proj.x / proj.z), (int)roundf(proj.y / proj.z));
 			if (debugPrint) {
 				printf("cam pos j2i = %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
+				printf("proj %f %f %f -> %f %f\n", proj.x, proj.y, proj.z, proj.x / proj.z, proj.y / proj.z);
 				printf("screen pos = %d %d\n", screenPos.x, screenPos.y);
 			}
 			if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)imageWidth && screenPos.y < (int)imageHeight) {
@@ -159,13 +164,19 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 
 		float4x4 transform = invTransform_i * transform_j;
 
+		//!!!debugging
+		const unsigned int x = gidx % input.denseDepthWidth; const unsigned int y = gidx / input.denseDepthWidth;
+		//!!!debugging
+
 		// find correspondence
 		float4 camPosSrcToTgt, camPosTgt, normalTgt;
 		if (findDenseDepthCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDepthDistThresh, parameters.denseDepthNormalThresh, transform, input.depthIntrinsics,
 			input.d_depthFrames[i].d_cameraposDownsampled, input.d_depthFrames[i].d_normalsDownsampled,
 			input.d_depthFrames[j].d_cameraposDownsampled, input.d_depthFrames[j].d_normalsDownsampled,
-			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, camPosTgt, normalTgt)) { //i tgt, j src
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, camPosTgt, normalTgt
+			, (i == 0 && j == 2 && x == 44 && y == 20)
+			)) { //i tgt, j src
 			// residual
 			float4 diff = camPosTgt - camPosSrcToTgt;
 			float res = dot(diff, normalTgt);
@@ -176,28 +187,33 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
 			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
 			float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDepthDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-			
+
 			addToLocalSystem(state.d_depthJtJ, state.d_depthJtr, input.numberOfImages * 6,
 				jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight
 				, state.d_sumResidual);
+			atomicAdd(state.d_corrCount, 1);
+			if (i == 0 && j == 2) state.d_corrImage[y*input.denseDepthWidth + x] = 1;
+
 			//!!!debugging
-			//const unsigned int x = gidx % input.denseDepthWidth; const unsigned int y = gidx / input.denseDepthWidth;
-			//if (x == 34 && y == 110) {
-			//	printf("-----------\n");
-			//	printf("(%d, %d)\n", x, y);
-			//	printf("transform i:\n"); transform_i.print();
-			//	printf("transform j:\n"); transform_j.print();
-			//	printf("transform:\n"); transform.print();
-			//	printf("cam pos src: %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z);
-			//	printf("cam pos src to tgt: %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
-			//	printf("cam pos tgt: %f %f %f\n", camPosTgt.x, camPosTgt.y, camPosTgt.z);
-			//	printf("normal tgt: %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z);
-			//	printf("diff = %f %f %f %f\n", diff.x, diff.y, diff.z, diff.w);
-			//	printf("res = %f\n", res);
-			//	printf("weight = %f\n", parameters.weightDenseDepth * weight);
-			//	printf("jac %f %f %f %f %f %f\n", jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
-			//		jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
-			//}
+			if (i == 0 && j == 2 && x == 44 && y == 20) {
+				printf("-----------\n");
+				printf("(%d, %d)\n", x, y);
+				printf("transform i:\n"); transform_i.print();
+				printf("inv transform i:\n"); invTransform_i.print();
+				printf("transform j:\n"); transform_j.print();
+				printf("transform:\n"); transform.print();
+				printf("cam pos src: %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z);
+				printf("cam pos src to tgt: %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
+				printf("cam pos tgt: %f %f %f\n", camPosTgt.x, camPosTgt.y, camPosTgt.z);
+				printf("normal tgt: %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z);
+				printf("diff = %f %f %f %f\n", diff.x, diff.y, diff.z, diff.w);
+				printf("res = %f\n", res);
+				printf("weight = %f\n", parameters.weightDenseDepth * weight);
+				printf("jac i %f %f %f %f %f %f\n", jacobianBlockRow_i(0), jacobianBlockRow_i(1), jacobianBlockRow_i(2),
+					jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5));
+				printf("jac j %f %f %f %f %f %f\n", jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
+					jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
+			}
 			//!!!debugging
 		} // found correspondence
 	} // valid image pixel
@@ -210,16 +226,12 @@ __global__ void FlipJtJDenseDepth_Kernel(unsigned int total, unsigned int dim, S
 		const unsigned int x = idx % dim;
 		const unsigned int y = idx / dim;
 		if (x > y) {
-			state.d_depthJtJ[y * dim + x] = state.d_depthJtJ[x * dim + y];
+			state.d_depthJtJ[y * dim + x] = state.d_depthJtJ[x * dim + y]; //!!!TODO CHECK
 		}
-
-		//!!!DEBUGGING
-		//if (isnan(state.d_depthJtJ[y * dim + x]) || isnan(state.d_depthJtr[x]) {
-		//	printf("NaN in jtj/jtr")
-		//}
 	}
 }
 
+extern "C"
 void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
 	const unsigned int N = input.numberOfImages;
@@ -237,6 +249,8 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 
 	//!!!debugging
 	cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
+	cutilSafeCall(cudaMemset(state.d_corrCount, 0, sizeof(int)));
+	cutilSafeCall(cudaMemset(state.d_corrImage, 0, sizeof(int) * 160 * 120));
 	//!!!debugging
 
 	cutilSafeCall(cudaMemset(state.d_depthJtJ, 0, sizeof(float) * sizeJtJ)); //TODO check if necessary
@@ -254,23 +268,31 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 #endif	
 
 		//!!!debugging
+		bool debugPrint = false;
+		float* h_JtJ = NULL;
+		float* h_Jtr = NULL;
+		if (debugPrint) {
+			h_JtJ = new float[sizeJtJ];
+			h_Jtr = new float[sizeJtr];
+			cutilSafeCall(cudaMemcpy(h_JtJ, state.d_depthJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
+			cutilSafeCall(cudaMemcpy(h_Jtr, state.d_depthJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
+			printf("JtJ:\n");
+			for (unsigned int i = 0; i < 6 * N; i++) {
+				for (unsigned int j = 0; j < 6 * N; j++)
+					printf(" %f,", h_JtJ[j * 6 * N + i]);
+				printf("\n");
+			}
+			printf("Jtr:\n");
+			for (unsigned int i = 0; i < 6 * N; i++) {
+				printf(" %f,", h_Jtr[i]);
+			}
+			printf("\n");
+		}
+		int corrCount;
+		cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
+		printf("#corr = %d\n", corrCount);
 		float sumResidual;
-		//float* h_JtJ = new float[sizeJtJ];
-		//float* h_Jtr = new float[sizeJtr];
-		//cutilSafeCall(cudaMemcpy(h_JtJ, state.d_depthJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-		//cutilSafeCall(cudaMemcpy(h_Jtr, state.d_depthJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
 		cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
-		//printf("JtJ:\n");
-		//for (unsigned int i = 0; i < 6 * N; i++) {
-		//	for (unsigned int j = 0; j < 6 * N; j++)
-		//		printf(" %f", h_JtJ[j * 6 * N + i]);
-		//	printf("\n");
-		//}
-		//printf("Jtr:\n");
-		//for (unsigned int i = 0; i < 6 * N; i++) {
-		//	printf(" %f", h_Jtr[i]);
-		//}
-		//printf("\n");
 		printf("sum res = %f\n\n", sumResidual);
 
 		const unsigned int flipgrid = (sizeJtJ + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
@@ -279,21 +301,23 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 #endif	
-		//cutilSafeCall(cudaMemcpy(h_JtJ, state.d_depthJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-		//cutilSafeCall(cudaMemcpy(h_Jtr, state.d_depthJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-		//printf("JtJ:\n");
-		//for (unsigned int i = 0; i < 6 * N; i++) {
-		//	for (unsigned int j = 0; j < 6 * N; j++)
-		//		printf(" %f", h_JtJ[j * 6 * N + i]);
-		//	printf("\n");
-		//}
-		//printf("Jtr:\n");
-		//for (unsigned int i = 0; i < 6 * N; i++) {
-		//	printf(" %f", h_Jtr[i]);
-		//}
-		//printf("\n\n");
-		//if (h_JtJ) delete[] h_JtJ;
-		//if (h_Jtr) delete[] h_Jtr;
+		if (debugPrint) {
+			cutilSafeCall(cudaMemcpy(h_JtJ, state.d_depthJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
+			cutilSafeCall(cudaMemcpy(h_Jtr, state.d_depthJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
+			printf("JtJ:\n");
+			for (unsigned int i = 0; i < 6 * N; i++) {
+				for (unsigned int j = 0; j < 6 * N; j++)
+					printf(" %f,", h_JtJ[j * 6 * N + i]);
+				printf("\n");
+			}
+			printf("Jtr:\n");
+			for (unsigned int i = 0; i < 6 * N; i++) {
+				printf(" %f,", h_Jtr[i]);
+			}
+			printf("\n\n");
+			if (h_JtJ) delete[] h_JtJ;
+			if (h_Jtr) delete[] h_Jtr;
+		}
 		//!!!debugging
 	}
 	if (timer) timer->endEvent();
@@ -567,8 +591,6 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 
 	//cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	//cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
-	//
 	//cutilSafeCall(cudaMemcpy(rRot, state.d_pRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 
