@@ -94,14 +94,12 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 			const float3x3 TJ = evalRMat(state.d_xRot[corr.imgIdx_j]);
 			const float3 r = (TI*corr.pos_i + state.d_xTrans[corr.imgIdx_i]) - (TJ*corr.pos_j + state.d_xTrans[corr.imgIdx_j]);
 
-			//float3 wp = TI*corr.p0+state.d_xTrans[corr.idx0];
-			//float3 wq = TJ*corr.p1+state.d_xTrans[corr.idx1];
-
 			rRot += variableSign*make_float3(dot(R_dAlpha*variableP, r), dot(R_dBeta*variableP, r), dot(R_dGamma*variableP, r));
 			rTrans += variableSign*r;
 
-			pRot += make_float3(dot(R_dAlpha*variableP, R_dAlpha*variableP), dot(R_dBeta*variableP, R_dBeta*variableP), dot(R_dGamma*variableP, R_dGamma*variableP));
-			pTrans += make_float3(1.0f, 1.0f, 1.0f);
+			//TODO uncomment preconditioner
+			//pRot += make_float3(dot(R_dAlpha*variableP, R_dAlpha*variableP), dot(R_dBeta*variableP, R_dBeta*variableP), dot(R_dGamma*variableP, R_dGamma*variableP));
+			//pTrans += make_float3(1.0f, 1.0f, 1.0f);
 		}
 	}
 

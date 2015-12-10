@@ -64,6 +64,8 @@ private:
 	void detectKeys(const std::vector<ColorImageR8G8B8A8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager) const;
 	void initSiftParams(unsigned int widthDepth, unsigned int heightDepth, unsigned int widthColor, unsigned int heightColor);
 
+	// for online
+	void constructSparseSystem(const std::vector<ColorImageR8G8B8A8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager, const CUDACache* cudaCache);
 
 	int* getNumMatchesCUDA(unsigned int curFrame, bool filtered) {
 		return const_cast<int*>(static_cast<const TestMatching*>(this)->getNumMatchesCUDA(curFrame, filtered));

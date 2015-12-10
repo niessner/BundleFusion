@@ -379,3 +379,32 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const std:
 	}
 	PointCloudIOf::saveToFile(filename, pc);
 }
+
+
+void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory)
+{
+	const unsigned int numFrames = (unsigned int)cache->getCacheFrames().size();
+	MLIB_ASSERT(numFrames == trajectory.size());
+	const unsigned int width = cache->getWidth();
+	const unsigned int height = cache->getHeight();
+
+	const std::vector<CUDACachedFrame>& cachedFrames = cache->getCacheFrames();
+	ColorImageR32G32B32A32 camPos(width, height), normals(width, height);
+	ColorImageR8G8B8A8 color(width, height);
+	std::list<PointCloudf> pcs;
+	for (unsigned int i = 0; i < numFrames; i++) {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPos.getPointer(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*camPos.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getPointer(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), cachedFrames[i].d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+
+		pcs.push_back(PointCloudf());
+		computePointCloud(pcs.back(), color, camPos, normals, trajectory[i]);
+	}
+	PointCloudf pc;
+	for (const auto& p : pcs) {
+		pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
+		pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
+		pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
+	}
+	PointCloudIOf::saveToFile(filename, pc);
+}

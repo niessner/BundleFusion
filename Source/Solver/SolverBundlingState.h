@@ -81,7 +81,6 @@ struct SolverState
 
 	//!!!DEBUGGING
 	int* d_corrCount;
-	int* d_corrImage;
 };
 
 #endif

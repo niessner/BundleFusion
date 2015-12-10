@@ -11,10 +11,6 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 
 extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
-//!!!DEBUGGING
-extern "C" void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
-//!!!DEBUGGING
-
 CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxCorrPerImage) 
 	: m_maxNumberOfImages(maxNumberOfImages), m_maxCorrPerImage(maxCorrPerImage)
 , THREADS_PER_BLOCK(512) // keep consistent with the GPU
@@ -62,7 +58,6 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtr, sizeof(float) * 6 * numberOfVariables));
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCount, sizeof(int)));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrImage, sizeof(int)*160*120));
 }
 
 CUDASolverBundling::~CUDASolverBundling()
@@ -100,7 +95,6 @@ CUDASolverBundling::~CUDASolverBundling()
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtr);
 
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
-	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrImage);
 }
 
 void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages,
@@ -132,8 +126,9 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.weightDenseDepthLinFactor = denseWeightLinFactor;
 	parameters.denseDepthDistThresh = 0.15f; //TODO params
 	parameters.denseDepthNormalThresh = 0.97f;
+	parameters.denseDepthColorThresh = 1.0f;//0.1f;
 	parameters.denseDepthMin = 0.1f;
-	parameters.denseDepthMax = 3.5f;
+	parameters.denseDepthMax = 3.0f;
 
 	SolverInput solverInput;
 	solverInput.d_correspondences = d_correspondences;
@@ -149,22 +144,6 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	solverInput.denseDepthWidth = 160; //TODO params - constant buffer?
 	solverInput.denseDepthHeight = 120;
 	solverInput.depthIntrinsics = MatrixConversion::toCUDA(cudaCache->getIntrinsics());
-
-	//!!!DEBUGGING
-	//parameters.weightDenseDepth = parameters.weightDenseDepthInit;
-	//BuildDenseDepthSystem(solverInput, m_solverState, parameters, NULL);
-	//std::vector<int> corrs(solverInput.denseDepthWidth*solverInput.denseDepthHeight);
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), m_solverState.d_corrImage, sizeof(int)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyDeviceToHost));
-	//ColorImageR8G8B8 im(solverInput.denseDepthWidth, solverInput.denseDepthHeight); im.setPixels(vec3uc(0, 0, 0));
-	//unsigned int count = 0;
-	//for (unsigned int i = 0; i < corrs.size(); i++) {
-	//	if (corrs[i] > 0) {
-	//		count++;
-	//		im.getPointer()[i] = vec3uc(255, 255, 255);
-	//	}
-	//}
-	//FreeImageWrapper::saveImage("debug/corr.png", im);
-	//!!!DEBUGGING
 
 	if (rebuildJT) {
 		buildVariablesToCorrespondencesTable(d_correspondences, numberOfCorrespondences);

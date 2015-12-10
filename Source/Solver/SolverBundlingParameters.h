@@ -14,7 +14,7 @@ struct SolverParameters
 	// dense depth corr
 	float denseDepthDistThresh;
 	float denseDepthNormalThresh;
-	//float denseDepthColorThresh;
+	float denseDepthColorThresh;
 	float denseDepthMin;
 	float denseDepthMax;
 
