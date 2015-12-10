@@ -80,6 +80,8 @@ struct SolverState
 	float* d_depthJtr;
 
 	//!!!DEBUGGING
+	float* d_sparseJtJ;
+	float* d_sparseJtr;
 	int* d_corrCount;
 };
 

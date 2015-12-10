@@ -11,6 +11,10 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 
 extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
+//!!!DEBUGGING
+extern "C" void BuildSparseSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
+//!!!DEBUGGING
+
 CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxCorrPerImage) 
 	: m_maxNumberOfImages(maxNumberOfImages), m_maxCorrPerImage(maxCorrPerImage)
 , THREADS_PER_BLOCK(512) // keep consistent with the GPU
@@ -56,8 +60,39 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtr, sizeof(float) * 6 * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_sparseJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_sparseJtr, sizeof(float) * 6 * numberOfVariables));
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCount, sizeof(int)));
+
+	//!!!DEBUGGING
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_deltaRot, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_deltaTrans, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_rRot, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_rTrans, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_zRot, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_zTrans, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_pRot, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_pTrans, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_Jp, -1, sizeof(float3)*numberOfResiduums));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_Ap_XRot, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_Ap_XTrans, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_scanAlpha, -1, sizeof(float) * 2));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_rDotzOld, -1, sizeof(float) *numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_precondionerRot, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_precondionerTrans, -1, sizeof(float3)*numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_sumResidual, -1, sizeof(float)));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_maxResidual, -1, sizeof(float) * n));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_maxResidualIndex, -1, sizeof(int) * n));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(d_variablesToCorrespondences, -1, sizeof(int)*m_maxNumberOfImages*m_maxCorrPerImage));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(d_numEntriesPerRow, -1, sizeof(int)*m_maxNumberOfImages));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_countHighResidual, -1, sizeof(int)));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtr, -1, sizeof(float) * 6 * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_sparseJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_sparseJtr, -1, sizeof(float) * 6 * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_corrCount, -1, sizeof(int)));
+	//!!!DEBUGGING
 }
 
 CUDASolverBundling::~CUDASolverBundling()
@@ -93,6 +128,8 @@ CUDASolverBundling::~CUDASolverBundling()
 	
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtJ);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtr);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_sparseJtJ);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_sparseJtr);
 
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
 }
@@ -148,6 +185,10 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	if (rebuildJT) {
 		buildVariablesToCorrespondencesTable(d_correspondences, numberOfCorrespondences);
 	}
+	//!!!DEBUGGING
+	//BuildSparseSystem(solverInput, m_solverState, parameters, NULL);
+	//!!!DEBUGGING
+
 	solveBundlingStub(solverInput, m_solverState, parameters, convergence, m_timer);
 
 	if (findMaxResidual) {

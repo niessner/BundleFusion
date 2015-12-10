@@ -1225,9 +1225,17 @@ void TestMatching::debugMatchInfo()
 void TestMatching::runOpt()
 {
 	MLIB_ASSERT(!m_colorImages.empty() && !m_cachedFrames.empty());
-
+	
+	// sparse only
+	//float weightSparse = 1.0f;
+	//float weightDenseInit = 0.0f;
+	// dense only
+	//float weightSparse = 0.0f;
+	//float weightDenseInit = 1.0f;
+	// both
 	float weightSparse = 1.0f;
-	float weightDenseInit = 0.0f;
+	float weightDenseInit = 1.0f;
+
 	float weightDenseLinFactor = 0.0f;
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
