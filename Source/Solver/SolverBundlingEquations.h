@@ -3,9 +3,6 @@
 #ifndef _SOLVER_EQUATIONS_
 #define _SOLVER_EQUATIONS_
 
-
-//#define PRECOMPUTE_SPARSE_JTJ
-
 #define THREADS_PER_BLOCK_JT 128
 
 #include <cutil_inline.h>
@@ -80,11 +77,6 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 	const float3x3 R_dBeta = evalR_dBeta(oldAngles0);
 	const float3x3 R_dGamma = evalR_dGamma(oldAngles0);
 
-
-	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
-	uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
-
-#ifndef PRECOMPUTE_SPARSE_JTJ //compute on-the-fly
 	for (int i = 0; i < N; i++)
 	{
 		int corrIdx = input.d_variablesToCorrespondences[variableIdx*input.maxCorrPerImage + i];
@@ -105,40 +97,29 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 			rRot += variableSign*make_float3(dot(R_dAlpha*variableP, r), dot(R_dBeta*variableP, r), dot(R_dGamma*variableP, r));
 			rTrans += variableSign*r;
 
-			//TODO uncomment preconditioner
-			//pRot += make_float3(dot(R_dAlpha*variableP, R_dAlpha*variableP), dot(R_dBeta*variableP, R_dBeta*variableP), dot(R_dGamma*variableP, R_dGamma*variableP));
-			//pTrans += make_float3(1.0f, 1.0f, 1.0f);
+			pRot += make_float3(dot(R_dAlpha*variableP, R_dAlpha*variableP), dot(R_dBeta*variableP, R_dBeta*variableP), dot(R_dGamma*variableP, R_dGamma*variableP));
+			pTrans += make_float3(1.0f, 1.0f, 1.0f);
 		}
 	}
 	resRot = -parameters.weightSparse * rRot;
 	resTrans = -parameters.weightSparse * rTrans;
 	pRot *= parameters.weightSparse;
 	pTrans *= parameters.weightSparse;
-#else //precomputed
-	resRot = -make_float3(state.d_sparseJtr[rotIndices.x], state.d_sparseJtr[rotIndices.y], state.d_sparseJtr[rotIndices.z]); //weight already applied
-	resTrans = -make_float3(state.d_sparseJtr[transIndices.x], state.d_sparseJtr[transIndices.y], state.d_sparseJtr[transIndices.z]); //weight already applied
-	//TODO uncomment try preconditioner //!!!DEBUGGING
-	//pRot += make_float3(
-	//	state.d_sparseJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
-	//	state.d_sparseJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
-	//	state.d_sparseJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
-	//pTrans += make_float3(
-	//	state.d_sparseJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
-	//	state.d_sparseJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
-	//	state.d_sparseJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
-#endif
+
 	// add dense term
+	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
+	uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
 	resRot -= make_float3(state.d_depthJtr[rotIndices.x], state.d_depthJtr[rotIndices.y], state.d_depthJtr[rotIndices.z]); //minus since -Jtf, weight already built in
 	resTrans -= make_float3(state.d_depthJtr[transIndices.x], state.d_depthJtr[transIndices.y], state.d_depthJtr[transIndices.z]); //minus since -Jtf, weight already built in
-	//TODO uncomment try preconditioner //!!!DEBUGGING
-	//pRot += make_float3(
-	//	state.d_depthJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
-	//	state.d_depthJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
-	//	state.d_depthJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
-	//pTrans += make_float3(
-	//	state.d_depthJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
-	//	state.d_depthJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
-	//	state.d_depthJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
+	// preconditioner
+	pRot += make_float3(
+		state.d_depthJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
+		state.d_depthJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
+		state.d_depthJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
+	pTrans += make_float3(
+		state.d_depthJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
+		state.d_depthJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
+		state.d_depthJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
 	// end dense part
 
 	// Preconditioner depends on last solution P(input.d_x)

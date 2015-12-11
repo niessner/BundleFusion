@@ -18,7 +18,7 @@ class CUDASolverBundling
 {
 	public:
 
-		CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxCorrPerImage);
+		CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxNumResiduals);
 		~CUDASolverBundling();
 
 		//weightSparse*Esparse + (#iters*weightDenseLinFactor + weightDense)*Edense

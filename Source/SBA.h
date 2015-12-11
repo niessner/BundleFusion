@@ -29,12 +29,12 @@ public:
 		m_weightSparse = 1.0f;
 		m_weightDenseInit = 1.0f;
 	}
-	void init(unsigned int maxImages, unsigned int maxNumCorrPerImage) {
+	void init(unsigned int maxImages, unsigned int maxNumResiduals) {
 		unsigned int maxNumImages = maxImages;
 		cutilSafeCall(cudaMalloc(&d_xRot, sizeof(EntryJ)*maxNumImages));
 		cutilSafeCall(cudaMalloc(&d_xTrans, sizeof(EntryJ)*maxNumImages));
 
-		m_solver = new CUDASolverBundling(maxImages, maxNumCorrPerImage);
+		m_solver = new CUDASolverBundling(maxImages, maxNumResiduals);
 		m_bVerify = false;
 
 		m_bUseComprehensiveFrameInvalidation = GlobalBundlingState::get().s_useComprehensiveFrameInvalidation;

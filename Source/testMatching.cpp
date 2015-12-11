@@ -793,8 +793,8 @@ void TestMatching::createCachedFrames()
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, m_depthImages[i].getPointer(), sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyHostToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, m_colorImages[i].getPointer(), sizeof(uchar4) * m_colorImages[i].getNumPixels(), cudaMemcpyHostToDevice));
 		//erode and smooth depth
-		//bool erode = true; bool smooth = true;
-		bool erode = false; bool smooth = false;
+		bool erode = true; bool smooth = true;
+		//bool erode = false; bool smooth = false;
 		if (erode) {
 			unsigned int numIter = 2; numIter = 2 * ((numIter + 1) / 2);
 			for (unsigned int i = 0; i < numIter; i++) {
@@ -1084,7 +1084,9 @@ void TestMatching::debugOptimizeGlobal()
 
 	// optimize
 	SBA bundler;
-	bundler.init(m_siftManager->getNumImages(), GlobalBundlingState::get().s_maxNumCorrPerImage);
+	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
+	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
+	bundler.init(m_siftManager->getNumImages(), maxNumResiduals);
 	const bool useVerify = false;
 
 	bool isStart = true;
@@ -1235,8 +1237,8 @@ void TestMatching::runOpt()
 	// both
 	float weightSparse = 1.0f;
 	float weightDenseInit = 1.0f;
+	float weightDenseLinFactor = 1.0f;
 
-	float weightDenseLinFactor = 0.0f;
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
 	std::vector<mat4f> referenceTrajectory = m_referenceTrajectory;
@@ -1261,7 +1263,9 @@ void TestMatching::runOpt()
 
 	// run opt
 	SBA sba;
-	sba.init(numImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
+	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
+	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
+	sba.init(numImages, maxNumResiduals);
 	sba.setWeights(weightSparse, weightDenseInit, weightDenseLinFactor);
 	// params
 	const unsigned int maxNumIters = 8;
@@ -1320,8 +1324,8 @@ void TestMatching::printCacheFrames(const std::string& dir) const
 		return;
 	}
 
-	unsigned int width = GlobalBundlingState::get().s_downsampledWidth;
-	unsigned int height = GlobalBundlingState::get().s_downsampledHeight;
+	unsigned int width =	GlobalBundlingState::get().s_downsampledWidth;
+	unsigned int height =	GlobalBundlingState::get().s_downsampledHeight;
 	DepthImage32 depthImage(width, height); ColorImageR8G8B8A8 colorImage(width, height);
 	ColorImageR32G32B32A32 camPosImage(width, height), normalImage(width, height);
 	for (unsigned int i = 0; i < m_cachedFrames.size(); i++) {

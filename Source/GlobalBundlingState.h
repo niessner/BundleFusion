@@ -15,7 +15,6 @@
 	X(unsigned int, s_widthSIFT) \
 	X(unsigned int, s_heightSIFT) \
 	X(unsigned int, s_maxNumKeysPerImage) \
-	X(unsigned int, s_maxNumCorrPerImage) \
 	X(unsigned int, s_numLocalNonLinIterations) \
 	X(unsigned int, s_numLocalLinIterations) \
 	X(unsigned int, s_numGlobalNonLinIterations) \

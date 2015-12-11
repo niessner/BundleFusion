@@ -52,7 +52,9 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 	const CUDAImageManager* imageManager, unsigned int numTotalFrames /*= (unsigned int)-1*/)
 {
 	initSIFT(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
-	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumCorrPerImage);
+	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
+	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
+	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, maxNumResiduals);
 
 	// cache
 	const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth;

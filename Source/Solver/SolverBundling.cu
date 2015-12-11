@@ -13,8 +13,9 @@
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
 #define THREADS_PER_BLOCK_DENSE_DEPTH_FLIP 64
 
-
-
+/////////////////////////////////////////////////////////////////////////
+// Dense Depth Term
+/////////////////////////////////////////////////////////////////////////
 __global__ void FlipJtJ_Kernel(unsigned int total, unsigned int dim, float* d_JtJ)
 {
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -26,139 +27,6 @@ __global__ void FlipJtJ_Kernel(unsigned int total, unsigned int dim, float* d_Jt
 		}
 	}
 }
-
-/////////////////////////////////////////////////////////////////////////
-// Sparse Term (materialize jtj/jtr)
-/////////////////////////////////////////////////////////////////////////
-__global__ void BuildSparseSystem_Kernel(SolverInput input, SolverState state, SolverParameters parameters)
-{
-	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx < input.numberOfCorrespondences) {
-		const EntryJ corr = input.d_correspondences[idx];
-		if (corr.isValid()) {
-			const float3x3 TI = evalRMat(state.d_xRot[corr.imgIdx_i]);
-			const float3x3 TJ = evalRMat(state.d_xRot[corr.imgIdx_j]);
-
-			const float3 angles_i = state.d_xRot[corr.imgIdx_i]; // get angles
-			const float3 angles_j = state.d_xRot[corr.imgIdx_j]; // get angles
-
-			const float3 dist = (TI * corr.pos_i + state.d_xTrans[corr.imgIdx_i]) - (TJ * corr.pos_j + state.d_xTrans[corr.imgIdx_j]);
-
-			float3 jacobianBlockRow_i[6];
-			float3 jacobianBlockRow_j[6];
-			if (corr.imgIdx_i > 0) {
-				jacobianBlockRow_i[0] = evalR_dAlpha(angles_i) * corr.pos_i; // alpha
-				jacobianBlockRow_i[1] = evalR_dBeta(angles_i) * corr.pos_i; // beta
-				jacobianBlockRow_i[2] = evalR_dGamma(angles_i) * corr.pos_i; // gamma
-				jacobianBlockRow_i[3] = make_float3(1.0f, 0.0f, 0.0f); // x
-				jacobianBlockRow_i[4] = make_float3(0.0f, 1.0f, 0.0f); // y
-				jacobianBlockRow_i[5] = make_float3(0.0f, 0.0f, 1.0f); // z
-			}
-			if (corr.imgIdx_j > 0) {
-				jacobianBlockRow_j[0] = -(evalR_dAlpha(angles_j) * corr.pos_j); // alpha
-				jacobianBlockRow_j[1] = -(evalR_dBeta(angles_j) * corr.pos_j); // beta
-				jacobianBlockRow_j[2] = -(evalR_dGamma(angles_j) * corr.pos_j); // gamma
-				jacobianBlockRow_j[3] = make_float3(1.0f, 0.0f, 0.0f); // x
-				jacobianBlockRow_j[4] = make_float3(0.0f, 1.0f, 0.0f); // y
-				jacobianBlockRow_j[5] = make_float3(0.0f, 0.0f, 1.0f); // z
-			}
-			
-			addToLocalSystemSparse(state.d_sparseJtJ, state.d_sparseJtr, 6*input.numberOfImages,
-				jacobianBlockRow_i, jacobianBlockRow_j, corr.imgIdx_i, corr.imgIdx_j, dist, parameters.weightSparse);
-
-			//!!!DEBUGGING
-			atomicAdd(state.d_sumResidual, parameters.weightSparse * dot(dist, dist));
-			//!!!DEBUGGING
-		} //valid correspondence
-	}
-}
-
-extern "C"
-void BuildSparseSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
-{
-	const unsigned int Ncorr = input.numberOfCorrespondences;
-
-	const int grid =(Ncorr + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-	const int sizeJtr = 6 * input.numberOfImages;
-	const int sizeJtJ = sizeJtr * sizeJtr;
-
-	if (timer) timer->startEvent("BuildSparseSystem");
-
-	//!!!debugging
-	cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
-	cutilSafeCall(cudaMemset(state.d_sparseJtJ, 0, sizeof(float) * sizeJtJ)); //TODO only need one for sparse and dense
-	cutilSafeCall(cudaMemset(state.d_sparseJtr, 0, sizeof(float) * sizeJtr));
-	//!!!debugging
-#ifdef _DEBUG
-	cutilSafeCall(cudaDeviceSynchronize());
-	cutilCheckMsg(__FUNCTION__);
-#endif		
-
-	if (parameters.weightSparse > 0.0f) {
-		BuildSparseSystem_Kernel << <grid, THREADS_PER_BLOCK >> >(input, state, parameters);
-#ifdef _DEBUG
-		cutilSafeCall(cudaDeviceSynchronize());
-		cutilCheckMsg(__FUNCTION__);
-#endif
-		//!!!debugging
-		bool debugPrint = false;
-		float* h_JtJ = NULL;
-		float* h_Jtr = NULL;
-		if (debugPrint) {
-			const unsigned int N = input.numberOfImages;
-			h_JtJ = new float[sizeJtJ];
-			h_Jtr = new float[sizeJtr];
-			cutilSafeCall(cudaMemcpy(h_JtJ, state.d_sparseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(h_Jtr, state.d_sparseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-			printf("sparse JtJ:\n");
-			for (unsigned int i = 0; i < 6 * N; i++) { //row
-				for (unsigned int j = 0; j < 6 * N; j++) //col
-					printf(" %f,", h_JtJ[i * 6 * N + j]);
-				printf("\n");
-			}
-			printf("sparse Jtr:\n");
-			for (unsigned int i = 0; i < 6 * N; i++) {
-				printf(" %f,", h_Jtr[i]);
-			}
-			printf("\n");
-		}
-		float sumResidual;
-		cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
-		printf("sparse res = %f\n", sumResidual);
-
-		const unsigned int flipgrid = (sizeJtJ + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
-		FlipJtJ_Kernel << <flipgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(sizeJtJ, sizeJtr, state.d_sparseJtJ);
-#ifdef _DEBUG
-		cutilSafeCall(cudaDeviceSynchronize());
-		cutilCheckMsg(__FUNCTION__);
-#endif	
-		if (debugPrint) {
-			const unsigned int N = input.numberOfImages;
-			cutilSafeCall(cudaMemcpy(h_JtJ, state.d_sparseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(h_Jtr, state.d_sparseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-			printf("sparse JtJ:\n");
-			for (unsigned int i = 0; i < 6 * N; i++) { //row
-				for (unsigned int j = 0; j < 6 * N; j++) //col
-					printf(" %f,", h_JtJ[i * 6 * N + j]);
-				printf("\n");
-			}
-			printf("sparse Jtr:\n");
-			for (unsigned int i = 0; i < 6 * N; i++) {
-				printf(" %f,", h_Jtr[i]);
-			}
-			printf("\n\n");
-			if (h_JtJ) delete[] h_JtJ;
-			if (h_Jtr) delete[] h_Jtr;
-		}
-		//!!!debugging
-	}
-	if (timer) timer->endEvent();
-}
-
-/////////////////////////////////////////////////////////////////////////
-// Dense Depth Term
-/////////////////////////////////////////////////////////////////////////
-
 __device__ bool findDenseDepthCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, /*float colorThresh,*/ const float4x4& transform, const float4x4& intrinsics,
 	const float4* tgtCamPos, const float4* tgtNormals, //const uchar4* tgtColor,
@@ -663,10 +531,9 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 
 	if (timer) timer->startEvent("Init1");
 
-	//!!!DEBUGGING
-	float3* rRot = new float3[input.numberOfImages]; // -jtf
-	float3* rTrans = new float3[input.numberOfImages];
-	//float scanAlpha;
+	//!!!DEBUGGING //remember to uncomment the delete...
+	//float3* rRot = new float3[input.numberOfImages]; // -jtf
+	//float3* rTrans = new float3[input.numberOfImages];
 	//!!!DEBUGGING
 
 	cutilSafeCall(cudaMemset(state.d_scanAlpha, 0, sizeof(float)));
@@ -682,15 +549,15 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 #endif		
 	if (timer) timer->endEvent();
 
-	cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	// print jtr
-	printf("Jtr:\n");
-	for (unsigned int i = 0; i < input.numberOfImages; i++) {
-		const float3& rotPart = rRot[i]; const float3& transPart = rTrans[i];
-		printf(" %f, %f, %f, %f, %f, %f,", rotPart.x, rotPart.y, rotPart.z, transPart.x, transPart.y, transPart.z);
-	}
-	printf("\n\n");
+	//cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	//cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	//// print jtr
+	//printf("Jtr:\n");
+	//for (unsigned int i = 0; i < input.numberOfImages; i++) {
+	//	const float3& rotPart = rRot[i]; const float3& transPart = rTrans[i];
+	//	printf(" %f, %f, %f, %f, %f, %f,", rotPart.x, rotPart.y, rotPart.z, transPart.x, transPart.y, transPart.z);
+	//}
+	//printf("\n\n");
 	//cutilSafeCall(cudaMemcpy(rRot, state.d_pRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 
@@ -711,21 +578,7 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 // PCG Iteration Parts
 /////////////////////////////////////////////////////////////////////////
 
-//TODO MAKE THESE EFFICIENT
-__global__ void PCGStep_Kernel_Sparse(SolverInput input, SolverState state, SolverParameters parameters)
-{
-	const unsigned int N = input.numberOfImages;							// Number of block variables
-	const unsigned int x = blockIdx.x;
-
-	if (x > 0 && x < N)
-	{
-		float3 rot, trans;
-		applyJTJDevice(x, state, state.d_sparseJtJ, input.numberOfImages, rot, trans);			// A x p_k  => J^T x J x p_k 
-
-		state.d_Ap_XRot[x] += rot;
-		state.d_Ap_XTrans[x] += trans;
-	}
-}
+//TODO MAKE EFFICIENT
 __global__ void PCGStep_Kernel_Dense(SolverInput input, SolverState state, SolverParameters parameters)
 {
 	const unsigned int N = input.numberOfImages;							// Number of block variables
@@ -905,15 +758,7 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 
 	// sparse part
 	if (parameters.weightSparse > 0.0f) {
-#ifdef PRECOMPUTE_SPARSE_JTJ
-		//PCGStep_Kernel_Sparse << < N, THREADS_PER_BLOCK_JT >> >(input, state, parameters);
-		PCGStep_Kernel_Sparse << < N, 1 >> >(input, state, parameters); //TODO fix this part
-#ifdef _DEBUG
-		cutilSafeCall(cudaDeviceSynchronize());
-		cutilCheckMsg(__FUNCTION__);
-#endif
-#else // applying JtJ on-the-fly
-		const unsigned int Ncorr = input.numberOfCorrespondences;
+		const unsigned int Ncorr = input.numberOfCorrespondences; //TODO handle when this > maxCorrPerImage*numberOfImages
 		const int blocksPerGridCorr = (Ncorr + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 		PCGStep_Kernel0 << <blocksPerGridCorr, THREADS_PER_BLOCK >> >(input, state, parameters);
 #ifdef _DEBUG
@@ -924,7 +769,6 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 #ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
-#endif
 #endif
 	}
 	if (parameters.weightDenseDepth > 0.0f) {
@@ -1024,9 +868,6 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	{
 		parameters.weightDenseDepth = parameters.weightDenseDepthInit + nIter * parameters.weightDenseDepthLinFactor;
 		BuildDenseDepthSystem(input, state, parameters, timer);
-#ifdef PRECOMPUTE_SPARSE_JTJ
-		BuildSparseSystem(input, state, parameters, timer);
-#endif
 		Initialization(input, state, parameters, timer);
 
 		//float linearResidual = EvalLinearRes(input, state, parameters);
@@ -1081,13 +922,17 @@ __global__ void BuildVariablesToCorrespondencesTableDevice(EntryJ* d_corresponde
 	const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (x < N) {
-		const EntryJ& corr = d_correspondences[x];
+		EntryJ& corr = d_correspondences[x];
 		if (corr.isValid()) {
-			int offset = atomicAdd(&d_numEntriesPerRow[corr.imgIdx_i], 1); // may overflow - need to check when read
-			if (offset < maxNumCorrespondencesPerImage)	d_variablesToCorrespondences[corr.imgIdx_i * maxNumCorrespondencesPerImage + offset] = x;
-
-			offset = atomicAdd(&d_numEntriesPerRow[corr.imgIdx_j], 1); // may overflow - need to check when read
-			if (offset < maxNumCorrespondencesPerImage)	d_variablesToCorrespondences[corr.imgIdx_j * maxNumCorrespondencesPerImage + offset] = x;
+			int offset0 = atomicAdd(&d_numEntriesPerRow[corr.imgIdx_i], 1); // may overflow - need to check when read
+			int offset1 = atomicAdd(&d_numEntriesPerRow[corr.imgIdx_j], 1); // may overflow - need to check when read
+			if (offset0 < maxNumCorrespondencesPerImage && offset1 < maxNumCorrespondencesPerImage)	{
+				d_variablesToCorrespondences[corr.imgIdx_i * maxNumCorrespondencesPerImage + offset0] = x;
+				d_variablesToCorrespondences[corr.imgIdx_j * maxNumCorrespondencesPerImage + offset1] = x;
+			}
+			else { //invalidate
+				corr.setInvalid(); //make sure j corresponds to jt
+			}
 		}
 	}
 }
