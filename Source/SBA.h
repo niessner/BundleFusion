@@ -19,17 +19,7 @@ struct JacobianBlock {
 class SBA
 {
 public:
-	SBA() {
-		d_xRot = NULL;
-		d_xTrans = NULL;
-		m_solver = NULL;
-
-		m_bUseComprehensiveFrameInvalidation = false;
-
-		m_weightSparse = 1.0f;
-		m_weightDenseInit = 1.0f;
-		m_weightDenseLinFactor = 1.0f;
-	}
+	SBA();
 	void init(unsigned int maxImages, unsigned int maxNumResiduals) {
 		unsigned int maxNumImages = maxImages;
 		cutilSafeCall(cudaMalloc(&d_xRot, sizeof(EntryJ)*maxNumImages));

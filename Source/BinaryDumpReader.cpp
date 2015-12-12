@@ -127,7 +127,7 @@ void BinaryDumpReader::evaluateTrajectory(const std::vector<mat4f>& trajectory) 
 			counter++;
 		}
 	}
-	rotErr = std::sqrt(rotErr); transErr = std::sqrt(transErr);
+	rotErr = std::sqrt(rotErr/counter); transErr = std::sqrt(transErr/counter);
 	std::cout << "*********************************" << std::endl;
 	std::cout << "evaluated trajectory for " << counter << "/" << numTransforms << " frames:" << std::endl;
 	std::cout << "trans err = " << transErr << std::endl;

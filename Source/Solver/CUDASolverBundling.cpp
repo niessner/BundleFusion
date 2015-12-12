@@ -20,6 +20,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	m_bRecordConvergence = GlobalBundlingState::get().s_recordSolverConvergence;
 
 	//TODO PARAMS
+	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	m_verifyOptDistThresh = 0.02f;//GlobalAppState::get().s_verifyOptDistThresh;
 	m_verifyOptPercentThresh = 0.05f;//GlobalAppState::get().s_verifyOptPercentThresh;
 
@@ -56,6 +57,10 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtr, sizeof(float) * 6 * numberOfVariables));
+	m_maxNumDenseImPairs = std::max(m_maxNumberOfImages, (submapSize + 1)*(submapSize + 1));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseCorrCounts, sizeof(int) * m_maxNumDenseImPairs));
+
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCount, sizeof(int)));
 
 	//!!!DEBUGGING
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_deltaRot, -1, sizeof(float3)*numberOfVariables));
@@ -81,6 +86,9 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_countHighResidual, -1, sizeof(int)));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtr, -1, sizeof(float) * 6 * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseCorrCounts, -1, sizeof(int) * m_maxNumDenseImPairs));
+
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_corrCount, -1, sizeof(int)));
 
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
@@ -120,6 +128,8 @@ CUDASolverBundling::~CUDASolverBundling()
 	
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtJ);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtr);
+
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
 }
 
 void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages,
@@ -170,6 +180,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 
 	solverInput.maxNumberOfImages = m_maxNumberOfImages;
 	solverInput.maxCorrPerImage = m_maxCorrPerImage;
+	solverInput.maxNumDenseImPairs = m_maxNumDenseImPairs;
 
 	if (cudaCache) {
 		solverInput.d_depthFrames = cudaCache->getCacheFramesGPU();

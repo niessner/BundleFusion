@@ -63,6 +63,8 @@ class CUDASolverBundling
 		unsigned int m_maxNumberOfImages;
 		unsigned int m_maxCorrPerImage;
 
+		unsigned int m_maxNumDenseImPairs;
+
 		int* d_variablesToCorrespondences;
 		int* d_numEntriesPerRow;
 

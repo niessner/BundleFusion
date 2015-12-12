@@ -388,7 +388,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 			if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
 			//!!!
 			std::cout << "WARNING: invalid local submap from verify " << curLocalIdx << std::endl;
-			getchar();
+			//getchar();
 			//!!!
 			ret = false;
 		}
@@ -479,7 +479,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
 				//!!!
 				std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
-				getchar();
+				//getchar();
 				//!!!
 				ret = 2;
 			}

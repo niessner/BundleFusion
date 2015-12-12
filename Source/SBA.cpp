@@ -15,6 +15,21 @@ extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_tr
 
 Timer SBA::s_timer;
 
+
+SBA::SBA()
+{
+	d_xRot = NULL;
+	d_xTrans = NULL;
+	m_solver = NULL;
+
+	m_bUseComprehensiveFrameInvalidation = false;
+
+	m_weightSparse = 1.0f;
+	m_weightDenseInit = 1.0f;
+	m_weightDenseLinFactor = 1.0f;
+}
+
+
 void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal,
 	bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt)
 {

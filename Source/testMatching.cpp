@@ -1,5 +1,6 @@
 
 #include "stdafx.h"
+//#include "mLibEigen.h"
 #include "SIFTImageManager.h"
 #include "SiftGPU/SiftMatch.h"
 #include "SiftGPU/SiftMatchFilter.h"
@@ -1238,8 +1239,8 @@ void TestMatching::runOpt()
 	//float weightDenseLinFactor = 0.0f;
 	// both
 	float weightSparse = 1.0f;
-	float weightDenseInit = 1.0f;
-	float weightDenseLinFactor = 1.0f;
+	float weightDenseInit = 100.0f;
+	float weightDenseLinFactor = 50.0f;
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
@@ -1300,19 +1301,23 @@ void TestMatching::runOpt()
 	MLIB_CUDA_SAFE_FREE(d_transforms);
 
 	// compare to reference trajectory
-	float rotErr = 0.0f, transErr = 0.0f;
-	for (unsigned int i = 1; i < transforms.size(); i++) {
-		mat3f refRot = referenceTrajectory[i].getRotation();
-		mat3f optRot = transforms[i].getRotation();
-		mat4f diffRot = mat4f::identity(); diffRot.setRotation(refRot.getTranspose() * optRot);
-		Pose rot = PoseHelper::MatrixToPose(diffRot);
-		rotErr += rot.getVec3().lengthSq();
+	float rotErr = 0.0f; float transErr = 0.0f;
+	unsigned int numTransforms = 0;
+	for (unsigned int i = 0; i < transforms.size(); i++) {
+		if (transforms[i][0] != -std::numeric_limits<float>::infinity()) {
+			mat3f refRot = referenceTrajectory[i].getRotation();
+			mat3f optRot = transforms[i].getRotation();
+			mat4f diffRot = mat4f::identity(); diffRot.setRotation(refRot.getTranspose() * optRot);
+			Pose rot = PoseHelper::MatrixToPose(diffRot);
+			rotErr += rot.getVec3().lengthSq();
 
-		vec3f refTrans = referenceTrajectory[i].getTranslation();
-		vec3f optTrans = transforms[i].getTranslation();
-		transErr += (refTrans - optTrans).lengthSq();
+			vec3f refTrans = referenceTrajectory[i].getTranslation();
+			vec3f optTrans = transforms[i].getTranslation();
+			transErr += (refTrans - optTrans).lengthSq();
+			numTransforms++;
+		}
 	}
-	rotErr = std::sqrt(rotErr); transErr = std::sqrt(transErr);
+	rotErr = std::sqrt(rotErr/numTransforms); transErr = std::sqrt(transErr/numTransforms);
 	std::cout << "*********************************" << std::endl;
 	std::cout << "trans err = " << transErr << std::endl;
 	std::cout << "rot err = " << rotErr << std::endl;

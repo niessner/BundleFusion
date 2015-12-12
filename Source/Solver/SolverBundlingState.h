@@ -23,6 +23,7 @@ struct SolverInput
 	unsigned int denseDepthWidth;
 	unsigned int denseDepthHeight;
 	float4x4 depthIntrinsics;		//TODO constant buffer for this + siftimagemanger stuff?
+	unsigned int maxNumDenseImPairs;
 };
 
 // State of the GN Solver
@@ -78,6 +79,10 @@ struct SolverState
 	// for dense depth term
 	float* d_depthJtJ;
 	float* d_depthJtr;
+	int* d_denseCorrCounts;
+
+	//!!!DEBUGGING
+	int* d_corrCount;
 };
 
 #endif
