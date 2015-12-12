@@ -18,6 +18,8 @@ struct SolverParameters
 	float denseDepthMin;
 	float denseDepthMax;
 
+	bool useDenseDepthAllPairwise; // instead of frame-to-frame
+
 	float weightSparse;
 	float weightDenseDepth;
 	float weightDenseDepthInit;

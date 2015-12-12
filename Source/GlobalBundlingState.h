@@ -45,7 +45,9 @@
 	X(float, s_siftMatchThresh) \
 	X(float, s_siftMatchRatioMaxLocal) \
 	X(float, s_siftMatchRatioMaxGlobal) \
-	X(bool, s_useLocalVerify)
+	X(bool, s_useLocalVerify) \
+	X(bool, s_localDenseUseAllPairwise) \
+	X(bool, s_useGlobalDenseOpt)
 
 using namespace ml;
 

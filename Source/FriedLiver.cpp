@@ -203,8 +203,8 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			fileNameDescGlobalApp = "zParametersDefault.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			//fileNameDescGlobalApp = "zParametersDefault.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 
 			//fileNameDescGlobalApp = "zParametersMedium.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
@@ -212,8 +212,8 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersHigh.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
 
-			//fileNameDescGlobalApp = "zParametersTUM.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
+			fileNameDescGlobalApp = "zParametersTUM.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
 
 			//fileNameDescGlobalApp = "zParametersKinect.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
@@ -232,11 +232,11 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (true) {
+		if (false) {
 			TestMatching test;
 			//test.loadFromSensor("debug/2.sensor", "", 1);
-			test.loadFromSensor("debug/33noise.sensor", "", 1);
-			//test.printCacheFrames("debug/");
+			//test.loadFromSensor("debug/3noise.sensor", "", 1);
+			test.loadFromSensor("debug/11noise.sensor", "", 1);
 			test.runOpt();
 
 			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);

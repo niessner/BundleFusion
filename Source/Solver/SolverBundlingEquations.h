@@ -414,8 +414,7 @@ __inline__ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, 
 	jacBlockRow(5) = -dot(invTransform_i * dt, normalTgt);
 }
 __inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
-	unsigned int vi, unsigned int vj, float residual, float weight
-	, float* d_sumResidual)
+	unsigned int vi, unsigned int vj, float residual, float weight)
 {
 	//fill in bottom half (vi < vj) -> x < y
 	for (unsigned int i = 0; i < 6; i++) {
@@ -452,10 +451,6 @@ __inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned
 		if (vi > 0) atomicAdd(&d_Jtr[vi * 6 + i], jacobianBlockRow_i(i) * residual * weight);
 		if (vj > 0) atomicAdd(&d_Jtr[vj * 6 + i], jacobianBlockRow_j(i) * residual * weight);
 	}
-
-	//!!!debugging
-	atomicAdd(d_sumResidual, residual * residual * weight);
-	//!!!debugging
 }
 
 //__inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,

@@ -381,7 +381,7 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const std:
 }
 
 
-void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory)
+void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory, bool saveFrameByFrame /*= false*/)
 {
 	const unsigned int numFrames = (unsigned int)cache->getCacheFrames().size();
 	MLIB_ASSERT(numFrames == trajectory.size());
@@ -400,11 +400,22 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 		pcs.push_back(PointCloudf());
 		computePointCloud(pcs.back(), color, camPos, normals, trajectory[i]);
 	}
-	PointCloudf pc;
-	for (const auto& p : pcs) {
-		pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
-		pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
-		pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
+	if (saveFrameByFrame) {
+		const std::string prefix = util::removeExtensions(filename);
+		unsigned int idx = 0;
+		for (const auto& p : pcs) {
+			PointCloudIOf::saveToFile(prefix + "_" + std::to_string(idx) + ".ply", p);
+			idx++;
+		}
 	}
-	PointCloudIOf::saveToFile(filename, pc);
+	else {
+		//aggregate to single point cloud
+		PointCloudf pc;
+		for (const auto& p : pcs) {
+			pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
+			pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
+			pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
+		}
+		PointCloudIOf::saveToFile(filename, pc);
+	}
 }

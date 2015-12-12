@@ -49,6 +49,8 @@ public:
 
 	void stopReceivingFrames() { m_bIsReceivingFrames = false; }
 
+	void evaluateTrajectory(const std::vector<mat4f>& trajectory) const;
+
 private:
 	//! deletes all allocated data
 	void releaseData();

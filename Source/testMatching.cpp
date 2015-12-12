@@ -1231,9 +1231,11 @@ void TestMatching::runOpt()
 	// sparse only
 	//float weightSparse = 1.0f;
 	//float weightDenseInit = 0.0f;
+	//float weightDenseLinFactor = 0.0f;
 	// dense only
 	//float weightSparse = 0.0f;
 	//float weightDenseInit = 1.0f;
+	//float weightDenseLinFactor = 0.0f;
 	// both
 	float weightSparse = 1.0f;
 	float weightDenseInit = 1.0f;
@@ -1293,7 +1295,7 @@ void TestMatching::runOpt()
 	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
 
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-	SiftVisualization::saveToPointCloud("debug/opt.ply", &cudaCache, transforms);
+	SiftVisualization::saveToPointCloud("debug/opt.ply", &cudaCache, transforms, true);
 
 	MLIB_CUDA_SAFE_FREE(d_transforms);
 

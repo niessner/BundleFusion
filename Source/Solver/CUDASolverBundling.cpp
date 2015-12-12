@@ -56,10 +56,6 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtr, sizeof(float) * 6 * numberOfVariables));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_sparseJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_sparseJtr, sizeof(float) * 6 * numberOfVariables));
-
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCount, sizeof(int)));
 
 	//!!!DEBUGGING
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_deltaRot, -1, sizeof(float3)*numberOfVariables));
@@ -85,9 +81,6 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_countHighResidual, -1, sizeof(int)));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtr, -1, sizeof(float) * 6 * numberOfVariables));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_sparseJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_sparseJtr, -1, sizeof(float) * 6 * numberOfVariables));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_corrCount, -1, sizeof(int)));
 
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
@@ -127,15 +120,11 @@ CUDASolverBundling::~CUDASolverBundling()
 	
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtJ);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtr);
-	MLIB_CUDA_SAFE_FREE(m_solverState.d_sparseJtJ);
-	MLIB_CUDA_SAFE_FREE(m_solverState.d_sparseJtr);
-
-	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
 }
 
 void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages,
 	unsigned int nNonLinearIterations, unsigned int nLinearIterations, 
-	CUDACache* cudaCache, float sparseWeight, float denseWeight, float denseWeightLinFactor,
+	const CUDACache* cudaCache, float sparseWeight, float denseWeight, float denseWeightLinFactor,
 	float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,
 	bool rebuildJT, bool findMaxResidual)
 {
@@ -170,6 +159,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.denseDepthColorThresh = 1.0f;//0.1f;
 	parameters.denseDepthMin = 0.1f;
 	parameters.denseDepthMax = 3.0f;
+	parameters.useDenseDepthAllPairwise = GlobalBundlingState::get().s_localDenseUseAllPairwise; //TODO update this correctly for global
 
 	SolverInput solverInput;
 	solverInput.d_correspondences = d_correspondences;
@@ -181,10 +171,18 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	solverInput.maxNumberOfImages = m_maxNumberOfImages;
 	solverInput.maxCorrPerImage = m_maxCorrPerImage;
 
-	solverInput.d_depthFrames = cudaCache->getCacheFramesGPU();
-	solverInput.denseDepthWidth = 160; //TODO params - constant buffer?
-	solverInput.denseDepthHeight = 120;
-	solverInput.depthIntrinsics = MatrixConversion::toCUDA(cudaCache->getIntrinsics());
+	if (cudaCache) {
+		solverInput.d_depthFrames = cudaCache->getCacheFramesGPU();
+		solverInput.denseDepthWidth = cudaCache->getWidth(); //TODO constant buffer for this?
+		solverInput.denseDepthHeight = cudaCache->getHeight();
+		solverInput.depthIntrinsics = MatrixConversion::toCUDA(cudaCache->getIntrinsics());
+	}
+	else {
+		solverInput.d_depthFrames = NULL;
+		solverInput.denseDepthWidth = 0;
+		solverInput.denseDepthHeight = 0;
+		solverInput.depthIntrinsics.setValue(-std::numeric_limits<float>::infinity());
+	}
 
 	if (rebuildJT) {
 		buildVariablesToCorrespondencesTable(d_correspondences, numberOfCorrespondences);

@@ -24,7 +24,7 @@ class CUDASolverBundling
 		//weightSparse*Esparse + (#iters*weightDenseLinFactor + weightDense)*Edense
 		void solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages, 
 			unsigned int nNonLinearIterations, unsigned int nLinearIterations,
-			CUDACache* cudaCache, float sparseWeight, float denseWeight, float denseWeightLinFactor,
+			const CUDACache* cudaCache, float sparseWeight, float denseWeight, float denseWeightLinFactor,
 			float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,
 			bool rebuildJT, bool findMaxResidual);
 		const std::vector<float>& getConvergenceAnalysis() const { return m_convergence; }

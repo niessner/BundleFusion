@@ -491,18 +491,6 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 		case 'Z':
 			GlobalAppState::get().s_timingsTotalEnabled = !GlobalAppState::get().s_timingsTotalEnabled;
 			break;
-			//case VK_F3:
-			//	GlobalAppState::get().s_texture_threshold += 0.02;
-			//	std::cout<<GlobalAppState::get().s_texture_threshold<<std::endl;
-			//	if(GlobalAppState::get().s_texture_threshold>1.0f)
-			//		GlobalAppState::get().s_texture_threshold = 1.0f;
-			//	break;
-			//case VK_F4:
-			//	GlobalAppState::get().s_texture_threshold -= 0.02;
-			//	std::cout<<GlobalAppState::get().s_texture_threshold<<std::endl;
-			//	if(GlobalAppState::get().s_texture_threshold<0.0f)
-			//		GlobalAppState::get().s_texture_threshold = 0.0f;
-			//	break;
 		case 'R':
 			ResetDepthSensing();
 			break;
@@ -513,8 +501,17 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 			g_sceneRep->debugHash();
 			if (g_chunkGrid)	g_chunkGrid->debugCheckForDuplicates();
 			break;
-		case 'D':
-			g_depthSensingRGBDSensor->savePointCloud("test.ply");
+		case 'E':
+		{ //TODO this is just a hack to be removed
+			if (GlobalAppState::get().s_sensorIdx == 3) {
+				std::vector<mat4f> trajectory;
+				g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+				((BinaryDumpReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
+				std::cout << "press key to continue" << std::endl; getchar();
+			} else {
+				std::cout << "Cannot evaluate trajectory (sensorIdx != 3)" << std::endl;
+			}
+		}
 			break;
 		case 'N':
 			StopScanningAndSaveSDFHash("test.hash");

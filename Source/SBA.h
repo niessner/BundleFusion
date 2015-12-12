@@ -28,6 +28,7 @@ public:
 
 		m_weightSparse = 1.0f;
 		m_weightDenseInit = 1.0f;
+		m_weightDenseLinFactor = 1.0f;
 	}
 	void init(unsigned int maxImages, unsigned int maxNumResiduals) {
 		unsigned int maxNumImages = maxImages;
@@ -46,7 +47,7 @@ public:
 		if (d_xTrans) cutilSafeCall(cudaFree(d_xTrans));
 	}
 
-	void align(SIFTImageManager* siftManager, CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt);
+	void align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt);
 
 	float getMaxResidual() const { return m_maxResidual; }
 	const std::vector<float>& getLinearConvergenceAnalysis() const { return m_solver->getLinearConvergenceAnalysis(); }
@@ -65,7 +66,7 @@ public:
 
 private:
 
-	bool alignCUDA(SIFTImageManager* siftManager, CUDACache* cudaCache, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd);
+	bool alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd);
 
 	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	
