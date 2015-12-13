@@ -24,9 +24,16 @@ SBA::SBA()
 
 	m_bUseComprehensiveFrameInvalidation = false;
 
-	m_weightSparse = 1.0f;
-	m_weightDenseInit = 1.0f;
-	m_weightDenseLinFactor = 1.0f;
+	m_localWeightSparse = 1.0f;
+	m_localWeightDenseInit = 1.0f;
+	m_localWeightDenseLinFactor = 1.0f;
+
+	m_globalWeightSparse = 1.0f;
+	m_globalWeightDenseInit = 0.0f;
+	m_globalWeightDenseLinFactor = 0.5f;
+
+	m_bUseGlobalDenseOpt = true;
+	m_bUseLocalDensePairwise = true;
 }
 
 
@@ -36,8 +43,22 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (recordConvergence) m_recordedConvergence.push_back(std::vector<float>());
 
 	m_bVerify = false;
-
 	m_maxResidual = -1.0f;
+	
+	//dense opt params
+	bool usePairwise; vec3f weights; const CUDACache* cache = cudaCache;
+	if (isLocal) {
+		weights = vec3f(m_localWeightSparse, m_localWeightDenseInit, m_localWeightDenseLinFactor);
+		usePairwise = m_bUseLocalDensePairwise;
+	} else {
+		usePairwise = false; //no global dense pairwise
+		if (!m_bUseGlobalDenseOpt) {
+			cache = NULL;
+			weights = vec3f(0.0f);
+		} else {
+			weights = vec3f(m_globalWeightSparse, m_globalWeightDenseInit, m_globalWeightDenseLinFactor);
+		}
+	}
 
 	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 
@@ -48,7 +69,7 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	const unsigned int maxIts = 1;//GlobalBundlingState::get().s_maxNumResidualsRemoved;
 	unsigned int curIt = 0;
 	do {
-		removed = alignCUDA(siftManager, cudaCache, maxNumIters, numPCGits, isStart, isEnd);
+		removed = alignCUDA(siftManager, cache, usePairwise, weights, maxNumIters, numPCGits, isStart, isEnd);
 		if (recordConvergence) {
 			const std::vector<float>& conv = m_solver->getConvergenceAnalysis();
 			m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
@@ -57,8 +78,8 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	} while (removed && curIt < maxIts);
 
 	if (useVerify) {
-		if (m_weightSparse > 0)	m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesDEBUG(), siftManager->getNumGlobalCorrespondences());
-		else m_bVerify = true; //TODO for debugging only???
+		if (weights.x) m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesDEBUG(), siftManager->getNumGlobalCorrespondences());
+		else m_bVerify = true; //!!!debugging //TODO this should not happen except for debugging
 	}
 
 	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
@@ -66,25 +87,18 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve += s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve += curIt * maxNumIters; }
 }
 
-bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd)
+bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise, const vec3f& weights, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd)
 {
 	EntryJ* d_correspondences = siftManager->getGlobalCorrespondencesDEBUG();
 	m_numCorrespondences = siftManager->getNumGlobalCorrespondences();
 
 	// transforms
 	unsigned int numImages = siftManager->getNumImages();
-
-	float weightDense = m_weightDenseInit;
-	float weightDenseLinFactor = m_weightDenseLinFactor;
-	if (cudaCache == NULL) {
-		weightDense = 0.0f;
-		weightDenseLinFactor = 0.0f;
-	}
 	m_solver->solve(d_correspondences, m_numCorrespondences, numImages, numNonLinearIterations, numLinearIterations,
-		cudaCache, m_weightSparse, weightDense, weightDenseLinFactor, d_xRot, d_xTrans, isStart, isEnd);
+		cudaCache, weights.x, weights.y, weights.z, useDensePairwise, d_xRot, d_xTrans, isStart, isEnd);
 
 	bool removed = false; 
-	if (isEnd && m_weightSparse > 0) {
+	if (isEnd && weights.x > 0) {
 		removed = removeMaxResidualCUDA(siftManager, numImages);
 	}
 

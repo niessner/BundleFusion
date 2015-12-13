@@ -507,7 +507,7 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 	const unsigned int numGlobalFrames = m_global->getNumImages();
 
 	const bool useVerify = false;
-	m_SparseBundler.align(m_global, NULL, d_globalTrajectory, numNonLinIterations, numLinIterations,
+	m_SparseBundler.align(m_global, m_globalCache, d_globalTrajectory, numNonLinIterations, numLinIterations,
 		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, isScanDone);
 
 	if (isEnd) {

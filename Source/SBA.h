@@ -29,6 +29,8 @@ public:
 		m_bVerify = false;
 
 		m_bUseComprehensiveFrameInvalidation = GlobalBundlingState::get().s_useComprehensiveFrameInvalidation;
+		m_bUseGlobalDenseOpt = GlobalBundlingState::get().s_useGlobalDenseOpt;
+		m_bUseLocalDensePairwise = GlobalBundlingState::get().s_localDenseUseAllPairwise;
 	}
 	~SBA() {
 		SAFE_DELETE(m_solver);
@@ -49,14 +51,14 @@ public:
 	void printConvergence(const std::string& filename) const;
 
 	void setWeights(float ws, float wd, float wdl) {
-		m_weightSparse = ws;
-		m_weightDenseInit = wd;
-		m_weightDenseLinFactor = wdl;
+		m_localWeightSparse = ws;
+		m_localWeightDenseInit = wd;
+		m_localWeightDenseLinFactor = wdl;
 	}
 
 private:
 
-	bool alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd);
+	bool alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise, const vec3f& weights, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd);
 
 	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	
@@ -64,9 +66,15 @@ private:
 	float3*			d_xTrans;
 	unsigned int	m_numCorrespondences;
 
-	float			m_weightSparse;
-	float			m_weightDenseInit;
-	float			m_weightDenseLinFactor;
+	//dense opt params
+	bool m_bUseLocalDensePairwise;
+	bool m_bUseGlobalDenseOpt;
+	float			m_localWeightSparse;
+	float			m_localWeightDenseInit;
+	float			m_localWeightDenseLinFactor;
+	float			m_globalWeightSparse;
+	float			m_globalWeightDenseInit;
+	float			m_globalWeightDenseLinFactor;
 
 	CUDASolverBundling* m_solver;
 

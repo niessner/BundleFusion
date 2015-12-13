@@ -134,7 +134,7 @@ CUDASolverBundling::~CUDASolverBundling()
 
 void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages,
 	unsigned int nNonLinearIterations, unsigned int nLinearIterations, 
-	const CUDACache* cudaCache, float sparseWeight, float denseWeight, float denseWeightLinFactor,
+	const CUDACache* cudaCache, float sparseWeight, float denseWeightInit, float denseWeightLinFactor, bool usePairwiseDense,
 	float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,
 	bool rebuildJT, bool findMaxResidual)
 {
@@ -144,7 +144,12 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		std::cerr << "WARNING: #corr (" << numberOfCorrespondences << ") exceeded limit (" << m_maxCorrPerImage << "*" << m_maxNumberOfImages << "), please increase max #corr per image in the GAS" << std::endl;
 	}
 
-	bool useSparse = sparseWeight > 0;
+	//!!!debugging
+	if (numberOfImages > 11 && (denseWeightInit > 0 || denseWeightLinFactor > 0) && usePairwiseDense) {
+		std::cout << "ERROR using pairwise dense for global keys!" << std::endl;
+		getchar();
+	}
+	//!!!debugging
 
 	float* convergence = NULL;
 	if (m_bRecordConvergence) {
@@ -162,14 +167,14 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.verifyOptPercentThresh = m_verifyOptPercentThresh;
 
 	parameters.weightSparse = sparseWeight;
-	parameters.weightDenseDepthInit = denseWeight;
+	parameters.weightDenseDepthInit = denseWeightInit;
 	parameters.weightDenseDepthLinFactor = denseWeightLinFactor;
 	parameters.denseDepthDistThresh = 0.15f; //TODO params
 	parameters.denseDepthNormalThresh = 0.97f;
 	parameters.denseDepthColorThresh = 1.0f;//0.1f;
 	parameters.denseDepthMin = 0.1f;
 	parameters.denseDepthMax = 3.0f;
-	parameters.useDenseDepthAllPairwise = GlobalBundlingState::get().s_localDenseUseAllPairwise; //TODO update this correctly for global
+	parameters.useDenseDepthAllPairwise = usePairwiseDense;
 
 	SolverInput solverInput;
 	solverInput.d_correspondences = d_correspondences;
