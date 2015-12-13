@@ -1,6 +1,5 @@
 
 #include "stdafx.h"
-//#include "mLibEigen.h"
 #include "SIFTImageManager.h"
 #include "SiftGPU/SiftMatch.h"
 #include "SiftGPU/SiftMatchFilter.h"
@@ -1100,9 +1099,9 @@ void TestMatching::debugOptimizeGlobal()
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globTrajectory.data(), d_globalTrajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
 
 		//if (i % 10 == 0) {
-			std::cout << "saving opt " << i << " to point cloud... ";
-			SiftVisualization::saveToPointCloud("debug/opt" + std::to_string(i) + ".ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
-			std::cout << "done!" << std::endl;
+		std::cout << "saving opt " << i << " to point cloud... ";
+		SiftVisualization::saveToPointCloud("debug/opt" + std::to_string(i) + ".ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
+		std::cout << "done!" << std::endl;
 		//}
 	}
 
@@ -1228,7 +1227,7 @@ void TestMatching::debugMatchInfo()
 void TestMatching::runOpt()
 {
 	MLIB_ASSERT(!m_colorImages.empty() && !m_cachedFrames.empty());
-	
+
 	// sparse only
 	//float weightSparse = 1.0f;
 	//float weightDenseInit = 0.0f;
@@ -1304,26 +1303,9 @@ void TestMatching::runOpt()
 	MLIB_CUDA_SAFE_FREE(d_transforms);
 
 	// compare to reference trajectory
-	float rotErr = 0.0f; float transErr = 0.0f;
-	unsigned int numTransforms = 0;
-	for (unsigned int i = 0; i < transforms.size(); i++) {
-		if (transforms[i][0] != -std::numeric_limits<float>::infinity()) {
-			mat3f refRot = referenceTrajectory[i].getRotation();
-			mat3f optRot = transforms[i].getRotation();
-			mat4f diffRot = mat4f::identity(); diffRot.setRotation(refRot.getTranspose() * optRot);
-			Pose rot = PoseHelper::MatrixToPose(diffRot);
-			rotErr += rot.getVec3().lengthSq();
-
-			vec3f refTrans = referenceTrajectory[i].getTranslation();
-			vec3f optTrans = transforms[i].getTranslation();
-			transErr += (refTrans - optTrans).lengthSq();
-			numTransforms++;
-		}
-	}
-	rotErr = std::sqrt(rotErr/numTransforms); transErr = std::sqrt(transErr/numTransforms);
+	float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
 	std::cout << "*********************************" << std::endl;
-	std::cout << "trans err = " << transErr << std::endl;
-	std::cout << "rot err = " << rotErr << std::endl;
+	std::cout << "ate rmse = " << transErr << std::endl;
 	std::cout << "*********************************" << std::endl;
 }
 
@@ -1334,8 +1316,8 @@ void TestMatching::printCacheFrames(const std::string& dir) const
 		return;
 	}
 
-	unsigned int width =	GlobalBundlingState::get().s_downsampledWidth;
-	unsigned int height =	GlobalBundlingState::get().s_downsampledHeight;
+	unsigned int width = GlobalBundlingState::get().s_downsampledWidth;
+	unsigned int height = GlobalBundlingState::get().s_downsampledHeight;
 	DepthImage32 depthImage(width, height); ColorImageR8G8B8A8 colorImage(width, height);
 	ColorImageR32G32B32A32 camPosImage(width, height), normalImage(width, height);
 	for (unsigned int i = 0; i < m_cachedFrames.size(); i++) {
@@ -1343,7 +1325,7 @@ void TestMatching::printCacheFrames(const std::string& dir) const
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), m_cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getPointer(), m_cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(colorImage.getPointer(), m_cachedFrames[i].d_colorDownsampled, sizeof(uchar4)*width*height, cudaMemcpyDeviceToHost));
-		
+
 		//debug check, save to point cloud
 		for (unsigned int k = 0; k < width*height; k++) {
 			normalImage.getPointer()[k].w = 1.0f; // make visible
@@ -1353,7 +1335,7 @@ void TestMatching::printCacheFrames(const std::string& dir) const
 			const vec4f& n = normalImage.getPointer()[k];
 			if (d != -std::numeric_limits<float>::infinity() && (d < 0.1f || d > 12.0f))
 				int a = 5;
-			if (c.x != -std::numeric_limits<float>::infinity() && (isnan(c.y) || isnan(c.z))) 
+			if (c.x != -std::numeric_limits<float>::infinity() && (isnan(c.y) || isnan(c.z)))
 				int a = 5;
 			if (n.x != -std::numeric_limits<float>::infinity() && (isnan(n.y) || isnan(n.z)))
 				int a = 5;
@@ -1429,7 +1411,7 @@ void TestMatching::constructSparseSystem(const std::vector<ColorImageR8G8B8A8> &
 
 				//filter
 				siftManager->SortKeyPointMatchesCU(curFrame);
-				siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, 
+				siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches,
 					GlobalBundlingState::get().s_maxKabschResidual2, false);
 				siftManager->FilterMatchesBySurfaceAreaCU(curFrame, siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
 				siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
@@ -1449,6 +1431,81 @@ void TestMatching::constructSparseSystem(const std::vector<ColorImageR8G8B8A8> &
 	MLIB_CUDA_SAFE_FREE(d_depth);
 	SAFE_DELETE(sift);
 	std::cout << "done!" << std::endl;
+}
+
+void TestMatching::analyzeLocalOpts()
+{
+	//TODO actually run the optimizations
+
+	// find local where error(test0) > error(test1)
+	const std::string test0File = "dump/recording.sensor"; //sparse+dense
+	const std::string test1File = "dump/fr1_desk.sensor"; //sparse
+	const std::string refFile = "../data/tum/fr1_desk.sensor"; //sparse
+
+	std::vector<mat4f> test0Trajectory, test1Trajectory, referenceTrajectory;
+	{
+		CalibratedSensorData cs;
+		BinaryDataStreamFile s(test0File, false);
+		s >> cs;
+		test0Trajectory = cs.m_trajectory;
+	}
+	{
+		CalibratedSensorData cs;
+		BinaryDataStreamFile s(test1File, false);
+		s >> cs;
+		test1Trajectory = cs.m_trajectory;
+	}
+	{
+		CalibratedSensorData cs;
+		BinaryDataStreamFile s(refFile, false);
+		s >> cs;
+		referenceTrajectory = cs.m_trajectory;
+	}
+
+	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
+	std::vector<float> errors0, errors1;
+	std::vector<std::pair<unsigned int, float>> badIndices;
+	std::vector<std::pair<unsigned int, float>> goodIndices;
+	for (unsigned int i = 0; i < referenceTrajectory.size(); i += submapSize) {
+		unsigned int numTransforms = std::min(submapSize, (int)referenceTrajectory.size() - i);
+		std::vector<mat4f> local0(numTransforms), local1(numTransforms), refLocalTrajectory(numTransforms);
+		mat4f offset0 = test0Trajectory[i].getInverse();
+		mat4f offset1 = test1Trajectory[i].getInverse();
+		mat4f refOffset = referenceTrajectory[i].getInverse();
+		for (unsigned int t = 0; t < numTransforms; t++) {
+			local0[t] = offset0 * test0Trajectory[i + t];
+			local1[t] = offset1 * test1Trajectory[i + t];
+			refLocalTrajectory[t] = refOffset * referenceTrajectory[i + t];
+		}
+		float err0 = PoseHelper::evaluateAteRmse(local0, refLocalTrajectory);
+		errors0.push_back(err0);
+		float err1 = PoseHelper::evaluateAteRmse(local1, refLocalTrajectory);
+		errors1.push_back(err1);
+
+		if (err0 > err1) badIndices.push_back(std::make_pair(i, err0-err1));
+		else goodIndices.push_back(std::make_pair(i, err1-err0));
+	}
+	std::sort(badIndices.begin(), badIndices.end(), [](const std::pair<unsigned int, float> &left, const std::pair<unsigned int, float> &right) {
+		return fabs(left.second) > fabs(right.second);
+	});
+	std::sort(goodIndices.begin(), goodIndices.end(), [](const std::pair<unsigned int, float> &left, const std::pair<unsigned int, float> &right) {
+		return fabs(left.second) > fabs(right.second);
+	});
+
+	float totalErr0 = PoseHelper::evaluateAteRmse(test0Trajectory, referenceTrajectory);
+	float totalErr1 = PoseHelper::evaluateAteRmse(test1Trajectory, referenceTrajectory);
+
+	//compare global keys
+	std::vector<mat4f> test0Keys, test1Keys, refKeys;
+	for (unsigned int i = 0; i < referenceTrajectory.size(); i += submapSize) {
+		test0Keys.push_back(test0Trajectory[i]);
+		test1Keys.push_back(test1Trajectory[i]);
+		refKeys.push_back(referenceTrajectory[i]);
+	}
+	float keysErr0 = PoseHelper::evaluateAteRmse(test0Keys, refKeys);
+	float keysErr1 = PoseHelper::evaluateAteRmse(test1Keys, refKeys);
+
+	int a = 5;
 }
 
 

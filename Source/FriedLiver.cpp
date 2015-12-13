@@ -232,10 +232,11 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (true) {
+		if (false) {
 			TestMatching test;
-			test.loadFromSensor("debug/11.sensor", "", 1);
-			test.runOpt();
+			//test.loadFromSensor("debug/11.sensor", "", 1);
+			//test.runOpt();
+			test.analyzeLocalOpts();
 
 			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);
 			//test.load("", "debug/global.sift");

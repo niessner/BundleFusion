@@ -8,6 +8,9 @@
 
 #include <conio.h>
 
+//!!!DEBUGGING
+//#define PRINT_RESIDUALS
+//!!!DEBUGGING
 
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
@@ -177,8 +180,10 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 				jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight * imPairWeight);
 
 			//!!!debugging
+#ifdef PRINT_RESIDUALS
 			atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
 			atomicAdd(state.d_corrCount, 1);
+#endif
 			//if (i == 0 && j == 1 && x == 47 && y == 53) {
 			if (i > 0 && (isnan(jacobianBlockRow_i(0)) || isnan(jacobianBlockRow_i(1)) || isnan(jacobianBlockRow_i(2)) || isnan(jacobianBlockRow_i(3)) || isnan(jacobianBlockRow_i(4)) || isnan(jacobianBlockRow_i(5))) ||
 				j > 0 && (isnan(jacobianBlockRow_j(0)) || isnan(jacobianBlockRow_j(1)) || isnan(jacobianBlockRow_j(2)) || isnan(jacobianBlockRow_j(3)) || isnan(jacobianBlockRow_j(4)) || isnan(jacobianBlockRow_j(5))) ||
@@ -228,8 +233,10 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 	if (timer) timer->startEvent("BuildDenseDepthSystem");
 
 	//!!!debugging
+#ifdef PRINT_RESIDUALS
 	cutilSafeCall(cudaMemset(state.d_corrCount, 0, sizeof(int)));
 	cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
+#endif
 	//!!!debugging
 	
 	cutilSafeCall(cudaMemset(state.d_denseCorrCounts, 0, sizeof(float) * input.maxNumDenseImPairs));
@@ -246,23 +253,23 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 #endif
-		//!!!DEBUGGING
-		float* denseCorrCounts = new float[input.maxNumDenseImPairs];
-		cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*input.maxNumDenseImPairs, cudaMemcpyDeviceToHost));
-		unsigned int totalCount = 0;
-		for (unsigned int i = 0; i < input.maxNumDenseImPairs; i++) totalCount += (unsigned int)denseCorrCounts[i];
-		//if (denseCorrCounts) delete[] denseCorrCounts;
+		//!!!DEBUGGING //remember the delete!
+		//float* denseCorrCounts = new float[input.maxNumDenseImPairs];
+		//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*input.maxNumDenseImPairs, cudaMemcpyDeviceToHost));
+		//unsigned int totalCount = 0;
+		//for (unsigned int i = 0; i < input.maxNumDenseImPairs; i++) totalCount += (unsigned int)denseCorrCounts[i];
+		////if (denseCorrCounts) delete[] denseCorrCounts;
 		//!!!DEBUGGING
 		int wgrid = (input.maxNumDenseImPairs + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
 		WeightDenseCorrespondences_Kernel << < wgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(input.maxNumDenseImPairs, state);
-		//!!!DEBUGGING
-		cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*input.maxNumDenseImPairs, cudaMemcpyDeviceToHost));
-		if (denseCorrCounts) delete[] denseCorrCounts;
-		//!!!DEBUGGING
 #ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 #endif
+		//!!!DEBUGGING
+		//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*input.maxNumDenseImPairs, cudaMemcpyDeviceToHost));
+		//if (denseCorrCounts) delete[] denseCorrCounts;
+		//!!!DEBUGGING
 
 		BuildDenseDepthSystem_Kernel << <grid, block >> >(input, state, parameters);
 #ifdef _DEBUG
@@ -291,12 +298,13 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 			}
 			printf("\n");
 		}
+#ifdef PRINT_RESIDUALS
 		float sumResidual; int corrCount;
 		cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
 		cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
 		printf("\tweight * dense res = %f * %f = %f\t[#corr = %d]\n\n", parameters.weightDenseDepth, sumResidual/parameters.weightDenseDepth, sumResidual, corrCount);
-		if (corrCount != totalCount) printf("ERROR: dense image pair corr counts (%d) != total corr count\n", totalCount, corrCount);
-
+		//if (corrCount != totalCount) printf("ERROR: dense image pair corr counts (%d) != total corr count\n", totalCount, corrCount);
+#endif
 		const unsigned int flipgrid = (sizeJtJ + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
 		FlipJtJ_Kernel << <flipgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(sizeJtJ, sizeJtr, state.d_depthJtJ);
 #ifdef _DEBUG
@@ -916,10 +924,12 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	//unsigned int idx = 0;
 
 	//!!!DEBUGGING
+#ifdef PRINT_RESIDUALS
 	if (parameters.weightSparse > 0) {
 		float initialResidual = EvalResidual(input, state, parameters, timer);
 		printf("initial sparse = %f*%f = %f\n", parameters.weightSparse, initialResidual/parameters.weightSparse, initialResidual);
 	}
+#endif
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
@@ -945,10 +955,12 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		//ApplyLinearUpdate(input, state, parameters);	//this should be also done in the last PCGIteration
 
 		//!!!DEBUGGING
+#ifdef PRINT_RESIDUALS
 		if (parameters.weightSparse > 0) {
 			float residual = EvalResidual(input, state, parameters, timer);
 			printf("[niter %d] weight * sparse = %f*%f = %f\t[#corr = %d]\n", nIter, parameters.weightSparse, residual/parameters.weightSparse, residual, input.numberOfCorrespondences);
 		}
+#endif
 		//!!!DEBUGGING
 
 		if (convergenceAnalysis) {

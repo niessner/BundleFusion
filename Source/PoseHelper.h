@@ -6,6 +6,36 @@ typedef ml::vec6f Pose;
 
 namespace PoseHelper {
 
+	static float evaluateAteRmse(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory) {
+		size_t numTransforms = math::min(trajectory.size(), referenceTrajectory.size());
+		std::vector<vec3f> pts, refPts; vec3f ptsMean(0.0f), refPtsMean(0.0f);
+		for (unsigned int i = 0; i < numTransforms; i++) {
+			if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) {
+				pts.push_back(trajectory[i].getTranslation());
+				refPts.push_back(referenceTrajectory[i].getTranslation());
+				ptsMean += pts.back();
+				refPtsMean += refPts.back();
+			}
+		}
+		ptsMean /= (float)pts.size();
+		refPtsMean /= (float)refPts.size();
+		for (unsigned int i = 0; i < pts.size(); i++) {
+			pts[i] -= ptsMean;
+			refPts[i] -= refPtsMean;
+		}
+		vec3f evs;
+		mat4f align = EigenWrapperf::kabsch(pts, refPts, evs);
+		float err = 0.0f;
+		for (unsigned int i = 0; i < pts.size(); i++) {
+			vec3f p0 = align.getRotation() * pts[i];
+			vec3f p1 = refPts[i];
+			float dist2 = vec3f::distSq(p0, p1);
+			err += dist2;
+		}
+		float rmse = std::sqrt(err / pts.size());
+		return rmse;
+	}
+
 	//! assumes z-y-x rotation composition (euler angles)
 	static Pose MatrixToPose(const ml::mat4f& Rt) {
 		ml::mat3f R = Rt.getRotation();

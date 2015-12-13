@@ -35,6 +35,7 @@ public:
 
 	//test sparse+dense opt
 	void runOpt();
+	void analyzeLocalOpts();
 
 	// match within first numFrames of sensorFile
 	void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));

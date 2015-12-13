@@ -108,30 +108,9 @@ void BinaryDumpReader::evaluateTrajectory(const std::vector<mat4f>& trajectory) 
 	mat4f offset = referenceTrajectory.front().getInverse();
 	for (unsigned int i = 0; i < referenceTrajectory.size(); i++) referenceTrajectory[i] = offset * referenceTrajectory[i];
 
-	unsigned int counter = 0;
-
-	float rotErr = 0.0f, transErr = 0.0f;
-	for (unsigned int i = 1; i < numTransforms; i++) {
-		if (trajectory[i][0] != -std::numeric_limits<float>::infinity() &&
-			referenceTrajectory[i][0] != -std::numeric_limits<float>::infinity()) {
-			mat3f refRot = referenceTrajectory[i].getRotation();
-			mat3f optRot = trajectory[i].getRotation();
-			mat4f diffRot = mat4f::identity(); diffRot.setRotation(refRot.getTranspose() * optRot);
-			Pose rot = PoseHelper::MatrixToPose(diffRot);
-			rotErr += rot.getVec3().lengthSq();
-
-			vec3f refTrans = referenceTrajectory[i].getTranslation();
-			vec3f optTrans = trajectory[i].getTranslation();
-			transErr += (refTrans - optTrans).lengthSq();
-
-			counter++;
-		}
-	}
-	rotErr = std::sqrt(rotErr/counter); transErr = std::sqrt(transErr/counter);
+	float transErr = PoseHelper::evaluateAteRmse(trajectory, referenceTrajectory);
 	std::cout << "*********************************" << std::endl;
-	std::cout << "evaluated trajectory for " << counter << "/" << numTransforms << " frames:" << std::endl;
-	std::cout << "trans err = " << transErr << std::endl;
-	std::cout << "rot err = " << rotErr << std::endl;
+	std::cout << "ate rmse = " << transErr << std::endl;
 	std::cout << "*********************************" << std::endl;
 }
 
