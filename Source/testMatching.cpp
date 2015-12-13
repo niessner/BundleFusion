@@ -1238,9 +1238,12 @@ void TestMatching::runOpt()
 	//float weightDenseInit = 1.0f;
 	//float weightDenseLinFactor = 0.0f;
 	// both
+	//float weightSparse = 1.0f;
+	//float weightDenseInit = 100.0f;
+	//float weightDenseLinFactor = 50.0f;
 	float weightSparse = 1.0f;
-	float weightDenseInit = 100.0f;
-	float weightDenseLinFactor = 50.0f;
+	float weightDenseInit = 1.0f;
+	float weightDenseLinFactor = 1.0f;
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 

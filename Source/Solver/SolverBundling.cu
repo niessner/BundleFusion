@@ -104,9 +104,24 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 			input.d_depthFrames[i].d_cameraposDownsampled, input.d_depthFrames[i].d_normalsDownsampled, //input.d_depthFrames[i].d_colorDownsampled,//target
 			input.d_depthFrames[j].d_cameraposDownsampled, input.d_depthFrames[j].d_normalsDownsampled, //input.d_depthFrames[j].d_colorDownsampled,//source
 			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, camPosTgt, normalTgt)) { //i tgt, j src
-			atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1);
+			atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f); 
 		} // found correspondence
 	} // valid image pixel
+}
+
+__global__ void WeightDenseCorrespondences_Kernel(unsigned int N, SolverState state)
+{
+	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < N) {
+		// apply ln to weights
+		float x = state.d_denseCorrCounts[idx];
+		if (x > 0) {
+			if (x < 400) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			else {
+				state.d_denseCorrCounts[idx] = 1.0f / min(logf(x), 9.0f); // natural log //TODO PARAMS
+			}
+		}
+	}
 }
 
 __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState state, SolverParameters parameters)
@@ -156,7 +171,7 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
 			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
 			float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDepthDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-			float imPairWeight = 1.0f / state.d_denseCorrCounts[imPairIdx];
+			float imPairWeight = state.d_denseCorrCounts[imPairIdx];
 
 			addToLocalSystem(state.d_depthJtJ, state.d_depthJtr, input.numberOfImages * 6,
 				jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight * imPairWeight);
@@ -217,7 +232,7 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 	cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
 	//!!!debugging
 	
-	cutilSafeCall(cudaMemset(state.d_denseCorrCounts, 0, sizeof(int) * input.maxNumDenseImPairs));
+	cutilSafeCall(cudaMemset(state.d_denseCorrCounts, 0, sizeof(float) * input.maxNumDenseImPairs));
 	cutilSafeCall(cudaMemset(state.d_depthJtJ, 0, sizeof(float) * sizeJtJ)); //TODO check if necessary
 	cutilSafeCall(cudaMemset(state.d_depthJtr, 0, sizeof(float) * sizeJtr));
 #ifdef _DEBUG
@@ -232,12 +247,23 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 		cutilCheckMsg(__FUNCTION__);
 #endif
 		//!!!DEBUGGING
-		int* denseCorrCounts = new int[input.maxNumDenseImPairs];
-		cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(int)*input.maxNumDenseImPairs, cudaMemcpyDeviceToHost));
+		float* denseCorrCounts = new float[input.maxNumDenseImPairs];
+		cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*input.maxNumDenseImPairs, cudaMemcpyDeviceToHost));
 		unsigned int totalCount = 0;
-		for (unsigned int i = 0; i < input.maxNumDenseImPairs; i++) totalCount += denseCorrCounts[i];
+		for (unsigned int i = 0; i < input.maxNumDenseImPairs; i++) totalCount += (unsigned int)denseCorrCounts[i];
+		//if (denseCorrCounts) delete[] denseCorrCounts;
+		//!!!DEBUGGING
+		int wgrid = (input.maxNumDenseImPairs + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
+		WeightDenseCorrespondences_Kernel << < wgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(input.maxNumDenseImPairs, state);
+		//!!!DEBUGGING
+		cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*input.maxNumDenseImPairs, cudaMemcpyDeviceToHost));
 		if (denseCorrCounts) delete[] denseCorrCounts;
 		//!!!DEBUGGING
+#ifdef _DEBUG
+		cutilSafeCall(cudaDeviceSynchronize());
+		cutilCheckMsg(__FUNCTION__);
+#endif
+
 		BuildDenseDepthSystem_Kernel << <grid, block >> >(input, state, parameters);
 #ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());

@@ -58,7 +58,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtr, sizeof(float) * 6 * numberOfVariables));
 	m_maxNumDenseImPairs = std::max(m_maxNumberOfImages, (submapSize + 1)*(submapSize + 1));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseCorrCounts, sizeof(int) * m_maxNumDenseImPairs));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseCorrCounts, sizeof(float) * m_maxNumDenseImPairs));
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCount, sizeof(int)));
 
@@ -86,7 +86,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_countHighResidual, -1, sizeof(int)));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtr, -1, sizeof(float) * 6 * numberOfVariables));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseCorrCounts, -1, sizeof(int) * m_maxNumDenseImPairs));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseCorrCounts, -1, sizeof(float) * m_maxNumDenseImPairs));
 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_corrCount, -1, sizeof(int)));
 
