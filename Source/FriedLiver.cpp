@@ -234,9 +234,9 @@ int main(int argc, char** argv)
 		//!!!DEBUGGING
 		if (false) {
 			TestMatching test;
-			//test.loadFromSensor("debug/11.sensor", "", 1);
-			//test.runOpt();
-			test.analyzeLocalOpts();
+			test.loadFromSensor("debug/11.sensor", "", 1);
+			test.runOpt();
+			//test.analyzeLocalOpts();
 
 			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);
 			//test.load("", "debug/global.sift");

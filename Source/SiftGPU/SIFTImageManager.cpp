@@ -397,11 +397,11 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 		if (corr.isValid()) {
 			const uint2& keyIndices = correspondenceKeyIndices[i];
 			uint2 k0 = make_uint2(corr.imgIdx_i, keyIndices.x);
-			//uint2 k1 = make_uint2(corr.imgIdx_j, keyIndices.y);
+			uint2 k1 = make_uint2(corr.imgIdx_j, keyIndices.y);
 
 			if (!keyMarker[k0.y] && curKeys.size() < m_maxKeyPointsPerImage) {
-				// average locations in world space
-				float3 pos = transforms[k0.x] * corr.pos_i;//((transforms[k0.x] * corr.pos_i) + (transforms[k1.x] * corr.pos_j)) / 2.0f;
+				float3 pos = ((transforms[k0.x] * corr.pos_i) + (transforms[k1.x] * corr.pos_j)) / 2.0f; // average locations in world space
+				//float3 pos = transforms[k0.x] * corr.pos_i; // just pick one
 				// project to first frame
 				pos = colorIntrinsics * pos;
 				float2 loc = make_float2(pos.x / pos.z, pos.y / pos.z);
