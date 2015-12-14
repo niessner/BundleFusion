@@ -20,10 +20,9 @@ struct SolverParameters
 
 	bool useDenseDepthAllPairwise; // instead of frame-to-frame
 
-	float weightSparse;
-	float weightDenseDepth;
-	float weightDenseDepthInit;
-	float weightDenseDepthLinFactor;
+	float weightSparse;		
+	float weightDenseDepth;	
+	float weightDenseColor;
 };
 
 #endif

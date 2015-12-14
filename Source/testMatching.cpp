@@ -1228,23 +1228,13 @@ void TestMatching::runOpt()
 {
 	MLIB_ASSERT(!m_colorImages.empty() && !m_cachedFrames.empty());
 
+	//params
+	const unsigned int maxNumIters = 8;
 	const bool isLocal = false;
-	// sparse only
-	//float weightSparse = 1.0f;
-	//float weightDenseInit = 0.0f;
-	//float weightDenseLinFactor = 0.0f;
-	// dense only
-	//float weightSparse = 0.0f;
-	//float weightDenseInit = 1.0f;
-	//float weightDenseLinFactor = 0.0f;
-	// both
-	//float weightSparse = 1.0f;	//pairwise params
-	//float weightDenseInit = 1.0f;
-	//float weightDenseLinFactor = 1.0f;
-	float weightSparse = 0.0f;	//pairwise params
-	float weightDenseInit = 1.0f;
-	float weightDenseLinFactor = 0.0f;
 	GlobalBundlingState::get().s_localDenseUseAllPairwise = false;
+	std::vector<float> weightsSparse(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); for (unsigned int i = 0; i < 3; i++) weightsDenseDepth[i] = 0.0f;
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f); //TODO try
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
@@ -1257,7 +1247,7 @@ void TestMatching::runOpt()
 	cudaCache.setCachedFrames(m_cachedFrames);
 
 	//TODO incorporate valid images
-	if (weightSparse > 0.0f) {
+	if (weightsSparse.front() > 0.0f) {
 		constructSparseSystem(m_colorImages, m_depthImages, m_siftManager, &cudaCache);
 	}
 	else {
@@ -1273,11 +1263,10 @@ void TestMatching::runOpt()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	if (isLocal) sba.setLocalWeights(weightSparse, weightDenseInit, weightDenseLinFactor);
-	else sba.setGlobalWeights(weightSparse, weightDenseInit, weightDenseLinFactor);
+	if (isLocal) sba.setLocalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor);
+	else sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor);
 	sba.setLocalDensePairwise(GlobalBundlingState::get().s_localDenseUseAllPairwise);
 	// params
-	const unsigned int maxNumIters = 8;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 
@@ -1556,11 +1545,6 @@ void TestMatching::testGlobalDense()
 	const unsigned int numImages = m_siftManager->getNumImages();
 	MLIB_ASSERT(refTrajectoryKeys.size() == numImages);
 
-	//params
-	float weightSparse = 1.0f;
-	float weightDenseInit = 0.0f;
-	float weightDenseLinFactor = 0.0f;
-
 	SBA sba;
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
@@ -1569,6 +1553,10 @@ void TestMatching::testGlobalDense()
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = true; //fake global pairwise
+	//params
+	std::vector<float> weightsSparse(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); for (unsigned int i = 0; i < 3; i++) weightsDenseDepth[i] = 0.0f;
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f); //TODO try
 
 	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
@@ -1578,7 +1566,7 @@ void TestMatching::testGlobalDense()
 	//	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
 	//	std::cout << std::endl;
 	////}
-	sba.setLocalWeights(1.0f, 0.0f, 0.1f); //some dense
+	sba.setLocalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor); //some dense
 	//for (unsigned int i = 0; i < 10; i++) {
 		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
 		std::cout << std::endl;

@@ -19,11 +19,16 @@ struct SolverInput
 	unsigned int maxNumberOfImages;
 	unsigned int maxCorrPerImage;
 
+	int* d_validImages;
 	const CUDACachedFrame* d_depthFrames;
 	unsigned int denseDepthWidth;
 	unsigned int denseDepthHeight;
 	float4x4 depthIntrinsics;		//TODO constant buffer for this + siftimagemanger stuff?
 	unsigned int maxNumDenseImPairs;
+
+	const float* weightsSparse;
+	const float* weightsDenseDepth;
+	const float* weightsDenseColor;
 };
 
 // State of the GN Solver

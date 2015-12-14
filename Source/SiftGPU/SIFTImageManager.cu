@@ -743,16 +743,11 @@ void SIFTImageManager::CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesP
 
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
-	//std::cout << __FUNCTION__ << ", #vars = " << numVars << ", #res = " << m_globNumResiduals << std::endl;
-
 	cutilSafeCall(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int) * numVars, cudaMemcpyHostToDevice));
 
 	CheckForInvalidFramesCU_Kernel << <block, threadsPerBlock >> >(d_varToCorrNumEntriesPerRow, d_validImages, numVars, d_globMatches, m_globNumResiduals);
 
 	cutilSafeCall(cudaMemcpy(m_validImages.data(), d_validImages, sizeof(int) * numVars, cudaMemcpyDeviceToHost));
-
-	//std::cout << "done (press key to continue)" << std::endl;
-	//getchar();
 
 	if (m_timer) m_timer->endEvent();
 

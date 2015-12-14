@@ -73,6 +73,7 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 
 	m_numTotalFrames = numTotalFrames;
 	m_submapSize = submapSize;
+	m_numOptPerResidualRemoval = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 
 	// sift manager
 	m_currentLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
@@ -346,10 +347,13 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 	SIFTImageManager* siftManager = m_nextLocal;
 	CUDACache* cudaCache = m_nextLocalCache;
 
+	const bool buildJt = true;
+	const bool removeMaxResidual = false;
+
 	MLIB_ASSERT(m_nextLocal->getNumImages() > 1);
 	bool useVerify = GlobalBundlingState::get().s_useLocalVerify;
 	m_SparseBundler.align(siftManager, cudaCache, getLocalTrajectoryGPU(curLocalIdx), numNonLinIterations, numLinIterations,
-		useVerify, true, false, true, true, false);
+		useVerify, true, false, buildJt, removeMaxResidual, false);
 	// still need this for global key fuse
 
 	//!!!DEBUGGING
@@ -506,9 +510,10 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 	bool ret = false;
 	const unsigned int numGlobalFrames = m_global->getNumImages();
 
+	bool removeMaxResidual = isEnd && ((numGlobalFrames % m_numOptPerResidualRemoval) == 0);
 	const bool useVerify = false;
 	m_SparseBundler.align(m_global, m_globalCache, d_globalTrajectory, numNonLinIterations, numLinIterations,
-		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, isEnd, isScanDone);
+		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, removeMaxResidual, isScanDone);
 
 	if (isEnd) {
 		//!!!DEBUGGING

@@ -160,6 +160,9 @@ public:
 		finishLocalOpt();
 		mutex_nextLocal.unlock();
 	}
+	void setGlobalDenseSolve(bool b) {
+		m_SparseBundler.setUseGlobalDenseOpt(b);
+	}
 
 private:
 
@@ -224,6 +227,7 @@ private:
 
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;
+	unsigned int m_numOptPerResidualRemoval;
 
 	//!!!DEBUGGING
 	std::vector<float*> m_fuseDepthImages; // vector of depth images (device) from local to use for global key fuse

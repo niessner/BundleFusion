@@ -22,21 +22,22 @@ public:
 	SBA();
 	void init(unsigned int maxImages, unsigned int maxNumResiduals) {
 		unsigned int maxNumImages = maxImages;
-		cutilSafeCall(cudaMalloc(&d_xRot, sizeof(EntryJ)*maxNumImages));
-		cutilSafeCall(cudaMalloc(&d_xTrans, sizeof(EntryJ)*maxNumImages));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_xRot, sizeof(EntryJ)*maxNumImages));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_xTrans, sizeof(EntryJ)*maxNumImages));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_validImages, sizeof(int)*maxNumImages));
 
 		m_solver = new CUDASolverBundling(maxImages, maxNumResiduals);
 		m_bVerify = false;
 
 		m_bUseComprehensiveFrameInvalidation = GlobalBundlingState::get().s_useComprehensiveFrameInvalidation;
-		m_bUseGlobalDenseOpt = GlobalBundlingState::get().s_useGlobalDenseOpt;
 		m_bUseLocalDensePairwise = GlobalBundlingState::get().s_localDenseUseAllPairwise;
 	}
 	~SBA() {
 		SAFE_DELETE(m_solver);
 
-		if (d_xRot) cutilSafeCall(cudaFree(d_xRot));
-		if (d_xTrans) cutilSafeCall(cudaFree(d_xTrans));
+		MLIB_CUDA_SAFE_FREE(d_validImages);
+		MLIB_CUDA_SAFE_FREE(d_xRot);
+		MLIB_CUDA_SAFE_FREE(d_xTrans);
 	}
 
 	void align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt);
@@ -50,26 +51,32 @@ public:
 	}
 	void printConvergence(const std::string& filename) const;
 
-	void setLocalWeights(float ws, float wd, float wdl) {
-		m_localWeightSparse = ws;
-		m_localWeightDenseInit = wd;
-		m_localWeightDenseLinFactor = wdl;
+	void setLocalWeights(const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor) {
+		m_localWeightsSparse = weightsSparse;
+		m_localWeightsDenseDepth = weightsDenseDepth;
+		m_localWeightsDenseColor = weightsDenseColor;
 	}
-	void setGlobalWeights(float ws, float wd, float wdl) {
-		m_globalWeightSparse = ws;
-		m_globalWeightDenseInit = wd;
-		m_globalWeightDenseLinFactor = wdl;
+	void setGlobalWeights(const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor) {
+		m_globalWeightsSparse = weightsSparse;
+		m_globalWeightsDenseDepth = weightsDenseDepth;
+		m_globalWeightsDenseColor = weightsDenseColor;
 	}
 	void setLocalDensePairwise(bool b) {
 		m_bUseLocalDensePairwise = b;
 	}
+	void setUseGlobalDenseOpt(bool b) {
+		m_bUseGlobalDenseOpt = b;
+	}
 
 private:
 
-	bool alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise, const vec3f& weights, unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd);
+	bool alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise,
+		const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor,
+		unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd);
 
 	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	
+	int*			d_validImages; //TODO this is an excess copy of siftimagemanager, to combine just need to regularly update one of them 
 	float3*			d_xRot;
 	float3*			d_xTrans;
 	unsigned int	m_numCorrespondences;
@@ -77,12 +84,12 @@ private:
 	//dense opt params
 	bool m_bUseLocalDensePairwise;
 	bool m_bUseGlobalDenseOpt;
-	float			m_localWeightSparse;
-	float			m_localWeightDenseInit;
-	float			m_localWeightDenseLinFactor;
-	float			m_globalWeightSparse;
-	float			m_globalWeightDenseInit;
-	float			m_globalWeightDenseLinFactor;
+	std::vector<float> m_localWeightsSparse;
+	std::vector<float> m_localWeightsDenseDepth;
+	std::vector<float> m_localWeightsDenseColor;
+	std::vector<float> m_globalWeightsSparse;
+	std::vector<float> m_globalWeightsDenseDepth;
+	std::vector<float> m_globalWeightsDenseColor;
 
 	CUDASolverBundling* m_solver;
 

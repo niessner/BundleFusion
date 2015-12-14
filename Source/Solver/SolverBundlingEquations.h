@@ -318,7 +318,7 @@ __inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState&
 	const unsigned int dim = 6 * N;
 
 	unsigned int baseVarIdx = variableIdx * 6;
-	for (unsigned int i = 0; i < N; i++) // iterate through (6) row(s) of JtJ and all of p
+	for (unsigned int i = 1; i < N; i++) // iterate through (6) row(s) of JtJ and all of p (i = 0 not a variable)
 	{
 		// (row, col) = vars, i
 		unsigned int baseIdx = 6 * i;

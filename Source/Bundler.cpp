@@ -75,6 +75,9 @@ void Bundler::processInput()
 		if (processLastFrame && m_currentState.m_localToSolve == -1) {
 			if (!m_SubmapManager.isLastLocalFrame(curFrame)) prepareLocalSolve(curFrame, true);
 			processLastFrame = false;
+#ifdef USE_GLOBAL_DENSE_AT_END
+			m_SubmapManager.setGlobalDenseSolve(true);
+#endif
 		}
 		return; // nothing new to process
 	}

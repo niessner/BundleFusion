@@ -122,9 +122,7 @@ void bundlingOptimizationThreadFunc() {
 
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
 
-	//for (unsigned int i = 0; i < 10; i++) {
 	bundlingOptimization();
-	//}
 }
 
 void bundlingThreadFunc() {
@@ -234,10 +232,10 @@ int main(int argc, char** argv)
 		//!!!DEBUGGING
 		if (true) {
 			TestMatching test;
-			//test.loadFromSensor("debug/11.sensor", "", 1);
-			//test.runOpt();
+			test.loadFromSensor("debug/11.sensor", "", 1);
+			test.runOpt();
 			//test.analyzeLocalOpts();
-			test.testGlobalDense();
+			//test.testGlobalDense();
 
 			std::cout << "done!" << std::endl;
 			getchar();

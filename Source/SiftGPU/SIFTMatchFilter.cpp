@@ -34,7 +34,8 @@ void SIFTMatchFilter::filterFrames(SIFTImageManager* siftManager)
 		//getchar();
 	}
 
-	cutilSafeCall(cudaMemcpy(siftManager->d_validImages + curFrame, &connected, sizeof(int), cudaMemcpyHostToDevice));
+	//cutilSafeCall(cudaMemcpy(siftManager->d_validImages + curFrame, &connected, sizeof(int), cudaMemcpyHostToDevice));
+	siftManager->invalidateFrame(curFrame);
 }
 
 void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches)

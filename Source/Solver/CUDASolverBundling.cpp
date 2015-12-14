@@ -132,13 +132,13 @@ CUDASolverBundling::~CUDASolverBundling()
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
 }
 
-void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int numberOfImages,
-	unsigned int nNonLinearIterations, unsigned int nLinearIterations, 
-	const CUDACache* cudaCache, float sparseWeight, float denseWeightInit, float denseWeightLinFactor, bool usePairwiseDense,
+void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, int* d_validImages, unsigned int numberOfImages,
+	unsigned int nNonLinearIterations, unsigned int nLinearIterations, const CUDACache* cudaCache, 
+	const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor, bool usePairwiseDense,
 	float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,
 	bool rebuildJT, bool findMaxResidual)
 {
-	MLIB_ASSERT(numberOfImages > 1);
+	MLIB_ASSERT(numberOfImages > 1 && nNonLinearIterations <= weightsSparse.size());
 	if (numberOfCorrespondences > m_maxCorrPerImage*m_maxNumberOfImages) {
 		//warning: correspondences will be invalidated AT RANDOM!
 		std::cerr << "WARNING: #corr (" << numberOfCorrespondences << ") exceeded limit (" << m_maxCorrPerImage << "*" << m_maxNumberOfImages << "), please increase max #corr per image in the GAS" << std::endl;
@@ -159,9 +159,9 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.verifyOptDistThresh = m_verifyOptDistThresh;
 	parameters.verifyOptPercentThresh = m_verifyOptPercentThresh;
 
-	parameters.weightSparse = sparseWeight;
-	parameters.weightDenseDepthInit = denseWeightInit;
-	parameters.weightDenseDepthLinFactor = denseWeightLinFactor;
+	parameters.weightSparse = weightsSparse.front();
+	parameters.weightDenseDepth = weightsDenseDepth.front();
+	parameters.weightDenseColor = weightsDenseColor.front();
 	parameters.denseDepthDistThresh = 0.15f; //TODO params
 	parameters.denseDepthNormalThresh = 0.97f;
 	parameters.denseDepthColorThresh = 1.0f;//0.1f;
@@ -180,6 +180,10 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	solverInput.maxCorrPerImage = m_maxCorrPerImage;
 	solverInput.maxNumDenseImPairs = m_maxNumDenseImPairs;
 
+	solverInput.weightsSparse = weightsSparse.data();
+	solverInput.weightsDenseDepth = weightsDenseDepth.data();
+	solverInput.weightsDenseColor = weightsDenseColor.data();
+	solverInput.d_validImages = d_validImages;
 	if (cudaCache) {
 		solverInput.d_depthFrames = cudaCache->getCacheFramesGPU();
 		solverInput.denseDepthWidth = cudaCache->getWidth(); //TODO constant buffer for this?

@@ -6,6 +6,8 @@
 #include <string>
 #include <list>
 
+#define USE_GLOBAL_DENSE_EVERY_FRAME
+//#define USE_GLOBAL_DENSE_AT_END
 
 #define X_GLOBAL_BUNDLING_APP_STATE_FIELDS \
 	X(bool, s_enableGlobalTimings) \
@@ -47,7 +49,7 @@
 	X(float, s_siftMatchRatioMaxGlobal) \
 	X(bool, s_useLocalVerify) \
 	X(bool, s_localDenseUseAllPairwise) \
-	X(bool, s_useGlobalDenseOpt)
+	X(unsigned int, s_numOptPerResidualRemoval)
 
 using namespace ml;
 

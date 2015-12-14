@@ -89,6 +89,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		i = blockIdx.x; j = i + 1; // frame-to-frame
 		imPairIdx = i;
 	}
+	if (input.d_validImages[i] == 0 || input.d_validImages[j] == 0) return;
 
 	const unsigned int idx = threadIdx.y * THREADS_PER_BLOCK_DENSE_DEPTH_X + threadIdx.x;
 	const unsigned int gidx = idx * gridDim.z + blockIdx.z;
@@ -141,6 +142,7 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 		i = blockIdx.x; j = i + 1; // frame-to-frame
 		imPairIdx = i;
 	}
+	if (input.d_validImages[i] == 0 || input.d_validImages[j] == 0) return;
 
 	const unsigned int idx = threadIdx.y * THREADS_PER_BLOCK_DENSE_DEPTH_X + threadIdx.x;
 	const unsigned int gidx = idx * gridDim.z + blockIdx.z;
@@ -152,13 +154,8 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 
 		float4x4 transform = invTransform_i * transform_j;
 
-		//!!!debugging
-		const unsigned int x = gidx % input.denseDepthWidth; const unsigned int y = gidx / input.denseDepthWidth;
-		float4 camPosSrcToTgt = make_float4(MINF, MINF, MINF, MINF), camPosTgt = make_float4(MINF, MINF, MINF, MINF), normalTgt = make_float4(MINF, MINF, MINF, MINF);
-		//!!!debugging
-
 		// find correspondence
-		//float4 camPosSrcToTgt, camPosTgt, normalTgt;
+		float4 camPosSrcToTgt, camPosTgt, normalTgt;
 		if (findDenseDepthCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDepthDistThresh, parameters.denseDepthNormalThresh, /*parameters.denseDepthColorThresh,*/ transform, input.depthIntrinsics,
 			input.d_depthFrames[i].d_cameraposDownsampled, input.d_depthFrames[i].d_normalsDownsampled, //input.d_depthFrames[i].d_colorDownsampled,//target
@@ -184,6 +181,7 @@ __global__ void BuildDenseDepthSystem_Kernel(SolverInput input, SolverState stat
 			atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
 			atomicAdd(state.d_corrCount, 1);
 #endif
+			const unsigned int x = gidx % input.denseDepthWidth; const unsigned int y = gidx / input.denseDepthWidth;
 			//if (i == 0 && j == 1 && x == 47 && y == 53) {
 			if (i > 0 && (isnan(jacobianBlockRow_i(0)) || isnan(jacobianBlockRow_i(1)) || isnan(jacobianBlockRow_i(2)) || isnan(jacobianBlockRow_i(3)) || isnan(jacobianBlockRow_i(4)) || isnan(jacobianBlockRow_i(5))) ||
 				j > 0 && (isnan(jacobianBlockRow_j(0)) || isnan(jacobianBlockRow_j(1)) || isnan(jacobianBlockRow_j(2)) || isnan(jacobianBlockRow_j(3)) || isnan(jacobianBlockRow_j(4)) || isnan(jacobianBlockRow_j(5))) ||
@@ -532,18 +530,7 @@ __global__ void PCGInit_Kernel1(SolverInput input, SolverState state, SolverPara
 	const int x = blockIdx.x * blockDim.x + threadIdx.x;
 
 	float d = 0.0f;
-	//!!!DEBUGGING
-	if (x == 0) {
-		state.d_rRot[x] = make_float3(0.0f, 0.0f, 0.0f);
-		state.d_rTrans[x] = make_float3(0.0f, 0.0f, 0.0f);
-		state.d_pRot[x] = make_float3(0.0f, 0.0f, 0.0f);
-		state.d_pTrans[x] = make_float3(0.0f, 0.0f, 0.0f);
-		state.d_Ap_XRot[x] = make_float3(0.0f, 0.0f, 0.0f);
-		state.d_Ap_XTrans[x] = make_float3(0.0f, 0.0f, 0.0f);
-	}
-	else if (x > 0 && x < N)
-	//!!!DEBUGGING
-	//if (x > 0 && x < N)
+	if (x > 0 && x < N)
 	{
 		float3 resRot, resTrans;
 		evalMinusJTFDevice(x, input, state, parameters, resRot, resTrans);  // residuum = J^T x -F - A x delta_0  => J^T x -F, since A x x_0 == 0 
@@ -574,17 +561,7 @@ __global__ void PCGInit_Kernel2(unsigned int N, SolverState state)
 {
 	const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
 
-	//TODO uncomment
-	//if (x > 0 && x < N) state.d_rDotzOld[x] = state.d_scanAlpha[0];				// store result for next kernel call
-
-	//!!!DEBUGGING
-	if (x == 0) {
-		state.d_rDotzOld[x] = 0.0f;
-	}
-	else if (x > 0 && x < N) {
-		state.d_rDotzOld[x] = state.d_scanAlpha[0];
-	}
-	//!!!DEBUGGING
+	if (x > 0 && x < N) state.d_rDotzOld[x] = state.d_scanAlpha[0];				// store result for next kernel call
 }
 
 void Initialization(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
@@ -707,7 +684,6 @@ __global__ void PCGStep_Kernel1a(SolverInput input, SolverState state, SolverPar
 	const unsigned int x = blockIdx.x;
 	const unsigned int lane = threadIdx.x % WARP_SIZE;
 
-	//float d = 0.0f;
 	if (x > 0 && x < N)
 	{
 		float3 rot, trans;
@@ -930,27 +906,14 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		printf("initial sparse = %f*%f = %f\n", parameters.weightSparse, initialResidual/parameters.weightSparse, initialResidual);
 	}
 #endif
-	//all sparse
-	//float weightsSparse[50]; for (unsigned int i = 0; i < 50; i++) weightsSparse[i] = 1.0f;
-	//float weightsDense[50];  for (unsigned int i = 0; i < 50; i++) weightsDense[i] = 0.0f;
-	//start sparse
-	//float weightsSparse[50]; unsigned int split = 2; for (unsigned int i = 0; i < split; i++) weightsSparse[i] = 1.0f; for (unsigned int i = split; i < 50; i++) weightsSparse[i] = 0.0f;
-	//float weightsDense[50];  for (unsigned int i = 0; i < split; i++) weightsDense[i] = 0.0f; for (unsigned int i = split; i < 50; i++) weightsDense[i] = 1.0f;
-	//all dense
-	//float weightsSparse[50]; for (unsigned int i = 0; i < 50; i++) weightsSparse[i] = 0.0f;
-	//float weightsDense[50];  for (unsigned int i = 0; i < 50; i++) weightsDense[i] = 1.0f;
-	//both
-	float weightsSparse[50]; for (unsigned int i = 0; i < 50; i++) weightsSparse[i] = 1.0f; 
-	float weightsDense[50]; unsigned int split = 2; for (unsigned int i = 0; i < split; i++) weightsDense[i] = 0.0f; for (unsigned int i = split; i < 50; i++) weightsDense[i] = 1.0f;
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
 	{
-		parameters.weightDenseDepth = parameters.weightDenseDepthInit + nIter * parameters.weightDenseDepthLinFactor;
-		//!!!debugging
-		parameters.weightDenseDepth = weightsDense[nIter];
-		parameters.weightSparse = weightsSparse[nIter];
-		//!!!debugging
+		parameters.weightSparse = input.weightsSparse[nIter];
+		parameters.weightDenseDepth = input.weightsDenseDepth[nIter];
+		parameters.weightDenseColor = input.weightsDenseColor[nIter];
+
 		BuildDenseDepthSystem(input, state, parameters, timer);
 		Initialization(input, state, parameters, timer);
 
