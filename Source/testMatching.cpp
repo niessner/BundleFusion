@@ -1228,6 +1228,7 @@ void TestMatching::runOpt()
 {
 	MLIB_ASSERT(!m_colorImages.empty() && !m_cachedFrames.empty());
 
+	const bool isLocal = false;
 	// sparse only
 	//float weightSparse = 1.0f;
 	//float weightDenseInit = 0.0f;
@@ -1237,12 +1238,13 @@ void TestMatching::runOpt()
 	//float weightDenseInit = 1.0f;
 	//float weightDenseLinFactor = 0.0f;
 	// both
-	//float weightSparse = 1.0f;
-	//float weightDenseInit = 100.0f;
-	//float weightDenseLinFactor = 50.0f;
-	float weightSparse = 1.0f;
+	//float weightSparse = 1.0f;	//pairwise params
+	//float weightDenseInit = 1.0f;
+	//float weightDenseLinFactor = 1.0f;
+	float weightSparse = 0.0f;	//pairwise params
 	float weightDenseInit = 1.0f;
-	float weightDenseLinFactor = 1.0f;
+	float weightDenseLinFactor = 0.0f;
+	GlobalBundlingState::get().s_localDenseUseAllPairwise = false;
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
@@ -1271,12 +1273,13 @@ void TestMatching::runOpt()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	sba.setWeights(weightSparse, weightDenseInit, weightDenseLinFactor);
+	if (isLocal) sba.setLocalWeights(weightSparse, weightDenseInit, weightDenseLinFactor);
+	else sba.setGlobalWeights(weightSparse, weightDenseInit, weightDenseLinFactor);
+	sba.setLocalDensePairwise(GlobalBundlingState::get().s_localDenseUseAllPairwise);
 	// params
 	const unsigned int maxNumIters = 8;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
-	const bool isLocal = true;
 
 	// initial transforms
 	std::vector<mat4f> transforms(numImages, mat4f::identity());
@@ -1291,14 +1294,14 @@ void TestMatching::runOpt()
 		float rz = RNG::global.uniform(0.0f, 7.0f); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
 		transforms[i] = mat4f::translation(tx, ty, tz) * mat4f::rotationZ(rz) * mat4f::rotationY(ry) * mat4f::rotationX(rx);
 	}
-	SiftVisualization::saveToPointCloud("debug/init.ply", &cudaCache, transforms);
+	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", &cudaCache, transforms); std::cout << "done" << std::endl;
 
 	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, transforms.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
 
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-	SiftVisualization::saveToPointCloud("debug/opt.ply", &cudaCache, transforms, true);
+	std::cout << "saving opt to point cloud... "; SiftVisualization::saveToPointCloud("debug/opt.ply", &cudaCache, transforms, true); std::cout << "done" << std::endl;
 
 	MLIB_CUDA_SAFE_FREE(d_transforms);
 
@@ -1482,8 +1485,8 @@ void TestMatching::analyzeLocalOpts()
 		float err1 = PoseHelper::evaluateAteRmse(local1, refLocalTrajectory);
 		errors1.push_back(err1);
 
-		if (err0 > err1) badIndices.push_back(std::make_pair(i, err0-err1));
-		else goodIndices.push_back(std::make_pair(i, err1-err0));
+		if (err0 > err1) badIndices.push_back(std::make_pair(i, err0 - err1));
+		else goodIndices.push_back(std::make_pair(i, err1 - err0));
 	}
 	std::sort(badIndices.begin(), badIndices.end(), [](const std::pair<unsigned int, float> &left, const std::pair<unsigned int, float> &right) {
 		return fabs(left.second) > fabs(right.second);
@@ -1504,6 +1507,120 @@ void TestMatching::analyzeLocalOpts()
 	}
 	float keysErr0 = PoseHelper::evaluateAteRmse(test0Keys, refKeys);
 	float keysErr1 = PoseHelper::evaluateAteRmse(test1Keys, refKeys);
+
+	int a = 5;
+}
+
+void TestMatching::testGlobalDense()
+{
+	if (true) {
+		CalibratedSensorData cs;
+		BinaryDataStreamFile s("../data/iclnuim/livingroom2.sensor", false);
+		s >> cs;
+		s.closeStream();
+		BinaryDataStreamFile o("debug/refTrajectory.bin", true);
+		o << cs.m_trajectory;
+		o.closeStream();
+	}
+
+	const std::string siftFile = "debug/test.sift";
+	const std::string cacheFile = "debug/test.cache";
+	const std::string trajFile = "debug/siftTrajectory.bin";
+	const std::string refTrajFile = "debug/refTrajectory.bin";
+	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
+
+	std::vector<mat4f> trajectoryAll, refTrajectoryAll;
+	std::vector<mat4f> trajectoryKeys, refTrajectoryKeys;
+	{
+		BinaryDataStreamFile s(trajFile, false);
+		s >> trajectoryAll;
+	}
+	{
+		BinaryDataStreamFile s(refTrajFile, false);
+		s >> refTrajectoryAll;
+	}
+	size_t numTransforms = std::min(trajectoryAll.size(), refTrajectoryAll.size());
+	for (unsigned int i = 0; i < numTransforms; i += submapSize) {
+		trajectoryKeys.push_back(trajectoryAll[i]);
+		refTrajectoryKeys.push_back(refTrajectoryAll[i]);
+	}
+	
+	std::cout << "loading sift from file... ";
+	m_siftManager->loadFromFile(siftFile);
+	std::cout << "done" << std::endl;
+	CUDACache cudaCache(GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight,
+		GlobalBundlingState::get().s_maxNumImages, mat4f::identity());
+	std::cout << "loading cache from file... ";
+	cudaCache.loadFromFile(cacheFile);
+	std::cout << "done" << std::endl;
+	const unsigned int numImages = m_siftManager->getNumImages();
+	MLIB_ASSERT(refTrajectoryKeys.size() == numImages);
+
+	//params
+	float weightSparse = 1.0f;
+	float weightDenseInit = 0.0f;
+	float weightDenseLinFactor = 0.0f;
+
+	SBA sba;
+	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
+	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
+	sba.init(numImages, maxNumResiduals);
+	const unsigned int maxNumIters = 4;
+	const unsigned int numPCGIts = 50;
+	const bool useVerify = true;
+	const bool isLocal = true; //fake global pairwise
+
+	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
+
+	//sba.setLocalWeights(1.0f, 0.0f, 0.0f); //sparse only
+	////for (unsigned int i = 0; i < 10; i++) {
+	//	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+	//	std::cout << std::endl;
+	////}
+	sba.setLocalWeights(1.0f, 0.0f, 0.1f); //some dense
+	//for (unsigned int i = 0; i < 10; i++) {
+		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+		std::cout << std::endl;
+	//}
+
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+	//SiftVisualization::saveToPointCloud("debug/opt.ply", &cudaCache, trajectoryKeys, true);
+
+	MLIB_CUDA_SAFE_FREE(d_transforms);
+
+	// compare to reference trajectory
+	float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+	std::cout << "*********************************" << std::endl;
+	std::cout << "ate rmse = " << transErr << std::endl;
+	std::cout << "*********************************" << std::endl;
+
+	std::ofstream sgt("debug/gt.txt"); mat4f refFirstTransform = refTrajectoryKeys.front().getInverse();
+	std::ofstream sot("debug/opt.txt");
+	for (unsigned int i = 0; i < trajectoryKeys.size(); i++) {
+		if (trajectoryKeys[i](0, 0) != -std::numeric_limits<float>::infinity()) {
+			mat4f transform = trajectoryKeys[i];
+			vec3f translation = transform.getTranslation();
+			mat3f rotation = transform.getRotation();
+			quatf quaternion(rotation);
+			vec3f imag = quaternion.imag();
+			float real = quaternion.real();
+			sot << i << " "; // time
+			sot << translation.x << " " << translation.y << " " << translation.z << " "; // translation
+			sot << imag.x << " " << imag.y << " " << imag.z << " " << real << std::endl; // rotation
+
+			transform = refTrajectoryKeys[i];
+			translation = transform.getTranslation();
+			rotation = transform.getRotation();
+			quaternion = quatf(rotation);
+			imag = quaternion.imag();
+			real = quaternion.real();
+			sgt << i << " "; // time
+			sgt << translation.x << " " << translation.y << " " << translation.z << " "; // translation
+			sgt << imag.x << " " << imag.y << " " << imag.z << " " << real << std::endl; // rotation
+		}
+	}
+	sgt.close(); sot.close();
 
 	int a = 5;
 }

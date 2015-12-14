@@ -9,7 +9,7 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-//#define PRINT_RESIDUALS
+#define PRINT_RESIDUALS
 //!!!DEBUGGING
 
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
@@ -302,7 +302,7 @@ void BuildDenseDepthSystem(SolverInput& input, SolverState& state, SolverParamet
 		float sumResidual; int corrCount;
 		cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
 		cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
-		printf("\tweight * dense res = %f * %f = %f\t[#corr = %d]\n\n", parameters.weightDenseDepth, sumResidual/parameters.weightDenseDepth, sumResidual, corrCount);
+		printf("\tweight * dense res = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseDepth, sumResidual/parameters.weightDenseDepth, sumResidual, corrCount);
 		//if (corrCount != totalCount) printf("ERROR: dense image pair corr counts (%d) != total corr count\n", totalCount, corrCount);
 #endif
 		const unsigned int flipgrid = (sizeJtJ + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
@@ -930,11 +930,27 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		printf("initial sparse = %f*%f = %f\n", parameters.weightSparse, initialResidual/parameters.weightSparse, initialResidual);
 	}
 #endif
+	//all sparse
+	//float weightsSparse[50]; for (unsigned int i = 0; i < 50; i++) weightsSparse[i] = 1.0f;
+	//float weightsDense[50];  for (unsigned int i = 0; i < 50; i++) weightsDense[i] = 0.0f;
+	//start sparse
+	//float weightsSparse[50]; unsigned int split = 2; for (unsigned int i = 0; i < split; i++) weightsSparse[i] = 1.0f; for (unsigned int i = split; i < 50; i++) weightsSparse[i] = 0.0f;
+	//float weightsDense[50];  for (unsigned int i = 0; i < split; i++) weightsDense[i] = 0.0f; for (unsigned int i = split; i < 50; i++) weightsDense[i] = 1.0f;
+	//all dense
+	//float weightsSparse[50]; for (unsigned int i = 0; i < 50; i++) weightsSparse[i] = 0.0f;
+	//float weightsDense[50];  for (unsigned int i = 0; i < 50; i++) weightsDense[i] = 1.0f;
+	//both
+	float weightsSparse[50]; for (unsigned int i = 0; i < 50; i++) weightsSparse[i] = 1.0f; 
+	float weightsDense[50]; unsigned int split = 2; for (unsigned int i = 0; i < split; i++) weightsDense[i] = 0.0f; for (unsigned int i = split; i < 50; i++) weightsDense[i] = 1.0f;
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
 	{
 		parameters.weightDenseDepth = parameters.weightDenseDepthInit + nIter * parameters.weightDenseDepthLinFactor;
+		//!!!debugging
+		parameters.weightDenseDepth = weightsDense[nIter];
+		parameters.weightSparse = weightsSparse[nIter];
+		//!!!debugging
 		BuildDenseDepthSystem(input, state, parameters, timer);
 		Initialization(input, state, parameters, timer);
 

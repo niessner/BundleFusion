@@ -11,7 +11,7 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 
 	float psi, theta, phi; // x,y,z axis angles
 	if (abs(matrix(2, 0) - 1) > eps || abs(matrix(2, 0) + 1) > eps) { // R(2, 0) != +/- 1
-		theta = -asin(matrix(2, 0)); // \pi - theta
+		theta = -asin(clamp(matrix(2, 0), -1.0f, 1.0f)); // \pi - theta
 		float costheta = cos(theta);
 		psi = atan2(matrix(2, 1) / costheta, matrix(2, 2) / costheta);
 		phi = atan2(matrix(1, 0) / costheta, matrix(0, 0) / costheta);

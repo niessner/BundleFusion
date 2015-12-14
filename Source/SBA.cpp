@@ -70,6 +70,9 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	unsigned int curIt = 0;
 	do {
 		removed = alignCUDA(siftManager, cache, usePairwise, weights, maxNumIters, numPCGits, isStart, isEnd);
+		//!!!debugging
+		if (removed) std::cout << "removed a correspondence" << std::endl;
+		//!!!debugging
 		if (recordConvergence) {
 			const std::vector<float>& conv = m_solver->getConvergenceAnalysis();
 			m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());

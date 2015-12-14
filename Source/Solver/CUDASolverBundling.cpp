@@ -57,7 +57,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtr, sizeof(float) * 6 * numberOfVariables));
-	m_maxNumDenseImPairs = std::max(m_maxNumberOfImages, (submapSize + 1)*(submapSize + 1));
+	m_maxNumDenseImPairs = (m_maxNumberOfImages + 1)*(m_maxNumberOfImages + 1);
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseCorrCounts, sizeof(float) * m_maxNumDenseImPairs));
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCount, sizeof(int)));
@@ -143,13 +143,6 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		//warning: correspondences will be invalidated AT RANDOM!
 		std::cerr << "WARNING: #corr (" << numberOfCorrespondences << ") exceeded limit (" << m_maxCorrPerImage << "*" << m_maxNumberOfImages << "), please increase max #corr per image in the GAS" << std::endl;
 	}
-
-	//!!!debugging
-	if (numberOfImages > 11 && (denseWeightInit > 0 || denseWeightLinFactor > 0) && usePairwiseDense) {
-		std::cout << "ERROR using pairwise dense for global keys!" << std::endl;
-		getchar();
-	}
-	//!!!debugging
 
 	float* convergence = NULL;
 	if (m_bRecordConvergence) {

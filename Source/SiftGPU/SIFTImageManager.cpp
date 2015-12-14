@@ -2,6 +2,7 @@
 #include "SIFTImageManager.h"
 #include "../GlobalBundlingState.h"
 #include "../GlobalAppState.h"
+#include "mLibCuda.h"
 
 SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
 {
@@ -9,8 +10,8 @@ SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsigned int maxImag
 	m_maxKeyPointsPerImage = maxKeyPointsPerImage;
 	m_submapSize = submapSize;
 
-	alloc();
 	m_timer = NULL;
+	alloc();
 }
 
 SIFTImageManager::~SIFTImageManager()
@@ -76,7 +77,7 @@ ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, u
 {
 	assert(prevImageIdx < m_maxNumImages);
 	assert(getNumImages() > 0);
-	keyPointOffset = make_uint2(m_numKeyPointsPerImagePrefixSum[prevImageIdx], m_numKeyPointsPerImagePrefixSum[getNumImages()-1]);
+	keyPointOffset = make_uint2(m_numKeyPointsPerImagePrefixSum[prevImageIdx], m_numKeyPointsPerImagePrefixSum[getNumImages() - 1]);
 	return m_currImagePairMatches[prevImageIdx];
 }
 
@@ -97,8 +98,8 @@ void SIFTImageManager::saveToFile(const std::string& s)
 	std::vector<SIFTKeyPointDesc> keyPointDescs(m_maxNumImages*m_maxKeyPointsPerImage);
 	std::vector<int> keyPointCounters(m_maxNumImages);
 
-	CUDA_SAFE_CALL(cudaMemcpy(keyPoints.data(), d_keyPoints, sizeof(SIFTKeyPoint)*m_maxNumImages*m_maxKeyPointsPerImage, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaMemcpy(keyPointDescs.data(), d_keyPointDescs, sizeof(SIFTKeyPointDesc)*m_maxNumImages*m_maxKeyPointsPerImage, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(keyPoints.data(), d_keyPoints, sizeof(SIFTKeyPoint)*m_maxNumImages*m_maxKeyPointsPerImage, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(keyPointDescs.data(), d_keyPointDescs, sizeof(SIFTKeyPointDesc)*m_maxNumImages*m_maxKeyPointsPerImage, cudaMemcpyDeviceToHost));
 	//CUDA_SAFE_CALL(cudaMemcpy(keyPointCounters.data(), d_keyPointCounters, sizeof(int)*m_maxNumImages, cudaMemcpyDeviceToHost));
 
 
@@ -107,9 +108,9 @@ void SIFTImageManager::saveToFile(const std::string& s)
 	std::vector<float> currMatchDistances(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
 	std::vector<uint2> currMatchKeyPointIndices(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
 
-	CUDA_SAFE_CALL(cudaMemcpy(currNumMatchesPerImagePair.data(), d_currNumMatchesPerImagePair, sizeof(int)*maxImageMatches, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaMemcpy(currMatchDistances.data(), d_currMatchDistances, sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaMemcpy(currMatchKeyPointIndices.data(), d_currMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currNumMatchesPerImagePair.data(), d_currNumMatchesPerImagePair, sizeof(int)*maxImageMatches, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currMatchDistances.data(), d_currMatchDistances, sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currMatchKeyPointIndices.data(), d_currMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyDeviceToHost));
 
 
 	std::vector<int> currNumFilteredMatchesPerImagePair(maxImageMatches);
@@ -118,19 +119,19 @@ void SIFTImageManager::saveToFile(const std::string& s)
 	std::vector < float4x4 > currFilteredTransforms(maxImageMatches);
 	std::vector<float4x4> currFilteredTransformsInv(maxImageMatches);
 
-	CUDA_SAFE_CALL(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair, sizeof(int)*maxImageMatches, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaMemcpy(currFilteredMatchDistances.data(), d_currFilteredMatchDistances, sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaMemcpy(currFilteredMatchKeyPointIndices.data(), d_currFilteredMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaMemcpy(currFilteredTransforms.data(), d_currFilteredTransforms, sizeof(float4x4)*maxImageMatches, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaMemcpy(currFilteredTransformsInv.data(), d_currFilteredTransformsInv, sizeof(float4x4)*maxImageMatches, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair, sizeof(int)*maxImageMatches, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currFilteredMatchDistances.data(), d_currFilteredMatchDistances, sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currFilteredMatchKeyPointIndices.data(), d_currFilteredMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currFilteredTransforms.data(), d_currFilteredTransforms, sizeof(float4x4)*maxImageMatches, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currFilteredTransformsInv.data(), d_currFilteredTransformsInv, sizeof(float4x4)*maxImageMatches, cudaMemcpyDeviceToHost));
 
 	std::vector<EntryJ> globMatches(m_globNumResiduals);
 	std::vector<uint2> globMatchesKeyPointIndices(m_globNumResiduals);
-	CUDA_SAFE_CALL(cudaMemcpy(globMatches.data(), d_globMatches, sizeof(EntryJ)*m_globNumResiduals, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaMemcpy(globMatchesKeyPointIndices.data(), d_globMatchesKeyPointIndices, sizeof(uint2)*m_globNumResiduals, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(globMatches.data(), d_globMatches, sizeof(EntryJ)*m_globNumResiduals, cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(globMatchesKeyPointIndices.data(), d_globMatchesKeyPointIndices, sizeof(uint2)*m_globNumResiduals, cudaMemcpyDeviceToHost));
 
 	int validOpt;
-	CUDA_SAFE_CALL(cudaMemcpy(&validOpt, d_validOpt, sizeof(int), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(&validOpt, d_validOpt, sizeof(int), cudaMemcpyDeviceToHost));
 
 	const unsigned int numImages = getNumImages();
 	out.write((char*)&numImages, sizeof(unsigned int));
@@ -196,9 +197,9 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 		in.read((char*)keyPointDescs.data(), sizeof(SIFTKeyPointDesc)*m_maxNumImages*m_maxKeyPointsPerImage);
 		in.read((char*)keyPointCounters.data(), sizeof(int)*m_maxNumImages);
 
-		CUDA_SAFE_CALL(cudaMemcpy(d_keyPoints, keyPoints.data(), sizeof(SIFTKeyPoint)*m_maxNumImages*m_maxKeyPointsPerImage, cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_keyPointDescs, keyPointDescs.data(), sizeof(SIFTKeyPointDesc)*m_maxNumImages*m_maxKeyPointsPerImage, cudaMemcpyHostToDevice));
-		//CUDA_SAFE_CALL(cudaMemcpy(d_keyPointCounters, keyPointCounters.data(), sizeof(int)*m_maxNumImages, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_keyPoints, keyPoints.data(), sizeof(SIFTKeyPoint)*m_maxNumImages*m_maxKeyPointsPerImage, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_keyPointDescs, keyPointDescs.data(), sizeof(SIFTKeyPointDesc)*m_maxNumImages*m_maxKeyPointsPerImage, cudaMemcpyHostToDevice));
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_keyPointCounters, keyPointCounters.data(), sizeof(int)*m_maxNumImages, cudaMemcpyHostToDevice));
 	}
 
 	{
@@ -211,9 +212,9 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 		in.read((char*)currMatchDistances.data(), sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
 		in.read((char*)currMatchKeyPointIndices.data(), sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
 
-		CUDA_SAFE_CALL(cudaMemcpy(d_currNumMatchesPerImagePair, currNumMatchesPerImagePair.data(), sizeof(int)*maxImageMatches, cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_currMatchDistances, currMatchDistances.data(), sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_currMatchKeyPointIndices, currMatchKeyPointIndices.data(), sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currNumMatchesPerImagePair, currNumMatchesPerImagePair.data(), sizeof(int)*maxImageMatches, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currMatchDistances, currMatchDistances.data(), sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currMatchKeyPointIndices, currMatchKeyPointIndices.data(), sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW, cudaMemcpyHostToDevice));
 
 		std::vector<int> currNumFilteredMatchesPerImagePair(maxImageMatches);
 		std::vector<float> currFilteredMatchDistances(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
@@ -227,11 +228,11 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 		in.read((char*)currFilteredTransforms.data(), sizeof(float4x4)*maxImageMatches);
 		in.read((char*)currFilteredTransformsInv.data(), sizeof(float4x4)*maxImageMatches);
 
-		CUDA_SAFE_CALL(cudaMemcpy(d_currNumFilteredMatchesPerImagePair, currNumFilteredMatchesPerImagePair.data(), sizeof(int)*maxImageMatches, cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredMatchDistances, currFilteredMatchDistances.data(), sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredMatchKeyPointIndices, currFilteredMatchKeyPointIndices.data(), sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredTransforms, currFilteredTransforms.data(), sizeof(float4x4)*maxImageMatches, cudaMemcpyHostToDevice));
-		CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredTransformsInv, currFilteredTransformsInv.data(), sizeof(float4x4)*maxImageMatches, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currNumFilteredMatchesPerImagePair, currNumFilteredMatchesPerImagePair.data(), sizeof(int)*maxImageMatches, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredMatchDistances, currFilteredMatchDistances.data(), sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredMatchKeyPointIndices, currFilteredMatchKeyPointIndices.data(), sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredTransforms, currFilteredTransforms.data(), sizeof(float4x4)*maxImageMatches, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredTransformsInv, currFilteredTransformsInv.data(), sizeof(float4x4)*maxImageMatches, cudaMemcpyHostToDevice));
 
 		m_validImages.resize(m_maxNumImages);
 		in.read((char*)m_validImages.data(), sizeof(int) * m_maxNumImages);
@@ -244,14 +245,14 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 			std::vector<uint2> globMatchesKeyPointIndices(m_globNumResiduals);
 			in.read((char*)globMatches.data(), sizeof(EntryJ)*m_globNumResiduals);
 			in.read((char*)globMatchesKeyPointIndices.data(), sizeof(uint2)*m_globNumResiduals);
-			CUDA_SAFE_CALL(cudaMemcpy(d_globNumResiduals, &m_globNumResiduals, sizeof(unsigned int), cudaMemcpyHostToDevice))
-			CUDA_SAFE_CALL(cudaMemcpy(d_globMatches, globMatches.data(), sizeof(EntryJ)*m_globNumResiduals, cudaMemcpyHostToDevice));
-			CUDA_SAFE_CALL(cudaMemcpy(d_globMatchesKeyPointIndices, globMatchesKeyPointIndices.data(), sizeof(uint2)*m_globNumResiduals, cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globNumResiduals, &m_globNumResiduals, sizeof(unsigned int), cudaMemcpyHostToDevice))
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globMatches, globMatches.data(), sizeof(EntryJ)*m_globNumResiduals, cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globMatchesKeyPointIndices, globMatchesKeyPointIndices.data(), sizeof(uint2)*m_globNumResiduals, cudaMemcpyHostToDevice));
 		}
 
 		int validOpt;
 		in.read((char*)&validOpt, sizeof(unsigned int));
-		CUDA_SAFE_CALL(cudaMemcpy(d_validOpt, &validOpt, sizeof(int), cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validOpt, &validOpt, sizeof(int), cudaMemcpyHostToDevice));
 	}
 	{
 		in.read((char*)&m_submapSize, sizeof(unsigned int));
@@ -273,43 +274,43 @@ void SIFTImageManager::alloc()
 {
 	m_numKeyPoints = 0;
 
-	CUDA_SAFE_CALL(cudaMalloc(&d_keyPoints, sizeof(SIFTKeyPoint)*m_maxNumImages*m_maxKeyPointsPerImage));
-	CUDA_SAFE_CALL(cudaMalloc(&d_keyPointDescs, sizeof(SIFTKeyPointDesc)*m_maxNumImages*m_maxKeyPointsPerImage));
-	//CUDA_SAFE_CALL(cudaMalloc(&d_keyPointCounters, sizeof(int)*m_maxNumImages));
-	//CUDA_SAFE_CALL(cudaMemset(d_keyPointCounters, 0, sizeof(int)*m_maxNumImages));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_keyPoints, sizeof(SIFTKeyPoint)*m_maxNumImages*m_maxKeyPointsPerImage));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_keyPointDescs, sizeof(SIFTKeyPointDesc)*m_maxNumImages*m_maxKeyPointsPerImage));
+	//MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_keyPointCounters, sizeof(int)*m_maxNumImages));
+	//MLIB_CUDA_SAFE_CALL(cudaMemset(d_keyPointCounters, 0, sizeof(int)*m_maxNumImages));
 
 	// matching
 
 	m_currImagePairMatches.resize(m_maxNumImages);
 
 	const unsigned maxImageMatches = m_maxNumImages;
-	CUDA_SAFE_CALL(cudaMalloc(&d_currNumMatchesPerImagePair, sizeof(int)*maxImageMatches));
-	CUDA_SAFE_CALL(cudaMalloc(&d_currMatchDistances, sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
-	CUDA_SAFE_CALL(cudaMalloc(&d_currMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currNumMatchesPerImagePair, sizeof(int)*maxImageMatches));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currMatchDistances, sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
 
-	CUDA_SAFE_CALL(cudaMalloc(&d_currNumFilteredMatchesPerImagePair, sizeof(int)*maxImageMatches));
-	CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredMatchDistances, sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
-	CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
-	CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredTransforms, sizeof(float4x4)*maxImageMatches));
-	CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredTransformsInv, sizeof(float4x4)*maxImageMatches));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currNumFilteredMatchesPerImagePair, sizeof(int)*maxImageMatches));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredMatchDistances, sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredMatchKeyPointIndices, sizeof(uint2)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredTransforms, sizeof(float4x4)*maxImageMatches));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_currFilteredTransformsInv, sizeof(float4x4)*maxImageMatches));
 
 	m_validImages.resize(m_maxNumImages, 0);
 	m_validImages[0] = 1; // first is valid
-	CUDA_SAFE_CALL(cudaMalloc(&d_validImages, sizeof(int) *  m_maxNumImages));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_validImages, sizeof(int) *  m_maxNumImages));
 
 	const unsigned int maxResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (m_maxNumImages*(m_maxNumImages - 1)) / 2;
 	m_globNumResiduals = 0;
-	CUDA_SAFE_CALL(cudaMalloc(&d_globNumResiduals, sizeof(int)));
-	CUDA_SAFE_CALL(cudaMemset(d_globNumResiduals, 0, sizeof(int)));
-	CUDA_SAFE_CALL(cudaMalloc(&d_globMatches, sizeof(EntryJ)*maxResiduals));
-	CUDA_SAFE_CALL(cudaMalloc(&d_globMatchesKeyPointIndices, sizeof(uint2)*maxResiduals));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globNumResiduals, sizeof(int)));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(d_globNumResiduals, 0, sizeof(int)));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globMatches, sizeof(EntryJ)*maxResiduals));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globMatchesKeyPointIndices, sizeof(uint2)*maxResiduals));
 
-	CUDA_SAFE_CALL(cudaMalloc(&d_validOpt, sizeof(int)));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_validOpt, sizeof(int)));
 
-	CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyCount, sizeof(int)));
-	CUDA_SAFE_CALL(cudaMemset(d_fuseGlobalKeyCount, 0, sizeof(int)));
-	CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyMarker, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
-	cutilSafeCall(cudaMemset(d_fuseGlobalKeyMarker, 0, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyCount, sizeof(int)));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(d_fuseGlobalKeyCount, 0, sizeof(int)));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyMarker, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(d_fuseGlobalKeyMarker, 0, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
 
 	initializeMatching();
 }
@@ -322,34 +323,36 @@ void SIFTImageManager::free()
 	m_numKeyPointsPerImage.clear();
 	m_numKeyPointsPerImagePrefixSum.clear();
 
-	CUDA_SAFE_CALL(cudaFree(d_keyPoints));
-	CUDA_SAFE_CALL(cudaFree(d_keyPointDescs));
+	MLIB_CUDA_SAFE_FREE(d_keyPoints);
+	MLIB_CUDA_SAFE_FREE(d_keyPointDescs);
 	//CUDA_SAFE_CALL(cudaFree(d_keyPointCounters));
 
 	m_currImagePairMatches.clear();
 
-	CUDA_SAFE_CALL(cudaFree(d_currNumMatchesPerImagePair));
-	CUDA_SAFE_CALL(cudaFree(d_currMatchDistances));
-	CUDA_SAFE_CALL(cudaFree(d_currMatchKeyPointIndices));
+	MLIB_CUDA_SAFE_FREE(d_currNumMatchesPerImagePair);
+	MLIB_CUDA_SAFE_FREE(d_currMatchDistances);
+	MLIB_CUDA_SAFE_FREE(d_currMatchKeyPointIndices);
 
-	CUDA_SAFE_CALL(cudaFree(d_currNumFilteredMatchesPerImagePair));
-	CUDA_SAFE_CALL(cudaFree(d_currFilteredMatchDistances));
-	CUDA_SAFE_CALL(cudaFree(d_currFilteredMatchKeyPointIndices));
-	CUDA_SAFE_CALL(cudaFree(d_currFilteredTransforms));
-	CUDA_SAFE_CALL(cudaFree(d_currFilteredTransformsInv));
+	MLIB_CUDA_SAFE_FREE(d_currNumFilteredMatchesPerImagePair);
+	MLIB_CUDA_SAFE_FREE(d_currFilteredMatchDistances);
+	MLIB_CUDA_SAFE_FREE(d_currFilteredMatchKeyPointIndices);
+	MLIB_CUDA_SAFE_FREE(d_currFilteredTransforms);
+	MLIB_CUDA_SAFE_FREE(d_currFilteredTransformsInv);
 
 	m_validImages.clear();
-	CUDA_SAFE_CALL(cudaFree(d_validImages));
+	MLIB_CUDA_SAFE_FREE(d_validImages);
 
 	m_globNumResiduals = 0;
-	CUDA_SAFE_CALL(cudaFree(d_globNumResiduals));
-	CUDA_SAFE_CALL(cudaFree(d_globMatches));
-	CUDA_SAFE_CALL(cudaFree(d_globMatchesKeyPointIndices));
+	MLIB_CUDA_SAFE_FREE(d_globNumResiduals);
+	MLIB_CUDA_SAFE_FREE(d_globMatches);
+	MLIB_CUDA_SAFE_FREE(d_globMatchesKeyPointIndices);
 
-	CUDA_SAFE_CALL(cudaFree(d_validOpt));
+	MLIB_CUDA_SAFE_FREE(d_validOpt);
 
-	CUDA_SAFE_CALL(cudaFree(d_fuseGlobalKeyCount));
-	CUDA_SAFE_CALL(cudaFree(d_fuseGlobalKeyMarker));
+	MLIB_CUDA_SAFE_FREE(d_fuseGlobalKeyCount);
+	MLIB_CUDA_SAFE_FREE(d_fuseGlobalKeyMarker);
+
+	SAFE_DELETE(m_timer);
 }
 
 void SIFTImageManager::initializeMatching()
@@ -442,7 +445,7 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 void SIFTImageManager::filterFrames(unsigned int numCurrImagePairs)
 {
 	if (numCurrImagePairs == 0) return;
-	
+
 	int connected = 0;
 
 	std::vector<unsigned int> currNumFilteredMatchesPerImagePair(numCurrImagePairs);

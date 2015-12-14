@@ -68,15 +68,20 @@ public:
 	}
 	//! warning: untested!
 	void loadFromFile(const std::string& filename) {
+		unsigned int oldMaxNumImages = m_maxNumImages;
+		unsigned int oldWidth = m_width;
+		unsigned int oldHeight = m_height;
 		BinaryDataStreamFile s(filename, false);
 		s >> m_width;
 		s >> m_height;
 		s >> m_intrinsics;
 		s >> m_intrinsicsInv;
 		s >> m_currentFrame;
-		unsigned int maxNumImages;
-		s >> maxNumImages;
-		MLIB_ASSERT(maxNumImages <= m_maxNumImages);
+		s >> m_maxNumImages;
+		if (m_maxNumImages > oldMaxNumImages || m_width > oldWidth || m_height > oldHeight) {
+			free();
+			alloc();
+		}
 
 		DepthImage32 depth(m_width, m_height);
 		ColorImageR32G32B32A32 camPos(m_width, m_height), normals(m_width, m_height);
@@ -123,6 +128,8 @@ private:
 		}
 		m_cache.clear();
 		MLIB_CUDA_SAFE_FREE(d_cache);
+
+		m_currentFrame = 0;
 	}
 
 	unsigned int m_width;

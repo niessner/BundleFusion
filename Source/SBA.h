@@ -50,10 +50,18 @@ public:
 	}
 	void printConvergence(const std::string& filename) const;
 
-	void setWeights(float ws, float wd, float wdl) {
+	void setLocalWeights(float ws, float wd, float wdl) {
 		m_localWeightSparse = ws;
 		m_localWeightDenseInit = wd;
 		m_localWeightDenseLinFactor = wdl;
+	}
+	void setGlobalWeights(float ws, float wd, float wdl) {
+		m_globalWeightSparse = ws;
+		m_globalWeightDenseInit = wd;
+		m_globalWeightDenseLinFactor = wdl;
+	}
+	void setLocalDensePairwise(bool b) {
+		m_bUseLocalDensePairwise = b;
 	}
 
 private:

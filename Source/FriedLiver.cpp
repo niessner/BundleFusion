@@ -191,7 +191,7 @@ int main(int argc, char** argv)
 	// Enable run-time memory check for debug builds.
 #if defined(DEBUG) | defined(_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-	//_CrtSetBreakAlloc(3727);
+	//_CrtSetBreakAlloc(3333);
 #endif 
 
 	try {
@@ -232,30 +232,12 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (false) {
+		if (true) {
 			TestMatching test;
-			test.loadFromSensor("debug/11.sensor", "", 1);
-			test.runOpt();
+			//test.loadFromSensor("debug/11.sensor", "", 1);
+			//test.runOpt();
 			//test.analyzeLocalOpts();
-
-			//test.loadFromSensor("../data/student/2296_eroded.sensor", "trajectory.bin", GlobalBundlingState::get().s_submapSize);
-			//test.load("", "debug/global.sift");
-			//std::cout << "waiting..." << std::endl;
-			//getchar();
-			
-			//test.loadImages("debug/images.bin");
-			//test.load("debug/matchAll.bin", "debug/global.sift");
-			//test.test();
-			//test.save("debug/filtered.bin");
-
-			//test.match("", "debug/matches/", "../data/sun3d/harvard_c8_3.sensor", vec2ui(140, 151));
-			//test.loadFromSensor("debug/to2080.sensor", "", GlobalBundlingState::get().s_submapSize);
-			//test.load("", "debug/test208.sift");
-			//test.matchFrame(207, true, true);
-			//test.debugOptimizeGlobal();
-			
-			//test.debugMatchInfo();
-			//test.checkCorrespondences();
+			test.testGlobalDense();
 
 			std::cout << "done!" << std::endl;
 			getchar();
@@ -294,7 +276,7 @@ int main(int argc, char** argv)
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
 		TimingLog::printAllTimings();
-		g_bundler->saveGlobalSiftManagerToFile("debug/global.sift");
+		g_bundler->saveGlobalSiftManagerAndCacheToFile("debug/global");
 		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
 		g_bundler->saveCompleteTrajectory("trajectory.bin");
 		g_bundler->saveSiftTrajectory("siftTrajectory.bin");

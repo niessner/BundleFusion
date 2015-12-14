@@ -152,7 +152,7 @@ public:
 	void saveCompleteTrajectory(const std::string& filename) const;
 	void saveSiftTrajectory(const std::string& filename) const;
 	void saveIntegrateTrajectory(const std::string& filename);
-	void saveGlobalSiftManagerToFile(const std::string& filename) const { m_SubmapManager.saveGlobalSiftManagerToFile(filename); }
+	void saveGlobalSiftManagerAndCacheToFile(const std::string& prefix) const { m_SubmapManager.saveGlobalSiftManagerAndCache(prefix); }
 
 	TrajectoryManager* getTrajectoryManager() {
 		return m_trajectoryManager;

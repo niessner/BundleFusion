@@ -688,3 +688,12 @@ void SubmapManager::saveImPairToPointCloud(const std::string& prefix, const CUDA
 	PointCloudIOf::saveToFile(prefix + "_" + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y) + ".ply", pc);
 }
 
+void SubmapManager::saveGlobalSiftManagerAndCache(const std::string& prefix) const
+{
+	const std::string siftFile = prefix + ".sift";
+	const std::string cacheFile = prefix + ".cache";
+
+	m_global->saveToFile(siftFile);
+	m_globalCache->saveToFile(cacheFile);
+}
+

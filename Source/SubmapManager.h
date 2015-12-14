@@ -122,6 +122,7 @@ public:
 	const float4x4* getCompleteTrajectory() const { return d_completeTrajectory; }
 
 	//debugging
+	void saveGlobalSiftManagerAndCache(const std::string& prefix) const;
 	void saveCompleteTrajectory(const std::string& filename, unsigned int numTransforms) const;
 	void saveSiftTrajectory(const std::string& filename, unsigned int numTransforms) const;
 	void printConvergence(const std::string& filename) const {
@@ -133,7 +134,6 @@ public:
 	const SIFTImageManager* getCurrentLocalDEBUG() const { return m_currentLocal; }
 	const SIFTImageManager* getGlobalDEBUG() const { return m_global; }
 	void setPrintMatchesDEBUG(bool b) { _debugPrintMatches = b; }
-	void saveGlobalSiftManagerToFile(const std::string& filename) const { m_global->saveToFile(filename); }
 
 	// to fake opt finish when no opt
 	void resetDEBUG(bool initNextGlobal, int numLocalSolved, unsigned int curFrame) { //numLocalSolved == numGlobalFrames
@@ -182,9 +182,6 @@ private:
 	void finishLocalOpt() {
 		m_nextLocal->reset();
 		m_nextLocalCache->reset();
-
-		//optLocal->reset();
-		//optLocalCache->reset();
 	}
 	//! assumes nextlocal locked
 	void saveOptToPointCloud(const std::string& filename, const CUDACache* cudaCache, const std::vector<int>& valid, const float4x4* d_transforms, unsigned int numFrames, bool saveFrameByFrame = false);
