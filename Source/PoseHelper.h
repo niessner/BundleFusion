@@ -8,6 +8,10 @@ namespace PoseHelper {
 
 	static float evaluateAteRmse(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory) {
 		size_t numTransforms = math::min(trajectory.size(), referenceTrajectory.size());
+		if (numTransforms < 3) {
+			std::cout << "cannot evaluate with < 3 transforms" << std::endl;
+			return -std::numeric_limits<float>::infinity();
+		}
 		std::vector<vec3f> pts, refPts; vec3f ptsMean(0.0f), refPtsMean(0.0f);
 		for (unsigned int i = 0; i < numTransforms; i++) {
 			if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) {

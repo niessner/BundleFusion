@@ -141,16 +141,18 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	// get images
 	unsigned int curFrame = numFrames - 1; //TODO get color cpu for these functions
 	const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
-	ColorImageR8G8B8A8 curImage(cudaCache->getWidth(), cudaCache->getHeight());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curImage.getPointer(), cachedFrames[curFrame].d_colorDownsampled,
-		sizeof(uchar4) * curImage.getNumPixels(), cudaMemcpyDeviceToHost));
+	ColorImageR32 curIntensity(cudaCache->getWidth(), cudaCache->getHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curIntensity.getPointer(), cachedFrames[curFrame].d_intensityDownsampled,
+		sizeof(float) * curIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	ColorImageR8G8B8A8 curImage(curIntensity);
 	curImage.reSample(widthSIFT, heightSIFT);
 
 	//print out images
 	for (unsigned int prev = 0; prev < curFrame; prev++) {
-		ColorImageR8G8B8A8 prevImage(cudaCache->getWidth(), cudaCache->getHeight());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevImage.getPointer(), cachedFrames[prev].d_colorDownsampled,
-			sizeof(uchar4) * prevImage.getNumPixels(), cudaMemcpyDeviceToHost));
+		ColorImageR32 prevIntensity(cudaCache->getWidth(), cudaCache->getHeight());
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevIntensity.getPointer(), cachedFrames[prev].d_intensityDownsampled,
+			sizeof(float) * prevIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
+		ColorImageR8G8B8A8 prevImage(prevIntensity);
 		prevImage.reSample(widthSIFT, heightSIFT);
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
@@ -208,9 +210,9 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 
 	//frames
 	ColorImageR32G32B32A32 camPosition;
-	ColorImageR8G8B8A8 color;
+	ColorImageR32 intensity;
 	camPosition.allocate(cacheWidth, cacheHeight);
-	color.allocate(cacheWidth, cacheHeight);
+	intensity.allocate(cacheWidth, cacheHeight);
 
 	bool saveFrameByFrame = true;
 	const std::string dir = util::directoryFromPath(prefix);
@@ -221,21 +223,7 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 		mat4f transform = transforms[i];
 		unsigned int f = imageIndices[i];
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getPointer(), cachedFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), cachedFrames[f].d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
-
-		//DepthImage32 dImage(cacheWidth, cacheHeight);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(dImage.getPointer(), cachedFrames[f].d_depthDownsampled, sizeof(float)*dImage.getNumPixels(), cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("debug/testDepth.png", ColorImageR32G32B32(dImage));
-		//FreeImageWrapper::saveImage("debug/test.png", camPosition);
-		//{
-		//	PointCloudf wtf;
-		//	for (unsigned int i = 0; i < dImage.getNumPixels(); i++) {
-		//		float d = dImage.getPointer()[i];
-		//		if (d != -std::numeric_limits<float>::infinity()) {
-		//			//vec3f p = 
-		//		}
-		//	}
-		//}
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), cachedFrames[f].d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 
 		PointCloudf framePc;
 
@@ -243,8 +231,8 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 			const vec4f& p = camPosition.getPointer()[i];
 			if (p.x != -std::numeric_limits<float>::infinity()) {
 				pc.m_points.push_back(transform * p.getVec3());
-				const vec4uc& c = color.getPointer()[i];
-				pc.m_colors.push_back(vec4f(c.x, c.y, c.z, c.w) / 255.f);
+				const float c = intensity.getPointer()[i];
+				pc.m_colors.push_back(vec4f(c));
 
 				if (saveFrameByFrame) {
 					framePc.m_points.push_back(pc.m_points.back());
@@ -391,11 +379,13 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 	const std::vector<CUDACachedFrame>& cachedFrames = cache->getCacheFrames();
 	ColorImageR32G32B32A32 camPos(width, height), normals(width, height);
 	ColorImageR8G8B8A8 color(width, height);
+	ColorImageR32 intensity(width, height);
 	std::list<PointCloudf> pcs;
 	for (unsigned int i = 0; i < numFrames; i++) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPos.getPointer(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*camPos.getNumPixels(), cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getPointer(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), cachedFrames[i].d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), cachedFrames[i].d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+		color = ColorImageR8G8B8A8(intensity);
 
 		pcs.push_back(PointCloudf());
 		computePointCloud(pcs.back(), color, camPos, normals, trajectory[i]);

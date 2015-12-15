@@ -11,6 +11,8 @@ CUDACache::CUDACache(unsigned int widthDownSampled, unsigned int heightDownSampl
 	m_intrinsics = intrinsics;
 	m_intrinsicsInv = m_intrinsics.getInverse();
 
+	d_intensityHelper = NULL;
+
 	alloc();
 	m_currentFrame = 0;
 }
@@ -21,12 +23,16 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 {
 	CUDACachedFrame& frame = m_cache[m_currentFrame];
 	CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, m_width, m_height, d_depth, inputDepthWidth, inputDepthHeight);
-	CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
+	//CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
 
 	CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(frame.d_cameraposDownsampled, frame.d_depthDownsampled, *(float4x4*)&m_intrinsicsInv, m_width, m_height);
 	CUDAImageUtil::computeNormals(frame.d_normalsDownsampled, frame.d_cameraposDownsampled, m_width, m_height);
 
 	//CUDAImageUtil::jointBilateralFilterFloatMap(frame.d_colorDownsampled)
+
+	CUDAImageUtil::resampleToIntensity(d_intensityHelper, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
+	CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, 3.0f, m_width, m_height); //TODO PARAM
+	CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, m_width, m_height);
 
 	m_currentFrame++;
 }

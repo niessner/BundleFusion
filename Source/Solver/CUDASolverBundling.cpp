@@ -55,8 +55,8 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_countHighResidual, sizeof(int)));
 
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_depthJtr, sizeof(float) * 6 * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseJtr, sizeof(float) * 6 * numberOfVariables));
 	m_maxNumDenseImPairs = (m_maxNumberOfImages + 1)*(m_maxNumberOfImages + 1);
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseCorrCounts, sizeof(float) * m_maxNumDenseImPairs));
 
@@ -84,8 +84,8 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(d_variablesToCorrespondences, -1, sizeof(int)*m_maxNumberOfImages*m_maxCorrPerImage));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(d_numEntriesPerRow, -1, sizeof(int)*m_maxNumberOfImages));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_countHighResidual, -1, sizeof(int)));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_depthJtr, -1, sizeof(float) * 6 * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseJtr, -1, sizeof(float) * 6 * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseCorrCounts, -1, sizeof(float) * m_maxNumDenseImPairs));
 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_corrCount, -1, sizeof(int)));
@@ -126,8 +126,8 @@ CUDASolverBundling::~CUDASolverBundling()
 	
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_countHighResidual);
 	
-	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtJ);
-	MLIB_CUDA_SAFE_FREE(m_solverState.d_depthJtr);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_denseJtJ);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_denseJtr);
 
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
 }
@@ -162,11 +162,13 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.weightSparse = weightsSparse.front();
 	parameters.weightDenseDepth = weightsDenseDepth.front();
 	parameters.weightDenseColor = weightsDenseColor.front();
-	parameters.denseDepthDistThresh = 0.15f; //TODO params
-	parameters.denseDepthNormalThresh = 0.97f;
-	parameters.denseDepthColorThresh = 1.0f;//0.1f;
+	parameters.denseDistThresh = 0.15f; //TODO params
+	parameters.denseNormalThresh = 0.97f;
+	parameters.denseColorThresh = 0.1f;
+	parameters.denseColorGradientMin = 0.005f;
 	parameters.denseDepthMin = 0.1f;
 	parameters.denseDepthMax = 3.0f;
+	parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
 	parameters.useDenseDepthAllPairwise = usePairwiseDense;
 
 	SolverInput solverInput;
@@ -185,16 +187,18 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	solverInput.weightsDenseColor = weightsDenseColor.data();
 	solverInput.d_validImages = d_validImages;
 	if (cudaCache) {
-		solverInput.d_depthFrames = cudaCache->getCacheFramesGPU();
+		solverInput.d_cacheFrames = cudaCache->getCacheFramesGPU();
 		solverInput.denseDepthWidth = cudaCache->getWidth(); //TODO constant buffer for this?
 		solverInput.denseDepthHeight = cudaCache->getHeight();
 		solverInput.depthIntrinsics = MatrixConversion::toCUDA(cudaCache->getIntrinsics());
+		solverInput.colorFocalLength = make_float2(solverInput.depthIntrinsics.m11, solverInput.depthIntrinsics.m22);
 	}
 	else {
-		solverInput.d_depthFrames = NULL;
+		solverInput.d_cacheFrames = NULL;
 		solverInput.denseDepthWidth = 0;
 		solverInput.denseDepthHeight = 0;
 		solverInput.depthIntrinsics.setValue(-std::numeric_limits<float>::infinity());
+		solverInput.colorFocalLength = make_float2(-std::numeric_limits<float>::infinity());
 	}
 
 	if (rebuildJT) {

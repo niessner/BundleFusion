@@ -78,7 +78,7 @@ bool CUDAImageManager::process()
 		}
 	}
 	if (GlobalBundlingState::get().s_depthFilter) { //smooth
-		CUDAImageUtil::gaussFilterFloatMap(d_depthErodeHelper, d_depthInput, GlobalBundlingState::get().s_depthSigmaD, GlobalBundlingState::get().s_depthSigmaR,
+		CUDAImageUtil::gaussFilterDepthMap(d_depthErodeHelper, d_depthInput, GlobalBundlingState::get().s_depthSigmaD, GlobalBundlingState::get().s_depthSigmaR,
 			m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
 		std::swap(d_depthInput, d_depthErodeHelper);
 	}

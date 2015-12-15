@@ -77,14 +77,14 @@ private:
 	static unsigned int filterImagePairKeyPointMatches(const std::vector<SIFTKeyPoint>& keys, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances, float4x4& transform, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxResThresh2, bool printDebug);
 	static bool filterImagePairBySurfaceArea(const std::vector<SIFTKeyPoint>& keys, float* depth0, float* depth1, const std::vector<uint2>& keyPointIndices, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches);
 	// depth0 -> src, depth1 -> tgt
-	static bool filterImagePairByDenseVerify(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,
-		const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const uchar4* modelColor, const float4x4& transform,
+	static bool filterImagePairByDenseVerify(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const float* inputColor,
+		const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const float* modelColor, const float4x4& transform,
 		unsigned int width, unsigned int height, const float4x4& depthIntrinsics, float depthMin, float depthMax);
 
 	static float2 computeSurfaceArea(const SIFTKeyPoint* keys, const uint2* keyPointIndices, float* depth0, float* depth1, unsigned int numMatches, const float4x4& siftIntrinsicsInv);
 
-	static float2 computeProjectiveError(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,
-		const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const uchar4* modelColor,
+	static float2 computeProjectiveError(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const float* inputColor,
+		const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const float* modelColor,
 		const float4x4& transform, unsigned int width, unsigned int height, const float4x4& depthIntrinsics, float depthMin, float depthMax);
 	//!!!TODO CAMERA INFO
 	static float2 cameraToDepth(const float4x4& depthIntrinsics, const float4& pos);
@@ -95,8 +95,8 @@ private:
 
 
 	static inline void getBestCorrespondence1x1(
-		const int2& screenPos, float4& pTarget, float4& nTarget, uchar4& cTarget,
-		const float4* target, const float4* targetNormals, const uchar4* targetColors,
+		const int2& screenPos, float4& pTarget, float4& nTarget, float& cTarget,
+		const float4* target, const float4* targetNormals, const float* targetColors,
 		unsigned int width)
 	{
 		pTarget = target[screenPos.y * width + screenPos.x];
@@ -104,15 +104,15 @@ private:
 		nTarget = targetNormals[screenPos.y * width + screenPos.x];
 	}
 	static void computeCorrespondences(unsigned int width, unsigned int height,
-		const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
-		const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor,
+		const float* inputDepth, const float4* input, const float4* inputNormals, const float* inputColor,
+		const float* modelDepth, const float4* model, const float4* modelNormals, const float* modelColor,
 		const float4x4& transform, float distThres, float normalThres, float colorThresh,
 		const float4x4& depthIntrinsics, float depthMin, float depthMax,
 		float& sumResidual, float& sumWeight, unsigned int& numCorr);
 
 	static void computeCorrespondencesDEBUG(unsigned int width, unsigned int height,
-		const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
-		const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor,
+		const float* inputDepth, const float4* input, const float4* inputNormals, const float* inputColor,
+		const float* modelDepth, const float4* model, const float4* modelNormals, const float* modelColor,
 		const float4x4& transform, float distThres, float normalThres, float colorThresh,
 		const float4x4& depthIntrinsics, float depthMin, float depthMax, float& sumResidual, float& sumWeight, unsigned int& numCorr);
 

@@ -12,9 +12,10 @@ struct SolverParameters
 	float verifyOptPercentThresh;
 
 	// dense depth corr
-	float denseDepthDistThresh;
-	float denseDepthNormalThresh;
-	float denseDepthColorThresh;
+	float denseDistThresh;
+	float denseNormalThresh;
+	float denseColorThresh;
+	float denseColorGradientMin;
 	float denseDepthMin;
 	float denseDepthMax;
 
@@ -23,6 +24,7 @@ struct SolverParameters
 	float weightSparse;		
 	float weightDenseDepth;	
 	float weightDenseColor;
+	bool useDense;
 };
 
 #endif

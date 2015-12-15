@@ -156,9 +156,36 @@ void CUDAImageUtil::resampleUCHAR4(uchar4* d_output, unsigned int outputWidth, u
 #endif
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Color to Intensity
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 __host__ __device__
 float convertToIntensity(const uchar4& c) {
 	return (0.299f*c.x + 0.587f*c.y + 0.114f*c.z) / 255.0f;
+}
+
+__global__ void convertUCHAR4ToIntensityFloat_Kernel(float* d_output, const uchar4* d_input, unsigned int width, unsigned int height)
+{
+	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x < width && y < height) {
+		d_output[y*width + x] = convertToIntensity(d_input[y*width + x]);
+	}
+}
+
+void CUDAImageUtil::convertUCHAR4ToIntensityFloat(float* d_output, const uchar4* d_input, unsigned int width, unsigned int height) {
+
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	convertUCHAR4ToIntensityFloat_Kernel << <gridSize, blockSize >> >(d_output, d_input, width, height);
+
+#ifdef _DEBUG
+	MLIB_CUDA_SAFE_CALL(cudaDeviceSynchronize());
+	MLIB_CUDA_CHECK_ERR(__FUNCTION__);
+#endif
 }
 
 __global__ void resampleToIntensity_Kernel(float* d_output, unsigned int outputWidth, unsigned int outputHeight, const uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight)
@@ -168,8 +195,8 @@ __global__ void resampleToIntensity_Kernel(float* d_output, unsigned int outputW
 
 	if (x < outputWidth && y < outputHeight)
 	{
-		const float scaleWidth = (float)(inputWidth - 1) / (float)(outputWidth - 1);
-		const float scaleHeight = (float)(inputHeight - 1) / (float)(outputHeight - 1);
+		const float scaleWidth = (float)inputWidth / (float)outputWidth;
+		const float scaleHeight = (float)inputHeight / (float)outputHeight;
 
 		const unsigned int xInput = (unsigned int)(x*scaleWidth + 0.5f);
 		const unsigned int yInput = (unsigned int)(y*scaleHeight + 0.5f);
@@ -180,7 +207,7 @@ __global__ void resampleToIntensity_Kernel(float* d_output, unsigned int outputW
 	}
 }
 
-void CUDAImageUtil::resampleToIntensity(float* d_output, unsigned int outputWidth, unsigned int outputHeight, uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight) {
+void CUDAImageUtil::resampleToIntensity(float* d_output, unsigned int outputWidth, unsigned int outputHeight, const uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight) {
 
 	const dim3 gridSize((outputWidth + T_PER_BLOCK - 1) / T_PER_BLOCK, (outputHeight + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
@@ -193,7 +220,61 @@ void CUDAImageUtil::resampleToIntensity(float* d_output, unsigned int outputWidt
 #endif
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// derivatives 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+__global__ void computeIntensityDerivatives_Kernel(float2* d_output, float* d_input, unsigned int width, unsigned int height)
+{
+	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x < width && y < height)
+	{
+		//derivative
+		if (x > 0 && x < width - 1 && y > 0 && y < height - 1)
+		{ //color always valid here (no invalid checks)
+			float pos00 = d_input[(y - 1)*width + (x - 1)];
+			float pos01 = d_input[(y - 0)*width + (x - 1)];
+			float pos02 = d_input[(y + 1)*width + (x - 1)];
+
+			float pos10 = d_input[(y - 1)*width + (x - 0)];
+			//float pos11 = d_input[(y-0)*width + (x-0)];
+			float pos12 = d_input[(y + 1)*width + (x - 0)];
+
+			float pos20 = d_input[(y - 1)*width + (x + 1)];
+			float pos21 = d_input[(y - 0)*width + (x + 1)];
+			float pos22 = d_input[(y + 1)*width + (x + 1)];
+
+			float resU = (-1.0f)*pos00 + (1.0f)*pos20 +
+				(-2.0f)*pos01 + (2.0f)*pos21 +
+				(-1.0f)*pos02 + (1.0f)*pos22;
+			resU /= 8.0f;
+
+			float resV = (-1.0f)*pos00 + (-2.0f)*pos10 + (-1.0f)*pos20 +
+				(1.0f)*pos02 + (2.0f)*pos12 + (1.0f)*pos22;
+			resV /= 8.0f;
+
+			d_output[y*width + x] = make_float2(resU, resV);
+		}
+		else {
+			d_output[y*width + x] = make_float2(MINF, MINF);
+		}
+	}
+}
+
+void CUDAImageUtil::computeIntensityDerivatives(float2* d_output, float* d_input, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	computeIntensityDerivatives_Kernel << <gridSize, blockSize >> >(d_output, d_input, width, height);
+
+#ifdef _DEBUG
+	MLIB_CUDA_SAFE_CALL(cudaDeviceSynchronize());
+	MLIB_CUDA_CHECK_ERR(__FUNCTION__);
+#endif
+}
 
 
 
@@ -216,7 +297,7 @@ __global__ void convertDepthFloatToCameraSpaceFloat4_Kernel(float4* d_output, fl
 		if (depth != MINF)
 		{
 			float4 cameraSpace(intrinsicsInv*make_float4((float)x*depth, (float)y*depth, depth, depth));
-			d_output[y*width+x] = make_float4(cameraSpace.x, cameraSpace.y, cameraSpace.w, 1.0f);
+			d_output[y*width + x] = make_float4(cameraSpace.x, cameraSpace.y, cameraSpace.w, 1.0f);
 			//d_output[y*width + x] = make_float4(depthCameraData.kinectDepthToSkeleton(x, y, depth), 1.0f);
 		}
 	}
@@ -227,7 +308,7 @@ void CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(float4* d_output, float
 	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
 
-	convertDepthFloatToCameraSpaceFloat4_Kernel<< <gridSize, blockSize >> >(d_output, d_input, intrinsicsInv, width, height);
+	convertDepthFloatToCameraSpaceFloat4_Kernel << <gridSize, blockSize >> >(d_output, d_input, intrinsicsInv, width, height);
 
 #ifdef _DEBUG
 	MLIB_CUDA_SAFE_CALL(cudaDeviceSynchronize());
@@ -245,26 +326,26 @@ __global__ void computeNormals_Kernel(float4* d_output, float4* d_input, unsigne
 	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
 
-	if(x >= width || y >= height) return;
+	if (x >= width || y >= height) return;
 
-	d_output[y*width+x] = make_float4(MINF, MINF, MINF, MINF);
+	d_output[y*width + x] = make_float4(MINF, MINF, MINF, MINF);
 
-	if(x > 0 && x < width-1 && y > 0 && y < height-1)
+	if (x > 0 && x < width - 1 && y > 0 && y < height - 1)
 	{
-		const float4 CC = d_input[(y+0)*width+(x+0)];
-		const float4 PC = d_input[(y+1)*width+(x+0)];
-		const float4 CP = d_input[(y+0)*width+(x+1)];
-		const float4 MC = d_input[(y-1)*width+(x+0)];
-		const float4 CM = d_input[(y+0)*width+(x-1)];
+		const float4 CC = d_input[(y + 0)*width + (x + 0)];
+		const float4 PC = d_input[(y + 1)*width + (x + 0)];
+		const float4 CP = d_input[(y + 0)*width + (x + 1)];
+		const float4 MC = d_input[(y - 1)*width + (x + 0)];
+		const float4 CM = d_input[(y + 0)*width + (x - 1)];
 
-		if(CC.x != MINF && PC.x != MINF && CP.x != MINF && MC.x != MINF && CM.x != MINF)
+		if (CC.x != MINF && PC.x != MINF && CP.x != MINF && MC.x != MINF && CM.x != MINF)
 		{
-			const float3 n = cross(make_float3(PC)-make_float3(MC), make_float3(CP)-make_float3(CM));
+			const float3 n = cross(make_float3(PC) - make_float3(MC), make_float3(CP) - make_float3(CM));
 			const float  l = length(n);
 
-			if(l > 0.0f)
+			if (l > 0.0f)
 			{
-				d_output[y*width+x] = make_float4(n/-l, 0.0f);
+				d_output[y*width + x] = make_float4(n / -l, 0.0f);
 			}
 		}
 	}
@@ -272,10 +353,10 @@ __global__ void computeNormals_Kernel(float4* d_output, float4* d_input, unsigne
 
 void CUDAImageUtil::computeNormals(float4* d_output, float4* d_input, unsigned int width, unsigned int height)
 {
-	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
 
-	computeNormals_Kernel<<<gridSize, blockSize>>>(d_output, d_input, width, height);
+	computeNormals_Kernel << <gridSize, blockSize >> >(d_output, d_input, width, height);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
@@ -290,11 +371,11 @@ void CUDAImageUtil::computeNormals(float4* d_output, float4* d_input, unsigned i
 
 inline __device__ float gaussD(float sigma, int x, int y)
 {
-	return exp(-((x*x+y*y)/(2.0f*sigma*sigma)));
+	return exp(-((x*x + y*y) / (2.0f*sigma*sigma)));
 }
 inline __device__ float gaussR(float sigma, float dist)
 {
-	return exp(-(dist*dist)/(2.0*sigma*sigma));
+	return exp(-(dist*dist) / (2.0*sigma*sigma));
 }
 
 __global__ void bilateralFilterUCHAR4_Kernel(uchar4* d_output, uchar4* d_color, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
@@ -302,30 +383,30 @@ __global__ void bilateralFilterUCHAR4_Kernel(uchar4* d_output, uchar4* d_color, 
 	const int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
-	if(x >= width || y >= height) return;
+	if (x >= width || y >= height) return;
 
 	const int kernelRadius = (int)ceil(2.0*sigmaD);
 
-	d_output[y*width+x] = d_color[y*width+x];
+	d_output[y*width + x] = d_color[y*width + x];
 
 	float3 sum = make_float3(0.0f, 0.0f, 0.0f);
 	float sumWeight = 0.0f;
 
 	//const uchar4 center = d_color[y*width+x];
-	const float depthCenter = d_depth[y*width+x];
-	if(depthCenter != MINF)
+	const float depthCenter = d_depth[y*width + x];
+	if (depthCenter != MINF)
 	{
-		for(int m = x-kernelRadius; m <= x+kernelRadius; m++)
+		for (int m = x - kernelRadius; m <= x + kernelRadius; m++)
 		{
-			for(int n = y-kernelRadius; n <= y+kernelRadius; n++)
-			{		
-				if(m >= 0 && n >= 0 && m < width && n < height)
+			for (int n = y - kernelRadius; n <= y + kernelRadius; n++)
+			{
+				if (m >= 0 && n >= 0 && m < width && n < height)
 				{
-					const uchar4 cur = d_color[n*width+m];
-					const float currentDepth = d_depth[n*width+m];
+					const uchar4 cur = d_color[n*width + m];
+					const float currentDepth = d_depth[n*width + m];
 
 					if (currentDepth != MINF) {
-						const float weight = gaussD(sigmaD, m-x, n-y)*gaussR(sigmaR, currentDepth-depthCenter);
+						const float weight = gaussD(sigmaD, m - x, n - y)*gaussR(sigmaR, currentDepth - depthCenter);
 
 						sumWeight += weight;
 						sum += weight*make_float3(cur.x, cur.y, cur.z);
@@ -343,10 +424,10 @@ __global__ void bilateralFilterUCHAR4_Kernel(uchar4* d_output, uchar4* d_color, 
 
 void CUDAImageUtil::jointBilateralFilterFloatMap(uchar4* d_output, uchar4* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
 {
-	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
 
-	bilateralFilterUCHAR4_Kernel<<<gridSize, blockSize>>>(d_output, d_input, d_depth, sigmaD, sigmaR, width, height);
+	bilateralFilterUCHAR4_Kernel << <gridSize, blockSize >> >(d_output, d_input, d_depth, sigmaD, sigmaR, width, height);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
@@ -363,21 +444,21 @@ __global__ void erodeDepthMapDevice(float* d_output, float* d_input, int structu
 	const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
 
-	if(x >= 0 && x < width && y >= 0 && y < height)
+	if (x >= 0 && x < width && y >= 0 && y < height)
 	{
-		
+
 
 		unsigned int count = 0;
 
-		float oldDepth = d_input[y*width+x];
-		for(int i = -structureSize; i<=structureSize; i++)
+		float oldDepth = d_input[y*width + x];
+		for (int i = -structureSize; i <= structureSize; i++)
 		{
-			for(int j = -structureSize; j<=structureSize; j++)
+			for (int j = -structureSize; j <= structureSize; j++)
 			{
-				if(x+j >= 0 && x+j < width && y+i >= 0 && y+i < height)
+				if (x + j >= 0 && x + j < width && y + i >= 0 && y + i < height)
 				{
-					float depth = d_input[(y+i)*width+(x+j)];
-					if(depth == MINF || depth == 0.0f || fabs(depth-oldDepth) > dThresh)
+					float depth = d_input[(y + i)*width + (x + j)];
+					if (depth == MINF || depth == 0.0f || fabs(depth - oldDepth) > dThresh)
 					{
 						count++;
 						//d_output[y*width+x] = MINF;
@@ -387,21 +468,22 @@ __global__ void erodeDepthMapDevice(float* d_output, float* d_input, int structu
 			}
 		}
 
-		unsigned int sum = (2*structureSize+1)*(2*structureSize+1);
-		if ((float)count/(float)sum >= fracReq) {
-			d_output[y*width+x] = MINF;
-		} else {
-			d_output[y*width+x] = d_input[y*width+x];
+		unsigned int sum = (2 * structureSize + 1)*(2 * structureSize + 1);
+		if ((float)count / (float)sum >= fracReq) {
+			d_output[y*width + x] = MINF;
+		}
+		else {
+			d_output[y*width + x] = d_input[y*width + x];
 		}
 	}
 }
 
 void CUDAImageUtil::erodeDepthMap(float* d_output, float* d_input, int structureSize, unsigned int width, unsigned int height, float dThresh, float fracReq)
 {
-	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
 
-	erodeDepthMapDevice<<<gridSize, blockSize>>>(d_output, d_input, structureSize, width, height, dThresh, fracReq);
+	erodeDepthMapDevice << <gridSize, blockSize >> >(d_output, d_input, structureSize, width, height, dThresh, fracReq);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
@@ -414,34 +496,34 @@ void CUDAImageUtil::erodeDepthMap(float* d_output, float* d_input, int structure
 // Gauss Filter Float Map
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__global__ void gaussFilterFloatMapDevice(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+__global__ void gaussFilterDepthMapDevice(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
 {
 	const int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
-	if(x >= width || y >= height) return;
+	if (x >= width || y >= height) return;
 
 	const int kernelRadius = (int)ceil(2.0*sigmaD);
 
-	d_output[y*width+x] = MINF;
+	d_output[y*width + x] = MINF;
 
 	float sum = 0.0f;
 	float sumWeight = 0.0f;
 
-	const float depthCenter = d_input[y*width+x];
-	if(depthCenter != MINF)
+	const float depthCenter = d_input[y*width + x];
+	if (depthCenter != MINF)
 	{
-		for(int m = x-kernelRadius; m <= x+kernelRadius; m++)
+		for (int m = x - kernelRadius; m <= x + kernelRadius; m++)
 		{
-			for(int n = y-kernelRadius; n <= y+kernelRadius; n++)
-			{		
-				if(m >= 0 && n >= 0 && m < width && n < height)
+			for (int n = y - kernelRadius; n <= y + kernelRadius; n++)
+			{
+				if (m >= 0 && n >= 0 && m < width && n < height)
 				{
-					const float currentDepth = d_input[n*width+m];
+					const float currentDepth = d_input[n*width + m];
 
-					if(currentDepth != MINF && fabs(depthCenter-currentDepth) < sigmaR)
+					if (currentDepth != MINF && fabs(depthCenter - currentDepth) < sigmaR)
 					{
-						const float weight = gaussD(sigmaD, m-x, n-y);
+						const float weight = gaussD(sigmaD, m - x, n - y);
 
 						sumWeight += weight;
 						sum += weight*currentDepth;
@@ -451,17 +533,67 @@ __global__ void gaussFilterFloatMapDevice(float* d_output, float* d_input, float
 		}
 	}
 
-	if(sumWeight > 0.0f) d_output[y*width+x] = sum / sumWeight;
+	if (sumWeight > 0.0f) d_output[y*width + x] = sum / sumWeight;
 }
 
-void CUDAImageUtil::gaussFilterFloatMap(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+void CUDAImageUtil::gaussFilterDepthMap(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
 {
-	const dim3 gridSize((width + T_PER_BLOCK - 1)/T_PER_BLOCK, (height + T_PER_BLOCK - 1)/T_PER_BLOCK);
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
 
-	gaussFilterFloatMapDevice<<<gridSize, blockSize>>>(d_output, d_input, sigmaD, sigmaR, width, height);
-	#ifdef _DEBUG
-		cutilSafeCall(cudaDeviceSynchronize());
-		cutilCheckMsg(__FUNCTION__);
-	#endif
+	gaussFilterDepthMapDevice << <gridSize, blockSize >> >(d_output, d_input, sigmaD, sigmaR, width, height);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
+
+__global__ void gaussFilterIntensityDevice(float* d_output, float* d_input, float sigmaD, unsigned int width, unsigned int height)
+{
+	const int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x >= width || y >= height) return;
+
+	const int kernelRadius = (int)ceil(2.0*sigmaD);
+
+	//d_output[y*width + x] = MINF;
+
+	float sum = 0.0f;
+	float sumWeight = 0.0f;
+
+	//const float center = d_input[y*width + x];
+	//if (center != MINF) {
+	for (int m = x - kernelRadius; m <= x + kernelRadius; m++)
+	{
+		for (int n = y - kernelRadius; n <= y + kernelRadius; n++)
+		{
+			if (m >= 0 && n >= 0 && m < width && n < height)
+			{
+				const float current = d_input[n*width + m];
+
+				//if (current != MINF && fabs(center - current) < sigmaR) {
+				const float weight = gaussD(sigmaD, m - x, n - y);
+
+				sumWeight += weight;
+				sum += weight*current;
+				//}
+			}
+		}
+	}
+	//}
+
+	if (sumWeight > 0.0f) d_output[y*width + x] = sum / sumWeight;
+}
+
+void CUDAImageUtil::gaussFilterIntensity(float* d_output, float* d_input, float sigmaD, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	gaussFilterIntensityDevice << <gridSize, blockSize >> >(d_output, d_input, sigmaD, width, height);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
 }

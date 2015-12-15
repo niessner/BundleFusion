@@ -9,7 +9,7 @@ class CUDAImageUtil {
 public:
 	template<class T> static void copy(T* d_output, T* d_input, unsigned int width, unsigned int height);
 	//template<class T> static void resample(T* d_output, unsigned int outputWidth, unsigned int outputHeight, T* d_input, unsigned int inputWidth, unsigned int inputHeight);
-	static void resampleToIntensity(float* d_output, unsigned int outputWidth, unsigned int outputHeight, uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight);
+	static void resampleToIntensity(float* d_output, unsigned int outputWidth, unsigned int outputHeight, const uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight);
 	
 	static void resampleFloat(float* d_output, unsigned int outputWidth, unsigned int outputHeight, const float* d_input, unsigned int inputWidth, unsigned int inputHeight);
 	static void resampleUCHAR4(uchar4* d_output, unsigned int outputWidth, unsigned int outputHeight, const uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight);
@@ -21,7 +21,14 @@ public:
 
 	static void erodeDepthMap(float* d_output, float* d_input, int structureSize, unsigned int width, unsigned int height, float dThresh, float fracReq);
 
-	static void gaussFilterFloatMap(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height);
+	static void gaussFilterDepthMap(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height);
+	//no invalid checks!
+	static void gaussFilterIntensity(float* d_output, float* d_input, float sigmaD, unsigned int width, unsigned int height);
+
+	static void convertUCHAR4ToIntensityFloat(float* d_output, const uchar4* d_input, unsigned int width, unsigned int height);
+	//no invalid checks!
+	static void computeIntensityDerivatives(float2* d_output, float* d_input, unsigned int width, unsigned int height);
+
 };
 
 //TODO 

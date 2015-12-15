@@ -18,23 +18,13 @@ TestMatching::TestMatching()
 	unsigned maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	m_siftManager = new SIFTImageManager(GlobalBundlingState::get().s_submapSize, maxNumImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
 
-	unsigned int maxNumMatches = (maxNumImages - 1) * maxNumImages / 2;
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_numMatchesPerImagePair, sizeof(int)*maxNumMatches));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_matchDistancesPerImagePair, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_matchKeyIndicesPerImagePair, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
-
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filtNumMatchesPerImagePair, sizeof(int)*maxNumMatches));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filtMatchDistancesPerImagePair, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filtMatchKeyIndicesPerImagePair, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
-
-	//!!!DEBUGGING
-	MLIB_CUDA_SAFE_CALL(cudaMemset(d_numMatchesPerImagePair, -1, sizeof(int)*maxNumMatches));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(d_matchDistancesPerImagePair, -1, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(d_matchKeyIndicesPerImagePair, -1, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(d_filtNumMatchesPerImagePair, -1, sizeof(int)*maxNumMatches));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(d_filtMatchDistancesPerImagePair, -1, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(d_filtMatchKeyIndicesPerImagePair, -1, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
-	//!!!DEBUGGING
+	d_numMatchesPerImagePair = NULL;
+	d_matchDistancesPerImagePair = NULL;
+	d_matchKeyIndicesPerImagePair = NULL;
+	d_filtNumMatchesPerImagePair = NULL;
+	d_filtMatchDistancesPerImagePair = NULL;
+	d_filtMatchKeyIndicesPerImagePair = NULL;
+	m_bAllMatchingAllocated = false;
 
 	d_cachedFrames = NULL;
 
@@ -231,6 +221,7 @@ void TestMatching::matchAll(bool print /*= false*/, const std::string outDir /*=
 {
 	MLIB_ASSERT(m_stage == INITIALIZED);
 	MLIB_ASSERT(!print || !outDir.empty());
+	allocForMatchAll();
 
 	SiftMatchGPU* siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
 	siftMatcher->InitSiftMatch();
@@ -776,20 +767,13 @@ void TestMatching::createCachedFrames()
 
 	allocCachedFrames((unsigned int)m_colorImages.size(), width, height);
 
-	float* d_depth = NULL; uchar4* d_color = NULL; float* d_depthErodeHelper = NULL;
+	float* d_depth = NULL; float* d_depthErodeHelper = NULL; uchar4* d_color = NULL; float* d_intensityHelper = NULL;
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depth, sizeof(float) * m_widthDepth * m_heightDepth));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_color, sizeof(uchar4) * m_widthSift * m_heightSift));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthErodeHelper, sizeof(float) * m_widthDepth * m_heightDepth));
-
-	//!!!DEBUGGING
-	//DepthImage32 origDepth(m_widthDepth, m_heightDepth);
-	//DepthImage32 subDepth(width, height);
-	//ColorImageR32G32B32A32 subCamPos(width, height);
-	//!!!DEBUGGING
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityHelper, sizeof(float) * width * height));
 
 	for (unsigned int i = 0; i < m_colorImages.size(); i++) {
-		//origDepth = m_depthImages[i]; FreeImageWrapper::saveImage("debug/_orig.png", ColorImageR32G32B32(origDepth));
-
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, m_depthImages[i].getPointer(), sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyHostToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, m_colorImages[i].getPointer(), sizeof(uchar4) * m_colorImages[i].getNumPixels(), cudaMemcpyHostToDevice));
 		//erode and smooth depth
@@ -807,32 +791,27 @@ void TestMatching::createCachedFrames()
 			}
 		}
 		if (smooth) {
-			CUDAImageUtil::gaussFilterFloatMap(d_depthErodeHelper, d_depth, 2.0f, 0.05f, m_widthDepth, m_heightDepth);
+			CUDAImageUtil::gaussFilterDepthMap(d_depthErodeHelper, d_depth, 2.0f, 0.05f, m_widthDepth, m_heightDepth);
 			std::swap(d_depth, d_depthErodeHelper);
 		}
 
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(origDepth.getPointer(), d_depth, sizeof(float)*origDepth.getNumPixels(), cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("debug/_procDepth.png", ColorImageR32G32B32(origDepth));
-
 		CUDACachedFrame& frame = m_cachedFrames[i];
 		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
-		CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, width, height, d_color, m_widthSift, m_heightSift);
-
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(subDepth.getPointer(), frame.d_depthDownsampled, sizeof(float)*subDepth.getNumPixels(), cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("debug/_subDepth.png", ColorImageR32G32B32(subDepth));
+		//CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, width, height, d_color, m_widthSift, m_heightSift);
 
 		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(frame.d_cameraposDownsampled, frame.d_depthDownsampled,
 			MatrixConversion::toCUDA(m_intrinsicsDownsampled.getInverse()), width, height);
 		CUDAImageUtil::computeNormals(frame.d_normalsDownsampled, frame.d_cameraposDownsampled, width, height);
 
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(subCamPos.getPointer(), frame.d_cameraposDownsampled, sizeof(float4)*subCamPos.getNumPixels(), cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("debug/_subCamPos.png", subCamPos);
-		//int a = 5;
+		CUDAImageUtil::resampleToIntensity(d_intensityHelper, width, height, d_color, m_widthSift, m_heightSift);
+		CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, 3.0f, width, height);
+		CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, width, height);
 	}
 
 	MLIB_CUDA_SAFE_FREE(d_depth);
 	MLIB_CUDA_SAFE_FREE(d_color);
 	MLIB_CUDA_SAFE_FREE(d_depthErodeHelper);
+	MLIB_CUDA_SAFE_FREE(d_intensityHelper);
 	std::cout << "done!" << std::endl;
 }
 
@@ -1232,9 +1211,14 @@ void TestMatching::runOpt()
 	const unsigned int maxNumIters = 8;
 	const bool isLocal = false;
 	GlobalBundlingState::get().s_localDenseUseAllPairwise = false;
-	std::vector<float> weightsSparse(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); for (unsigned int i = 0; i < 3; i++) weightsDenseDepth[i] = 0.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f); //TODO try
+	//std::vector<float> weightsSparse(maxNumIters, 1.0f); // no rgb
+	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); for (unsigned int i = 0; i < 3; i++) weightsDenseDepth[i] = 0.0f;
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); 
+
+	//debug rgb
+	std::vector<float> weightsSparse(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
@@ -1256,6 +1240,7 @@ void TestMatching::runOpt()
 			SIFTImageGPU& cur = m_siftManager->createSIFTImageGPU();
 			m_siftManager->finalizeSIFTImageGPU(0);
 		}
+		m_siftManager->setValidImagesDEBUG(std::vector<int>(numImages, 1));
 	}
 
 	// run opt
@@ -1273,14 +1258,14 @@ void TestMatching::runOpt()
 	// initial transforms
 	std::vector<mat4f> transforms(numImages, mat4f::identity());
 	// rand init
-	RNG::global.init(0, 1, 2, 3);
+	RNG::global.init(0, 1, 2, 3); /*const float maxTrans = 0.1f; const float maxRot = 7.0f;*/ const float maxTrans = 0.03f; const float maxRot = 3.0f;
 	for (unsigned int i = 1; i < transforms.size(); i++) {
-		float tx = RNG::global.uniform(0.0f, 0.1f); if (RNG::global.uniform(0, 1) == 0) tx = -tx;
-		float ty = RNG::global.uniform(0.0f, 0.1f); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
-		float tz = RNG::global.uniform(0.0f, 0.1f); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
-		float rx = RNG::global.uniform(0.0f, 7.0f); if (RNG::global.uniform(0, 1) == 0) rx = -rx;
-		float ry = RNG::global.uniform(0.0f, 7.0f); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
-		float rz = RNG::global.uniform(0.0f, 7.0f); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
+		float tx = RNG::global.uniform(0.0f, maxTrans); if (RNG::global.uniform(0, 1) == 0) tx = -tx;
+		float ty = RNG::global.uniform(0.0f, maxTrans); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
+		float tz = RNG::global.uniform(0.0f, maxTrans); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
+		float rx = RNG::global.uniform(0.0f, maxRot); if (RNG::global.uniform(0, 1) == 0) rx = -rx;
+		float ry = RNG::global.uniform(0.0f, maxRot); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
+		float rz = RNG::global.uniform(0.0f, maxRot); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
 		transforms[i] = mat4f::translation(tx, ty, tz) * mat4f::rotationZ(rz) * mat4f::rotationY(ry) * mat4f::rotationX(rx);
 	}
 	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", &cudaCache, transforms); std::cout << "done" << std::endl;
@@ -1310,13 +1295,15 @@ void TestMatching::printCacheFrames(const std::string& dir) const
 
 	unsigned int width = GlobalBundlingState::get().s_downsampledWidth;
 	unsigned int height = GlobalBundlingState::get().s_downsampledHeight;
-	DepthImage32 depthImage(width, height); ColorImageR8G8B8A8 colorImage(width, height);
+	DepthImage32 depthImage(width, height); ColorImageR32 intensityImage(width, height); BaseImage<vec2f> intensityDerivImage(width, height);
 	ColorImageR32G32B32A32 camPosImage(width, height), normalImage(width, height);
+	ColorImageR32 dx(width, height), dy(width, height);
 	for (unsigned int i = 0; i < m_cachedFrames.size(); i++) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), m_cachedFrames[i].d_depthDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), m_cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getPointer(), m_cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(colorImage.getPointer(), m_cachedFrames[i].d_colorDownsampled, sizeof(uchar4)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getPointer(), m_cachedFrames[i].d_intensityDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivImage.getPointer(), m_cachedFrames[i].d_intensityDerivsDownsampled, sizeof(float2)*width*height, cudaMemcpyDeviceToHost));
 
 		//debug check, save to point cloud
 		for (unsigned int k = 0; k < width*height; k++) {
@@ -1335,12 +1322,24 @@ void TestMatching::printCacheFrames(const std::string& dir) const
 				int a = 5;
 		}
 		PointCloudf pc;
-		SiftVisualization::computePointCloud(pc, colorImage, camPosImage, normalImage, mat4f::identity());
+		SiftVisualization::computePointCloud(pc, intensityImage, camPosImage, normalImage, mat4f::identity());
 		PointCloudIOf::saveToFile(dir + "frame-" + std::to_string(i) + ".ply", pc);
 
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_depth.png", ColorImageR32G32B32(depthImage));
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_camPos.png", camPosImage);
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_normal.png", normalImage);
+		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_intensity.png", intensityImage);
+
+		//!!!debugging
+		intensityImage.saveAsBinaryMImage(dir + std::to_string(i) + "_intensity.mbindepth");
+		//!!!debugging
+
+		for (unsigned int p = 0; p < intensityDerivImage.getNumPixels(); p++) {
+			const vec2f& d = intensityDerivImage.getPointer()[p];
+			dx.getPointer()[p] = d.x; dy.getPointer()[p] = d.y;
+		}
+		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_intensityDerivX.png", dx);
+		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_intensityDerivY.png", dy);
 	}
 }
 
@@ -1533,7 +1532,7 @@ void TestMatching::testGlobalDense()
 		trajectoryKeys.push_back(trajectoryAll[i]);
 		refTrajectoryKeys.push_back(refTrajectoryAll[i]);
 	}
-	
+
 	std::cout << "loading sift from file... ";
 	m_siftManager->loadFromFile(siftFile);
 	std::cout << "done" << std::endl;
@@ -1568,8 +1567,8 @@ void TestMatching::testGlobalDense()
 	////}
 	sba.setLocalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor); //some dense
 	//for (unsigned int i = 0; i < 10; i++) {
-		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
-		std::cout << std::endl;
+	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+	std::cout << std::endl;
 	//}
 
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
@@ -1611,6 +1610,41 @@ void TestMatching::testGlobalDense()
 	sgt.close(); sot.close();
 
 	int a = 5;
+}
+
+void TestMatching::saveCacheFramesToSensorFile(const std::string& filename) const
+{
+	if (m_cachedFrames.empty()) {
+		std::cout << "no cached frames to save!" << std::endl;
+		return;
+	}
+
+	CalibratedSensorData cs;
+	cs.m_DepthImageWidth = GlobalBundlingState::get().s_downsampledWidth;
+	cs.m_DepthImageHeight = GlobalBundlingState::get().s_downsampledHeight;
+	cs.m_ColorImageWidth = cs.m_DepthImageWidth;
+	cs.m_ColorImageHeight = cs.m_DepthImageHeight;
+	cs.m_CalibrationColor.setMatrices(m_intrinsicsDownsampled, mat4f::identity());
+	cs.m_CalibrationDepth.setMatrices(m_intrinsicsDownsampled, mat4f::identity());
+
+	//actual 
+	ColorImageR8G8B8A8 tmpColor(cs.m_ColorImageWidth, cs.m_ColorImageHeight);
+	for (unsigned int i = 0; i < m_cachedFrames.size(); i++) {
+		float* depth = new float[cs.m_DepthImageWidth * cs.m_DepthImageHeight];
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depth, m_cachedFrames[i].d_depthDownsampled, sizeof(float)*cs.m_DepthImageWidth*cs.m_DepthImageHeight, cudaMemcpyDeviceToHost));
+		vec4uc* color = new vec4uc[cs.m_ColorImageWidth * cs.m_ColorImageHeight];
+		m_colorImages[i].subSample(cs.m_ColorImageWidth, cs.m_ColorImageHeight, tmpColor);
+		memcpy(color, tmpColor.getPointer(), sizeof(vec4uc)*cs.m_ColorImageWidth*cs.m_ColorImageHeight);
+
+		cs.m_DepthImages.push_back(depth);
+		cs.m_ColorImages.push_back(color);
+	}
+	cs.m_DepthNumFrames = (unsigned int)cs.m_DepthImages.size();
+	cs.m_ColorNumFrames = (unsigned int)cs.m_ColorImages.size();
+
+	BinaryDataStreamFile s(filename, true);
+	s << cs;
+	s.closeStream();
 }
 
 

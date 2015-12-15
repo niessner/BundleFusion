@@ -20,11 +20,12 @@ struct SolverInput
 	unsigned int maxCorrPerImage;
 
 	int* d_validImages;
-	const CUDACachedFrame* d_depthFrames;
+	const CUDACachedFrame* d_cacheFrames;
 	unsigned int denseDepthWidth;
 	unsigned int denseDepthHeight;
 	float4x4 depthIntrinsics;		//TODO constant buffer for this + siftimagemanger stuff?
 	unsigned int maxNumDenseImPairs;
+	float2 colorFocalLength; //color camera params (actually same as depthIntrinsics...)
 
 	const float* weightsSparse;
 	const float* weightsDenseDepth;
@@ -82,8 +83,8 @@ struct SolverState
 	}
 
 	// for dense depth term
-	float* d_depthJtJ;
-	float* d_depthJtr;
+	float* d_denseJtJ;
+	float* d_denseJtr;
 	float* d_denseCorrCounts;
 
 	//!!!DEBUGGING

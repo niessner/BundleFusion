@@ -23,9 +23,12 @@ public:
 
 	void copyCacheFrameFrom(CUDACache* other, unsigned int frameFrom) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_depthDownsampled, other->m_cache[frameFrom].d_depthDownsampled, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_colorDownsampled, other->m_cache[frameFrom].d_colorDownsampled, sizeof(uchar4) * m_width * m_height, cudaMemcpyDeviceToDevice));
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_colorDownsampled, other->m_cache[frameFrom].d_colorDownsampled, sizeof(uchar4) * m_width * m_height, cudaMemcpyDeviceToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_cameraposDownsampled, other->m_cache[frameFrom].d_cameraposDownsampled, sizeof(float4) * m_width * m_height, cudaMemcpyDeviceToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_normalsDownsampled, other->m_cache[frameFrom].d_normalsDownsampled, sizeof(float4) * m_width * m_height, cudaMemcpyDeviceToDevice));
+
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_intensityDownsampled, other->m_cache[frameFrom].d_intensityDownsampled, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_intensityDerivsDownsampled, other->m_cache[frameFrom].d_intensityDerivsDownsampled, sizeof(float2) * m_width * m_height, cudaMemcpyDeviceToDevice));
 
 		m_currentFrame++;
 	}
@@ -52,17 +55,23 @@ public:
 		s << m_maxNumImages;
 		DepthImage32 depth(m_width, m_height);
 		ColorImageR32G32B32A32 camPos(m_width, m_height), normals(m_width, m_height);
-		ColorImageR8G8B8A8 color(m_width, m_height);
+		//ColorImageR8G8B8A8 color(m_width, m_height);
+		ColorImageR32 intensity(m_width, m_height);
+		BaseImage<vec2f> intensityDerivative(m_width, m_height);
 		for (unsigned int i = 0; i < m_currentFrame; i++) {
 			const CUDACachedFrame& f = m_cache[i];
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(depth.getPointer(), f.d_depthDownsampled, sizeof(float)*depth.getNumPixels(), cudaMemcpyDeviceToHost));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPos.getPointer(), f.d_cameraposDownsampled, sizeof(float4)*camPos.getNumPixels(), cudaMemcpyDeviceToHost));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getPointer(), f.d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), f.d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), f.d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), f.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivative.getPointer(), f.d_intensityDerivsDownsampled, sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyDeviceToHost));
 			s << depth;
 			s << camPos;
 			s << normals;
-			s << color;
+			//s << color;
+			s << intensity;
+			s << intensityDerivative;
 		}
 		s.closeStream();
 	}
@@ -85,17 +94,23 @@ public:
 
 		DepthImage32 depth(m_width, m_height);
 		ColorImageR32G32B32A32 camPos(m_width, m_height), normals(m_width, m_height);
-		ColorImageR8G8B8A8 color(m_width, m_height);
+		//ColorImageR8G8B8A8 color(m_width, m_height);
+		ColorImageR32 intensity(m_width, m_height);
+		BaseImage<vec2f> intensityDerivative(m_width, m_height);
 		for (unsigned int i = 0; i < m_currentFrame; i++) {
 			const CUDACachedFrame& f = m_cache[i];
 			s >> depth;
 			s >> camPos;
 			s >> normals;
-			s >> color;
+			//s >> color;
+			s >> intensity;
+			s >> intensityDerivative;
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_depthDownsampled, depth.getPointer(), sizeof(float)*depth.getNumPixels(), cudaMemcpyHostToDevice));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_cameraposDownsampled, camPos.getPointer(), sizeof(float4)*camPos.getNumPixels(), cudaMemcpyHostToDevice));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_normalsDownsampled, normals.getPointer(), sizeof(float4)*normals.getNumPixels(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_colorDownsampled, color.getPointer(), sizeof(uchar4)*color.getNumPixels(), cudaMemcpyHostToDevice));
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_colorDownsampled, color.getPointer(), sizeof(uchar4)*color.getNumPixels(), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_intensityDownsampled, intensity.getPointer(), sizeof(float)*intensity.getNumPixels(), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_intensityDerivsDownsampled, intensityDerivative.getPointer(), sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyHostToDevice));
 		}
 		s.closeStream();
 	}
@@ -105,9 +120,12 @@ public:
 		MLIB_ASSERT(cachedFrames.size() <= m_cache.size());
 		for (unsigned int i = 0; i < cachedFrames.size(); i++) {
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_depthDownsampled, cachedFrames[i].d_depthDownsampled, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_colorDownsampled, cachedFrames[i].d_colorDownsampled, sizeof(uchar4) * m_width * m_height, cudaMemcpyDeviceToDevice));
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_colorDownsampled, cachedFrames[i].d_colorDownsampled, sizeof(uchar4) * m_width * m_height, cudaMemcpyDeviceToDevice));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_cameraposDownsampled, cachedFrames[i].d_cameraposDownsampled, sizeof(float4) * m_width * m_height, cudaMemcpyDeviceToDevice));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_normalsDownsampled, cachedFrames[i].d_normalsDownsampled, sizeof(float4) * m_width * m_height, cudaMemcpyDeviceToDevice));
+
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_intensityDownsampled, cachedFrames[i].d_intensityDownsampled, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_intensityDerivsDownsampled, cachedFrames[i].d_intensityDerivsDownsampled, sizeof(float2) * m_width * m_height, cudaMemcpyDeviceToDevice));
 		}
 	}
 
@@ -120,6 +138,8 @@ private:
 		}
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_cache, sizeof(CUDACachedFrame)*m_maxNumImages));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_cache, m_cache.data(), sizeof(CUDACachedFrame)*m_maxNumImages, cudaMemcpyHostToDevice));
+
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityHelper, sizeof(float)*m_width*m_height));
 	}
 
 	void free() {
@@ -128,6 +148,7 @@ private:
 		}
 		m_cache.clear();
 		MLIB_CUDA_SAFE_FREE(d_cache);
+		MLIB_CUDA_SAFE_FREE(d_intensityHelper);
 
 		m_currentFrame = 0;
 	}
@@ -143,4 +164,5 @@ private:
 	std::vector < CUDACachedFrame > m_cache;
 	CUDACachedFrame*				d_cache;
 
+	float* d_intensityHelper; //for intensity filtering
 };

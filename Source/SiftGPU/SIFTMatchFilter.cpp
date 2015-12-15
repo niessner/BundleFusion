@@ -195,8 +195,8 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 	const unsigned int curFrame = numImages - 1;
 	ml::DepthImage32 curDepth(downSampWidth, downSampHeight);
 	cutilSafeCall(cudaMemcpy(curDepth.getPointer(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
-	ml::ColorImageR8G8B8A8 curColor(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curColor.getPointer(), cachedFrames[curFrame].d_colorDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR8G8B8A8 curIntensity(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(curIntensity.getPointer(), cachedFrames[curFrame].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 curCamPos(downSampWidth, downSampHeight);
 	cutilSafeCall(cudaMemcpy(curCamPos.getPointer(), cachedFrames[curFrame].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 curNormals(downSampWidth, downSampHeight);
@@ -210,8 +210,8 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 		// get data
 		ml::DepthImage32 prvDepth(downSampWidth, downSampHeight);
 		cutilSafeCall(cudaMemcpy(prvDepth.getPointer(), cachedFrames[i].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
-		ml::ColorImageR8G8B8A8 prvColor(downSampWidth, downSampHeight);
-		cutilSafeCall(cudaMemcpy(prvColor.getPointer(), cachedFrames[i].d_colorDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+		ml::ColorImageR8G8B8A8 prvIntensity(downSampWidth, downSampHeight);
+		cutilSafeCall(cudaMemcpy(prvIntensity.getPointer(), cachedFrames[i].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 		ml::ColorImageR32G32B32A32 prvCamPos(downSampWidth, downSampHeight);
 		cutilSafeCall(cudaMemcpy(prvCamPos.getPointer(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 		ml::ColorImageR32G32B32A32 prvNormals(downSampWidth, downSampHeight);
@@ -222,8 +222,8 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 
 		//std::cout << "(" << i << ", " << curFrame << "): ";
 		bool valid =
-			filterImagePairByDenseVerify(prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(),
-			curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(),
+			filterImagePairByDenseVerify(prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (float*)prvIntensity.getPointer(),
+			curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (float*)curIntensity.getPointer(),
 			transforms[i], downSampWidth, downSampHeight, depthIntrinsics, depthMin, depthMax);
 		//if (valid) std::cout << "VALID" << std::endl;
 		//else std::cout << "INVALID" << std::endl;
@@ -236,8 +236,8 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 	}
 }
 
-bool SIFTMatchFilter::filterImagePairByDenseVerify(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,
-	const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const uchar4* modelColor,
+bool SIFTMatchFilter::filterImagePairByDenseVerify(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const float* inputColor,
+	const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const float* modelColor,
 	const float4x4& transform, unsigned int width, unsigned int height, const float4x4& depthIntrinsics, float depthMin, float depthMax)
 {
 
@@ -255,8 +255,8 @@ bool SIFTMatchFilter::filterImagePairByDenseVerify(const float* inputDepth, cons
 
 }
 
-float2 SIFTMatchFilter::computeProjectiveError(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const uchar4* inputColor,
-	const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const uchar4* modelColor,
+float2 SIFTMatchFilter::computeProjectiveError(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const float* inputColor,
+	const float* modelDepth, const float4* modelCamPos, const float4* modelNormals, const float* modelColor,
 	const float4x4& transform, unsigned int width, unsigned int height, const float4x4& depthIntrinsics, float depthMin, float depthMax)
 {
 	const float distThres = GlobalBundlingState::get().s_projCorrDistThres;
@@ -298,8 +298,8 @@ float SIFTMatchFilter::cameraToDepthZ(const float4x4& depthIntrinsics, const flo
 }
 
 void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int height,
-	const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
-	const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor,
+	const float* inputDepth, const float4* input, const float4* inputNormals, const float* inputColor,
+	const float* modelDepth, const float4* model, const float4* modelNormals, const float* modelColor,
 	const float4x4& transform, float distThres, float normalThres, float colorThresh,
 	const float4x4& depthIntrinsics, float depthMin, float depthMax,
 	float& sumResidual, float& sumWeight, unsigned int& numCorr)
@@ -317,7 +317,7 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 
 			float4 pInput = input[idx]; // point
 			float4 nInput = inputNormals[idx]; nInput.w = 0.0f; // vector
-			uchar4 cInput = inputColor[idx];
+			float cInput = inputColor[idx];
 
 			if (pInput.x != INVALID && nInput.x != INVALID) {
 				const float4 pTransInput = transform * pInput;
@@ -327,13 +327,13 @@ void SIFTMatchFilter::computeCorrespondences(unsigned int width, unsigned int he
 				int2 screenPos = make_int2((int)round(screenPosf.x), (int)round(screenPosf.y));
 
 				if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)width && screenPos.y < (int)height) {
-					float4 pTarget; float4 nTarget; uchar4 cTarget;
+					float4 pTarget; float4 nTarget; float cTarget;
 					getBestCorrespondence1x1(screenPos, pTarget, nTarget, cTarget, model, modelNormals, modelColor, width);
 
 					if (pTarget.x != INVALID && nTarget.x != INVALID) {
 						float d = length(pTransInput - pTarget);
 						float dNormal = dot(make_float3(nTransInput.x, nTransInput.y, nTransInput.z), make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
-						//float c = length(make_float3((cInput.x - cTarget.x) / 255.0f, (cInput.y - cTarget.y) / 255.0f, (cInput.z - cTarget.z) / 255.0f));
+						//float c = length(cInput - cTarget);
 
 						float projInputDepth = pTransInput.z;//cameraToDepthZ(pTransInput);
 						float tgtDepth = modelDepth[screenPos.y * width + screenPos.x];
@@ -721,8 +721,8 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	// current data
 	ml::DepthImage32 curDepth(downSampWidth, downSampHeight);
 	cutilSafeCall(cudaMemcpy(curDepth.getPointer(), cachedFrames[imageIndices.y].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
-	ml::ColorImageR8G8B8A8 curColor(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curColor.getPointer(), cachedFrames[imageIndices.y].d_colorDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR8G8B8A8 curIntensity(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(curIntensity.getPointer(), cachedFrames[imageIndices.y].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 curCamPos(downSampWidth, downSampHeight);
 	cutilSafeCall(cudaMemcpy(curCamPos.getPointer(), cachedFrames[imageIndices.y].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 curNormals(downSampWidth, downSampHeight);
@@ -731,8 +731,8 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	// prev data
 	ml::DepthImage32 prvDepth(downSampWidth, downSampHeight);
 	cutilSafeCall(cudaMemcpy(prvDepth.getPointer(), cachedFrames[imageIndices.x].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
-	ml::ColorImageR8G8B8A8 prvColor(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(prvColor.getPointer(), cachedFrames[imageIndices.x].d_colorDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	ml::ColorImageR8G8B8A8 prvIntensity(downSampWidth, downSampHeight);
+	cutilSafeCall(cudaMemcpy(prvIntensity.getPointer(), cachedFrames[imageIndices.x].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 prvCamPos(downSampWidth, downSampHeight);
 	cutilSafeCall(cudaMemcpy(prvCamPos.getPointer(), cachedFrames[imageIndices.x].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 prvNormals(downSampWidth, downSampHeight);
@@ -754,8 +754,8 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	// input -> model
 	float4x4 transformEstimate = transformCurToPrv;
 	float sumResidual0, sumWeight0; unsigned int numCorr0;
-	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(),
-		prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(),
+	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (float*)curIntensity.getPointer(),
+		prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (float*)prvIntensity.getPointer(),
 		transformEstimate, distThres, normalThres, colorThresh,
 		depthIntrinsics, depthMin, depthMax, sumResidual0, sumWeight0, numCorr0);
 	
@@ -764,8 +764,8 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	// model -> input
 	transformEstimate = transformCurToPrv.getInverse();
 	float sumResidual1, sumWeight1; unsigned int numCorr1;
-	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (uchar4*)prvColor.getPointer(),
-		curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (uchar4*)curColor.getPointer(),
+	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (float*)prvIntensity.getPointer(),
+		curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (float*)curIntensity.getPointer(),
 		transformEstimate, distThres, normalThres, colorThresh,
 		depthIntrinsics, depthMin, depthMax, sumResidual1, sumWeight1, numCorr1);
 
@@ -785,8 +785,8 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	}
 }
 
-void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned int height, const float* inputDepth, const float4* input, const float4* inputNormals, const uchar4* inputColor,
-	const float* modelDepth, const float4* model, const float4* modelNormals, const uchar4* modelColor, const float4x4& transform, float distThres, float normalThres, float colorThresh,
+void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned int height, const float* inputDepth, const float4* input, const float4* inputNormals, const float* inputColor,
+	const float* modelDepth, const float4* model, const float4* modelNormals, const float* modelColor, const float4x4& transform, float distThres, float normalThres, float colorThresh,
 	const float4x4& depthIntrinsics, float depthMin, float depthMax, float& sumResidual, float& sumWeight, unsigned int& numCorr)
 {
 	PointCloudf pcSrc, pcTgt;
@@ -807,7 +807,7 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 
 			float4 pInput = input[idx]; // point
 			float4 nInput = inputNormals[idx]; nInput.w = 0.0f; // vector
-			uchar4 cInput = inputColor[idx];
+			float cInput = inputColor[idx];
 			float dInput = inputDepth[idx];
 
 			if (pInput.x != INVALID && nInput.x != INVALID && dInput >= depthMin && dInput <= depthMax) {
@@ -818,13 +818,13 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 				int2 screenPos = make_int2((int)round(screenPosf.x), (int)round(screenPosf.y)); // subsampled space
 
 				if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)width && screenPos.y < (int)height) {
-					float4 pTarget; float4 nTarget; uchar4 cTarget;
+					float4 pTarget; float4 nTarget; float cTarget;
 					getBestCorrespondence1x1(screenPos, pTarget, nTarget, cTarget, model, modelNormals, modelColor, width);
 
 					if (pTarget.x != INVALID && nTarget.x != INVALID) {
 						float d = length(pTransInput - pTarget);
 						float dNormal = dot(make_float3(nTransInput.x, nTransInput.y, nTransInput.z), make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
-						//float c = length(make_float3((cInput.x - cTarget.x) / 255.0f, (cInput.y - cTarget.y) / 255.0f, (cInput.z - cTarget.z) / 255.0f));
+						//float c = length(cInput - cTarget);
 
 						float projInputDepth = pTransInput.z;//cameraToDepthZ(pTransInput);
 						float tgtDepth = modelDepth[screenPos.y * width + screenPos.x];
@@ -846,8 +846,8 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 									pcTgt.m_colors.push_back(vec4f(0.0f, 1.0f, 0.0f, 1.0f));
 								}
 								else {
-									pcSrc.m_colors.push_back(vec4f(cInput.x, cInput.y, cInput.z, cInput.w) / 255.f);
-									pcTgt.m_colors.push_back(vec4f(cTarget.x, cTarget.y, cTarget.z, cTarget.w) / 255.f);
+									pcSrc.m_colors.push_back(vec4f(cInput));
+									pcTgt.m_colors.push_back(vec4f(cTarget));
 								}
 							}
 						} // target depth within depth min/max

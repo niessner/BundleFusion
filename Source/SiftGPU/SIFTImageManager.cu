@@ -410,8 +410,8 @@ void SIFTImageManager::FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePai
 
 __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, float colorThresh, const float4x4& transform, const float4x4& intrinsics,
-	const float* d_inputDepth, const float4* d_inputCamPos, const float4* d_inputNormal, const uchar4* d_inputColor,
-	const float* d_modelDepth, const float4* d_modelCamPos, const float4* d_modelNormal, const uchar4* d_modelColor,
+	const float* d_inputDepth, const float4* d_inputCamPos, const float4* d_inputNormal, const float* d_inputColor,
+	const float* d_modelDepth, const float4* d_modelCamPos, const float4* d_modelNormal, const float* d_modelColor,
 	float sensorDepthMin, float sensorDepthMax)
 {
 	float3 out = make_float3(0.0f);
@@ -419,7 +419,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 	float4 pInput = d_inputCamPos[idx]; // point
 	float4 nInput = d_inputNormal[idx]; nInput.w = 0.0f; // vector
 	float dInput = d_inputDepth[idx];
-	//uchar4 cInput = d_inputColor[idx];
+	//float cInput = d_inputColor[idx];
 
 	if (pInput.x != MINF && nInput.x != MINF && dInput >= sensorDepthMin && dInput <= sensorDepthMax) {
 		const float4 pTransInput = transform * pInput;
@@ -427,18 +427,16 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 
 		float3 tmp = intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z);
 		int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z), (int)roundf(tmp.y / tmp.z)); // subsampled space
-		//float3 tmp = intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z);
-		//int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z) / 4, (int)roundf(tmp.y / tmp.z) / 4); // subsampled space
 
 		if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)imageWidth && screenPos.y < (int)imageHeight) {
 			float4 pTarget = d_modelCamPos[screenPos.y * imageWidth + screenPos.x]; //getBestCorrespondence1x1
 			float4 nTarget = d_modelNormal[screenPos.y * imageWidth + screenPos.x];
-			//uchar4 cTarget = d_modelColor[screenPos.y * imageWidth + screenPos.x];
+			//float cTarget = d_modelColor[screenPos.y * imageWidth + screenPos.x];
 
 			if (pTarget.x != MINF && nTarget.x != MINF) {
 				float d = length(pTransInput - pTarget);
 				float dNormal = dot(make_float3(nTransInput.x, nTransInput.y, nTransInput.z), make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
-				//float c = length(make_float3((cInput.x - cTarget.x) / 255.0f, (cInput.y - cTarget.y) / 255.0f, (cInput.z - cTarget.z) / 255.0f));
+				//float c = length(cInput - cTarget);
 
 				//float projInputDepth = (intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z)).z;
 				float projInputDepth = pTransInput.z;
@@ -480,12 +478,12 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int imageWidth, uns
 	const float*  d_inputDepth = d_cachedFrames[imagePairIdx].d_depthDownsampled;
 	const float4* d_inputCamPos = d_cachedFrames[imagePairIdx].d_cameraposDownsampled;
 	const float4* d_inputNormal = d_cachedFrames[imagePairIdx].d_normalsDownsampled;
-	const uchar4* d_inputColor = d_cachedFrames[imagePairIdx].d_colorDownsampled;
+	const float* d_inputColor = d_cachedFrames[imagePairIdx].d_intensityDownsampled;
 
 	const float*  d_modelDepth = d_cachedFrames[curImageIdx].d_depthDownsampled;
 	const float4* d_modelCamPos = d_cachedFrames[curImageIdx].d_cameraposDownsampled;
 	const float4* d_modelNormal = d_cachedFrames[curImageIdx].d_normalsDownsampled;
-	const uchar4* d_modelColor = d_cachedFrames[curImageIdx].d_colorDownsampled;
+	const float* d_modelColor = d_cachedFrames[curImageIdx].d_intensityDownsampled;
 
 	const float4x4 transform = d_currFilteredTransforms[imagePairIdx];
 
@@ -1036,12 +1034,12 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, int* d_validIm
 	const float*  d_inputDepth = d_cachedFrames[img0].d_depthDownsampled;
 	const float4* d_inputCamPos = d_cachedFrames[img0].d_cameraposDownsampled;
 	const float4* d_inputNormal = d_cachedFrames[img0].d_normalsDownsampled;
-	const uchar4* d_inputColor = d_cachedFrames[img0].d_colorDownsampled;
+	const float* d_inputColor = d_cachedFrames[img0].d_intensityDownsampled;
 
 	const float*  d_modelDepth = d_cachedFrames[img1].d_depthDownsampled;
 	const float4* d_modelCamPos = d_cachedFrames[img1].d_cameraposDownsampled;
 	const float4* d_modelNormal = d_cachedFrames[img1].d_normalsDownsampled;
-	const uchar4* d_modelColor = d_cachedFrames[img1].d_colorDownsampled;
+	const float* d_modelColor = d_cachedFrames[img1].d_intensityDownsampled;
 
 	const float4x4 transform = d_trajectory[img1].getInverse() * d_trajectory[img0];
 

@@ -159,6 +159,10 @@ public:
 	const std::vector<int>& getValidImages() const { return m_validImages; }
 	void invalidateFrame(unsigned int frame) { m_validImages[frame] = 0; }
 
+	//actually debug function...
+	void setValidImagesDEBUG(const std::vector<int>& valid) {
+		m_validImages = valid;
+	}
 	void getNumRawMatchesDEBUG(std::vector<unsigned int>& numMatches) const {
 		MLIB_ASSERT(getNumImages() > 1);
 		numMatches.resize(getNumImages() - 1);

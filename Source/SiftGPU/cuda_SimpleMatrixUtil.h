@@ -1634,6 +1634,14 @@ inline __device__ __host__ matNxM<4, 1>::matNxM(const float4& other)
 	entries[3] = other.w;
 }
 
+template<>
+template<>
+inline __device__ __host__ matNxM<1, 2>::matNxM(const float2& other)
+{
+	entries[0] = other.x;
+	entries[1] = other.y;
+}
+
 // To floatN from Matrix
 template<>
 inline __device__ __host__ matNxM<1, 1>::operator float()

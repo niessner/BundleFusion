@@ -280,7 +280,6 @@ void SIFTImageManager::alloc()
 	//MLIB_CUDA_SAFE_CALL(cudaMemset(d_keyPointCounters, 0, sizeof(int)*m_maxNumImages));
 
 	// matching
-
 	m_currImagePairMatches.resize(m_maxNumImages);
 
 	const unsigned maxImageMatches = m_maxNumImages;
@@ -302,6 +301,7 @@ void SIFTImageManager::alloc()
 	m_globNumResiduals = 0;
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globNumResiduals, sizeof(int)));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(d_globNumResiduals, 0, sizeof(int)));
+
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globMatches, sizeof(EntryJ)*maxResiduals));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globMatchesKeyPointIndices, sizeof(uint2)*maxResiduals));
 

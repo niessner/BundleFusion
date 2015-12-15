@@ -31,12 +31,41 @@ public:
 	};
 
 	TestMatching();
+
+	void allocForMatchAll()
+	{
+		if (!m_bAllMatchingAllocated) {
+			unsigned maxNumImages = GlobalBundlingState::get().s_maxNumImages;
+			unsigned int maxNumMatches = (maxNumImages - 1) * maxNumImages / 2;
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_numMatchesPerImagePair, sizeof(int)*maxNumMatches));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_matchDistancesPerImagePair, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_matchKeyIndicesPerImagePair, sizeof(uint2)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
+
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filtNumMatchesPerImagePair, sizeof(int)*maxNumMatches));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filtMatchDistancesPerImagePair, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filtMatchKeyIndicesPerImagePair, sizeof(uint2)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
+
+			//!!!DEBUGGING
+			MLIB_CUDA_SAFE_CALL(cudaMemset(d_numMatchesPerImagePair, -1, sizeof(int)*maxNumMatches));
+			MLIB_CUDA_SAFE_CALL(cudaMemset(d_matchDistancesPerImagePair, -1, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
+			MLIB_CUDA_SAFE_CALL(cudaMemset(d_matchKeyIndicesPerImagePair, -1, sizeof(uint2)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_RAW));
+			MLIB_CUDA_SAFE_CALL(cudaMemset(d_filtNumMatchesPerImagePair, -1, sizeof(int)*maxNumMatches));
+			MLIB_CUDA_SAFE_CALL(cudaMemset(d_filtMatchDistancesPerImagePair, -1, sizeof(int)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
+			MLIB_CUDA_SAFE_CALL(cudaMemset(d_filtMatchKeyIndicesPerImagePair, -1, sizeof(uint2)*maxNumMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED));
+			//!!!DEBUGGING
+
+			m_bAllMatchingAllocated = true;
+		}
+	}
+
 	~TestMatching();
 
 	//test sparse+dense opt
 	void runOpt();
 	void analyzeLocalOpts();
 	void testGlobalDense();
+	//debug
+	void saveCacheFramesToSensorFile(const std::string& filename) const;
 
 	// match within first numFrames of sensorFile
 	void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));
@@ -152,6 +181,8 @@ private:
 	int*	d_filtNumMatchesPerImagePair;
 	float*	d_filtMatchDistancesPerImagePair;
 	uint2*	d_filtMatchKeyIndicesPerImagePair;
+
+	bool	m_bAllMatchingAllocated;
 
 	STAGE	m_stage;
 

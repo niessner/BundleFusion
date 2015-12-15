@@ -7,6 +7,20 @@
 
 #include "../../SiftGPU/cuda_SimpleMatrixUtil.h"
 
+// color stuff
+inline __device__ mat2x3 dCameraToScreen(const float4& v, float fx, float fy)
+{
+	mat2x3 res; res.setZero();
+	const float wSquared = v.z*v.z;
+
+	res(0, 0) = fx / v.z;
+	res(1, 1) = fy / v.z;
+	res(0, 2) = -v.x * fx / wSquared;
+	res(1, 2) = -v.y * fy / wSquared;
+
+	return res;
+}
+
 
 inline __device__ float2 dehomogenize(const float3& v)
 {

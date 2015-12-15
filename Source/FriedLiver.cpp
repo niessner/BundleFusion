@@ -50,12 +50,12 @@ RGBDSensor* getRGBDSensor()
 		throw MLIB_EXCEPTION("Requires BINARY_DUMP_READER macro");
 #endif
 	}
-//	if (GlobalAppState::get().s_sensorIdx == 4) {
-//		//static NetworkSensor s_networkSensor;
-//		//return &s_networkSensor;
-//		g_sensor = new NetworkSensor;
-//		return g_sensor;
-//}
+	//	if (GlobalAppState::get().s_sensorIdx == 4) {
+	//		//static NetworkSensor s_networkSensor;
+	//		//return &s_networkSensor;
+	//		g_sensor = new NetworkSensor;
+	//		return g_sensor;
+	//}
 	if (GlobalAppState::get().s_sensorIdx == 5) {
 #ifdef INTEL_SENSOR
 		//static IntelSensor s_intelSensor;
@@ -232,7 +232,8 @@ int main(int argc, char** argv)
 		//!!!DEBUGGING
 		if (true) {
 			TestMatching test;
-			test.loadFromSensor("debug/11.sensor", "", 1);
+			test.loadFromSensor("debug/2noise.sensor", "", 1);
+			//test.printCacheFrames("debug/cache/");
 			test.runOpt();
 			//test.analyzeLocalOpts();
 			//test.testGlobalDense();

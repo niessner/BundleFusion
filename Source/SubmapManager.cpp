@@ -568,9 +568,9 @@ void SubmapManager::saveOptToPointCloud(const std::string& filename, const CUDAC
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numFrames, cudaMemcpyDeviceToHost));
 	//frames
 	ColorImageR32G32B32A32 camPosition;
-	ColorImageR8G8B8A8 color;
+	ColorImageR32 intensity;
 	camPosition.allocate(cudaCache->getWidth(), cudaCache->getHeight());
-	color.allocate(cudaCache->getWidth(), cudaCache->getHeight());
+	intensity.allocate(cudaCache->getWidth(), cudaCache->getHeight());
 	const std::vector<CUDACachedFrame>& cacheFrames = cudaCache->getCacheFrames();
 
 	const std::string outFrameByFrame = "debug/frames/";
@@ -581,7 +581,7 @@ void SubmapManager::saveOptToPointCloud(const std::string& filename, const CUDAC
 		if (valid[f] == 0) continue;
 
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getPointer(), cacheFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), cacheFrames[f].d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), cacheFrames[f].d_intensityDownsampled, sizeof(uchar4)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 
 		PointCloudf framePc;
 
@@ -589,8 +589,8 @@ void SubmapManager::saveOptToPointCloud(const std::string& filename, const CUDAC
 			const vec4f& p = camPosition.getPointer()[i];
 			if (p.x != -std::numeric_limits<float>::infinity()) {
 				pc.m_points.push_back(transforms[f] * p.getVec3());
-				const vec4uc& c = color.getPointer()[i];
-				pc.m_colors.push_back(vec4f(c.x, c.y, c.z, c.w) / 255.f);
+				const float c = intensity.getPointer()[i];
+				pc.m_colors.push_back(vec4f(c));
 
 				if (saveFrameByFrame) {
 					framePc.m_points.push_back(pc.m_points.back());
@@ -655,9 +655,9 @@ void SubmapManager::saveImPairToPointCloud(const std::string& prefix, const CUDA
 	}
 	//frames
 	ColorImageR32G32B32A32 camPosition;
-	ColorImageR8G8B8A8 color;
+	ColorImageR32 intensity;
 	camPosition.allocate(cudaCache->getWidth(), cudaCache->getHeight());
-	color.allocate(cudaCache->getWidth(), cudaCache->getHeight());
+	intensity.allocate(cudaCache->getWidth(), cudaCache->getHeight());
 	const std::vector<CUDACachedFrame>& cacheFrames = cudaCache->getCacheFrames();
 
 	bool saveFrameByFrame = true;
@@ -669,7 +669,7 @@ void SubmapManager::saveImPairToPointCloud(const std::string& prefix, const CUDA
 		mat4f transform = transforms[i];
 		unsigned int f = imageIndices[i];
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getPointer(), cacheFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), cacheFrames[f].d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), cacheFrames[f].d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 
 		PointCloudf framePc;
 
@@ -677,8 +677,8 @@ void SubmapManager::saveImPairToPointCloud(const std::string& prefix, const CUDA
 			const vec4f& p = camPosition.getPointer()[i];
 			if (p.x != -std::numeric_limits<float>::infinity()) {
 				pc.m_points.push_back(transform * p.getVec3());
-				const vec4uc& c = color.getPointer()[i];
-				pc.m_colors.push_back(vec4f(c.x, c.y, c.z, c.w) / 255.f);
+				const float c = intensity.getPointer()[i];
+				pc.m_colors.push_back(vec4f(c));
 
 				if (saveFrameByFrame) {
 					framePc.m_points.push_back(pc.m_points.back());

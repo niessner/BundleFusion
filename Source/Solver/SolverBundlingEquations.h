@@ -109,17 +109,17 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 	// add dense term
 	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
 	uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
-	resRot -= make_float3(state.d_depthJtr[rotIndices.x], state.d_depthJtr[rotIndices.y], state.d_depthJtr[rotIndices.z]); //minus since -Jtf, weight already built in
-	resTrans -= make_float3(state.d_depthJtr[transIndices.x], state.d_depthJtr[transIndices.y], state.d_depthJtr[transIndices.z]); //minus since -Jtf, weight already built in
+	resRot -= make_float3(state.d_denseJtr[rotIndices.x], state.d_denseJtr[rotIndices.y], state.d_denseJtr[rotIndices.z]); //minus since -Jtf, weight already built in
+	resTrans -= make_float3(state.d_denseJtr[transIndices.x], state.d_denseJtr[transIndices.y], state.d_denseJtr[transIndices.z]); //minus since -Jtf, weight already built in
 	// preconditioner
 	pRot += make_float3(
-		state.d_depthJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
-		state.d_depthJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
-		state.d_depthJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
+		state.d_denseJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
+		state.d_denseJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
+		state.d_denseJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
 	pTrans += make_float3(
-		state.d_depthJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
-		state.d_depthJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
-		state.d_depthJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
+		state.d_denseJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
+		state.d_denseJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
+		state.d_denseJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
 	// end dense part
 
 	// Preconditioner depends on last solution P(input.d_x)
@@ -145,40 +145,6 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 ////////////////////////////////////////
 // applyJT : this function is called per variable and evaluates each residual influencing that variable (i.e., each energy term per variable)
 ////////////////////////////////////////
-
-//__inline__ __device__ void applyJTDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters, float3& outRot, float3& outTrans, unsigned int lane)
-//{
-//	// Compute J^T*d_Jp here
-//	outRot	 = make_float3(0.0f, 0.0f, 0.0f);
-//	outTrans = make_float3(0.0f, 0.0f, 0.0f);
-//
-//	const float3&  oldAngles0 = state.d_xRot[variableIdx]; // get angles
-//	const float3x3 R_dAlpha = evalR_dAlpha(oldAngles0);
-//	const float3x3 R_dBeta  = evalR_dBeta (oldAngles0);
-//	const float3x3 R_dGamma = evalR_dGamma(oldAngles0);
-//
-//	int N = min(input.d_numEntriesPerRow[variableIdx], input.maxCorrPerImage);
-//
-//	for (int i = lane; i < N; i+=WARP_SIZE)
-//	{
-//		int corrIdx = input.d_variablesToCorrespondences[variableIdx*input.maxCorrPerImage + i];
-//		const Correspondence& corr = input.d_correspondences[corrIdx];
-//
-//		float3 variableP = corr.p0;
-//		float  variableSign = 1;
-//		if (variableIdx != corr.idx0)
-//		{
-//			variableP	 = corr.p1;
-//			variableSign = -1;
-//		}
-//
-//		outRot   += variableSign * make_float3(dot(R_dAlpha*variableP, state.d_Jp[corrIdx]), dot(R_dBeta*variableP, state.d_Jp[corrIdx]), dot(R_dGamma*variableP, state.d_Jp[corrIdx]));
-//		outTrans += variableSign * state.d_Jp[corrIdx];
-//	}
-//
-//	outRot.x   = warpReduce(outRot.x);	 outRot.y   = warpReduce(outRot.y);	  outRot.z   = warpReduce(outRot.z);
-//	outTrans.x = warpReduce(outTrans.x); outTrans.y = warpReduce(outTrans.y); outTrans.z = warpReduce(outTrans.z);
-//}
 
 __inline__ __device__ void applyJTDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,
 	float3& outRot, float3& outTrans, unsigned int threadIdx, unsigned int lane)
@@ -413,6 +379,81 @@ __inline__ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, 
 	dt = make_float4(0.0f, 0.0f, 1.0f, 1.0f);
 	jacBlockRow(5) = -dot(invTransform_i * dt, normalTgt);
 }
+////////////////////////////////////////
+// dense depth term
+////////////////////////////////////////
+__inline__ __device__ float computeColorDProjLookup(const float4& dx, const float4& camPosTgt, const float2& intensityDerivTgt, const float2& colorFocalLength
+	, bool debug = false)
+{
+	mat3x1 dcdx; dcdx(0) = dx.x; dcdx(1) = dx.y; dcdx(2) = dx.z;
+	mat2x3 dProjectionC = dCameraToScreen(camPosTgt, colorFocalLength.x, colorFocalLength.y);
+	mat2x1 dbdx = dProjectionC * dcdx;
+	mat1x2 dColorB(intensityDerivTgt);
+	mat1x1 dadx = dColorB * dbdx;
+
+	if (debug) {
+		mat1x3 dd = dColorB * dProjectionC;
+		printf("dcdx = %f %f %f\n", dcdx(0), dcdx(1), dcdx(2));
+		printf("dProjectionC = %f %f %f, %f %f %f\n", dProjectionC(0, 0), dProjectionC(0, 1), dProjectionC(0, 2),
+			dProjectionC(1, 0), dProjectionC(1, 1), dProjectionC(1, 2));
+		printf("dintensity*dProj = %f %f %f\n", dd(0), dd(1), dd(2));
+		printf("dbdx = %f %f\n", dbdx(0), dbdx(1));
+		printf("dintensity = %f %f\n", dColorB(0), dColorB(1));
+		printf("res = %f\n", dadx(0));
+		printf("\n");
+	}
+
+	return dadx(0);
+}
+__inline__ __device__ void computeJacobianBlockIntensityRow_i(matNxM<1, 6>& jacBlockRow, const float2& colorFocal, const float3& angles, const float3& translation,
+	const float4x4& transform_j, const float4& camPosSrc, const float4& camPosTgt, const float2& intensityDerivTgt)
+{
+	float4 world = transform_j * camPosSrc;
+	//alpha
+	float4 dx = evalRtInverse_dAlpha(angles, translation) * world;
+	jacBlockRow(0) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//beta
+	dx = evalRtInverse_dBeta(angles, translation) * world;
+	jacBlockRow(1) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//gamma
+	dx = evalRtInverse_dGamma(angles, translation) * world;
+	jacBlockRow(2) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//x
+	dx = evalRtInverse_dX(angles, translation) * world;
+	jacBlockRow(3) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//y
+	dx = evalRtInverse_dY(angles, translation) * world;
+	jacBlockRow(4) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//z
+	dx = evalRtInverse_dZ(angles, translation) * world;
+	jacBlockRow(5) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+}
+__inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacBlockRow, const float2& colorFocal, const float3& angles, const float3& translation,
+	const float4x4& invTransform_i, const float4& camPosSrc, const float4& camPosTgt, const float2& intensityDerivTgt
+	, bool debug)
+{
+	//alpha
+	float4 dx = invTransform_i * evalR_dAlpha(angles) * camPosSrc;
+	jacBlockRow(0) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal, debug);
+	//beta
+	dx = invTransform_i * evalR_dBeta(angles) * camPosSrc;
+	jacBlockRow(1) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//gamma
+	dx = invTransform_i * evalR_dGamma(angles) * camPosSrc;
+	jacBlockRow(2) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//x
+	dx = invTransform_i * make_float4(1.0f, 0.0f, 0.0f, 1.0f);
+	jacBlockRow(3) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//y
+	dx = invTransform_i * make_float4(0.0f, 1.0f, 0.0f, 1.0f);
+	jacBlockRow(4) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	//z
+	dx = invTransform_i * make_float4(0.0f, 0.0f, 1.0f, 1.0f);
+	jacBlockRow(5) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+}
+////////////////////////////////////////
+// dense term
+////////////////////////////////////////
 __inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
 	unsigned int vi, unsigned int vj, float residual, float weight)
 {
