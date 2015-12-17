@@ -99,25 +99,12 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 
 			pRot += make_float3(dot(R_dAlpha*variableP, R_dAlpha*variableP), dot(R_dBeta*variableP, R_dBeta*variableP), dot(R_dGamma*variableP, R_dGamma*variableP));
 			pTrans += make_float3(1.0f, 1.0f, 1.0f);
-
-			//!!!debugging
-			if (i == 0 && (isnan(pRot.x) || isnan(pRot.y) || isnan(pRot.z) || isnan(pTrans.x) || isnan(pTrans.y) || isnan(pTrans.z))) {
-				printf("NaN evalminusjtf pRot/Trans (sparse) at %d,%d oldangles %f %f %f, varp %f %f %f\n",
-					variableIdx, i, oldAngles0.x, oldAngles0.y, oldAngles0.z, variableP.x, variableP.y, variableP.z);
-			}
-			//!!!debugging
 		}
 	}
 	resRot = -parameters.weightSparse * rRot;
 	resTrans = -parameters.weightSparse * rTrans;
 	pRot *= parameters.weightSparse;
 	pTrans *= parameters.weightSparse;
-
-	//!!!debugging
-	if (isnan(pRot.x) || isnan(pRot.y) || isnan(pRot.z) || isnan(pTrans.x) || isnan(pTrans.y) || isnan(pTrans.z)) {
-		printf("NaN evalminusjtf pRot/Trans (sparse) at %d (%f %f %f %f %f %f) w %f N %d\n", variableIdx, pRot.x, pRot.y, pRot.z, pTrans.x, pTrans.y, pTrans.z, parameters.weightSparse, N);
-	}
-	//!!!debugging
 
 	// add dense term
 	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
@@ -134,12 +121,6 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 		state.d_denseJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
 		state.d_denseJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
 	// end dense part
-
-	//!!!debugging
-	//if (isnan(pRot.x) || isnan(pRot.y) || isnan(pRot.z) || isnan(pTrans.x) || isnan(pTrans.y) || isnan(pTrans.z)) {
-	//	printf("NaN evalminusjtf pRot/Trans (dense) at %d (%f %f %f %f %f %f)\n", variableIdx, pRot.x, pRot.y, pRot.z, pTrans.x, pTrans.y, pTrans.z);
-	//}
-	//!!!debugging
 
 	// Preconditioner depends on last solution P(input.d_x)
 	if (pRot.x > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].x = 1.0f / pRot.x;
@@ -234,63 +215,6 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 }
 
 ////////////////////////////////////////
-// sparse term
-////////////////////////////////////////
-__inline__ __device__ void addToLocalSystemSparse(float* d_JtJ, float* d_Jtr, unsigned int dim, const float3* jacobianBlockRow_i, const float3* jacobianBlockRow_j,
-	unsigned int vi, unsigned int vj, const float3& dist, float weight)
-{
-	//fill in bottom half (vi < vj) -> x < y
-	for (unsigned int i = 0; i < 6; i++) {
-		for (unsigned int j = i; j < 6; j++) {
-
-			if (vi > 0) {
-				float dii = weight * dot(jacobianBlockRow_i[i], jacobianBlockRow_i[i]);
-				//!!!DEBUGGING
-				if (isnan(dii)) printf("ERROR NaN addlocalsystemSparse i2 %f | %f %f %f\n", weight,
-					jacobianBlockRow_i[i].x, jacobianBlockRow_i[i].y, jacobianBlockRow_i[i].z);
-				//!!!DEBUGGING
-				atomicAdd(&d_JtJ[(vi*6 + j)*dim + (vi*6 + i)], dii);
-			}
-			if (vj > 0) {
-				float djj = weight * dot(jacobianBlockRow_j[i], jacobianBlockRow_j[j]);
-				//!!!DEBUGGING
-				if (isnan(djj)) printf("ERROR NaN addlocalsystemSparse j2 %f | %f %f %f\n", weight,
-					jacobianBlockRow_j[i].x, jacobianBlockRow_j[i].y, jacobianBlockRow_j[i].z);
-				//!!!DEBUGGING
-				atomicAdd(&d_JtJ[(vj*6 + j)*dim + (vj*6 + i)], djj);
-			}
-			if (vi > 0 && vj > 0) {
-				float dij = weight * dot(jacobianBlockRow_i[i], jacobianBlockRow_j[j]);
-				//!!!DEBUGGING
-				if (isnan(dij)) printf("ERROR NaN addlocalsystemSparse ij %f | %f %f %f, %f %f %f\n", weight,
-					jacobianBlockRow_i[i].x, jacobianBlockRow_i[i].y, jacobianBlockRow_i[i].z,
-					jacobianBlockRow_j[j].x, jacobianBlockRow_j[j].y, jacobianBlockRow_j[j].z);
-				//!!!DEBUGGING
-				atomicAdd(&d_JtJ[(vj*6 + j)*dim + (vi*6 + i)], dij);
-				if (i != j) {
-					float dji = weight * dot(jacobianBlockRow_i[j], jacobianBlockRow_j[i]);
-					//!!!DEBUGGING
-					if (isnan(dji)) printf("ERROR NaN addlocalsystemSparse ji %f | %f %f %f, %f %f %f\n", weight,
-						jacobianBlockRow_i[j].x, jacobianBlockRow_i[j].y, jacobianBlockRow_i[j].z,
-						jacobianBlockRow_j[i].x, jacobianBlockRow_j[i].y, jacobianBlockRow_j[i].z);
-					//!!!DEBUGGING
-					atomicAdd(&d_JtJ[(vj*6 + i)*dim + (vi*6 + j)], dji);
-				}
-			}
-
-		} // j
-		if (vi > 0) {
-			float jr = weight * dot(jacobianBlockRow_i[i], dist);
-			atomicAdd(&d_Jtr[vi*6 + i], jr);
-		}
-		if (vj > 0) {
-			float jr = weight * dot(jacobianBlockRow_j[i], dist);
-			atomicAdd(&d_Jtr[vj*6 + i], jr);
-		}
-	} // i
-}
-
-////////////////////////////////////////
 // pre-computed jtj
 ////////////////////////////////////////
 //TODO MAKE EFFICIENT
@@ -324,33 +248,6 @@ __inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState&
 			d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 5],
 			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 5],
 			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 5]);
-
-		//!!!debugging
-		for (unsigned int r = 0; r < 3; r++) {
-			for (unsigned int c = 0; c < 3; c++)
-				if (isnan(block00(r,c))) printf("NaN applyJtJ var %d block00 (%d,%d) at [%d %d]\n", variableIdx, baseVarIdx, baseIdx, r, c);
-		}
-		for (unsigned int r = 0; r < 3; r++) {
-			for (unsigned int c = 0; c < 3; c++)
-				if (isnan(block01(r, c))) printf("NaN applyJtJ var %d block01 (%d,%d) at [%d %d]\n", variableIdx, baseVarIdx, baseIdx, r, c);
-		}
-		for (unsigned int r = 0; r < 3; r++) {
-			for (unsigned int c = 0; c < 3; c++)
-				if (isnan(block10(r, c))) printf("NaN applyJtJ var %d block10 (%d,%d) at [%d %d]\n", variableIdx, baseVarIdx, baseIdx, r, c);
-		}
-		for (unsigned int r = 0; r < 3; r++) {
-			for (unsigned int c = 0; c < 3; c++)
-				if (isnan(block11(r, c))) printf("NaN applyJtJ var %d block11 (%d,%d) at [%d %d]\n", variableIdx, baseVarIdx, baseIdx, r, c);
-		}
-		float3 pr = state.d_pRot[i];
-		float3 pt = state.d_pTrans[i];
-		if (isnan(pr.x) || isnan(pr.y) || isnan(pr.z) || isnan(pt.x) || isnan(pt.y) || isnan(pt.z))
-			printf("NaN applyJtJ pRot/pTrans at %d of %d (%f %f %f %f %f %f)\n", i, N, pr.x, pr.y, pr.z, pt.x, pt.y, pt.z);
-		//float3 a0 = block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
-		//float3 a1 = block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
-		//if (isnan(a0.x) || isnan(a0.y) || isnan(a0.z) || isnan(a1.x) || isnan(a1.y) || isnan(a1.z))
-		//	printf("NaN applyJtJ add part %d (%f %f %f %f %f %f)\n", i, a0.x, a0.y, a0.z, a1.x, a1.y, a1.z);
-		//!!!debugging
 
 		outRot += block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
 		outTrans += block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];

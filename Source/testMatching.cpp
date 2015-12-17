@@ -1600,8 +1600,7 @@ void TestMatching::testGlobalDense()
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 		sba.setUseGlobalDenseOpt(true);
 		sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f));
-		//for (unsigned int i = 0; i < 8; i++)
-		for (unsigned int i = 0; i < 2; i++)
+		for (unsigned int i = 0; i < 8; i++)
 			sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);

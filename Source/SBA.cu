@@ -17,7 +17,7 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 		phi = atan2(matrix(1, 0) / costheta, matrix(0, 0) / costheta);
 
 		//!!!debugging
-		if (isnan(theta)) {
+		if (isnan(theta)) { //can happen if matrix(2, 0) significantly outside of [-1,1] range
 			printf("ERROR NaN matrixToPose theta = -asin(%f) = %f\n", matrix(2, 0), theta);
 		}
 		//!!!debugging
@@ -46,15 +46,6 @@ __global__ void convertMatricesToPosesCU_Kernel(const float4x4* d_transforms, un
 
 	if (idx < numTransforms) {
 		matrixToPose(d_transforms[idx], d_rot[idx], d_trans[idx]);
-
-		//!!!debugging
-		if (isnan(d_rot[idx].x) || isnan(d_rot[idx].y) || isnan(d_rot[idx].z)) {
-			printf("NaN convertMatrixToPose rot at %d (%f,%f,%f)\n", idx, d_rot[idx].x, d_rot[idx].y, d_rot[idx].z);
-		}
-		if (isnan(d_trans[idx].x) || isnan(d_trans[idx].y) || isnan(d_trans[idx].z)) {
-			printf("NaN convertMatrixToPose trans at %d (%f,%f,%f)\n", idx, d_trans[idx].x, d_trans[idx].y, d_trans[idx].z);
-		}
-		//!!!debugging
 	}
 }
 
