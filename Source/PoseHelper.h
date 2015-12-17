@@ -98,6 +98,24 @@ namespace PoseHelper {
 
 		return poses;
 	}
+
+	static void saveToPoseFile(const std::string filename, const std::vector<mat4f>& trajectory) {
+		std::ofstream s(filename);
+		for (unsigned int i = 0; i < trajectory.size(); i++) {
+			if (trajectory[i](0, 0) != -std::numeric_limits<float>::infinity()) {
+				mat4f transform = trajectory[i];
+				vec3f translation = transform.getTranslation();
+				mat3f rotation = transform.getRotation();
+				quatf quaternion(rotation);
+				vec3f imag = quaternion.imag();
+				float real = quaternion.real();
+				s << i << " "; // time
+				s << translation.x << " " << translation.y << " " << translation.z << " "; // translation
+				s << imag.x << " " << imag.y << " " << imag.z << " " << real << std::endl; // rotation
+			}
+		}
+		s.close();
+	}
 }
 
 #endif

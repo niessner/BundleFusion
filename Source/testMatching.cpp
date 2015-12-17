@@ -1585,10 +1585,25 @@ void TestMatching::testGlobalDense()
 	//	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
 	//	std::cout << "waiting..." << std::endl; getchar();
 	//}
-	//{//evaluate sparse only
+	{//evaluate sparse only
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
+		sba.setUseGlobalDenseOpt(false);
+		sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f));
+		for (unsigned int i = 0; i < 8; i++)
+			sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+		std::cout << "ate rmse = " << transErr << std::endl;
+		//!!!debugging
+		PoseHelper::saveToPoseFile("debug/gt.txt", refTrajectoryKeys);
+		PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryKeys);
+		//!!!debugging
+		std::cout << "waiting..." << std::endl; getchar();
+	}
+	//{//evaluate dense depth only
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
-	//	sba.setUseGlobalDenseOpt(false);
-	//	sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f));
+	//	sba.setUseGlobalDenseOpt(true);
+	//	sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f));
 	//	for (unsigned int i = 0; i < 8; i++)
 	//		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
@@ -1596,17 +1611,6 @@ void TestMatching::testGlobalDense()
 	//	std::cout << "ate rmse = " << transErr << std::endl;
 	//	std::cout << "waiting..." << std::endl; getchar();
 	//}
-	{//evaluate dense depth only
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
-		sba.setUseGlobalDenseOpt(true);
-		sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f));
-		for (unsigned int i = 0; i < 8; i++)
-			sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
-		std::cout << "ate rmse = " << transErr << std::endl;
-		std::cout << "waiting..." << std::endl; getchar();
-	}
 	//{//evaluate dense color only
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 	//	sba.setUseGlobalDenseOpt(true);
@@ -1658,32 +1662,8 @@ void TestMatching::testGlobalDense()
 	std::cout << "ate rmse = " << transErr << std::endl;
 	std::cout << "*********************************" << std::endl;
 
-	std::ofstream sgt("debug/gt.txt"); mat4f refFirstTransform = refTrajectoryKeys.front().getInverse();
-	std::ofstream sot("debug/opt.txt");
-	for (unsigned int i = 0; i < trajectoryKeys.size(); i++) {
-		if (trajectoryKeys[i](0, 0) != -std::numeric_limits<float>::infinity()) {
-			mat4f transform = trajectoryKeys[i];
-			vec3f translation = transform.getTranslation();
-			mat3f rotation = transform.getRotation();
-			quatf quaternion(rotation);
-			vec3f imag = quaternion.imag();
-			float real = quaternion.real();
-			sot << i << " "; // time
-			sot << translation.x << " " << translation.y << " " << translation.z << " "; // translation
-			sot << imag.x << " " << imag.y << " " << imag.z << " " << real << std::endl; // rotation
-
-			transform = refTrajectoryKeys[i];
-			translation = transform.getTranslation();
-			rotation = transform.getRotation();
-			quaternion = quatf(rotation);
-			imag = quaternion.imag();
-			real = quaternion.real();
-			sgt << i << " "; // time
-			sgt << translation.x << " " << translation.y << " " << translation.z << " "; // translation
-			sgt << imag.x << " " << imag.y << " " << imag.z << " " << real << std::endl; // rotation
-		}
-	}
-	sgt.close(); sot.close();
+	PoseHelper::saveToPoseFile("debug/gt.txt", refTrajectoryKeys);
+	PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryKeys);
 
 	int a = 5;
 }
