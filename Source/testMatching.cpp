@@ -1578,6 +1578,11 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsDenseColorEnd(maxNumIters, 0.5f);
 
 	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
+	{//evaluate initial trajectory
+		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+		std::cout << "ate rmse = " << transErr << std::endl;
+		std::cout << "waiting..." << std::endl; getchar();
+	}
 	//{//evaluate at ground truth
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, refTrajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 	//	sba.setUseGlobalDenseOpt(true);
@@ -1585,21 +1590,21 @@ void TestMatching::testGlobalDense()
 	//	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
 	//	std::cout << "waiting..." << std::endl; getchar();
 	//}
-	{//evaluate sparse only
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
-		sba.setUseGlobalDenseOpt(false);
-		sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f));
-		for (unsigned int i = 0; i < 8; i++)
-			sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
-		std::cout << "ate rmse = " << transErr << std::endl;
-		//!!!debugging
-		PoseHelper::saveToPoseFile("debug/gt.txt", refTrajectoryKeys);
-		PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryKeys);
-		//!!!debugging
-		std::cout << "waiting..." << std::endl; getchar();
-	}
+	//{//evaluate sparse only
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
+	//	sba.setUseGlobalDenseOpt(false);
+	//	sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f));
+	//	for (unsigned int i = 0; i < 8; i++)
+	//		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+	//	float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+	//	std::cout << "ate rmse = " << transErr << std::endl;
+	//	//!!!debugging
+	//	PoseHelper::saveToPoseFile("debug/gt.txt", refTrajectoryKeys);
+	//	PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryKeys);
+	//	//!!!debugging
+	//	std::cout << "waiting..." << std::endl; getchar();
+	//}
 	//{//evaluate dense depth only
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 	//	sba.setUseGlobalDenseOpt(true);
@@ -1611,17 +1616,17 @@ void TestMatching::testGlobalDense()
 	//	std::cout << "ate rmse = " << transErr << std::endl;
 	//	std::cout << "waiting..." << std::endl; getchar();
 	//}
-	//{//evaluate dense color only
-	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
-	//	sba.setUseGlobalDenseOpt(true);
-	//	sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 1.0f));
-	//	for (unsigned int i = 0; i < 16; i++)
-	//		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
-	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-	//	float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
-	//	std::cout << "ate rmse = " << transErr << std::endl;
-	//	std::cout << "waiting..." << std::endl; getchar();
-	//}
+	{//evaluate dense color only
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
+		sba.setUseGlobalDenseOpt(true);
+		sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 1.0f));
+		for (unsigned int i = 0; i < 16; i++)
+			sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, false, false);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+		std::cout << "ate rmse = " << transErr << std::endl;
+		std::cout << "waiting..." << std::endl; getchar();
+	}
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 
 	//first sparse

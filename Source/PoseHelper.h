@@ -31,7 +31,7 @@ namespace PoseHelper {
 		mat4f align = EigenWrapperf::kabsch(pts, refPts, evs);
 		float err = 0.0f;
 		for (unsigned int i = 0; i < pts.size(); i++) {
-			vec3f p0 = align.getRotation() * pts[i];
+			vec3f p0 = align * pts[i];
 			vec3f p1 = refPts[i];
 			float dist2 = vec3f::distSq(p0, p1);
 			err += dist2;
@@ -48,7 +48,7 @@ namespace PoseHelper {
 		float eps = 0.0001f;
 
 		float psi, theta, phi; // x,y,z axis angles
-		if (abs(R(2, 0) - 1) > eps && abs(R(2, 0) + 1) > eps) { // R(2, 0) != +/- 1
+		if (abs(R(2, 0) - 1) > -1+eps && abs(R(2, 0) + 1) > 1-eps) { // R(2, 0) != +/- 1
 			theta = -asin(R(2, 0)); // \pi - theta
 			float costheta = cos(theta);
 			psi = atan2(R(2, 1) / costheta, R(2, 2) / costheta);
@@ -58,7 +58,7 @@ namespace PoseHelper {
 		}
 		else {
 			phi = 0;
-			if (abs(R(2, 0) + 1) > eps) {
+			if (abs(R(2, 0) + 1) < eps) { // R(2, 0) == - 1
 				theta = ml::math::PIf / 2.0f;
 				psi = phi + atan2(R(0, 1), R(0, 2));
 			}

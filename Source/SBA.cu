@@ -10,7 +10,7 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 	const float eps = 0.0001f;
 
 	float psi, theta, phi; // x,y,z axis angles
-	if (abs(matrix(2, 0) - 1) > eps && abs(matrix(2, 0) + 1) > eps) { // R(2, 0) != +/- 1
+	if (matrix(2, 0) > -1+eps && matrix(2, 0) < 1-eps) { // R(2, 0) != +/- 1
 		theta = -asin(matrix(2, 0)); // \pi - theta
 		float costheta = cos(theta);
 		psi = atan2(matrix(2, 1) / costheta, matrix(2, 2) / costheta);
@@ -24,7 +24,7 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 	}
 	else {
 		phi = 0;
-		if (abs(matrix(2, 0) + 1) > eps) {
+		if (abs(matrix(2, 0) + 1) < eps) { // R(2, 0) == -1
 			theta = CUDART_PI_F / 2.0f;
 			psi = phi + atan2(matrix(0, 1), matrix(0, 2));
 		}
