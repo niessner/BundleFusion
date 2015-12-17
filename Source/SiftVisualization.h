@@ -39,7 +39,7 @@ public:
 		const mat4f& depthIntrinsicsInv, const mat4f& transform);
 
 	static void saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
-		const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv);
+		const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, bool saveFrameByFrame = false);
 
 	static void saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory, bool saveFrameByFrame = false);
 	static void computePointCloud(PointCloudf& pc, const ColorImageR8G8B8A8& color, const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal, const mat4f& transform);

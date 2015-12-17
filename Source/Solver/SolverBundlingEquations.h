@@ -99,12 +99,25 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 
 			pRot += make_float3(dot(R_dAlpha*variableP, R_dAlpha*variableP), dot(R_dBeta*variableP, R_dBeta*variableP), dot(R_dGamma*variableP, R_dGamma*variableP));
 			pTrans += make_float3(1.0f, 1.0f, 1.0f);
+
+			//!!!debugging
+			if (i == 0 && (isnan(pRot.x) || isnan(pRot.y) || isnan(pRot.z) || isnan(pTrans.x) || isnan(pTrans.y) || isnan(pTrans.z))) {
+				printf("NaN evalminusjtf pRot/Trans (sparse) at %d,%d oldangles %f %f %f, varp %f %f %f\n",
+					variableIdx, i, oldAngles0.x, oldAngles0.y, oldAngles0.z, variableP.x, variableP.y, variableP.z);
+			}
+			//!!!debugging
 		}
 	}
 	resRot = -parameters.weightSparse * rRot;
 	resTrans = -parameters.weightSparse * rTrans;
 	pRot *= parameters.weightSparse;
 	pTrans *= parameters.weightSparse;
+
+	//!!!debugging
+	if (isnan(pRot.x) || isnan(pRot.y) || isnan(pRot.z) || isnan(pTrans.x) || isnan(pTrans.y) || isnan(pTrans.z)) {
+		printf("NaN evalminusjtf pRot/Trans (sparse) at %d (%f %f %f %f %f %f) w %f N %d\n", variableIdx, pRot.x, pRot.y, pRot.z, pTrans.x, pTrans.y, pTrans.z, parameters.weightSparse, N);
+	}
+	//!!!debugging
 
 	// add dense term
 	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
@@ -121,6 +134,12 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 		state.d_denseJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
 		state.d_denseJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
 	// end dense part
+
+	//!!!debugging
+	//if (isnan(pRot.x) || isnan(pRot.y) || isnan(pRot.z) || isnan(pTrans.x) || isnan(pTrans.y) || isnan(pTrans.z)) {
+	//	printf("NaN evalminusjtf pRot/Trans (dense) at %d (%f %f %f %f %f %f)\n", variableIdx, pRot.x, pRot.y, pRot.z, pTrans.x, pTrans.y, pTrans.z);
+	//}
+	//!!!debugging
 
 	// Preconditioner depends on last solution P(input.d_x)
 	if (pRot.x > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].x = 1.0f / pRot.x;
@@ -306,6 +325,33 @@ __inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState&
 			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 5],
 			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 5]);
 
+		//!!!debugging
+		for (unsigned int r = 0; r < 3; r++) {
+			for (unsigned int c = 0; c < 3; c++)
+				if (isnan(block00(r,c))) printf("NaN applyJtJ var %d block00 (%d,%d) at [%d %d]\n", variableIdx, baseVarIdx, baseIdx, r, c);
+		}
+		for (unsigned int r = 0; r < 3; r++) {
+			for (unsigned int c = 0; c < 3; c++)
+				if (isnan(block01(r, c))) printf("NaN applyJtJ var %d block01 (%d,%d) at [%d %d]\n", variableIdx, baseVarIdx, baseIdx, r, c);
+		}
+		for (unsigned int r = 0; r < 3; r++) {
+			for (unsigned int c = 0; c < 3; c++)
+				if (isnan(block10(r, c))) printf("NaN applyJtJ var %d block10 (%d,%d) at [%d %d]\n", variableIdx, baseVarIdx, baseIdx, r, c);
+		}
+		for (unsigned int r = 0; r < 3; r++) {
+			for (unsigned int c = 0; c < 3; c++)
+				if (isnan(block11(r, c))) printf("NaN applyJtJ var %d block11 (%d,%d) at [%d %d]\n", variableIdx, baseVarIdx, baseIdx, r, c);
+		}
+		float3 pr = state.d_pRot[i];
+		float3 pt = state.d_pTrans[i];
+		if (isnan(pr.x) || isnan(pr.y) || isnan(pr.z) || isnan(pt.x) || isnan(pt.y) || isnan(pt.z))
+			printf("NaN applyJtJ pRot/pTrans at %d of %d (%f %f %f %f %f %f)\n", i, N, pr.x, pr.y, pr.z, pt.x, pt.y, pt.z);
+		//float3 a0 = block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
+		//float3 a1 = block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
+		//if (isnan(a0.x) || isnan(a0.y) || isnan(a0.z) || isnan(a1.x) || isnan(a1.y) || isnan(a1.z))
+		//	printf("NaN applyJtJ add part %d (%f %f %f %f %f %f)\n", i, a0.x, a0.y, a0.z, a1.x, a1.y, a1.z);
+		//!!!debugging
+
 		outRot += block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
 		outTrans += block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
 	}
@@ -382,74 +428,72 @@ __inline__ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, 
 ////////////////////////////////////////
 // dense depth term
 ////////////////////////////////////////
-__inline__ __device__ float computeColorDProjLookup(const float4& dx, const float4& camPosTgt, const float2& intensityDerivTgt, const float2& colorFocalLength
-	, bool debug = false)
+__inline__ __device__ float computeColorDProjLookup(const float4& dx, const float4& camPosSrcToTgt, const float2& intensityDerivTgt, const float2& colorFocalLength)
 {
 	mat3x1 dcdx; dcdx(0) = dx.x; dcdx(1) = dx.y; dcdx(2) = dx.z;
-	mat2x3 dProjectionC = dCameraToScreen(camPosTgt, colorFocalLength.x, colorFocalLength.y);
+	mat2x3 dProjectionC = dCameraToScreen(camPosSrcToTgt, colorFocalLength.x, colorFocalLength.y);
 	mat2x1 dbdx = dProjectionC * dcdx;
 	mat1x2 dColorB(intensityDerivTgt);
 	mat1x1 dadx = dColorB * dbdx;
 
-	if (debug) {
-		mat1x3 dd = dColorB * dProjectionC;
-		printf("dcdx = %f %f %f\n", dcdx(0), dcdx(1), dcdx(2));
-		printf("dProjectionC = %f %f %f, %f %f %f\n", dProjectionC(0, 0), dProjectionC(0, 1), dProjectionC(0, 2),
-			dProjectionC(1, 0), dProjectionC(1, 1), dProjectionC(1, 2));
-		printf("dintensity*dProj = %f %f %f\n", dd(0), dd(1), dd(2));
-		printf("dbdx = %f %f\n", dbdx(0), dbdx(1));
-		printf("dintensity = %f %f\n", dColorB(0), dColorB(1));
-		printf("res = %f\n", dadx(0));
-		printf("\n");
-	}
+	//if (debug) {
+	//	mat1x3 dd = dColorB * dProjectionC;
+	//	printf("dcdx = %f %f %f\n", dcdx(0), dcdx(1), dcdx(2));
+	//	printf("dProjectionC = %f %f %f, %f %f %f\n", dProjectionC(0, 0), dProjectionC(0, 1), dProjectionC(0, 2),
+	//		dProjectionC(1, 0), dProjectionC(1, 1), dProjectionC(1, 2));
+	//	printf("dintensity*dProj = %f %f %f\n", dd(0), dd(1), dd(2));
+	//	printf("dbdx = %f %f\n", dbdx(0), dbdx(1));
+	//	printf("dintensity = %f %f\n", dColorB(0), dColorB(1));
+	//	printf("res = %f\n", dadx(0));
+	//	printf("\n");
+	//}
 
 	return dadx(0);
 }
 __inline__ __device__ void computeJacobianBlockIntensityRow_i(matNxM<1, 6>& jacBlockRow, const float2& colorFocal, const float3& angles, const float3& translation,
-	const float4x4& transform_j, const float4& camPosSrc, const float4& camPosTgt, const float2& intensityDerivTgt)
+	const float4x4& transform_j, const float4& camPosSrc, const float4& camPosSrcToTgt, const float2& intensityDerivTgt)
 {
 	float4 world = transform_j * camPosSrc;
 	//alpha
 	float4 dx = evalRtInverse_dAlpha(angles, translation) * world;
-	jacBlockRow(0) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(0) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//beta
 	dx = evalRtInverse_dBeta(angles, translation) * world;
-	jacBlockRow(1) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(1) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//gamma
 	dx = evalRtInverse_dGamma(angles, translation) * world;
-	jacBlockRow(2) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(2) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//x
 	dx = evalRtInverse_dX(angles, translation) * world;
-	jacBlockRow(3) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(3) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//y
 	dx = evalRtInverse_dY(angles, translation) * world;
-	jacBlockRow(4) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(4) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//z
 	dx = evalRtInverse_dZ(angles, translation) * world;
-	jacBlockRow(5) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(5) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 }
 __inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacBlockRow, const float2& colorFocal, const float3& angles, const float3& translation,
-	const float4x4& invTransform_i, const float4& camPosSrc, const float4& camPosTgt, const float2& intensityDerivTgt
-	, bool debug)
+	const float4x4& invTransform_i, const float4& camPosSrc, const float4& camPosSrcToTgt, const float2& intensityDerivTgt)
 {
 	//alpha
 	float4 dx = invTransform_i * evalR_dAlpha(angles) * camPosSrc;
-	jacBlockRow(0) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal, debug);
+	jacBlockRow(0) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//beta
 	dx = invTransform_i * evalR_dBeta(angles) * camPosSrc;
-	jacBlockRow(1) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(1) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//gamma
 	dx = invTransform_i * evalR_dGamma(angles) * camPosSrc;
-	jacBlockRow(2) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(2) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//x
 	dx = invTransform_i * make_float4(1.0f, 0.0f, 0.0f, 1.0f);
-	jacBlockRow(3) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(3) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//y
 	dx = invTransform_i * make_float4(0.0f, 1.0f, 0.0f, 1.0f);
-	jacBlockRow(4) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(4) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 	//z
 	dx = invTransform_i * make_float4(0.0f, 0.0f, 1.0f, 1.0f);
-	jacBlockRow(5) = computeColorDProjLookup(dx, camPosTgt, intensityDerivTgt, colorFocal);
+	jacBlockRow(5) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 }
 ////////////////////////////////////////
 // dense term

@@ -27,7 +27,7 @@ SBA::SBA()
 
 	const unsigned int maxNumIts = 10;
 	if (GlobalBundlingState::get().s_numGlobalNonLinIterations >= maxNumIts || GlobalBundlingState::get().s_numLocalNonLinIterations >= maxNumIts) {
-		std::cout << "ERROR max num its weights specified for is " <<  maxNumIts << std::endl;
+		std::cout << "ERROR max num its weights specified for is " << maxNumIts << std::endl;
 		getchar();
 	}
 	m_localWeightsSparse.resize(maxNumIts, 1.0f);
@@ -55,9 +55,9 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 
 	m_bVerify = false;
 	m_maxResidual = -1.0f;
-	
+
 	//dense opt params
-	bool usePairwise; const CUDACache* cache = cudaCache; 
+	bool usePairwise; const CUDACache* cache = cudaCache;
 	std::vector<float> weightsDenseDepth, weightsDenseColor, weightsSparse;
 	if (isLocal) {
 		//to turn off
@@ -67,7 +67,8 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 		weightsDenseDepth = m_localWeightsDenseDepth;
 		weightsDenseColor = m_localWeightsDenseColor;
 		weightsSparse = m_localWeightsSparse;
-	} else {
+	}
+	else {
 		usePairwise = true; //always global dense pairwise
 		weightsSparse = m_globalWeightsSparse;
 		if (!m_bUseGlobalDenseOpt) {
@@ -86,6 +87,16 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans);
 	if (isStart) MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages, siftManager->getValidImages().data(), sizeof(int)*numImages, cudaMemcpyHostToDevice));
 
+	//!!!debugging
+	{
+		std::vector<vec3f> rot(numImages), trans(numImages);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
+		for (unsigned int i = 0; i < numImages; i++) { if (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z)) { printf("NaN input pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
+		for (unsigned int i = 0; i < numImages; i++) { if (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z)) { printf("NaN input pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
+	}
+	//!!!debugging
+
 	bool removed = false;
 	const unsigned int maxIts = 1;//GlobalBundlingState::get().s_maxNumResidualsRemoved;
 	unsigned int curIt = 0;
@@ -103,8 +114,18 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 		else m_bVerify = true; //!!!debugging //TODO this should not happen except for debugging
 	}
 
+	//!!!debugging
+	{
+		std::vector<vec3f> rot(numImages), trans(numImages);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
+		for (unsigned int i = 0; i < numImages; i++) { if (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z)) { printf("NaN out pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
+		for (unsigned int i = 0; i < numImages; i++) { if (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z)) { printf("NaN out pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
+	}
+	//!!!debugging
+
 	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
-	
+
 	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve += s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve += curIt * maxNumIters; }
 }
 
@@ -119,7 +140,7 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 	m_solver->solve(d_correspondences, m_numCorrespondences, d_validImages, numImages, numNonLinearIterations, numLinearIterations,
 		cudaCache, weightsSparse, weightsDenseDepth, weightsDenseColor, useDensePairwise, d_xRot, d_xTrans, isStart, isEnd); //isStart -> rebuild jt, isEnd -> remove max residual
 
-	bool removed = false; 
+	bool removed = false;
 	if (isEnd && weightsSparse.front() > 0) {
 		removed = removeMaxResidualCUDA(siftManager, numImages);
 	}

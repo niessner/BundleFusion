@@ -13,6 +13,8 @@ struct CUDACachedFrame {
 
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityDownsampled, sizeof(float) * width * height));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityDerivsDownsampled, sizeof(float2) * width * height));
+
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityOrigDown, sizeof(float) * width * height));
 	}
 	void free() {
 		MLIB_CUDA_SAFE_FREE(d_depthDownsampled);
@@ -22,6 +24,8 @@ struct CUDACachedFrame {
 
 		MLIB_CUDA_SAFE_FREE(d_intensityDownsampled);
 		MLIB_CUDA_SAFE_FREE(d_intensityDerivsDownsampled);
+
+		MLIB_CUDA_SAFE_FREE(d_intensityOrigDown);
 	}
 
 	float* d_depthDownsampled;
@@ -32,6 +36,10 @@ struct CUDACachedFrame {
 	//for dense color term
 	float* d_intensityDownsampled; //this could be packed with intensityDerivaties to a float4 dunno about the read there
 	float2* d_intensityDerivsDownsampled; //TODO could have energy over intensity gradient instead of intensity
+
+	//!!!debuggging
+	float* d_intensityOrigDown; //TODO if keep no need for intensityhelper in cudacache
+	//!!!debuggging
 };
 
 #endif //CUDA_CACHE_UTIL

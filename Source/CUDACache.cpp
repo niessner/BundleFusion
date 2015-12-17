@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CUDACache.h"
+#include "GlobalBundlingState.h"
 
 
 CUDACache::CUDACache(unsigned int widthDownSampled, unsigned int heightDownSampled, unsigned int maxNumImages, const mat4f& intrinsics)
@@ -12,6 +13,7 @@ CUDACache::CUDACache(unsigned int widthDownSampled, unsigned int heightDownSampl
 	m_intrinsicsInv = m_intrinsics.getInverse();
 
 	d_intensityHelper = NULL;
+	m_filterIntensitySigma = GlobalBundlingState::get().s_colorSigma;
 
 	alloc();
 	m_currentFrame = 0;
@@ -31,7 +33,11 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 	//CUDAImageUtil::jointBilateralFilterFloatMap(frame.d_colorDownsampled)
 
 	CUDAImageUtil::resampleToIntensity(d_intensityHelper, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
-	CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, 3.0f, m_width, m_height); //TODO PARAM
+	//!!!debugging
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.d_intensityOrigDown, d_intensityHelper, sizeof(float)*m_width*m_height, cudaMemcpyDeviceToDevice));
+	//!!!debugging
+	if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, m_filterIntensitySigma, m_width, m_height);
+	else std::swap(frame.d_intensityDownsampled, d_intensityHelper);
 	CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, m_width, m_height);
 
 	m_currentFrame++;

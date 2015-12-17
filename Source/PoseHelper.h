@@ -45,14 +45,16 @@ namespace PoseHelper {
 		ml::mat3f R = Rt.getRotation();
 		ml::vec3f tr = Rt.getTranslation();
 
-		float eps = 0.00001f;
+		float eps = 0.0001f;
 
 		float psi, theta, phi; // x,y,z axis angles
-		if (abs(R(2, 0) - 1) > eps || abs(R(2, 0) + 1) > eps) { // R(2, 0) != +/- 1
-			theta = -asin(math::clamp(R(2, 0), -1.0f, 1.0f)); // \pi - theta
+		if (abs(R(2, 0) - 1) > eps && abs(R(2, 0) + 1) > eps) { // R(2, 0) != +/- 1
+			theta = -asin(R(2, 0)); // \pi - theta
 			float costheta = cos(theta);
 			psi = atan2(R(2, 1) / costheta, R(2, 2) / costheta);
 			phi = atan2(R(1, 0) / costheta, R(0, 0) / costheta);
+
+			if (isnan(theta)) { std::cout << "ERROR MatrixToPose: NaN theta = -asin(" << R(2,0) << ")" << std::endl; getchar(); }
 		}
 		else {
 			phi = 0;

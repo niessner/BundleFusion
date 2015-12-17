@@ -7,14 +7,20 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 	trans = make_float3(matrix(0,3), matrix(1,3), matrix(2,3));
 	rot = make_float3(0.0f);
 
-	const float eps = 0.00001f;
+	const float eps = 0.0001f;
 
 	float psi, theta, phi; // x,y,z axis angles
-	if (abs(matrix(2, 0) - 1) > eps || abs(matrix(2, 0) + 1) > eps) { // R(2, 0) != +/- 1
-		theta = -asin(clamp(matrix(2, 0), -1.0f, 1.0f)); // \pi - theta
+	if (abs(matrix(2, 0) - 1) > eps && abs(matrix(2, 0) + 1) > eps) { // R(2, 0) != +/- 1
+		theta = -asin(matrix(2, 0)); // \pi - theta
 		float costheta = cos(theta);
 		psi = atan2(matrix(2, 1) / costheta, matrix(2, 2) / costheta);
 		phi = atan2(matrix(1, 0) / costheta, matrix(0, 0) / costheta);
+
+		//!!!debugging
+		if (isnan(theta)) {
+			printf("ERROR NaN matrixToPose theta = -asin(%f) = %f\n", matrix(2, 0), theta);
+		}
+		//!!!debugging
 	}
 	else {
 		phi = 0;
@@ -40,6 +46,15 @@ __global__ void convertMatricesToPosesCU_Kernel(const float4x4* d_transforms, un
 
 	if (idx < numTransforms) {
 		matrixToPose(d_transforms[idx], d_rot[idx], d_trans[idx]);
+
+		//!!!debugging
+		if (isnan(d_rot[idx].x) || isnan(d_rot[idx].y) || isnan(d_rot[idx].z)) {
+			printf("NaN convertMatrixToPose rot at %d (%f,%f,%f)\n", idx, d_rot[idx].x, d_rot[idx].y, d_rot[idx].z);
+		}
+		if (isnan(d_trans[idx].x) || isnan(d_trans[idx].y) || isnan(d_trans[idx].z)) {
+			printf("NaN convertMatrixToPose trans at %d (%f,%f,%f)\n", idx, d_trans[idx].x, d_trans[idx].y, d_trans[idx].z);
+		}
+		//!!!debugging
 	}
 }
 

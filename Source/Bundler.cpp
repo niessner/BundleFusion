@@ -71,13 +71,17 @@ void Bundler::processInput()
 		}
 		MLIB_ASSERT(!m_RGBDSensor->isReceivingFrames());
 #endif
-		static bool processLastFrame = true;
-		if (processLastFrame && m_currentState.m_localToSolve == -1) {
+		static unsigned int framePastLast = 0;
+		if (framePastLast == 0 && m_currentState.m_localToSolve == -1) {
 			if (!m_SubmapManager.isLastLocalFrame(curFrame)) prepareLocalSolve(curFrame, true);
-			processLastFrame = false;
 #ifdef USE_GLOBAL_DENSE_AT_END
 			m_SubmapManager.setGlobalDenseSolve(true);
 #endif
+			framePastLast++;
+		}
+		else {
+			if (framePastLast >= 10) m_SubmapManager.setEndSolveGlobalDenseWeights();
+			else framePastLast++;
 		}
 		return; // nothing new to process
 	}
@@ -91,7 +95,7 @@ void Bundler::processInput()
 	const unsigned int curLocalFrame = m_SubmapManager.runSIFT(curFrame, m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepth,
 		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
-	
+
 	// match with every other local
 	m_currentState.m_bLastFrameValid = 1;
 	if (curLocalFrame > 0) {
@@ -204,7 +208,7 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 		if (isEnd) {
 			m_SubmapManager.updateTrajectory(numFrames);
 			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.getCompleteTrajectory(), numFrames);
-			m_currentState.m_numCompleteTransforms = numFrames; 
+			m_currentState.m_numCompleteTransforms = numFrames;
 			if (valid) m_currentState.m_lastValidCompleteTransform = m_submapSize * m_currentState.m_lastLocalSolved; //TODO over-conservative but easier
 			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}
@@ -214,7 +218,7 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 			m_SubmapManager.invalidateLastGlobalFrame();
 			m_SubmapManager.updateTrajectory(numFrames);
 			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.getCompleteTrajectory(), numFrames);
-			m_currentState.m_numCompleteTransforms = numFrames; 
+			m_currentState.m_numCompleteTransforms = numFrames;
 
 			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}
@@ -283,7 +287,7 @@ void Bundler::prepareLocalSolve(unsigned int curFrame, bool isLastFrame /*= fals
 		curLocalIdx++;
 		m_currentState.m_localToSolve = -((int)curLocalIdx + m_currentState.s_markOffset);
 		if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last local submap 1 frame -> invalidating" << curFrame << std::endl;
-	} 
+	}
 
 	// if valid local
 	if (m_SubmapManager.isCurrentLocalValidChunk()) {

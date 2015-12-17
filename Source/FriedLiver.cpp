@@ -232,11 +232,11 @@ int main(int argc, char** argv)
 		//!!!DEBUGGING
 		if (true) {
 			TestMatching test;
-			test.loadFromSensor("debug/2noise.sensor", "", 1);
+			//test.loadFromSensor("debug/11.sensor", "", 1);
 			//test.printCacheFrames("debug/cache/");
-			test.runOpt();
+			//test.runOpt();
 			//test.analyzeLocalOpts();
-			//test.testGlobalDense();
+			test.testGlobalDense();
 
 			std::cout << "done!" << std::endl;
 			getchar();

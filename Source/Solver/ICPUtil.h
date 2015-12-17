@@ -8,15 +8,15 @@
 #include "../../SiftGPU/cuda_SimpleMatrixUtil.h"
 
 // color stuff
-inline __device__ mat2x3 dCameraToScreen(const float4& v, float fx, float fy)
+inline __device__ mat2x3 dCameraToScreen(const float4& p, float fx, float fy)
 {
 	mat2x3 res; res.setZero();
-	const float wSquared = v.z*v.z;
+	const float wSquared = p.z*p.z;
 
-	res(0, 0) = fx / v.z;
-	res(1, 1) = fy / v.z;
-	res(0, 2) = -v.x * fx / wSquared;
-	res(1, 2) = -v.y * fy / wSquared;
+	res(0, 0) = fx / p.z;
+	res(1, 1) = fy / p.z;
+	res(0, 2) = -fx * p.x / wSquared;
+	res(1, 2) = -fy * p.y / wSquared;
 
 	return res;
 }

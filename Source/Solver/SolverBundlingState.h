@@ -89,6 +89,8 @@ struct SolverState
 
 	//!!!DEBUGGING
 	int* d_corrCount;
+	int* d_corrCountColor;
+	float* d_sumResidualColor;
 };
 
 #endif
