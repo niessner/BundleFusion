@@ -193,11 +193,11 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 			if (useColor) {
 				const float2 intensityDerivTgt = input.d_cacheFrames[i].d_intensityDerivsDownsampled[tgtIdx];
 				float diffIntensity = input.d_cacheFrames[i].d_intensityDownsampled[tgtIdx] - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
-				float diffIntensityNorm1 = sqrtf(diffIntensity * diffIntensity);
-				if (intensityDerivTgt.x != MINF && diffIntensityNorm1 < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin) {
+				if (intensityDerivTgt.x != MINF && abs(diffIntensity) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin) {
 					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
-					weight = max(0.0f, 1.0f - diffIntensityNorm1 / parameters.denseColorThresh);
+					//weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
+					weight = 1.0f;
 
 					//!!!debugging
 					//if (x == 3 && y == 42) {
@@ -242,6 +242,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 	} // valid image pixel
 }
 
+extern "C"
 void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
 	const unsigned int N = input.numberOfImages;
@@ -284,8 +285,8 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 		cutilCheckMsg(__FUNCTION__);
 #endif
 		//!!!DEBUGGING //remember the delete!
-		//float* denseCorrCounts = new float[maxDenseImPairs];
-		//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
+		float* denseCorrCounts = new float[maxDenseImPairs];
+		cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
 		//unsigned int totalCount = 0;
 		//for (unsigned int i = 0; i < maxDenseImPairs; i++) { totalCount += (unsigned int)denseCorrCounts[i]; }
 		//printf("total count = %d\n", totalCount);
@@ -298,7 +299,7 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 #endif
 		//!!!DEBUGGING
 		//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
-		//if (denseCorrCounts) delete[] denseCorrCounts;
+		if (denseCorrCounts) delete[] denseCorrCounts;
 		//!!!DEBUGGING
 
 		if (parameters.weightDenseColor > 0.0f)
@@ -968,10 +969,23 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		{
 			//!!!debugging
 			//if (linIter == parameters.nLinIterations - 1) {
-				//cutilSafeCall(cudaMemcpy(xRot, state.d_deltaRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-				//cutilSafeCall(cudaMemcpy(xTrans, state.d_deltaTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-				//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(xRot[i].x) || isnan(xRot[i].y) || isnan(xRot[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); } }
-				//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(xTrans[i].x) || isnan(xTrans[i].y) || isnan(xTrans[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); } }
+			//	cutilSafeCall(cudaMemcpy(xRot, state.d_deltaRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+			//	cutilSafeCall(cudaMemcpy(xTrans, state.d_deltaTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+			//	char buffer [50];
+			//	sprintf (buffer, "debug/delta-%d.txt", nIter);
+			//	FILE* pf = fopen(buffer, "w");
+			//	if (pf == NULL) { printf("failed to open %s for writing\n", buffer); getchar(); }
+			//	fprintf(pf, "delta rot:\n");
+			//	for (unsigned int i = 1; i < input.numberOfImages; i++) { 
+			//		if (isnan(xRot[i].x) || isnan(xRot[i].y) || isnan(xRot[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
+			//		fprintf(pf, "%d: %f %f %f\n", i, xRot[i].x, xRot[i].y, xRot[i].z);
+			//	}
+			//	fprintf(pf, "delta trans:\n");
+			//	for (unsigned int i = 1; i < input.numberOfImages; i++) { 
+			//		if (isnan(xTrans[i].x) || isnan(xTrans[i].y) || isnan(xTrans[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
+			//		fprintf(pf, "%d: %f %f %f\n", i, xTrans[i].x, xTrans[i].y, xTrans[i].z);
+			//	}
+			//	fclose(pf);
 			//}
 			//!!!debugging
 			PCGIteration(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);

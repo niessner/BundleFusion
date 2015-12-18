@@ -11,6 +11,8 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 
 extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
+extern "C" void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
+
 CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxNumResiduals) 
 	: m_maxNumberOfImages(maxNumberOfImages)
 , THREADS_PER_BLOCK(512) // keep consistent with the GPU
@@ -171,7 +173,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.denseColorThresh = 0.1f;
 	parameters.denseColorGradientMin = 0.005f;
 	parameters.denseDepthMin = 0.1f;
-	parameters.denseDepthMax = 3.0f;
+	parameters.denseDepthMax = 3.0f; //TODO 
 	parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
 	parameters.useDenseDepthAllPairwise = usePairwiseDense;
 
@@ -204,6 +206,26 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		solverInput.depthIntrinsics.setValue(-std::numeric_limits<float>::infinity());
 		solverInput.colorFocalLength = make_float2(-std::numeric_limits<float>::infinity());
 	}
+	//!!!debugging
+	//if (parameters.weightDenseDepth > 0) {
+	//	BuildDenseSystem(solverInput, m_solverState, parameters, NULL);
+	//	std::vector<float> imPairWeights(numberOfImages * numberOfImages);
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairWeights.data(), m_solverState.d_denseCorrCounts, sizeof(float)*imPairWeights.size(), cudaMemcpyDeviceToHost));
+	//	ColorImageR8G8B8 corrImage(numberOfImages, numberOfImages); unsigned int count = 0;
+	//	for (unsigned int i = 0; i < imPairWeights.size(); i++) {
+	//		if (imPairWeights[i] > 0) {
+	//			vec3f c = BaseImageHelper::convertDepthToRGB(imPairWeights[i], 0.0f, 1.0f) * 255.0f;
+	//			corrImage.getPointer()[i] = vec3uc(c);
+	//			count++;
+	//		}
+	//	}
+	//	std::cout << "count = " << count << std::endl;
+	//	FreeImageWrapper::saveImage("debug/corr.png", corrImage);
+	//	std::cout << "waiting..." << std::endl; getchar();
+	//}
+	//!!!debugging
+
+
 
 	if (rebuildJT) {
 		buildVariablesToCorrespondencesTable(d_correspondences, numberOfCorrespondences);

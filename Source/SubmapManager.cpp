@@ -510,7 +510,7 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 	bool ret = false;
 	const unsigned int numGlobalFrames = m_global->getNumImages();
 
-	bool removeMaxResidual = isEnd && ((numGlobalFrames % m_numOptPerResidualRemoval) == 0);
+	bool removeMaxResidual = isEnd && ((numGlobalFrames % m_numOptPerResidualRemoval) == (m_numOptPerResidualRemoval - 1));
 	const bool useVerify = false;
 	m_SparseBundler.align(m_global, m_globalCache, d_globalTrajectory, numNonLinIterations, numLinIterations,
 		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, removeMaxResidual, isScanDone);

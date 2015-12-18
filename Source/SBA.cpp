@@ -25,12 +25,8 @@ SBA::SBA()
 
 	m_bUseComprehensiveFrameInvalidation = false;
 
-	const unsigned int maxNumIts = 10;
-	if (GlobalBundlingState::get().s_numGlobalNonLinIterations >= maxNumIts || GlobalBundlingState::get().s_numLocalNonLinIterations >= maxNumIts) {
-		std::cout << "ERROR max num its weights specified for is " << maxNumIts << std::endl;
-		getchar();
-	}
-	m_localWeightsSparse.resize(maxNumIts, 1.0f);
+	const unsigned int maxNumIts = std::max(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numLocalNonLinIterations);
+	m_localWeightsSparse.resize(maxNumIts, 1.0f); m_localWeightsSparse.back() = 0.0f;
 	m_localWeightsDenseDepth.resize(maxNumIts);
 	for (unsigned int i = 0; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = i + 1.0f;
 	m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //TODO turn on

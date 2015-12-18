@@ -329,9 +329,8 @@ __inline__ __device__ float computeColorDProjLookup(const float4& dx, const floa
 {
 	mat3x1 dcdx; dcdx(0) = dx.x; dcdx(1) = dx.y; dcdx(2) = dx.z;
 	mat2x3 dProjectionC = dCameraToScreen(camPosSrcToTgt, colorFocalLength.x, colorFocalLength.y);
-	mat2x1 dbdx = dProjectionC * dcdx;
 	mat1x2 dColorB(intensityDerivTgt);
-	mat1x1 dadx = dColorB * dbdx;
+	mat1x1 dadx = dColorB * dProjectionC * dcdx;
 
 	//if (debug) {
 	//	mat1x3 dd = dColorB * dProjectionC;
