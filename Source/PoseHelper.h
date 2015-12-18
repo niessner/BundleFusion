@@ -48,7 +48,7 @@ namespace PoseHelper {
 		float eps = 0.0001f;
 
 		float psi, theta, phi; // x,y,z axis angles
-		if (abs(R(2, 0) - 1) > -1+eps && abs(R(2, 0) + 1) > 1-eps) { // R(2, 0) != +/- 1
+		if (R(2, 0) > -1+eps && R(2, 0) < 1-eps) { // R(2, 0) != +/- 1
 			theta = -asin(R(2, 0)); // \pi - theta
 			float costheta = cos(theta);
 			psi = atan2(R(2, 1) / costheta, R(2, 2) / costheta);
