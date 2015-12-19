@@ -373,6 +373,9 @@
       <Filter>Sensors</Filter>
     </ClInclude>
     <ClInclude Include="Source\GlobalDefines.h" />
+    <ClInclude Include="Source\Solver\LieDerivUtil.h">
+      <Filter>SolverBundling</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

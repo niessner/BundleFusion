@@ -1221,12 +1221,11 @@ void TestMatching::runOpt()
 	//debug rgb
 	//std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); for (unsigned int i = 0; i < 2; i++) weightsDenseDepth[i] = 0.0f;
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.05f); for (unsigned int i = 0; i < 3; i++) weightsDenseColor[i] = 0.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = (i + 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
+	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); 
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = (i + 1.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f); 
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
@@ -1290,22 +1289,22 @@ void TestMatching::runOpt()
 		float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
 		std::cout << "ate rmse = " << transErr << std::endl;
 	}
-	//now some dense
-	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor);
-	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
-	{
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
-		std::cout << "ate rmse = " << transErr << std::endl;
-	}
-	//more dense
-	sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 10.0f), std::vector<float>(maxNumIters, 0.0f));
-	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
-	{
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
-		std::cout << "ate rmse = " << transErr << std::endl;
-	}
+	////now some dense
+	//sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor);
+	//sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+	//{
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+	//	float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
+	//	std::cout << "ate rmse = " << transErr << std::endl;
+	//}
+	////more dense
+	//sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 10.0f), std::vector<float>(maxNumIters, 0.0f));
+	//sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+	//{
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+	//	float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
+	//	std::cout << "ate rmse = " << transErr << std::endl;
+	//}
 
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 

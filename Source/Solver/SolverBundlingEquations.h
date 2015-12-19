@@ -3,6 +3,11 @@
 #ifndef _SOLVER_EQUATIONS_
 #define _SOLVER_EQUATIONS_
 
+
+#include "GlobalDefines.h"
+
+#ifndef USE_LIE_SPACE
+
 #define THREADS_PER_BLOCK_JT 128
 
 #include <cutil_inline.h>
@@ -19,7 +24,7 @@
 // residual functions only for sparse!
 
 // not squared!
-__inline__ __device__ float evalResidualDeviceFloat3(unsigned int corrIdx, unsigned int componentIdx, SolverInput& input, SolverState& state, SolverParameters& parameters)
+__inline__ __device__ float evalAbsResidualDeviceFloat3(unsigned int corrIdx, unsigned int componentIdx, SolverInput& input, SolverState& state, SolverParameters& parameters)
 {
 	float3 r = make_float3(0.0f, 0.0f, 0.0f);
 
@@ -53,7 +58,7 @@ __inline__ __device__ float evalFDevice(unsigned int corrIdx, SolverInput& input
 	return 0.0f;
 }
 
-#ifndef USE_LIE_SPACE
+
 ////////////////////////////////////////
 // applyJT : this function is called per variable and evaluates each residual influencing that variable (i.e., each energy term per variable)
 ////////////////////////////////////////
@@ -216,46 +221,6 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 }
 
 ////////////////////////////////////////
-// pre-computed jtj
-////////////////////////////////////////
-//TODO MAKE EFFICIENT
-__inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState& state, float* d_JtJ, unsigned int N, float3& outRot, float3& outTrans)
-{
-	// Compute J^T*d_Jp here
-	outRot = make_float3(0.0f, 0.0f, 0.0f);
-	outTrans = make_float3(0.0f, 0.0f, 0.0f);
-
-	const unsigned int dim = 6 * N;
-
-	unsigned int baseVarIdx = variableIdx * 6;
-	for (unsigned int i = 1; i < N; i++) // iterate through (6) row(s) of JtJ and all of p (i = 0 not a variable)
-	{
-		// (row, col) = vars, i
-		unsigned int baseIdx = 6 * i;
-
-		float3x3 block00(
-			d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 2],
-			d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 2],
-			d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 2]);
-		float3x3 block01(
-			d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 5],
-			d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 5],
-			d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 5]);
-		float3x3 block10(
-			d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 2],
-			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 2],
-			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 2]);
-		float3x3 block11(
-			d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 5],
-			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 5],
-			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 5]);
-
-		outRot += block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
-		outTrans += block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
-	}
-}
-
-////////////////////////////////////////
 // dense depth term
 ////////////////////////////////////////
 
@@ -396,6 +361,7 @@ __inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacB
 ////////////////////////////////////////
 // dense term
 ////////////////////////////////////////
+
 __inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
 	unsigned int vi, unsigned int vj, float residual, float weight)
 {
@@ -436,6 +402,42 @@ __inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned
 	}
 }
 
+//TODO MAKE EFFICIENT
+__inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState& state, float* d_JtJ, unsigned int N, float3& outRot, float3& outTrans)
+{
+	// Compute J^T*d_Jp here
+	outRot = make_float3(0.0f, 0.0f, 0.0f);
+	outTrans = make_float3(0.0f, 0.0f, 0.0f);
+
+	const unsigned int dim = 6 * N;
+
+	unsigned int baseVarIdx = variableIdx * 6;
+	for (unsigned int i = 1; i < N; i++) // iterate through (6) row(s) of JtJ and all of p (i = 0 not a variable)
+	{
+		// (row, col) = vars, i
+		unsigned int baseIdx = 6 * i;
+
+		float3x3 block00(
+			d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 2],
+			d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 2],
+			d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 2]);
+		float3x3 block01(
+			d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 5],
+			d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 5],
+			d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 5]);
+		float3x3 block10(
+			d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 2],
+			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 2],
+			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 2]);
+		float3x3 block11(
+			d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 5],
+			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 5],
+			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 5]);
+
+		outRot += block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
+		outTrans += block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
+	}
+}
 //__inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,
 //	float3& outRot, float3& outTrans, unsigned int threadIdx)
 //{

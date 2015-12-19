@@ -1,6 +1,7 @@
 
 #pragma once
-
+#ifndef _GLOBAL_DEFINES_
+#define _GLOBAL_DEFINES_
 
 #define MINF __int_as_float(0xff800000)
 
@@ -10,3 +11,4 @@
 
 #define USE_LIE_SPACE
 
+#endif //_GLOBAL_DEFINES_

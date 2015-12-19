@@ -93,8 +93,13 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 	const unsigned int gidx = idx * gridDim.z + blockIdx.z;
 
 	if (gidx < (input.denseDepthWidth * input.denseDepthHeight)) {
+#ifdef USE_LIE_SPACE
+		float4x4 transform_i = poseToMatrix(state.d_xRot[i], state.d_xTrans[i]);		//TODO HERE
+		float4x4 transform_j = poseToMatrix(state.d_xRot[j], state.d_xTrans[j]);
+#else
 		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
 		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
+#endif
 		float4x4 invTransform_i = transform_i.getInverse(); //TODO pre-compute the inverts
 
 		float4x4 transform = invTransform_i * transform_j;
@@ -149,8 +154,13 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 	const unsigned int srcIdx = idx * gridDim.z + blockIdx.z;
 
 	if (srcIdx < (input.denseDepthWidth * input.denseDepthHeight)) {
+#ifdef USE_LIE_SPACE
+		float4x4 transform_i = poseToMatrix(state.d_xRot[i], state.d_xTrans[i]);		//TODO HERE
+		float4x4 transform_j = poseToMatrix(state.d_xRot[j], state.d_xTrans[j]);
+#else
 		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
 		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
+#endif
 		float4x4 invTransform_i = transform_i.getInverse(); //TODO unncessary invert for pairwise?
 
 		float4x4 transform = invTransform_i * transform_j;
@@ -287,8 +297,8 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 		cutilCheckMsg(__FUNCTION__);
 #endif
 		//!!!DEBUGGING //remember the delete!
-		float* denseCorrCounts = new float[maxDenseImPairs];
-		cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
+		//float* denseCorrCounts = new float[maxDenseImPairs];
+		//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
 		//unsigned int totalCount = 0;
 		//for (unsigned int i = 0; i < maxDenseImPairs; i++) { totalCount += (unsigned int)denseCorrCounts[i]; }
 		//printf("total count = %d\n", totalCount);
@@ -301,7 +311,7 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 #endif
 		//!!!DEBUGGING
 		//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
-		if (denseCorrCounts) delete[] denseCorrCounts;
+		//if (denseCorrCounts) delete[] denseCorrCounts;
 		//!!!DEBUGGING
 
 		if (parameters.weightDenseColor > 0.0f)
@@ -394,7 +404,7 @@ __global__ void EvalMaxResidualDevice(SolverInput input, SolverState state, Solv
 	if (x < N) {
 		const unsigned int corrIdx = x / 3;
 		const unsigned int componentIdx = x - corrIdx * 3;
-		float residual = evalResidualDeviceFloat3(corrIdx, componentIdx, input, state, parameters);
+		float residual = evalAbsResidualDeviceFloat3(corrIdx, componentIdx, input, state, parameters);
 
 		maxRes[threadIdx.x] = residual;
 		maxResIndex[threadIdx.x] = x;
@@ -536,7 +546,7 @@ __global__ void CountHighResidualsDevice(SolverInput input, SolverState state, S
 	if (x < N) {
 		const unsigned int corrIdx = x / 3;
 		const unsigned int componentIdx = x - corrIdx * 3;
-		float residual = evalResidualDeviceFloat3(corrIdx, componentIdx, input, state, parameters);
+		float residual = evalAbsResidualDeviceFloat3(corrIdx, componentIdx, input, state, parameters);
 
 		if (residual > parameters.verifyOptDistThresh)
 			atomicAdd(state.d_countHighResidual, 1);
@@ -624,8 +634,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 	if (timer) timer->startEvent("Init1");
 
 	//!!!DEBUGGING //remember to uncomment the delete...
-	//float3* rRot = new float3[input.numberOfImages]; // -jtf
-	//float3* rTrans = new float3[input.numberOfImages];
+	float3* rRot = new float3[input.numberOfImages]; // -jtf
+	float3* rTrans = new float3[input.numberOfImages];
 	//!!!DEBUGGING
 
 	cutilSafeCall(cudaMemset(state.d_scanAlpha, 0, sizeof(float)));
@@ -641,12 +651,12 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 #endif		
 	if (timer) timer->endEvent();
 
-	//cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	//cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr rRot %d\n", i); getchar(); } }
 	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr rTrans %d\n", i); getchar(); } }
-	//cutilSafeCall(cudaMemcpy(rRot, state.d_pRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	//cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(rRot, state.d_pRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr pRot %d\n", i); getchar(); } }
 	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr pTrans %d\n", i); getchar(); } }
 
@@ -659,8 +669,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 
 	if (timer) timer->endEvent();
 
-	//if (rRot) delete[] rRot;
-	//if (rTrans) delete[] rTrans;
+	if (rRot) delete[] rRot;
+	if (rTrans) delete[] rTrans;
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -823,8 +833,15 @@ __global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 
 		if (lastIteration)
 		{
+#ifdef USE_LIE_SPACE //TODO just keep that matrix transforms around
+			float3 rot, trans;
+			computeLieUpdate(state.d_deltaRot[x], state.d_deltaTrans[x], state.d_xRot[x], state.d_xTrans[x], rot, trans);
+			state.d_xRot[x] = rot;
+			state.d_xTrans[x] = trans;
+#else
 			state.d_xRot[x] = state.d_xRot[x] + state.d_deltaRot[x];
 			state.d_xTrans[x] = state.d_xTrans[x] + state.d_deltaTrans[x];
+#endif
 		}
 	}
 }
@@ -950,8 +967,8 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		printf("initial sparse = %f*%f = %f\n", parameters.weightSparse, initialResidual / parameters.weightSparse, initialResidual);
 	}
 #endif
-	//float3* xRot = new float3[input.numberOfImages];
-	//float3* xTrans = new float3[input.numberOfImages];
+	float3* xRot = new float3[input.numberOfImages];
+	float3* xTrans = new float3[input.numberOfImages];
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
@@ -970,31 +987,36 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
 		{
 			//!!!debugging
-			//if (linIter == parameters.nLinIterations - 1) {
-			//	cutilSafeCall(cudaMemcpy(xRot, state.d_deltaRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-			//	cutilSafeCall(cudaMemcpy(xTrans, state.d_deltaTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-			//	char buffer [50];
-			//	sprintf (buffer, "debug/delta-%d.txt", nIter);
-			//	FILE* pf = fopen(buffer, "w");
-			//	if (pf == NULL) { printf("failed to open %s for writing\n", buffer); getchar(); }
-			//	fprintf(pf, "delta rot:\n");
-			//	for (unsigned int i = 1; i < input.numberOfImages; i++) { 
-			//		if (isnan(xRot[i].x) || isnan(xRot[i].y) || isnan(xRot[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
-			//		fprintf(pf, "%d: %f %f %f\n", i, xRot[i].x, xRot[i].y, xRot[i].z);
-			//	}
-			//	fprintf(pf, "delta trans:\n");
-			//	for (unsigned int i = 1; i < input.numberOfImages; i++) { 
-			//		if (isnan(xTrans[i].x) || isnan(xTrans[i].y) || isnan(xTrans[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
-			//		fprintf(pf, "%d: %f %f %f\n", i, xTrans[i].x, xTrans[i].y, xTrans[i].z);
-			//	}
-			//	fclose(pf);
-			//}
+			if (linIter == parameters.nLinIterations - 1) {
+				cutilSafeCall(cudaMemcpy(xRot, state.d_deltaRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+				cutilSafeCall(cudaMemcpy(xTrans, state.d_deltaTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+				//char buffer [50];
+				//sprintf (buffer, "debug/delta-%d.txt", nIter);
+				//FILE* pf = fopen(buffer, "w");
+				//if (pf == NULL) { printf("failed to open %s for writing\n", buffer); getchar(); }
+				//fprintf(pf, "delta rot:\n");
+				//for (unsigned int i = 1; i < input.numberOfImages; i++) { 
+				//	if (isnan(xRot[i].x) || isnan(xRot[i].y) || isnan(xRot[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
+				//	fprintf(pf, "%d: %f %f %f\n", i, xRot[i].x, xRot[i].y, xRot[i].z);
+				//}
+				//fprintf(pf, "delta trans:\n");
+				//for (unsigned int i = 1; i < input.numberOfImages; i++) { 
+				//	if (isnan(xTrans[i].x) || isnan(xTrans[i].y) || isnan(xTrans[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
+				//	fprintf(pf, "%d: %f %f %f\n", i, xTrans[i].x, xTrans[i].y, xTrans[i].z);
+				//}
+				//fclose(pf);
+				int a = 5;
+			}
 			//!!!debugging
 			PCGIteration(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
 
 			//linearResidual = EvalLinearRes(input, state, parameters);
 			//linConvergenceAnalysis[idx++] = linearResidual;
 		}
+		//!!!debugging
+		cutilSafeCall(cudaMemcpy(xRot, state.d_xRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(xTrans, state.d_xTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+		//!!!debugging
 
 		//ApplyLinearUpdate(input, state, parameters);	//this should be also done in the last PCGIteration
 
@@ -1014,8 +1036,8 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		}
 	}
 	//!!!debugging
-	//if (xRot) delete[] xRot;
-	//if (xTrans) delete[] xTrans;
+	if (xRot) delete[] xRot;
+	if (xTrans) delete[] xTrans;
 	//!!!debugging
 }
 

@@ -1,6 +1,10 @@
 #ifndef _ICP_UTIL_
 #define _ICP_UTIL_
 
+#include "GlobalDefines.h"
+
+#ifndef USE_LIE_SPACE
+
 #include <cutil_inline.h>
 #include <cutil_math.h>
 #include <device_functions.h>
@@ -423,5 +427,6 @@ inline __device__ float4 getValueNearestNeighbour(const float x, const float y, 
 
 	return inputMap[v*imageWidth + u];
 }
+#endif //USE_LIE_SPACE
 
 #endif // _ICP_UTIL_

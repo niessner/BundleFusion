@@ -213,6 +213,7 @@
     <ClInclude Include="Source\SiftVisualization.h" />
     <ClInclude Include="Source\Solver\CUDASolverBundling.h" />
     <ClInclude Include="Source\Solver\ICPUtil.h" />
+    <ClInclude Include="Source\Solver\LieDerivUtil.h" />
     <ClInclude Include="Source\Solver\SolverBundlingEquations.h" />
     <ClInclude Include="Source\Solver\SolverBundlingParameters.h" />
     <ClInclude Include="Source\Solver\SolverBundlingState.h" />
