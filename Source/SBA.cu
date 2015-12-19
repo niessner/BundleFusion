@@ -36,9 +36,8 @@ __inline__ __device__ float3x3 LieAlgebraToLieGroupSO3(const float3& w) {
 }
 
 //! logarithm map: SO(3) -> so(3) / R3x3 -> w
-__inline__ __device__ float3 LieGroupToLieAlgebraSO3(const float3x3& R, bool debug) {
+__inline__ __device__ float3 LieGroupToLieAlgebraSO3(const float3x3& R) {
 	float tmp = (R.trace() - 1.0f) / 2.0f;
-	if (debug) printf("tmp = %f\n", tmp);
 
 	if (tmp < -1.0f)
 		tmp = -1.0f;
@@ -48,23 +47,16 @@ __inline__ __device__ float3 LieGroupToLieAlgebraSO3(const float3x3& R, bool deb
 	if (angleOfRotation == 0.0f)
 		return make_float3(0.0f);
 	float3x3 lnR = (R - R.getTranspose()) * (angleOfRotation / (2.0f * sin(angleOfRotation)));
-	if (debug) {
-		printf("angleOfRotation = %f\n", angleOfRotation);
-		printf("ln R:\n");
-		lnR.print();
-	}
 	return SkewSymmetricMatrixToVector(lnR);
 }
 
-__device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans, bool debug)
+__device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 {
 	float3x3 R = matrix.getFloat3x3();
 	float3 tr = matrix.getTranslation();
-	if (debug) printf("translation %f %f %f\n", tr.x, tr.y, tr.z);
 
-	rot = LieGroupToLieAlgebraSO3(R, debug);
+	rot = LieGroupToLieAlgebraSO3(R);
 	trans = tr;
-	if (debug) printf("rot %f %f %f\n", rot.x, rot.y, rot.z);
 
 	float norm = length(rot);
 	float3x3 skewSymmetricW = VectorToSkewSymmetricMatrix(rot);
@@ -73,14 +65,6 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans,
 		V += skewSymmetricW * ((1.0f - cos(norm)) / (norm * norm));
 		V += skewSymmetricW * skewSymmetricW * ((norm - sin(norm)) / (norm * norm * norm));
 		trans = V.getInverse() * tr;
-		if (debug) {
-			printf("norm = %f\n", norm);
-			printf("skewSymmetricW:\n");
-			skewSymmetricW.print();
-			printf("V:\n");
-			V.print();
-			printf("updated translation %f %f %f\n", trans.x, trans.y, trans.z);
-		}
 	}
 }
 
@@ -122,12 +106,6 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 		float costheta = cos(theta);
 		psi = atan2(matrix(2, 1) / costheta, matrix(2, 2) / costheta);
 		phi = atan2(matrix(1, 0) / costheta, matrix(0, 0) / costheta);
-
-		//!!!debugging
-		if (isnan(theta)) { //can happen if matrix(2, 0) significantly outside of [-1,1] range
-			printf("ERROR NaN matrixToPose theta = -asin(%f) = %f\n", matrix(2, 0), theta);
-		}
-		//!!!debugging
 	}
 	else {
 		phi = 0;
@@ -181,7 +159,7 @@ __global__ void convertMatricesToPosesCU_Kernel(const float4x4* d_transforms, un
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (idx < numTransforms) {
-		matrixToPose(d_transforms[idx], d_rot[idx], d_trans[idx], idx == 1);
+		matrixToPose(d_transforms[idx], d_rot[idx], d_trans[idx]);
 	}
 }
 
