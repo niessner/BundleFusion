@@ -354,7 +354,7 @@ inline __device__ float4x4 evalRtInverse_dZ(const float3& angles, const float3& 
 
 
 
-#define MINF __int_as_float(0xff800000)
+//#define MINF __int_as_float(0xff800000)
 inline __device__ float4 bilinearInterpolationFloat4(float x, float y, float4* d_input, unsigned int imageWidth, unsigned int imageHeight)
 {
 	const int2 p00 = make_int2(floor(x), floor(y));

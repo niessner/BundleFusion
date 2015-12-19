@@ -53,6 +53,7 @@ __inline__ __device__ float evalFDevice(unsigned int corrIdx, SolverInput& input
 	return 0.0f;
 }
 
+#ifndef USE_LIE_SPACE
 ////////////////////////////////////////
 // applyJT : this function is called per variable and evaluates each residual influencing that variable (i.e., each energy term per variable)
 ////////////////////////////////////////
@@ -391,6 +392,7 @@ __inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacB
 	dx = invTransform_i * make_float4(0.0f, 0.0f, 1.0f, 1.0f);
 	jacBlockRow(5) = computeColorDProjLookup(dx, camPosSrcToTgt, intensityDerivTgt, colorFocal);
 }
+#endif
 ////////////////////////////////////////
 // dense term
 ////////////////////////////////////////

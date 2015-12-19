@@ -4,6 +4,13 @@
 
 #include "FriedLiver.h"
 
+//!!!debugging
+extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned int numTransforms,
+	float3* d_rot, float3* d_trans);
+
+extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms);
+//!!!debugging
+
 RGBDSensor* getRGBDSensor()
 {
 	static RGBDSensor* g_sensor = NULL;
@@ -231,6 +238,57 @@ int main(int argc, char** argv)
 
 		//!!!DEBUGGING
 		if (true) {
+			//debug test lie conversion
+			std::vector<mat4f> transforms(10, mat4f::identity());
+			RNG::global.init(0, 1, 2, 3); const float maxTrans = 0.1f; const float maxRot = 7.0f; 
+			for (unsigned int i = 1; i < transforms.size(); i++) {
+				float tx = RNG::global.uniform(0.0f, maxTrans); if (RNG::global.uniform(0, 1) == 0) tx = -tx;
+				float ty = RNG::global.uniform(0.0f, maxTrans); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
+				float tz = RNG::global.uniform(0.0f, maxTrans); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
+				float rx = RNG::global.uniform(0.0f, maxRot); if (RNG::global.uniform(0, 1) == 0) rx = -rx;
+				float ry = RNG::global.uniform(0.0f, maxRot); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
+				float rz = RNG::global.uniform(0.0f, maxRot); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
+				transforms[i] = mat4f::translation(tx, ty, tz) * mat4f::rotationZ(rz) * mat4f::rotationY(ry) * mat4f::rotationX(rx);
+			}
+			std::vector<Pose> poses = PoseHelper::convertToPoses(transforms);
+			//gpu conversion
+			const float eps = 0.00001f;
+			float4x4* d_transforms = NULL; float3* d_xRot = NULL; float3* d_xTrans = NULL;
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*transforms.size()));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_xRot, sizeof(float3)*transforms.size()));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_xTrans, sizeof(float3)*transforms.size()));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, transforms.data(), sizeof(float4x4)*transforms.size(), cudaMemcpyHostToDevice));
+			convertMatricesToPosesCU(d_transforms, (unsigned int)transforms.size(), d_xRot, d_xTrans);
+			std::vector<vec3f> rot(transforms.size()), trans(transforms.size());
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*transforms.size(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*transforms.size(), cudaMemcpyDeviceToHost));
+
+			//Pose p = PoseHelper::MatrixToPose(transforms[1]);
+
+			for (unsigned int i = 0; i < poses.size(); i++) {
+				vec3f rdiff = poses[i].getVec3() - rot[i];
+				vec3f tdiff = vec3f(poses[i][3], poses[i][4], poses[i][5]) - trans[i];
+				float rlen = rdiff.length(); float tlen = tdiff.length();
+				if (rlen > eps || tlen > eps) {
+					int a = 5;
+				}
+			}
+			convertPosesToMatricesCU(d_xRot, d_xTrans, (unsigned int)transforms.size(), d_transforms);
+			std::vector<mat4f> newTransforms(transforms.size());
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(newTransforms.data(), d_transforms, sizeof(float4x4)*transforms.size(), cudaMemcpyDeviceToHost));
+			for (unsigned int i = 0; i < transforms.size(); i++) {
+				for (unsigned int k = 0; k < 16; k++) {
+					if (fabs(transforms[i][k] - newTransforms[i][k]) > eps)
+						int a = 5;
+				}
+			}
+
+			MLIB_CUDA_SAFE_FREE(d_transforms);
+			MLIB_CUDA_SAFE_FREE(d_xRot);
+			MLIB_CUDA_SAFE_FREE(d_xTrans);
+			std::cout << "waiting..." << std::endl;
+			getchar();
+
 			TestMatching test;
 			test.loadFromSensor("debug/66.sensor", "", 1);
 			//test.printCacheFrames("debug/cache/");

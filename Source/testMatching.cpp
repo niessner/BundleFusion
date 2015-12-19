@@ -1595,11 +1595,11 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i+1));  weightsDenseDepth[i+1] =  weightsDenseDepth[i]; }
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.5f);  for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i+1] =  weightsDenseColor[i]; }
+	std::vector<float> weightsDenseColor(maxNumIters, 0.5f);  for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 
 	//std::vector<float> weightsDenseDepthEnd(maxNumIters, 3.0f);
 	//std::vector<float> weightsDenseColorEnd(maxNumIters, 2.0f);

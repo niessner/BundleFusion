@@ -5,4 +5,5 @@
 #include <windows.h>
 #include <DXUT.h>
 
-#include "mlib.h"
+#include "mLib.h"
+#include "GlobalDefines.h"

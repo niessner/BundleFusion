@@ -137,12 +137,6 @@
     <ClCompile Include="Source\SBA.cpp">
       <Filter>SBA</Filter>
     </ClCompile>
-    <ClCompile Include="Source\SBA_CPU.cpp">
-      <Filter>SBA</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\SBALie.cpp">
-      <Filter>SBA</Filter>
-    </ClCompile>
     <ClCompile Include="Source\SensorDataReader.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
@@ -210,9 +204,6 @@
       <Filter>SiftGPU</Filter>
     </ClInclude>
     <ClInclude Include="Source\SiftGPU\CuTexImage.h">
-      <Filter>SiftGPU</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\SiftGPU\GlobalDefines.h">
       <Filter>SiftGPU</Filter>
     </ClInclude>
     <ClInclude Include="Source\SiftGPU\ProgramCU.h">
@@ -378,18 +369,10 @@
     <ClInclude Include="Source\SBA.h">
       <Filter>SBA</Filter>
     </ClInclude>
-    <ClInclude Include="Source\SBA_CPU.h">
-      <Filter>SBA</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\SBALie.h">
-      <Filter>SBA</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\SBA_param.h">
-      <Filter>SBA</Filter>
-    </ClInclude>
     <ClInclude Include="Source\SensorDataReader.h">
       <Filter>Sensors</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GlobalDefines.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

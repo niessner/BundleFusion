@@ -1,9 +1,11 @@
 #include <iostream>
 
+#include "GlobalDefines.h"
 #include "SolverBundlingParameters.h"
 #include "SolverBundlingState.h"
 #include "SolverBundlingUtil.h"
 #include "SolverBundlingEquations.h"
+#include "SolverBundlingEquationsLie.h"
 #include "../../SiftGPU/CUDATimer.h"
 
 #include <conio.h>
