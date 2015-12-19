@@ -1211,6 +1211,7 @@ void TestMatching::runOpt()
 	MLIB_ASSERT(!m_colorImages.empty() && !m_cachedFrames.empty());
 
 	//params
+	const bool savePointClouds = false;
 	const unsigned int maxNumIters = 5;
 	const bool isLocal = false;
 	GlobalBundlingState::get().s_localDenseUseAllPairwise = false;
@@ -1277,7 +1278,9 @@ void TestMatching::runOpt()
 		float rz = RNG::global.uniform(0.0f, maxRot); if (RNG::global.uniform(0, 1) == 0) ry = -ry;
 		transforms[i] = mat4f::translation(tx, ty, tz) * mat4f::rotationZ(rz) * mat4f::rotationY(ry) * mat4f::rotationX(rx);
 	}
-	//std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, transforms, m_depthCalibration.m_IntrinsicInverse); std::cout << "done" << std::endl;
+	if (savePointClouds) {
+		std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, transforms, m_depthCalibration.m_IntrinsicInverse); std::cout << "done" << std::endl;
+	}
 
 	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, transforms.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
@@ -1314,7 +1317,9 @@ void TestMatching::runOpt()
 	std::cout << "ate rmse = " << transErr << std::endl;
 	std::cout << "*********************************" << std::endl;
 
-	//std::cout << "saving opt to point cloud... "; SiftVisualization::saveToPointCloud("debug/opt.ply", m_depthImages, m_colorImages, transforms, m_depthCalibration.m_IntrinsicInverse, true); std::cout << "done" << std::endl;
+	if (savePointClouds) {
+		std::cout << "saving opt to point cloud... "; SiftVisualization::saveToPointCloud("debug/opt.ply", m_depthImages, m_colorImages, transforms, m_depthCalibration.m_IntrinsicInverse, false); std::cout << "done" << std::endl;
+	}
 
 	MLIB_CUDA_SAFE_FREE(d_transforms);
 	int a = 5;
@@ -1585,7 +1590,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
 	const unsigned int maxNumOutIts = 1;
-	const unsigned int maxNumIters = 20;
+	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;

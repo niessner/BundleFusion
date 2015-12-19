@@ -107,18 +107,6 @@ __inline__ __device__ float4x4 poseToMatrix(const float3& rot, const float3& tra
 // deriv wrt e^e * T * p; pTransformed = T * p [alpha,beta,gamma,tx,ty,tz]
 /////////////////////////////////////////////////////////////////////////
 
-//__inline__ __device__ float3 evalLie_dAlpha(const float3& pTransformed)
-//{
-//	return make_float3(0.0f, pTransformed.z, -pTransformed.y);
-//}
-//__inline__ __device__ float3 evalLie_dBeta(const float3& pTransformed)
-//{
-//	return make_float3(-pTransformed.z, 0.0f, pTransformed.x);
-//}
-//__inline__ __device__ float3 evalLie_dGamma(const float3& pTransformed)
-//{
-//	return make_float3(pTransformed.y, -pTransformed.x, 0.0f);
-//}
 __inline__ __device__ float3 evalLie_dAlpha(const float3& pTransformed)
 {
 	return make_float3(0.0f, -pTransformed.z, pTransformed.y);

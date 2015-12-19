@@ -9,7 +9,8 @@
 #include "Solver\LieDerivUtil.h"
 #else
 //! assumes z-y-x rotation composition (euler angles)
-__device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans) {
+__device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
+{
 	trans = make_float3(matrix(0,3), matrix(1,3), matrix(2,3));
 	rot = make_float3(0.0f);
 
@@ -38,7 +39,8 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 }
 
 //! assumes z-y-x rotation composition (euler angles)
-__device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& matrix) {
+__device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& matrix)
+{
 
 	// rotation
 	const float CosAlpha = cos(rot.x); float CosBeta = cos(rot.y); float CosGamma = cos(rot.z);

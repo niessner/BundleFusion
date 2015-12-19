@@ -634,8 +634,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 	if (timer) timer->startEvent("Init1");
 
 	//!!!DEBUGGING //remember to uncomment the delete...
-	float3* rRot = new float3[input.numberOfImages]; // -jtf
-	float3* rTrans = new float3[input.numberOfImages];
+	//float3* rRot = new float3[input.numberOfImages]; // -jtf
+	//float3* rTrans = new float3[input.numberOfImages];
 	//!!!DEBUGGING
 
 	cutilSafeCall(cudaMemset(state.d_scanAlpha, 0, sizeof(float)));
@@ -651,14 +651,14 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 #endif		
 	if (timer) timer->endEvent();
 
-	cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr rRot %d\n", i); getchar(); } }
-	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr rTrans %d\n", i); getchar(); } }
-	cutilSafeCall(cudaMemcpy(rRot, state.d_pRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr pRot %d\n", i); getchar(); } }
-	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr pTrans %d\n", i); getchar(); } }
+	//cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	//cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr rRot %d\n", i); getchar(); } }
+	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr rTrans %d\n", i); getchar(); } }
+	//cutilSafeCall(cudaMemcpy(rRot, state.d_pRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	//cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr pRot %d\n", i); getchar(); } }
+	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr pTrans %d\n", i); getchar(); } }
 
 	if (timer) timer->startEvent("Init2");
 	PCGInit_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(N, state);
@@ -669,8 +669,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 
 	if (timer) timer->endEvent();
 
-	if (rRot) delete[] rRot;
-	if (rTrans) delete[] rTrans;
+	//if (rRot) delete[] rRot;
+	//if (rTrans) delete[] rTrans;
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -922,31 +922,6 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 
 }
 
-/////////////////////////////////////////////////////////////////////////
-// Apply Update
-/////////////////////////////////////////////////////////////////////////
-
-__global__ void ApplyLinearUpdateDevice(SolverInput input, SolverState state, SolverParameters parameters)
-{
-	const unsigned int N = input.numberOfImages; // Number of block variables
-	const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (x > 0 && x < N) {
-		state.d_xRot[x] = state.d_xRot[x] + state.d_deltaRot[x];
-		state.d_xTrans[x] = state.d_xTrans[x] + state.d_deltaTrans[x];
-	}
-}
-
-void ApplyLinearUpdate(SolverInput& input, SolverState& state, SolverParameters& parameters)
-{
-	const unsigned int N = input.numberOfImages; // Number of block variables
-	ApplyLinearUpdateDevice << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(input, state, parameters);
-#ifdef _DEBUG
-	cutilSafeCall(cudaDeviceSynchronize());
-	cutilCheckMsg(__FUNCTION__);
-#endif
-}
-
 ////////////////////////////////////////////////////////////////////
 // Main GN Solver Loop
 ////////////////////////////////////////////////////////////////////
@@ -967,8 +942,8 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		printf("initial sparse = %f*%f = %f\n", parameters.weightSparse, initialResidual / parameters.weightSparse, initialResidual);
 	}
 #endif
-	float3* xRot = new float3[input.numberOfImages];
-	float3* xTrans = new float3[input.numberOfImages];
+	//float3* xRot = new float3[input.numberOfImages];
+	//float3* xTrans = new float3[input.numberOfImages];
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
@@ -987,26 +962,26 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
 		{
 			//!!!debugging
-			if (linIter == parameters.nLinIterations - 1) {
-				cutilSafeCall(cudaMemcpy(xRot, state.d_deltaRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-				cutilSafeCall(cudaMemcpy(xTrans, state.d_deltaTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-				//char buffer [50];
-				//sprintf (buffer, "debug/delta-%d.txt", nIter);
-				//FILE* pf = fopen(buffer, "w");
-				//if (pf == NULL) { printf("failed to open %s for writing\n", buffer); getchar(); }
-				//fprintf(pf, "delta rot:\n");
-				//for (unsigned int i = 1; i < input.numberOfImages; i++) { 
-				//	if (isnan(xRot[i].x) || isnan(xRot[i].y) || isnan(xRot[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
-				//	fprintf(pf, "%d: %f %f %f\n", i, xRot[i].x, xRot[i].y, xRot[i].z);
-				//}
-				//fprintf(pf, "delta trans:\n");
-				//for (unsigned int i = 1; i < input.numberOfImages; i++) { 
-				//	if (isnan(xTrans[i].x) || isnan(xTrans[i].y) || isnan(xTrans[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
-				//	fprintf(pf, "%d: %f %f %f\n", i, xTrans[i].x, xTrans[i].y, xTrans[i].z);
-				//}
-				//fclose(pf);
-				int a = 5;
-			}
+			//if (linIter == parameters.nLinIterations - 1) {
+			//	cutilSafeCall(cudaMemcpy(xRot, state.d_deltaRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+			//	cutilSafeCall(cudaMemcpy(xTrans, state.d_deltaTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+			//	//char buffer [50];
+			//	//sprintf (buffer, "debug/delta-%d.txt", nIter);
+			//	//FILE* pf = fopen(buffer, "w");
+			//	//if (pf == NULL) { printf("failed to open %s for writing\n", buffer); getchar(); }
+			//	//fprintf(pf, "delta rot:\n");
+			//	//for (unsigned int i = 1; i < input.numberOfImages; i++) { 
+			//	//	if (isnan(xRot[i].x) || isnan(xRot[i].y) || isnan(xRot[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
+			//	//	fprintf(pf, "%d: %f %f %f\n", i, xRot[i].x, xRot[i].y, xRot[i].z);
+			//	//}
+			//	//fprintf(pf, "delta trans:\n");
+			//	//for (unsigned int i = 1; i < input.numberOfImages; i++) { 
+			//	//	if (isnan(xTrans[i].x) || isnan(xTrans[i].y) || isnan(xTrans[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
+			//	//	fprintf(pf, "%d: %f %f %f\n", i, xTrans[i].x, xTrans[i].y, xTrans[i].z);
+			//	//}
+			//	//fclose(pf);
+			//	int a = 5;
+			//}
 			//!!!debugging
 			PCGIteration(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
 
@@ -1014,11 +989,9 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 			//linConvergenceAnalysis[idx++] = linearResidual;
 		}
 		//!!!debugging
-		cutilSafeCall(cudaMemcpy(xRot, state.d_xRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-		cutilSafeCall(cudaMemcpy(xTrans, state.d_xTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+		//cutilSafeCall(cudaMemcpy(xRot, state.d_xRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
+		//cutilSafeCall(cudaMemcpy(xTrans, state.d_xTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 		//!!!debugging
-
-		//ApplyLinearUpdate(input, state, parameters);	//this should be also done in the last PCGIteration
 
 		//!!!DEBUGGING
 #ifdef PRINT_RESIDUALS
@@ -1036,8 +1009,8 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		}
 	}
 	//!!!debugging
-	if (xRot) delete[] xRot;
-	if (xTrans) delete[] xTrans;
+	//if (xRot) delete[] xRot;
+	//if (xTrans) delete[] xTrans;
 	//!!!debugging
 }
 
