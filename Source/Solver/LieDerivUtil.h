@@ -53,8 +53,11 @@ __inline__ __device__ float3 LieGroupToLieAlgebraSO3(const float3x3& R) {
 	return SkewSymmetricMatrixToVector(lnR);
 }
 
-__inline__ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
+__inline__ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans, bool debug)
 {
+	//!!!debugging
+	if (debug) printf("matrixToPose lie\n");
+	//!!!debugging
 	float3x3 R = matrix.getFloat3x3();
 	float3 tr = matrix.getTranslation();
 
@@ -71,8 +74,11 @@ __inline__ __device__ void matrixToPose(const float4x4& matrix, float3& rot, flo
 	}
 }
 
-__inline__ __device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& matrix)
+__inline__ __device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& matrix, bool debug)
 {
+	//!!!debugging
+	if (debug) printf("poseToMatrix lie\n");
+	//!!!debugging
 	matrix.setIdentity();
 
 	float norm = length(rot);
@@ -99,7 +105,7 @@ __inline__ __device__ void poseToMatrix(const float3& rot, const float3& trans, 
 __inline__ __device__ float4x4 poseToMatrix(const float3& rot, const float3& trans)
 {
 	float4x4 res;
-	poseToMatrix(rot, trans, res);
+	poseToMatrix(rot, trans, res, false);
 	return res;
 }
 
@@ -142,7 +148,7 @@ __inline__ __device__ void computeLieUpdate(const float3& updateW, const float3&
 {
 	const float4x4 update = poseToMatrix(updateW, updateT);
 	const float4x4 cur = poseToMatrix(curW, curT);
-	matrixToPose(update * cur, newW, newT);
+	matrixToPose(update * cur, newW, newT, false);
 }
 
 #endif //USE_LIE_SPACE

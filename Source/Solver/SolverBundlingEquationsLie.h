@@ -40,8 +40,11 @@ __inline__ __device__ float evalAbsResidualDeviceFloat3(unsigned int corrIdx, un
 	return 0.0f;
 }
 
-__inline__ __device__ float evalFDevice(unsigned int corrIdx, SolverInput& input, SolverState& state, SolverParameters& parameters)
+__inline__ __device__ float evalFDevice(unsigned int corrIdx, SolverInput& input, SolverState& state, SolverParameters& parameters, bool debug)
 {
+	//!!!debugging
+	if (debug) printf("evalFDevice lie\n");
+	//!!!debugging
 	float3 r = make_float3(0.0f, 0.0f, 0.0f);
 
 	const EntryJ& corr = input.d_correspondences[corrIdx];

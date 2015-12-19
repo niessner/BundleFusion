@@ -464,7 +464,7 @@ __global__ void EvalResidualDevice(SolverInput input, SolverState state, SolverP
 
 	float residual = 0.0f;
 	if (x < N) {
-		residual = evalFDevice(x, input, state, parameters);
+		residual = evalFDevice(x, input, state, parameters, x == 0);
 		//float out = warpReduce(residual);
 		//unsigned int laneid;
 		////This command gets the lane ID within the current warp

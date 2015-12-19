@@ -9,8 +9,11 @@
 #include "Solver\LieDerivUtil.h"
 #else
 //! assumes z-y-x rotation composition (euler angles)
-__device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
+__device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans, bool debug)
 {
+	//!!!debugging
+	if (debug) printf("matrixToPose euler\n");
+	//!!!debugging
 	trans = make_float3(matrix(0,3), matrix(1,3), matrix(2,3));
 	rot = make_float3(0.0f);
 
@@ -39,9 +42,11 @@ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
 }
 
 //! assumes z-y-x rotation composition (euler angles)
-__device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& matrix)
+__device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& matrix, bool debug)
 {
-
+	//!!!debugging
+	if (debug) printf("poseToMatrix euler\n");
+	//!!!debugging
 	// rotation
 	const float CosAlpha = cos(rot.x); float CosBeta = cos(rot.y); float CosGamma = cos(rot.z);
 	const float SinAlpha = sin(rot.x); float SinBeta = sin(rot.y); float SinGamma = sin(rot.z);
@@ -76,7 +81,7 @@ __global__ void convertMatricesToPosesCU_Kernel(const float4x4* d_transforms, un
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (idx < numTransforms) {
-		matrixToPose(d_transforms[idx], d_rot[idx], d_trans[idx]);
+		matrixToPose(d_transforms[idx], d_rot[idx], d_trans[idx], idx == 1);
 	}
 }
 
@@ -101,7 +106,7 @@ __global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (idx < numImages) {
-		poseToMatrix(d_rot[idx], d_trans[idx], d_transforms[idx]);
+		poseToMatrix(d_rot[idx], d_trans[idx], d_transforms[idx], idx == 1);
 	}
 }
 
