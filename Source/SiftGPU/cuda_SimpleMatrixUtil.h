@@ -416,6 +416,14 @@ public:
 		m31 = m32 = m33 = value;
 	}
 
+	//! sets the 3x3 part of the matrix to identity
+	inline __device__ __host__ void setIdentity()
+	{
+		m11 = 1.0f;	m12 = 0.0f;	m13 = 0.0f;
+		m21 = 0.0f;	m22 = 1.0f;	m23 = 0.0f;
+		m31 = 0.0f;	m32 = 0.0f;	m33 = 1.0f;
+	}
+
 	inline __device__ __host__ float det() const {
 		return
 			+ m11*m22*m33
@@ -424,6 +432,10 @@ public:
 			- m31*m22*m13
 			- m32*m23*m11
 			- m33*m21*m12;
+	}
+
+	inline __device__ __host__ float trace() const {
+		return m11 + m22 + m33;
 	}
 
 	inline __device__ __host__ float3 getRow(unsigned int i) {
@@ -533,6 +545,13 @@ public:
 		res.m21 = m21 - other.m21;	res.m22 = m22 - other.m22;	res.m23 = m23 - other.m23;
 		res.m31 = m31 - other.m31;	res.m32 = m32 - other.m32;	res.m33 = m33 - other.m33;
 		return res;
+	}
+
+	inline __device__ __host__ float3x3& operator+=(const float3x3 &other) {
+		m11 += other.m11;	m12 += other.m12;	m13 += other.m13;
+		m21 += other.m21;	m22 += other.m22;	m23 += other.m23;
+		m31 += other.m31;	m32 += other.m32;	m33 += other.m33;
+		return *this;
 	}
 
 	static inline __device__ __host__ float3x3 getIdentity() {
@@ -1087,12 +1106,17 @@ public:
 
 
 	//! returns the 3x3 part of the matrix
-	inline __device__ __host__ float3x3 getFloat3x3() {
+	inline __device__ __host__ float3x3 getFloat3x3() const {
 		float3x3 ret;
 		ret.m11 = m11;	ret.m12 = m12;	ret.m13 = m13;
 		ret.m21 = m21;	ret.m22 = m22;	ret.m23 = m23;
 		ret.m31 = m31;	ret.m32 = m32;	ret.m33 = m33;
 		return ret;
+	}
+
+	//! returns the translation part of the matrix
+	inline __device__ __host__ float3 getTranslation() const {
+		return make_float3(m14, m24, m34);
 	}
 
 	//! sets the 3x3 part of the matrix (other values remain unchanged)
