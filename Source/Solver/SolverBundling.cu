@@ -11,7 +11,7 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-#define PRINT_RESIDUALS
+//#define PRINT_RESIDUALS
 //!!!DEBUGGING
 
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32

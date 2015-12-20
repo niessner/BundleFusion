@@ -132,12 +132,8 @@ __inline__ __device__ float3 ln_rotation(const float3x3& rotation)
 	return result;
 }
 
-__inline__ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans, bool debug)
-{
-	//!!!debugging
-	if (debug) printf("matrixToPose lie\n");
-	//!!!debugging
-	
+__inline__ __device__ void matrixToPose(const float4x4& matrix, float3& rot, float3& trans)
+{	
 	const float3x3 R = matrix.getFloat3x3();
 	const float3 t = matrix.getTranslation();
 	rot = ln_rotation(R);
@@ -161,11 +157,8 @@ __inline__ __device__ void matrixToPose(const float4x4& matrix, float3& rot, flo
 	trans *= 1.0f / (2 * shtot);
 }
 
-__inline__ __device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& matrix, bool debug)
+__inline__ __device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& matrix)
 {
-	//!!!debugging
-	if (debug) printf("poseToMatrix lie\n");
-	//!!!debugging
 	matrix.setIdentity();
 
 	float3 translation;
@@ -216,7 +209,7 @@ __inline__ __device__ void poseToMatrix(const float3& rot, const float3& trans, 
 __inline__ __device__ float4x4 poseToMatrix(const float3& rot, const float3& trans)
 {
 	float4x4 res;
-	poseToMatrix(rot, trans, res, false);
+	poseToMatrix(rot, trans, res);
 	return res;
 }
 
@@ -259,7 +252,7 @@ __inline__ __device__ void computeLieUpdate(const float3& updateW, const float3&
 {
 	const float4x4 update = poseToMatrix(updateW, updateT);
 	const float4x4 cur = poseToMatrix(curW, curT);
-	matrixToPose(update * cur, newW, newT, false);
+	matrixToPose(update * cur, newW, newT);
 }
 
 #endif //USE_LIE_SPACE
