@@ -110,115 +110,329 @@ namespace PoseHelper {
 		return matrices;
 	}
 #else
-	static mat3f VectorToSkewSymmetricMatrix(const vec3f& v) {
-		mat3f res = mat3f::zero();
-		res(1, 0) = v[2];
-		res(2, 0) = -v[1];
-		res(2, 1) = v[0];
-		res(0, 1) = -v[2];
-		res(0, 2) = v[1];
-		res(1, 2) = -v[0];
-		return res;
-	}
+	//https://github.com/MRPT/mrpt/blob/cc2f0d0e08b2659595c0821748be2d537a3c24b4/libs/base/src/poses/CPose3D.cpp
 
-	//! exponential map: so(3) -> SO(3) / w -> R3x3
-	static mat3f LieAlgebraToLieGroupSO3(const vec3f& w) {
-		float norm = w.length();
-		if (norm == 0.0f)
-			return mat3f::identity();
-		mat3f wHat = VectorToSkewSymmetricMatrix(w);
-
-		mat3f res = mat3f::identity();
-		res += wHat * (sin(norm) / norm);
-		res += (wHat * wHat) * ((1.0f - cos(norm)) / (norm*norm));
-		return res;
-	}
-
-	// LieAlgebraToLieGroupSE3
-	static mat4f PoseToMatrix(const vec6f& ksi) {
-		vec3f w;
-		vec3f t;
-
-		for (int i = 0; i < 3; ++i) {
-			w[i] = ksi[i];
-			t[i] = ksi[i + 3];
+	static void rodrigues_so3_exp(const vec3f& w, const float A, const float B, mat3f& R)
+	{
+		{
+			const float wx2 = w[0] * w[0];
+			const float wy2 = w[1] * w[1];
+			const float wz2 = w[2] * w[2];
+			R(0, 0) = 1.0f - B*(wy2 + wz2);
+			R(1, 1) = 1.0f - B*(wx2 + wz2);
+			R(2, 2) = 1.0f - B*(wx2 + wy2);
 		}
-		float norm = w.length();
-		vec3f trans;
-		mat3f rot = LieAlgebraToLieGroupSO3(w);
-		if (norm == 0.0f) {
-			trans = vec3f::origin;
+		{
+			const float a = A*w[2];
+			const float b = B*(w[0] * w[1]);
+			R(0, 1) = b - a;
+			R(1, 0) = b + a;
+		}
+		{
+			const float a = A*w[1];
+			const float b = B*(w[0] * w[2]);
+			R(0, 2) = b + a;
+			R(2, 0) = b - a;
+		}
+		{
+			const float a = A*w[0];
+			const float b = B*(w[1] * w[2]);
+			R(1, 2) = b - a;
+			R(2, 1) = b + a;
+		}
+	}
+
+	static mat3f exp_rotation(const vec3f& w)
+	{
+		static const float one_6th = 1.0f / 6.0f;
+		static const float one_20th = 1.0f / 20.0f;
+
+		const float theta_sq = w.lengthSq(); //w*w;
+		const float theta = std::sqrt(theta_sq);
+		float A, B;
+		//Use a Taylor series expansion near zero. This is required for
+		//accuracy, since sin t / t and (1-cos t)/t^2 are both 0/0.
+		if (theta_sq < 1e-8) {
+			A = 1.0f - one_6th * theta_sq;
+			B = 0.5f;
 		}
 		else {
-			mat3f skewSymmetricW = VectorToSkewSymmetricMatrix(w);
-			mat3f skewSymmetricW2 = skewSymmetricW * skewSymmetricW;
-			mat3f V = mat3f::identity();
-			V += skewSymmetricW * ((1.0f - cos(norm)) / (norm * norm));
-			V += skewSymmetricW2 * ((norm - sin(norm)) / (norm * norm * norm));
-			trans = V * t;
+			if (theta_sq < 1e-6) {
+				B = 0.5f - 0.25f * one_6th * theta_sq;
+				A = 1.0f - theta_sq * one_6th*(1.0f - one_20th * theta_sq);
+			}
+			else {
+				const float inv_theta = 1.0f / theta;
+				A = sin(theta) * inv_theta;
+				B = (1 - cos(theta)) * (inv_theta * inv_theta);
+			}
 		}
-		mat4f res = mat4f::identity();
-		res.setRotation(rot);
-		res.setTranslationVector(trans);
-		return res;
+
+		mat3f result;
+		rodrigues_so3_exp(w, A, B, result);
+		return result;
 	}
+	static vec3f ln_rotation(const mat3f& rotation)
+	{
+		vec3f result; // skew symm matrix = (R - R^T) * angle / (2 * sin(angle))
 
-	static vec3f SkewSymmetricMatrixToVector(const mat3f& m) {
-		vec3f res;
-		res[0] = m(2, 1);
-		res[1] = m(0, 2);
-		res[2] = m(1, 0);
-		return res;
-	}
+		const float cos_angle = (rotation.trace() - 1.0f) * 0.5f;
+		//(R - R^T) / 2
+		result[0] = (rotation(2, 1) - rotation(1, 2))*0.5f;
+		result[1] = (rotation(0, 2) - rotation(2, 0))*0.5f;
+		result[2] = (rotation(1, 0) - rotation(0, 1))*0.5f;
 
-	//! logarithm map: SO(3) -> so(3) / R3x3 -> w
-	static vec3f LieGroupToLieAlgebraSO3(const mat3f& R) {
-		float tmp = (R.trace() - 1.0f) / 2.0f;
-
-		if (tmp < -1.0f)
-			tmp = -1.0f;
-		if (tmp > 1.0f)
-			tmp = 1.0f;
-		float angleOfRotation = acos(tmp);
-		if (angleOfRotation == 0.0f)
-			return vec3f::origin;
-		mat3f lnR = (R - R.getTranspose()) * (angleOfRotation / (2.0f * sin(angleOfRotation)));
-		return SkewSymmetricMatrixToVector(lnR);
-	}
-
-	// LieGroupToLieAlgebraSE3
-	static vec6f MatrixToPose(const mat4f& Rt) {
-		mat3f R = Rt.getRotation();
-		vec3f tr = Rt.getTranslation();
-
-		vec3f w = LieGroupToLieAlgebraSO3(R);
-
-		float	norm = w.length();
-		mat3f skewSymmetricW = VectorToSkewSymmetricMatrix(w);
-		mat3f skewSymmetricW2 = skewSymmetricW * skewSymmetricW;
-		mat3f V = mat3f::identity();
-		if (norm > 0.0f)	{
-			V += skewSymmetricW * ((1.0f - cos(norm)) / (norm * norm));
-			V += skewSymmetricW2 * ((norm - sin(norm)) / (norm * norm * norm));
+		float sin_angle_abs = result.length(); //sqrt(result*result);
+		if (cos_angle > (float)0.70710678118654752440)
+		{            // [0 - Pi/4[ use asin
+			if (sin_angle_abs > 0){
+				result *= asin(sin_angle_abs) / sin_angle_abs;
+			}
 		}
-		//else {
-		//	V += skewSymmetricW * (1.0f - cos(norm));  // 1 - cos(0) = 0
-		//	V += skewSymmetricW2 * (norm - sin(norm)); // 0 - sin(0) = 0
-		//}
-		vec3f t = V.getInverse() * tr;
-
-		vec6f ksi(w.x, w.y, w.z, t.x, t.y, t.z);
-		return ksi;
+		else if (cos_angle > -(float)0.70710678118654752440)
+		{    // [Pi/4 - 3Pi/4[ use acos, but antisymmetric part
+			float angle = acos(cos_angle);
+			result *= angle / sin_angle_abs;
+		}
+		else
+		{  // rest use symmetric part
+			// antisymmetric part vanishes, but still large rotation, need information from symmetric part
+			const float angle = math::PIf - asin(sin_angle_abs);
+			const float
+				d0 = rotation(0, 0) - cos_angle,
+				d1 = rotation(1, 1) - cos_angle,
+				d2 = rotation(2, 2) - cos_angle;
+			vec3f r2;
+			if (fabs(d0) > fabs(d1) && fabs(d0) > fabs(d2))
+			{ // first is largest, fill with first column
+				r2[0] = d0;
+				r2[1] = (rotation(1, 0) + rotation(0, 1))*0.5f;
+				r2[2] = (rotation(0, 2) + rotation(2, 0))*0.5f;
+			}
+			else if (fabs(d1) > fabs(d2))
+			{ 			    // second is largest, fill with second column
+				r2[0] = (rotation(1, 0) + rotation(0, 1))*0.5f;
+				r2[1] = d1;
+				r2[2] = (rotation(2, 1) + rotation(1, 2))*0.5f;
+			}
+			else
+			{							    // third is largest, fill with third column
+				r2[0] = (rotation(0, 2) + rotation(2, 0))*0.5f;
+				r2[1] = (rotation(2, 1) + rotation(1, 2))*0.5f;
+				r2[2] = d2;
+			}
+			// flip, if we point in the wrong direction!
+			if ((r2 | result) < 0)
+				r2 *= -1;
+			result = r2;
+			result *= (angle / r2.length());
+		}
+		return result;
 	}
+	static Pose MatrixToPose(const mat4f& transform)
+	{
+		Pose result;
+		const mat3f R = transform.getRotation();
+		const vec3f t = transform.getTranslation();
+		vec3f rot = ln_rotation(R);
+		const float theta = rot.length(); //sqrt(rot*rot);
+
+		float shtot = 0.5f;
+		if (theta > 0.00001f)
+			shtot = sin(theta*0.5f) / theta;
+
+		// now do the rotation
+		vec3f rot_half = rot;
+		rot_half *= -0.5f;
+		const mat3f halfrotator = exp_rotation(rot_half);
+
+		vec3f rottrans = halfrotator * t;
+
+		if (theta > 0.001f)
+			rottrans -= rot * ((t | rot) * (1 - 2 * shtot) / rot.lengthSq()); //(rot*rot));
+		else
+			rottrans -= rot * ((t | rot) / 24);
+		rottrans *= 1.0f / (2 * shtot);
+
+		for (int i = 0; i < 3; i++) result[i] = rot[i];
+		for (int i = 0; i < 3; i++) result[3 + i] = rottrans[i];
+		return result;
+	}
+
+	//pseudo-exponential exponentiates the rot part but just copies the trans
+	static mat4f PoseToMatrix(const Pose& mu)//, bool pseudo_exponential)
+	{
+		vec3f translation;
+		mat3f rotation;
+
+		static const float one_6th = 1.0f / 6.0f;
+		static const float one_20th = 1.0f / 20.0f;
+
+		vec3f mu_xyz = vec3f(mu[3], mu[4], mu[5]);
+		vec3f w = mu.getVec3();
+
+		const float theta_sq = w.lengthSq(); // w*w;
+		const float theta = std::sqrt(theta_sq);
+		float A, B;
+
+		vec3f cross = w ^ mu_xyz;
+
+		if (theta_sq < 1e-8)
+		{
+			A = 1.0f - one_6th * theta_sq;
+			B = 0.5f;
+			//if (!pseudo_exponential) {
+			translation[0] = mu_xyz[0] + 0.5f * cross[0];
+			translation[1] = mu_xyz[1] + 0.5f * cross[1];
+			translation[2] = mu_xyz[2] + 0.5f * cross[2];
+			//}
+		}
+		else
+		{
+			float C;
+			if (theta_sq < 1e-6) {
+				C = one_6th*(1.0f - one_20th * theta_sq);
+				A = 1.0f - theta_sq * C;
+				B = 0.5f - 0.25f * one_6th * theta_sq;
+			}
+			else {
+				const float inv_theta = 1.0f / theta;
+				A = sin(theta) * inv_theta;
+				B = (1 - cos(theta)) * (inv_theta * inv_theta);
+				C = (1 - A) * (inv_theta * inv_theta);
+			}
+
+			vec3f w_cross = w ^ cross;
+			//if (!pseudo_exponential) { //result.get_translation() = mu_xyz + B * cross + C * (w ^ cross);
+				translation[0] = mu_xyz[0] + B * cross[0] + C * w_cross[0];
+				translation[1] = mu_xyz[1] + B * cross[1] + C * w_cross[1];
+				translation[2] = mu_xyz[2] + B * cross[2] + C * w_cross[2];
+			//}
+		}
+
+		// 3x3 rotation part:
+		rodrigues_so3_exp(w, A, B, rotation);
+
+		//if (pseudo_exponential) out_pose.m_coords = mu_xyz;
+		mat4f result = mat4f::identity();
+		result.setRotation(rotation);
+		result.setTranslationVector(translation);
+		return result;
+	}
+
+
+	//static mat3f VectorToSkewSymmetricMatrix(const vec3f& v) {
+	//	mat3f res = mat3f::zero();
+	//	res(1, 0) = v[2];
+	//	res(2, 0) = -v[1];
+	//	res(2, 1) = v[0];
+	//	res(0, 1) = -v[2];
+	//	res(0, 2) = v[1];
+	//	res(1, 2) = -v[0];
+	//	return res;
+	//}
+	////! exponential map: so(3) -> SO(3) / w -> R3x3
+	//static mat3f LieAlgebraToLieGroupSO3(const vec3f& w) {
+	//	float norm = w.length();
+	//	if (norm == 0.0f)
+	//		return mat3f::identity();
+	//	mat3f wHat = VectorToSkewSymmetricMatrix(w);
+
+	//	mat3f res = mat3f::identity();
+	//	res += wHat * (sin(norm) / norm);
+	//	res += (wHat * wHat) * ((1.0f - cos(norm)) / (norm*norm));
+	//	return res;
+	//}
+
+	//// LieAlgebraToLieGroupSE3
+	//static mat4f PoseToMatrix(const vec6f& ksi) {
+	//	vec3f w;
+	//	vec3f t;
+
+	//	for (int i = 0; i < 3; ++i) {
+	//		w[i] = ksi[i];
+	//		t[i] = ksi[i + 3];
+	//	}
+	//	float norm = w.length();
+	//	vec3f trans;
+	//	mat3f rot = LieAlgebraToLieGroupSO3(w);
+	//	if (norm == 0.0f) {
+	//		trans = vec3f::origin;
+	//	}
+	//	else {
+	//		mat3f skewSymmetricW = VectorToSkewSymmetricMatrix(w);
+	//		mat3f skewSymmetricW2 = skewSymmetricW * skewSymmetricW;
+	//		mat3f V = mat3f::identity();
+	//		V += skewSymmetricW * ((1.0f - cos(norm)) / (norm * norm));
+	//		V += skewSymmetricW2 * ((norm - sin(norm)) / (norm * norm * norm));
+	//		trans = V * t;
+	//	}
+	//	mat4f res = mat4f::identity();
+	//	res.setRotation(rot);
+	//	res.setTranslationVector(trans);
+	//	return res;
+	//}
+
+	//static vec3f SkewSymmetricMatrixToVector(const mat3f& m) {
+	//	vec3f res;
+	//	res[0] = m(2, 1);
+	//	res[1] = m(0, 2);
+	//	res[2] = m(1, 0);
+	//	return res;
+	//}
+
+	////! logarithm map: SO(3) -> so(3) / R3x3 -> w
+	//static vec3f LieGroupToLieAlgebraSO3(const mat3f& R) {
+	//	float tmp = (R.trace() - 1.0f) / 2.0f;
+
+	//	float angleOfRotation = acos(clamp(tmp, -1.0f, 1.0f));
+	//	if (angleOfRotation == 0.0f)
+	//		return vec3f::origin;
+	//	mat3f lnR = (R - R.getTranspose()) * (angleOfRotation / (2.0f * sin(angleOfRotation)));
+	//	return SkewSymmetricMatrixToVector(lnR);
+	//}
+
+	//// LieGroupToLieAlgebraSE3
+	//static vec6f MatrixToPose(const mat4f& Rt) {
+	//	mat3f R = Rt.getRotation();
+	//	vec3f tr = Rt.getTranslation();
+
+	//	vec3f w = LieGroupToLieAlgebraSO3(R);
+
+	//	float	norm = w.length();
+	//	mat3f skewSymmetricW = VectorToSkewSymmetricMatrix(w);
+	//	mat3f skewSymmetricW2 = skewSymmetricW * skewSymmetricW;
+	//	mat3f V = mat3f::identity();
+	//	if (norm > 0.0f)	{
+	//		V += skewSymmetricW * ((1.0f - cos(norm)) / (norm * norm));
+	//		V += skewSymmetricW2 * ((norm - sin(norm)) / (norm * norm * norm));
+	//	}
+	//	//else {
+	//	//	V += skewSymmetricW * (1.0f - cos(norm));  // 1 - cos(0) = 0
+	//	//	V += skewSymmetricW2 * (norm - sin(norm)); // 0 - sin(0) = 0
+	//	//}
+	//	vec3f t = V.getInverse() * tr;
+
+	//	vec6f ksi(w.x, w.y, w.z, t.x, t.y, t.z);
+	//	return ksi;
+	//}
 #endif
 
-	static std::vector<Pose> convertToPoses(const std::vector<ml::mat4f>& matrices) {
+	static std::vector<Pose> convertToPoses(const std::vector<mat4f>& matrices) {
 		std::vector<Pose> poses(matrices.size());
 
 		for (unsigned int i = 0; i < matrices.size(); i++)
 			poses[i] = PoseHelper::MatrixToPose(matrices[i]);
 
 		return poses;
+	}
+	static std::vector<mat4f> convertToMatrices(const std::vector<Pose>& poses) {
+		std::vector<mat4f> matrices(poses.size());
+
+		for (unsigned int i = 0; i < poses.size(); i++)
+			matrices[i] = PoseHelper::PoseToMatrix(poses[i]);
+
+		return matrices;
 	}
 }
 

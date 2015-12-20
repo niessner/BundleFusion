@@ -84,10 +84,60 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (isStart) MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages, siftManager->getValidImages().data(), sizeof(int)*numImages, cudaMemcpyHostToDevice));
 
 	//!!!debugging
+	//{
+	//	evalResidualDEBUG(siftManager, d_transforms);
+	//	std::vector<mat4f> transforms(numImages);
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*transforms.size(), cudaMemcpyDeviceToHost));
+	//	const std::vector<Pose> poses = PoseHelper::convertToPoses(transforms);
+	//	const std::vector<mat4f> cTransforms = PoseHelper::convertToMatrices(poses);
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, cTransforms.data(), sizeof(float4x4)*cTransforms.size(), cudaMemcpyHostToDevice));
+	//	evalResidualDEBUG(siftManager, d_transforms);
+	//	std::cout << "waiting..." << std::endl; getchar();
+	//}
 	{
 		std::vector<vec3f> rot(numImages), trans(numImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
+		std::vector<mat4f> cpuTransforms(numImages);
+		for (unsigned int i = 0; i < numImages; i++) cpuTransforms[i] = PoseHelper::PoseToMatrix(Pose(rot[i].x, rot[i].y, rot[i].z, trans[i].x, trans[i].y, trans[i].z));
+
+		const float eps = 0.01f; //TODO make smaller
+		std::vector<mat4f> transforms(numImages), newTransforms(numImages);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+		std::vector<Pose> cpuPoses = PoseHelper::convertToPoses(transforms);
+		for (unsigned int i = 0; i < numImages; i++) {
+			vec3f cpuRot = cpuPoses[i].getVec3(); vec3f cpuTrans = vec3f(cpuPoses[i][3], cpuPoses[i][4], cpuPoses[i][5]);
+			vec3f rrot = rot[i]; vec3f rtrans = trans[i];
+			float rlen = vec3f::dist(cpuRot, rrot); float tlen = vec3f::dist(cpuTrans, rtrans);
+			if (rlen > 0.00001f || tlen > 0.00001f) {
+				int a = 5;
+			}
+		}
+
+		evalResidualDEBUG(siftManager, d_transforms);
+		convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(newTransforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+		evalResidualDEBUG(siftManager, d_transforms);
+		for (unsigned int i = 0; i < transforms.size(); i++) {
+			for (unsigned int k = 0; k < 16; k++) {
+				float diff = fabs(transforms[i][k] - newTransforms[i][k]);
+				if (diff > eps) {
+					const mat4f t0 = transforms[i];
+					const mat4f t1 = newTransforms[i];
+					int a = 5;
+				}
+				float cpuDiff = fabs(transforms[i][k] - cpuTransforms[i][k]);
+				if (cpuDiff > eps) {
+					const mat4f t0 = transforms[i];
+					const mat4f t1 = cpuTransforms[i];
+					int a = 5;
+				}
+			}
+		}
+		
+		//std::vector<vec3f> rot(numImages), trans(numImages);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
 		for (unsigned int i = 0; i < numImages; i++) { if (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z)) { printf("NaN input pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
 		for (unsigned int i = 0; i < numImages; i++) { if (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z)) { printf("NaN input pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
 	}
