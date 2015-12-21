@@ -237,11 +237,11 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (false) {
+		if (true) {
 			TestMatching test;
-			//test.loadFromSensor("debug/livingroom1/66.sensor", "", 1);
-			//test.runOpt();
-			test.testGlobalDense();
+			test.loadFromSensor("debug/livingroom1/2noise.sensor", "", 1);
+			test.runOpt();
+			//test.testGlobalDense();
 
 			std::cout << "done!" << std::endl;
 			getchar();

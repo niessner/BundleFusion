@@ -1,6 +1,7 @@
 #pragma once
 #ifndef POSE_HELPER_H
 #define POSE_HELPER_H
+#include "GlobalDefines.h"
 
 typedef ml::vec6f Pose;
 

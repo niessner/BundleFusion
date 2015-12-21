@@ -11,9 +11,8 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-//#define PRINT_RESIDUALS
+#define PRINT_RESIDUALS
 //!!!DEBUGGING
-
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
 #define THREADS_PER_BLOCK_DENSE_DEPTH_FLIP 64
@@ -50,7 +49,7 @@ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigne
 			//if (debugPrint) {
 			//	printf("cam pos j2i = %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
 			//	printf("proj %f %f %f -> %f %f\n", proj.x, proj.y, proj.z, proj.x / proj.z, proj.y / proj.z);
-			//	printf("screen pos = %d %d\n", screenPos.x, screenPos.y);
+			//	printf("screen pos = %d %d\n", tgtScreenPos.x, tgtScreenPos.y);
 			//}
 			if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
 				tgtIdx = tgtScreenPos.y * imageWidth + tgtScreenPos.x;
@@ -161,7 +160,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
 		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
 #endif
-		float4x4 invTransform_i = transform_i.getInverse(); //TODO unncessary invert for pairwise?
+		float4x4 invTransform_i = transform_i.getInverse(); //TODO precompute this crap
+		float4x4 invTransform_j = transform_j.getInverse(); //TODO precompute this crap
 
 		float4x4 transform = invTransform_i * transform_j;
 
@@ -177,13 +177,18 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 			// point-to-plane residual
 			float4 diff = camPosTgt - camPosSrcToTgt;
 			float res = dot(diff, normalTgt);
+			float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
 
 			// point-to-plane jacobian
 			const float4 camPosSrc = input.d_cacheFrames[j].d_cameraposDownsampled[srcIdx];
 			matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
+#ifdef USE_LIE_SPACE
+			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
+			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
+#else
 			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
 			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
-			float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
+#endif
 
 			//!!!debugging
 			const unsigned int x = srcIdx % input.denseDepthWidth; const unsigned int y = srcIdx / input.denseDepthWidth;
@@ -210,23 +215,6 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					//weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
 					weight = 1.0f;
-
-					//!!!debugging
-					//if (x == 3 && y == 42) {
-					//	printf("(%d,%d)\n", x, y);
-					//	printf("cam pos src = %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z);
-					//	printf("cam pos src2tgt = %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
-					//	uint2 screenPosTgt = make_uint2(tgtIdx % input.denseDepthWidth, tgtIdx / input.denseDepthWidth);
-					//	printf("screen pos tgt = %d %d\n", screenPosTgt.x, screenPosTgt.y);
-					//	printf("intensity src = %f\n", input.d_cacheFrames[j].d_intensityDownsampled[srcIdx]);
-					//	printf("intensity tgt = %f\n", input.d_cacheFrames[i].d_intensityDownsampled[tgtIdx]);
-					//	printf("d(intensity tgt) = %f %f\n", intensityDerivTgt.x, intensityDerivTgt.y);
-					//	printf("weight = %f\n", weight);
-					//	if (i > 0) printf("jac i: %f %f %f %f %f %f\n", jacobianBlockRow_i(0), jacobianBlockRow_i(1), jacobianBlockRow_i(2), jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5));
-					//	if (j > 0) printf("jac j: %f %f %f %f %f %f\n", jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2), jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
-					//	printf("res = %f\n", diffIntensity);
-					//}
-					//!!!debugging
 
 					addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
 						jacobianBlockRow_i, jacobianBlockRow_j, i, j, diffIntensity, parameters.weightDenseColor * weight * imPairWeight);

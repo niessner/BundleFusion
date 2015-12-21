@@ -111,20 +111,20 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 	pRot *= parameters.weightSparse;
 	pTrans *= parameters.weightSparse;
 
-	// add dense term //TODO UNCOMMENT HERE
-	//uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
-	//uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
-	//resRot -= make_float3(state.d_denseJtr[rotIndices.x], state.d_denseJtr[rotIndices.y], state.d_denseJtr[rotIndices.z]); //minus since -Jtf, weight already built in
-	//resTrans -= make_float3(state.d_denseJtr[transIndices.x], state.d_denseJtr[transIndices.y], state.d_denseJtr[transIndices.z]); //minus since -Jtf, weight already built in
-	//// preconditioner
-	//pRot += make_float3(
-	//	state.d_denseJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
-	//	state.d_denseJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
-	//	state.d_denseJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
-	//pTrans += make_float3(
-	//	state.d_denseJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
-	//	state.d_denseJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
-	//	state.d_denseJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
+	// add dense term	//TODO templating!
+	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
+	uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
+	resRot -= make_float3(state.d_denseJtr[rotIndices.x], state.d_denseJtr[rotIndices.y], state.d_denseJtr[rotIndices.z]); //minus since -Jtf, weight already built in
+	resTrans -= make_float3(state.d_denseJtr[transIndices.x], state.d_denseJtr[transIndices.y], state.d_denseJtr[transIndices.z]); //minus since -Jtf, weight already built in
+	// preconditioner
+	pRot += make_float3(
+		state.d_denseJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
+		state.d_denseJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
+		state.d_denseJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
+	pTrans += make_float3(
+		state.d_denseJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
+		state.d_denseJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
+		state.d_denseJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
 	// end dense part
 
 	// Preconditioner depends on last solution P(input.d_x)
@@ -231,69 +231,45 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 // dense depth term
 ////////////////////////////////////////
 
-__inline__ __device__ void computeJacobianBlockRow_i(matNxM<1, 6>& jacBlockRow, const float3& angles, const float3& translation,
+__inline__ __device__ void computeJacobianBlockRow_i(matNxM<1, 6>& jacBlockRow, const float4x4& transform_i,
+	const float4x4& invTransform_j, const float4& camPosSrc, const float4& normalTgt)
+{
+	//!!!DEBUGGING
+	if (isnan(camPosSrc.x) || isnan(camPosSrc.y) || isnan(camPosSrc.z) || isnan(camPosSrc.w)) {
+		printf("ERROR jac i: camPosSrc = %f %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z, camPosSrc.w);
+	}
+	if (isnan(normalTgt.x) || isnan(normalTgt.y) || isnan(normalTgt.z) || isnan(normalTgt.w)) {
+		printf("ERROR jac i: camPosSrc = %f %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z, normalTgt.w);
+	}
+	//!!!DEBUGGING
+
+	float3 p = make_float3(camPosSrc.x, camPosSrc.y, camPosSrc.z);
+	float3 n = make_float3(normalTgt.x, normalTgt.y, normalTgt.z);
+
+	matNxM<3, 6> jac = evalLie_derivI(invTransform_j, transform_i, p);
+	for (unsigned int i = 0; i < 6; i++) {
+		jacBlockRow(i) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);
+	}
+}
+__inline__ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, const float4x4& invTransform_i,
 	const float4x4& transform_j, const float4& camPosSrc, const float4& normalTgt)
 {
 	////!!!DEBUGGING
-	//if (isnan(camPosSrc.x) || isnan(camPosSrc.y) || isnan(camPosSrc.z) || isnan(camPosSrc.w)) {
-	//	printf("ERROR jac i: camPosSrc = %f %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z, camPosSrc.w);
-	//}
-	//if (isnan(normalTgt.x) || isnan(normalTgt.y) || isnan(normalTgt.z) || isnan(normalTgt.w)) {
-	//	printf("ERROR jac i: camPosSrc = %f %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z, normalTgt.w);
-	//}
+	if (isnan(camPosSrc.x) || isnan(camPosSrc.y) || isnan(camPosSrc.z) || isnan(camPosSrc.w)) {
+		printf("ERROR jac j: camPosSrc = %f %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z, camPosSrc.w);
+	}
+	if (isnan(normalTgt.x) || isnan(normalTgt.y) || isnan(normalTgt.z) || isnan(normalTgt.w)) {
+		printf("ERROR jac j: camPosSrc = %f %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z, normalTgt.w);
+	}
 	////!!!DEBUGGING
 
-	//float4 world = transform_j * camPosSrc;
-	////alpha
-	//float4x4 dx = evalRtInverse_dAlpha(angles, translation);
-	//jacBlockRow(0) = -dot(dx * world, normalTgt);
-	////beta
-	//dx = evalRtInverse_dBeta(angles, translation);
-	//jacBlockRow(1) = -dot(dx * world, normalTgt);
-	////gamma
-	//dx = evalRtInverse_dGamma(angles, translation);
-	//jacBlockRow(2) = -dot(dx * world, normalTgt);
-	////x
-	//dx = evalRtInverse_dX(angles, translation);
-	//jacBlockRow(3) = -dot(dx * world, normalTgt);
-	////y
-	//dx = evalRtInverse_dY(angles, translation);
-	//jacBlockRow(4) = -dot(dx * world, normalTgt);
-	////z
-	//dx = evalRtInverse_dZ(angles, translation);
-	//jacBlockRow(5) = -dot(dx * world, normalTgt);
-}
-__inline__ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, const float3& angles, const float3& translation,
-	const float4x4& invTransform_i, const float4& camPosSrc, const float4& normalTgt)
-{
-	////!!!DEBUGGING
-	//if (isnan(camPosSrc.x) || isnan(camPosSrc.y) || isnan(camPosSrc.z) || isnan(camPosSrc.w)) {
-	//	printf("ERROR jac j: camPosSrc = %f %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z, camPosSrc.w);
-	//}
-	//if (isnan(normalTgt.x) || isnan(normalTgt.y) || isnan(normalTgt.z) || isnan(normalTgt.w)) {
-	//	printf("ERROR jac j: camPosSrc = %f %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z, normalTgt.w);
-	//}
-	////!!!DEBUGGING
+	float3 p = make_float3(camPosSrc.x, camPosSrc.y, camPosSrc.z);
+	float3 n = make_float3(normalTgt.x, normalTgt.y, normalTgt.z);
 
-	//float4x4 dx; dx.setIdentity();
-	////alpha
-	//dx.setFloat3x3(evalR_dAlpha(angles));
-	//jacBlockRow(0) = -dot(invTransform_i * dx * camPosSrc, normalTgt);
-	////beta
-	//dx.setFloat3x3(evalR_dBeta(angles));
-	//jacBlockRow(1) = -dot(invTransform_i * dx * camPosSrc, normalTgt);
-	////gamma
-	//dx.setFloat3x3(evalR_dGamma(angles));
-	//jacBlockRow(2) = -dot(invTransform_i * dx * camPosSrc, normalTgt);
-	////x
-	//float4 dt = make_float4(1.0f, 0.0f, 0.0f, 1.0f);
-	//jacBlockRow(3) = -dot(invTransform_i * dt, normalTgt);
-	////y
-	//dt = make_float4(0.0f, 1.0f, 0.0f, 1.0f);
-	//jacBlockRow(4) = -dot(invTransform_i * dt, normalTgt);
-	////z
-	//dt = make_float4(0.0f, 0.0f, 1.0f, 1.0f);
-	//jacBlockRow(5) = -dot(invTransform_i * dt, normalTgt);
+	matNxM<3,6> jac = evalLie_derivJ(invTransform_i, transform_j, p);
+	for (unsigned int i = 0; i < 6; i++) {
+		jacBlockRow(i) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);
+	}
 }
 ////////////////////////////////////////
 // dense depth term

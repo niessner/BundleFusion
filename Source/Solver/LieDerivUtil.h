@@ -213,6 +213,17 @@ __inline__ __device__ float4x4 poseToMatrix(const float3& rot, const float3& tra
 	return res;
 }
 
+__inline__ __device__ float3x3 VectorToSkewSymmetricMatrix(const float3& v) {
+	float3x3 res; res.setZero();
+	res(1, 0) = v.z;
+	res(2, 0) = -v.y;
+	res(2, 1) = v.x;
+	res(0, 1) = -v.z;
+	res(0, 2) = v.y;
+	res(1, 2) = -v.x;
+	return res;
+}
+
 /////////////////////////////////////////////////////////////////////////
 // deriv wrt e^e * T * p; pTransformed = T * p [alpha,beta,gamma,tx,ty,tz]
 /////////////////////////////////////////////////////////////////////////
@@ -229,19 +240,59 @@ __inline__ __device__ float3 evalLie_dGamma(const float3& pTransformed)
 {
 	return make_float3(-pTransformed.y, pTransformed.x, 0.0f);
 }
-//__inline__ __device__ float3 evalLie_dX()
-//{
-//	return make_float3(1.0f, 0.0f, 0.0f);
-//}
-//__inline__ __device__ float3 evalLie_dY()
-//{
-//	return make_float3(0.0f, 1.0f, 0.0f);
-//}
-//__inline__ __device__ float3 evalLie_dZ()
-//{
-//	return make_float3(0.0f, 0.0f, 1.0f);
-//}
 
+/////////////////////////////////////////////////////////////////////////
+// deriv for Ti: (A * e^e * D)^{-1} * p; A = Tj^{-1}; D = Ti
+/////////////////////////////////////////////////////////////////////////
+__inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& A, const float4x4& D, const float3& p)
+{
+	matNxM<3, 12> j0; matNxM<12, 6> j1;
+	const float4x4 transform = A * D;
+	float3 pt = p - transform.getTranslation();
+	j0.setZero();	j1.setZero();
+	j0(0, 0) = pt.x;	j0(0, 1) = pt.y;	j0(0, 2) = pt.z;
+	j0(1, 3) = pt.x;	j0(1, 4) = pt.y;	j0(1, 5) = pt.z;
+	j0(2, 6) = pt.x;	j0(2, 7) = pt.y;	j0(2, 8) = pt.z;
+	for (unsigned int r = 0; r < 3; r++) {
+		for (unsigned int c = 0; c < 3; c++) {
+			j0(r, c + 9) = -transform(c, r); //-R(AD)^T
+			j1(r + 9, 3 + c) = transform(r, c);	 // R(AD)
+		}
+	}
+	const float3x3 RA = A.getFloat3x3();
+	for (unsigned int k = 0; k < 4; k++) {
+		float3x3 m = RA * VectorToSkewSymmetricMatrix(make_float3(D(0, k), D(1, k), D(2, k))) * -1.0f; //RA * col k of D
+		for (unsigned int r = 0; r < 3; r++) {
+			for (unsigned int c = 0; c < 3; c++)
+				j1(3 * k + r, c) = m(r, c);
+		}
+	}
+
+	return (j0 * j1);
+}
+
+/////////////////////////////////////////////////////////////////////////
+// deriv for Tj: (A * e^e * D) * p; A = Ti^{-1}; D = Tj
+/////////////////////////////////////////////////////////////////////////
+__inline__ __device__ matNxM<3, 6> evalLie_derivJ(const float4x4& A, const float4x4& D, const float3& p)
+{
+	float3 dr1 = make_float3(D(0, 0), D(0, 1), D(0, 2));	//rows of D (rotation part)
+	float3 dr2 = make_float3(D(1, 0), D(1, 1), D(1, 2));
+	float3 dr3 = make_float3(D(2, 0), D(2, 1), D(2, 2));
+	float dtx = D(0, 3);	//translation of D
+	float dty = D(1, 3);
+	float dtz = D(2, 3);
+	matNxM<3, 6> jac;
+	jac(0, 0) = 0.0f;					jac(0, 1) = dot(p, dr3) + dtz;		jac(0, 2) = -(dot(p, dr2) + dty);
+	jac(1, 0) = -(dot(p, dr3) + dtz);	jac(1, 1) = 0.0f;					jac(1, 2) = dot(p, dr1) + dtx;
+	jac(2, 0) = dot(p, dr2) + dty;		jac(2, 1) = -(dot(p, dr1) + dtx);	jac(2, 2) = 0.0f;
+	jac(0, 3) = 1.0f;	jac(0, 4) = 0.0f;	jac(0, 5) = 0.0f;
+	jac(1, 3) = 0.0f;	jac(1, 4) = 1.0f;	jac(1, 5) = 0.0f;
+	jac(2, 3) = 0.0f;	jac(2, 4) = 0.0f;	jac(2, 5) = 1.0f;
+
+	jac = mat3x3(A.getFloat3x3()) * jac;
+	return jac;
+}
 
 /////////////////////////////////////////////////////////////////////////
 // Lie Update
