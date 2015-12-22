@@ -91,6 +91,8 @@ public:
 	void printCacheFrames(const std::string& dir) const;
 
 private:
+	void evaluateTrajectory(unsigned int submapSize, const std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll);
+
 	// for global offline matching
 	void detectKeys(const std::vector<ColorImageR8G8B8A8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager) const;
 	void initSiftParams(unsigned int widthDepth, unsigned int heightDepth, unsigned int widthColor, unsigned int heightColor);

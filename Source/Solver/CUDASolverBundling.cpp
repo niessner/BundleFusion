@@ -173,7 +173,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.denseColorThresh = 0.1f;
 	parameters.denseColorGradientMin = 0.005f;
 	parameters.denseDepthMin = 0.1f;
-	parameters.denseDepthMax = 3.0f; //TODO 
+	parameters.denseDepthMax = 3.5f; //TODO 
 	parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
 	parameters.useDenseDepthAllPairwise = usePairwiseDense;
 

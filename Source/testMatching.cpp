@@ -1531,14 +1531,15 @@ void TestMatching::analyzeLocalOpts()
 
 void TestMatching::testGlobalDense()
 {
-	const std::string which = "liv2clean";
+	const std::string which = "liv1"; //"liv2clean"
 
 	if (false) {
 		std::cout << "check if need to update ref trajectory! (press key to continue)" << std::endl;
 		getchar();
 
 		CalibratedSensorData cs;
-		BinaryDataStreamFile s("../data/iclnuim/livingroom2_nonoise.sensor", false);
+		BinaryDataStreamFile s("../data/iclnuim/livingroom1.sensor", false);
+		//BinaryDataStreamFile s("../data/iclnuim/livingroom2_nonoise.sensor", false);
 		//BinaryDataStreamFile s("../data/iclnuim/livingroom2.sensor", false);
 		//BinaryDataStreamFile s("../data/tum/fr1_desk.sensor", false);
 		s >> cs;
@@ -1598,7 +1599,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
-	unsigned int numPerRemove = 8;//GlobalBundlingState::get().s_numOptPerResidualRemoval;
+	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
 	//std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
@@ -1673,21 +1674,21 @@ void TestMatching::testGlobalDense()
 	}
 	getchar();
 
-	sba.setUseGlobalDenseOpt(true);
-	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor); //some dense
-	for (unsigned int i = 0; i < maxNumOutIts; i++) {
-		//if (i > 1) sba.setGlobalWeights(weightsSparse, weightsDenseDepthEnd, weightsDenseColorEnd);
-		//if (i > 1) sba.setGlobalWeights(weightsSparse, weightsDenseDepthEnd, weightsDenseColor);
-		//if (i > 0) sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColorEnd);
+	//sba.setUseGlobalDenseOpt(true);
+	//sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor); //some dense
+	//for (unsigned int i = 0; i < maxNumOutIts; i++) {
+	//	//if (i > 1) sba.setGlobalWeights(weightsSparse, weightsDenseDepthEnd, weightsDenseColorEnd);
+	//	//if (i > 1) sba.setGlobalWeights(weightsSparse, weightsDenseDepthEnd, weightsDenseColor);
+	//	//if (i > 0) sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColorEnd);
 
-		bool remove = false;//(i % numPerRemove) == (numPerRemove - 1);
-		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, remove, false);
+	//	bool remove = false;//(i % numPerRemove) == (numPerRemove - 1);
+	//	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, remove, false);
 
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
-		std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
-		std::cout << std::endl;
-	}
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+	//	float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+	//	std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
+	//	std::cout << std::endl;
+	//}
 
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 	//SiftVisualization::saveToPointCloud("debug/opt.ply", &cudaCache, trajectoryKeys, true);
@@ -1699,6 +1700,7 @@ void TestMatching::testGlobalDense()
 	std::cout << "*********************************" << std::endl;
 	std::cout << "ate rmse = " << transErr << std::endl;
 	std::cout << "*********************************" << std::endl;
+	evaluateTrajectory(submapSize, trajectoryAll, trajectoryKeys, refTrajectoryAll);
 
 	PoseHelper::saveToPoseFile("debug/gt.txt", refTrajectoryKeys);
 	PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryKeys);
@@ -1739,6 +1741,25 @@ void TestMatching::saveCacheFramesToSensorFile(const std::string& filename) cons
 	BinaryDataStreamFile s(filename, true);
 	s << cs;
 	s.closeStream();
+}
+
+void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll)
+{
+	std::vector<mat4f> transforms;
+	for (unsigned int i = 0; i < keys.size(); i++) {
+		const mat4f& key = keys[i];
+		transforms.push_back(key);
+
+		const mat4f offset = all[i*submapSize].getInverse();
+		unsigned int num = std::min((int)submapSize, (int)all.size() - (int)(i * submapSize));
+		for (unsigned int s = 1; s < num; s++) {
+			transforms.push_back(key * offset * all[i*submapSize + s]);
+		}
+	}
+	float transErr = PoseHelper::evaluateAteRmse(transforms, refAll);
+	std::cout << "*********************************" << std::endl;
+	std::cout << "[ all ] ate rmse = " << transErr << std::endl;
+	std::cout << "*********************************" << std::endl;
 }
 
 
