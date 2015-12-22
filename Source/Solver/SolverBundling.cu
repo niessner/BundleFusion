@@ -11,7 +11,7 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-#define PRINT_RESIDUALS
+//#define PRINT_RESIDUALS
 //!!!DEBUGGING
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
@@ -27,6 +27,11 @@ __global__ void FlipJtJ_Kernel(unsigned int total, unsigned int dim, float* d_Jt
 		const unsigned int x = idx % dim;
 		const unsigned int y = idx / dim;
 		if (x > y) {
+			//!!!debugging
+			if (y * dim + x >= total || x * dim + y >= total) {
+				printf("ERROR FlipJtJ: (%d,%d) [%d,%d] out of bounds!\n", x, y, total, dim);
+			}
+			//!!!debugging
 			d_JtJ[y * dim + x] = d_JtJ[x * dim + y];
 		}
 	}
@@ -183,7 +188,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 			const float4 camPosSrc = input.d_cacheFrames[j].d_cameraposDownsampled[srcIdx];
 			matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
 #ifdef USE_LIE_SPACE
-			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
+			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, transform_j, camPosSrc, normalTgt);
+			//if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
 			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
 #else
 			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
@@ -200,6 +206,16 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 					jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5),
 					jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
 					jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
+			}
+			if (false) {//if (i == 1 && j == 2 && x == 18 && y == 1) {
+				printf("(%d,%d) (%d,%d)\n", i, j, x, y);
+				printf("transform j:\n");
+				transform_j.print();
+				printf("inv transform j:\n");
+				invTransform_j.print();
+				printf("residual = %f\nweight = %f\n", res, weight);
+				if (i > 0) printf("jac i: %f %f %f, %f %f %f\n", jacobianBlockRow_i(0), jacobianBlockRow_i(1), jacobianBlockRow_i(2), jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5));
+				if (j > 0) printf("jac j: %f %f %f, %f %f %f\n", jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2), jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
 			}
 			//!!!debugging
 
@@ -320,12 +336,12 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 			h_Jtr = new float[sizeJtr];
 			cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
 			cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-			printf("JtJ:\n");
-			for (unsigned int i = 0; i < 6 * N; i++) {
-				for (unsigned int j = 0; j < 6 * N; j++)
-					printf(" %f,", h_JtJ[j * 6 * N + i]);
-				printf("\n");
-			}
+			//printf("JtJ:\n");
+			//for (unsigned int i = 0; i < 6 * N; i++) {
+			//	for (unsigned int j = 0; j < 6 * N; j++)
+			//		printf(" %f,", h_JtJ[j * 6 * N + i]);
+			//	printf("\n");
+			//}
 			printf("Jtr:\n");
 			for (unsigned int i = 0; i < 6 * N; i++) {
 				printf(" %f,", h_Jtr[i]);
@@ -352,23 +368,23 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 #endif	
-		if (debugPrint) {
-			cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-			printf("JtJ:\n");
-			for (unsigned int i = 0; i < 6 * N; i++) {
-				for (unsigned int j = 0; j < 6 * N; j++)
-					printf(" %f,", h_JtJ[j * 6 * N + i]);
-				printf("\n");
-			}
-			printf("Jtr:\n");
-			for (unsigned int i = 0; i < 6 * N; i++) {
-				printf(" %f,", h_Jtr[i]);
-			}
-			printf("\n\n");
-			if (h_JtJ) delete[] h_JtJ;
-			if (h_Jtr) delete[] h_Jtr;
-		}
+		//if (debugPrint) {
+		//	cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
+		//	cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
+		//	printf("JtJ:\n");
+		//	for (unsigned int i = 0; i < 6 * N; i++) {
+		//		for (unsigned int j = 0; j < 6 * N; j++)
+		//			printf(" %f,", h_JtJ[j * 6 * N + i]);
+		//		printf("\n");
+		//	}
+		//	printf("Jtr:\n");
+		//	for (unsigned int i = 0; i < 6 * N; i++) {
+		//		printf(" %f,", h_Jtr[i]);
+		//	}
+		//	printf("\n\n");
+		//	if (h_JtJ) delete[] h_JtJ;
+		//	if (h_Jtr) delete[] h_Jtr;
+		//}
 		//!!!debugging
 	}
 	if (timer) timer->endEvent();
@@ -930,7 +946,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		printf("initial sparse = %f*%f = %f\n", parameters.weightSparse, initialResidual / parameters.weightSparse, initialResidual);
 	}
 #endif
-	//float3* xRot = new float3[input.numberOfImages];
+	//float3* xRot = new float3[input.numberOfImages];	//remember the delete!
 	//float3* xTrans = new float3[input.numberOfImages];
 	//!!!DEBUGGING
 

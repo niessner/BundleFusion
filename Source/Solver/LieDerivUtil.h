@@ -244,32 +244,82 @@ __inline__ __device__ float3 evalLie_dGamma(const float3& pTransformed)
 /////////////////////////////////////////////////////////////////////////
 // deriv for Ti: (A * e^e * D)^{-1} * p; A = Tj^{-1}; D = Ti
 /////////////////////////////////////////////////////////////////////////
-__inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& A, const float4x4& D, const float3& p)
+//__inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& A, const float4x4& D, const float3& p)
+//{
+//	matNxM<3, 12> j0; matNxM<12, 6> j1;
+//	const float4x4 transform = A * D;
+//	float3 pt = p - transform.getTranslation();
+//	j0.setZero();	j1.setZero();
+//	j0(0, 0) = pt.x;	j0(0, 1) = pt.y;	j0(0, 2) = pt.z;
+//	j0(1, 3) = pt.x;	j0(1, 4) = pt.y;	j0(1, 5) = pt.z;
+//	j0(2, 6) = pt.x;	j0(2, 7) = pt.y;	j0(2, 8) = pt.z;
+//	for (unsigned int r = 0; r < 3; r++) {
+//		for (unsigned int c = 0; c < 3; c++) {
+//			j0(r, c + 9) = -transform(c, r); //-R(AD)^T
+//			j1(r + 9, c) = transform(r, c);	 // R(AD)
+//		}
+//	}
+//	const float3x3 RA = A.getFloat3x3();
+//	for (unsigned int k = 0; k < 4; k++) {
+//		float3x3 m = RA * VectorToSkewSymmetricMatrix(make_float3(D(0, k), D(1, k), D(2, k))) * -1.0f; //RA * col k of D
+//		for (unsigned int r = 0; r < 3; r++) {
+//			for (unsigned int c = 0; c < 3; c++)
+//				j1(3 * k + r, 3 + c) = m(r, c);
+//		}
+//	}
+//
+//	return (j0 * j1);
+//}
+__inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& ti, const float4x4& tj, const float3& p)
 {
-	matNxM<3, 12> j0; matNxM<12, 6> j1;
-	const float4x4 transform = A * D;
-	float3 pt = p - transform.getTranslation();
-	j0.setZero();	j1.setZero();
-	j0(0, 0) = pt.x;	j0(0, 1) = pt.y;	j0(0, 2) = pt.z;
-	j0(1, 3) = pt.x;	j0(1, 4) = pt.y;	j0(1, 5) = pt.z;
-	j0(2, 6) = pt.x;	j0(2, 7) = pt.y;	j0(2, 8) = pt.z;
-	for (unsigned int r = 0; r < 3; r++) {
-		for (unsigned int c = 0; c < 3; c++) {
-			j0(r, c + 9) = -transform(c, r); //-R(AD)^T
-			j1(r + 9, 3 + c) = transform(r, c);	 // R(AD)
+	//!!!debugging
+	matNxM<4, 4> D(tj);
+
+	matNxM<1, 4> point; point(0) = p.x; point(1) = p.y; point(2) = p.z; point(3) = 1.0f;
+	matNxM<3, 3> id; id.setIdentity();
+	matNxM<3, 12> dPoint = point.composeDEBUG(id);
+	matNxM<12, 12> dMult = D.getTranspose().composeDEBUG(id);
+	matNxM<12, 12> dInverse; dInverse.setZero();
+	{
+		dInverse(0, 0) = 1;	//perm part
+		dInverse(1, 3) = 1;
+		dInverse(2, 6) = 1;
+		dInverse(3, 1) = 1;
+		dInverse(4, 4) = 1;
+		dInverse(5, 7) = 1;
+		dInverse(6, 2) = 1;
+		dInverse(7, 5) = 1;
+		dInverse(8, 8) = 1;
+		matNxM<1, 3> trans; trans(0) = -ti(0, 3); trans(1) = -ti(1, 3); trans(2) = -ti(2, 3);
+		matNxM<3, 9> part = id.composeDEBUG(trans);
+		for (unsigned int r = 0; r < 3; r++) {
+			for (unsigned int c = 0; c < 9; c++)
+				dInverse(9 + r, c) = part(r, c);
 		}
-	}
-	const float3x3 RA = A.getFloat3x3();
-	for (unsigned int k = 0; k < 4; k++) {
-		float3x3 m = RA * VectorToSkewSymmetricMatrix(make_float3(D(0, k), D(1, k), D(2, k))) * -1.0f; //RA * col k of D
 		for (unsigned int r = 0; r < 3; r++) {
 			for (unsigned int c = 0; c < 3; c++)
-				j1(3 * k + r, c) = m(r, c);
+				dInverse(9 + r, 9 + c) = -ti(c, r);
+		}
+	}
+	matNxM<12, 6> dTransform; dTransform.setZero();
+	{
+		for (unsigned int r = 0; r < 3; r++) {
+			for (unsigned int c = 0; c < 3; c++)
+				dTransform(9 + r, c) = id(r, c);
+		}
+		for (unsigned int k = 0; k < 4; k++) { // col k
+			float3x3 m = VectorToSkewSymmetricMatrix(make_float3(ti(0, k), ti(1, k), ti(2, k)));
+			for (unsigned int r = 0; r < 3; r++) {
+				for (unsigned int c = 0; c < 3; c++)
+					dTransform(3 * k + r, 3 + c) = -m(r, c);
+			}
 		}
 	}
 
-	return (j0 * j1);
+	matNxM<3, 6> res = dPoint * (dMult * (dInverse * dTransform));
+	return res;
 }
+//!!!debugging
 
 /////////////////////////////////////////////////////////////////////////
 // deriv for Tj: (A * e^e * D) * p; A = Ti^{-1}; D = Tj
@@ -283,12 +333,12 @@ __inline__ __device__ matNxM<3, 6> evalLie_derivJ(const float4x4& A, const float
 	float dty = D(1, 3);
 	float dtz = D(2, 3);
 	matNxM<3, 6> jac;
-	jac(0, 0) = 0.0f;					jac(0, 1) = dot(p, dr3) + dtz;		jac(0, 2) = -(dot(p, dr2) + dty);
-	jac(1, 0) = -(dot(p, dr3) + dtz);	jac(1, 1) = 0.0f;					jac(1, 2) = dot(p, dr1) + dtx;
-	jac(2, 0) = dot(p, dr2) + dty;		jac(2, 1) = -(dot(p, dr1) + dtx);	jac(2, 2) = 0.0f;
-	jac(0, 3) = 1.0f;	jac(0, 4) = 0.0f;	jac(0, 5) = 0.0f;
-	jac(1, 3) = 0.0f;	jac(1, 4) = 1.0f;	jac(1, 5) = 0.0f;
-	jac(2, 3) = 0.0f;	jac(2, 4) = 0.0f;	jac(2, 5) = 1.0f;
+	jac(0, 0) = 1.0f;	jac(0, 1) = 0.0f;	jac(0, 2) = 0.0f;
+	jac(1, 0) = 0.0f;	jac(1, 1) = 1.0f;	jac(1, 2) = 0.0f;
+	jac(2, 0) = 0.0f;	jac(2, 1) = 0.0f;	jac(2, 2) = 1.0f;
+	jac(0, 3) = 0.0f;					jac(0, 4) = dot(p, dr3) + dtz;		jac(0, 5) = -(dot(p, dr2) + dty);
+	jac(1, 3) = -(dot(p, dr3) + dtz);	jac(1, 4) = 0.0f;					jac(1, 5) = dot(p, dr1) + dtx;
+	jac(2, 3) = dot(p, dr2) + dty;		jac(2, 4) = -(dot(p, dr1) + dtx);	jac(2, 5) = 0.0f;
 
 	jac = mat3x3(A.getFloat3x3()) * jac;
 	return jac;

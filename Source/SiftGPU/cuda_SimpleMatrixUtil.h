@@ -1317,6 +1317,34 @@ class matNxM
 		inline __device__ __host__ operator float3x3();
 		inline __device__ __host__ operator float4x4();
 
+		inline __device__ __host__ void print() const {
+			printf("[%d x %d matrix]\n", N, M);
+			for (unsigned int r = 0; r < N; r++) {
+				for (unsigned int c = 0; c < M; c++)
+					printf("%.3f ", entries2D[r][c]);
+				printf("\n");
+			}
+			printf("\n");
+		}
+
+		//debugging!
+		template<unsigned int NOther, unsigned int MOther>
+		inline __device__ __host__ matNxM<N*NOther, M*MOther> composeDEBUG(const matNxM<NOther, MOther>& other) const
+		{
+			matNxM<N*NOther, M*MOther> res;
+			for (unsigned int r = 0; r < N; r++) {
+				for (unsigned int c = 0; c < M; c++) {
+					float val = entries2D[r][c];
+					for (unsigned int rr = 0; rr < NOther; rr++) {
+						for (unsigned int cc = 0; cc < MOther; cc++) {
+							res(r*NOther + rr, c*MOther + cc) = val * other(rr, cc);
+						}
+					}
+				}
+			}
+			return res;
+		}
+
 		//////////////////////////////
 		// Matrix - Matrix Multiplication
 		//////////////////////////////

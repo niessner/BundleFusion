@@ -102,14 +102,6 @@ namespace PoseHelper {
 		return res;
 	}
 
-	static std::vector<ml::mat4f> convertToMatrices(const std::vector<Pose>& poses) {
-		std::vector<ml::mat4f> matrices(poses.size());
-
-		for (unsigned int i = 0; i < poses.size(); i++)
-			matrices[i] = PoseHelper::PoseToMatrix(poses[i]);
-
-		return matrices;
-	}
 #else
 	//https://github.com/MRPT/mrpt/blob/cc2f0d0e08b2659595c0821748be2d537a3c24b4/libs/base/src/poses/CPose3D.cpp
 

@@ -231,44 +231,42 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 // dense depth term
 ////////////////////////////////////////
 
+//__inline__ __device__ void computeJacobianBlockRow_i(matNxM<1, 6>& jacBlockRow, const float4x4& transform_i,
+//	const float4x4& invTransform_j, const float4& camPosSrc, const float4& normalTgt)
+//{
+//	float3 p = make_float3(camPosSrc.x, camPosSrc.y, camPosSrc.z);
+//	float3 n = make_float3(normalTgt.x, normalTgt.y, normalTgt.z);
+//
+//	matNxM<3, 6> jac = evalLie_derivI(invTransform_j, transform_i, p);
+//	for (unsigned int i = 0; i < 3; i++) {
+//		jacBlockRow(i) = -dot(make_float3(jac(0, i + 3), jac(1, i + 3), jac(2, i + 3)), n); //rot
+//		jacBlockRow(i+3) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);			//trans
+//	}
+//
+//}
 __inline__ __device__ void computeJacobianBlockRow_i(matNxM<1, 6>& jacBlockRow, const float4x4& transform_i,
-	const float4x4& invTransform_j, const float4& camPosSrc, const float4& normalTgt)
+	const float4x4& transform_j, const float4& camPosSrc, const float4& normalTgt)
 {
-	//!!!DEBUGGING
-	if (isnan(camPosSrc.x) || isnan(camPosSrc.y) || isnan(camPosSrc.z) || isnan(camPosSrc.w)) {
-		printf("ERROR jac i: camPosSrc = %f %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z, camPosSrc.w);
-	}
-	if (isnan(normalTgt.x) || isnan(normalTgt.y) || isnan(normalTgt.z) || isnan(normalTgt.w)) {
-		printf("ERROR jac i: camPosSrc = %f %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z, normalTgt.w);
-	}
-	//!!!DEBUGGING
-
 	float3 p = make_float3(camPosSrc.x, camPosSrc.y, camPosSrc.z);
 	float3 n = make_float3(normalTgt.x, normalTgt.y, normalTgt.z);
 
-	matNxM<3, 6> jac = evalLie_derivI(invTransform_j, transform_i, p);
-	for (unsigned int i = 0; i < 6; i++) {
-		jacBlockRow(i) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);
+	matNxM<3, 6> jac = evalLie_derivI(transform_i, transform_j, p);
+	for (unsigned int i = 0; i < 3; i++) {
+		jacBlockRow(i) = -dot(make_float3(jac(0, i + 3), jac(1, i + 3), jac(2, i + 3)), n); //rot
+		jacBlockRow(i + 3) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);			//trans
 	}
+
 }
 __inline__ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, const float4x4& invTransform_i,
 	const float4x4& transform_j, const float4& camPosSrc, const float4& normalTgt)
 {
-	////!!!DEBUGGING
-	if (isnan(camPosSrc.x) || isnan(camPosSrc.y) || isnan(camPosSrc.z) || isnan(camPosSrc.w)) {
-		printf("ERROR jac j: camPosSrc = %f %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z, camPosSrc.w);
-	}
-	if (isnan(normalTgt.x) || isnan(normalTgt.y) || isnan(normalTgt.z) || isnan(normalTgt.w)) {
-		printf("ERROR jac j: camPosSrc = %f %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z, normalTgt.w);
-	}
-	////!!!DEBUGGING
-
 	float3 p = make_float3(camPosSrc.x, camPosSrc.y, camPosSrc.z);
 	float3 n = make_float3(normalTgt.x, normalTgt.y, normalTgt.z);
 
-	matNxM<3,6> jac = evalLie_derivJ(invTransform_i, transform_j, p);
-	for (unsigned int i = 0; i < 6; i++) {
-		jacBlockRow(i) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);
+	matNxM<3, 6> jac = evalLie_derivJ(invTransform_i, transform_j, p);
+	for (unsigned int i = 0; i < 3; i++) {
+		jacBlockRow(i) = -dot(make_float3(jac(0, i+3), jac(1, i+3), jac(2, i+3)), n);	//rot
+		jacBlockRow(i+3) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);		//trans
 	}
 }
 ////////////////////////////////////////

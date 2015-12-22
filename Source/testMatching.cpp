@@ -1217,8 +1217,8 @@ void TestMatching::runOpt()
 	GlobalBundlingState::get().s_localDenseUseAllPairwise = false;
 
 	//weights...
-	std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
+	std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
 	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); 
@@ -1582,11 +1582,18 @@ void TestMatching::testGlobalDense()
 	const unsigned int numImages = m_siftManager->getNumImages();
 	MLIB_ASSERT(refTrajectoryKeys.size() == numImages);
 
+	//initial trajectory
+	{
+		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+		std::cout << "[ init ate rmse = " << transErr << " ]" << std::endl;
+		std::cout << std::endl;
+	}
+
 	SBA sba;
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 1;
+	const unsigned int maxNumOutIts = 4;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
@@ -1595,12 +1602,13 @@ void TestMatching::testGlobalDense()
 	//params
 	//std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
+	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.5f);  for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.5f);  for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 
 	//std::vector<float> weightsDenseDepthEnd(maxNumIters, 3.0f);
 	//std::vector<float> weightsDenseColorEnd(maxNumIters, 2.0f);
@@ -1654,7 +1662,7 @@ void TestMatching::testGlobalDense()
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 
 	//first sparse
-	sba.setUseGlobalDenseOpt(false); sba.setGlobalWeights(weightsSparse, std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f));
+	sba.setUseGlobalDenseOpt(false); sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f));
 	for (unsigned int i = 0; i < 8; i++) {
 		bool remove = (i % numPerRemove) == (numPerRemove - 1);
 		sba.align(m_siftManager, &cudaCache, d_transforms, 4, numPCGIts, useVerify, isLocal, false, true, remove, false);
