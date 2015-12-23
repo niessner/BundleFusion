@@ -110,7 +110,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		float4x4 transform = invTransform_i * transform_j;
 
 		//!!!debugging
-		//if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
+		if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
 		//!!!debugging
 
 		// find correspondence
@@ -676,13 +676,6 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 	//cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr pRot %d\n", i); getchar(); } }
 	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr pTrans %d\n", i); getchar(); } }
-#ifdef PRINT_RESIDUALS_DENSE //!!!debugging
-	if (input.numberOfImages > 11 && parameters.weightDenseDepth > 0) {
-		float scanAlpha;
-		cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
-		printf("[ PCGInit_Kernel1 ] scanAlpha = %f\n", scanAlpha);
-	}
-#endif //!!!debugging
 
 	if (timer) timer->startEvent("Init2");
 	PCGInit_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(N, state);
@@ -870,8 +863,7 @@ __global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 	}
 }
 
-void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& parameters, bool lastIteration, CUDATimer *timer
-	, bool print) //!!!debugging
+void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& parameters, bool lastIteration, CUDATimer *timer)
 {
 	const unsigned int N = input.numberOfImages;	// Number of block variables
 
@@ -925,26 +917,12 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-#ifdef PRINT_RESIDUALS_DENSE //!!!debugging
-	if (input.numberOfImages > 11 && print) {
-		float scanAlpha;
-		cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
-		printf("[ PCGStep_Kernel1b ] scanAlpha = %f\n", scanAlpha);
-	}
-#endif //!!!debugging
 
 	PCGStep_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-#ifdef PRINT_RESIDUALS_DENSE //!!!debugging
-	if (input.numberOfImages > 11 && print) {
-		float scanBeta;
-		cutilSafeCall(cudaMemcpy(&scanBeta, &state.d_scanAlpha[1], sizeof(float), cudaMemcpyDeviceToHost));
-		printf("[ PCGStep_Kernel1b ] scanBeta = %f\n", scanBeta);
-	}
-#endif //!!!debugging
 
 	if (lastIteration) {
 		PCGStep_Kernel3<true> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
@@ -1021,9 +999,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 			//	int a = 5;
 			//}
 			//!!!debugging
-			bool print = input.numberOfImages > 11 && linIter >= parameters.nLinIterations - 2 && parameters.weightDenseDepth > 0;
-			if (print)	printf("lin iter = %d\n", linIter);
-			PCGIteration(input, state, parameters, linIter == parameters.nLinIterations - 1, timer, print); //debugging
+			PCGIteration(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
 
 			//linearResidual = EvalLinearRes(input, state, parameters);
 			//linConvergenceAnalysis[idx++] = linearResidual;

@@ -237,7 +237,7 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (true) {
+		if (false) {
 			TestMatching test;
 			//test.loadFromSensor("debug/livingroom1/33noise.sensor", "", 1);
 			//test.runOpt();
