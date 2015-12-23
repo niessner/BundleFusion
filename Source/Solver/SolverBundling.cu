@@ -11,7 +11,8 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-#define PRINT_RESIDUALS
+//#define PRINT_RESIDUALS_SPARSE
+#define PRINT_RESIDUALS_DENSE
 //!!!DEBUGGING
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
@@ -248,15 +249,19 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 							jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
 							jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
 					}
-#ifdef PRINT_RESIDUALS
-					atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * res * res);
-					atomicAdd(state.d_corrCountColor, 1);
+#ifdef PRINT_RESIDUALS_DENSE
+					if (input.numberOfImages > 11) {//!!!debugging
+						atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * res * res);
+						atomicAdd(state.d_corrCountColor, 1);
+					}//!!!debugging
 #endif
 				}
 			}
-#ifdef PRINT_RESIDUALS
-			atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
-			atomicAdd(state.d_corrCount, 1);
+#ifdef PRINT_RESIDUALS_DENSE
+			if (input.numberOfImages > 11) {//!!!debugging
+				atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
+				atomicAdd(state.d_corrCount, 1);
+			}//!!!debugging
 #endif
 		} // found correspondence
 	} // valid image pixel
@@ -280,11 +285,13 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 	if (timer) timer->startEvent("BuildDenseDepthSystem");
 
 	//!!!debugging
-#ifdef PRINT_RESIDUALS
-	cutilSafeCall(cudaMemset(state.d_corrCount, 0, sizeof(int)));
-	cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
-	cutilSafeCall(cudaMemset(state.d_corrCountColor, 0, sizeof(int)));
-	cutilSafeCall(cudaMemset(state.d_sumResidualColor, 0, sizeof(float)));
+#ifdef PRINT_RESIDUALS_DENSE
+	if (input.numberOfImages > 11) {//!!!debugging
+		cutilSafeCall(cudaMemset(state.d_corrCount, 0, sizeof(int)));
+		cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
+		cutilSafeCall(cudaMemset(state.d_corrCountColor, 0, sizeof(int)));
+		cutilSafeCall(cudaMemset(state.d_sumResidualColor, 0, sizeof(float)));
+	}//!!!debugging
 #endif
 	//!!!debugging
 
@@ -352,19 +359,21 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 			}
 			printf("\n");
 		}
-#ifdef PRINT_RESIDUALS
-		if (parameters.weightDenseDepth > 0) {
-			float sumResidual; int corrCount;
-			cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
-			printf("\tdense depth: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseDepth, sumResidual / parameters.weightDenseDepth, sumResidual, corrCount);
-		}
-		if (parameters.weightDenseColor > 0) {
-			float sumResidual; int corrCount;
-			cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidualColor, sizeof(float), cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCountColor, sizeof(int), cudaMemcpyDeviceToHost));
-			printf("\tdense color: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseColor, sumResidual / parameters.weightDenseColor, sumResidual, corrCount);
-		}
+#ifdef PRINT_RESIDUALS_DENSE
+		if (input.numberOfImages > 11) {//!!!debugging
+			if (parameters.weightDenseDepth > 0) {
+				float sumResidual; int corrCount;
+				cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
+				cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
+				printf("\tdense depth: weights * residual = %f * %f = %f\t[#corr = %d, %d images]\n", parameters.weightDenseDepth, sumResidual / parameters.weightDenseDepth, sumResidual, corrCount, input.numberOfImages);
+			}
+			if (parameters.weightDenseColor > 0) {
+				float sumResidual; int corrCount;
+				cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidualColor, sizeof(float), cudaMemcpyDeviceToHost));
+				cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCountColor, sizeof(int), cudaMemcpyDeviceToHost));
+				printf("\tdense color: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseColor, sumResidual / parameters.weightDenseColor, sumResidual, corrCount);
+			}
+		}//!!!debugging
 #endif
 		const unsigned int flipgrid = (sizeJtJ + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
 		FlipJtJ_Kernel << <flipgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(sizeJtJ, sizeJtr, state.d_denseJtJ);
@@ -667,6 +676,13 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 	//cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr pRot %d\n", i); getchar(); } }
 	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr pTrans %d\n", i); getchar(); } }
+#ifdef PRINT_RESIDUALS_DENSE //!!!debugging
+	if (input.numberOfImages > 11 && parameters.weightDenseDepth > 0) {
+		float scanAlpha;
+		cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
+		printf("[ PCGInit_Kernel1 ] scanAlpha = %f\n", scanAlpha);
+	}
+#endif //!!!debugging
 
 	if (timer) timer->startEvent("Init2");
 	PCGInit_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(N, state);
@@ -854,7 +870,8 @@ __global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 	}
 }
 
-void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& parameters, bool lastIteration, CUDATimer *timer)
+void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& parameters, bool lastIteration, CUDATimer *timer
+	, bool print) //!!!debugging
 {
 	const unsigned int N = input.numberOfImages;	// Number of block variables
 
@@ -908,13 +925,26 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
+#ifdef PRINT_RESIDUALS_DENSE //!!!debugging
+	if (input.numberOfImages > 11 && print) {
+		float scanAlpha;
+		cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
+		printf("[ PCGStep_Kernel1b ] scanAlpha = %f\n", scanAlpha);
+	}
+#endif //!!!debugging
 
 	PCGStep_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-
+#ifdef PRINT_RESIDUALS_DENSE //!!!debugging
+	if (input.numberOfImages > 11 && print) {
+		float scanBeta;
+		cutilSafeCall(cudaMemcpy(&scanBeta, &state.d_scanAlpha[1], sizeof(float), cudaMemcpyDeviceToHost));
+		printf("[ PCGStep_Kernel1b ] scanBeta = %f\n", scanBeta);
+	}
+#endif //!!!debugging
 
 	if (lastIteration) {
 		PCGStep_Kernel3<true> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
@@ -944,7 +974,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	//unsigned int idx = 0;
 
 	//!!!DEBUGGING
-#ifdef PRINT_RESIDUALS
+#ifdef PRINT_RESIDUALS_SPARSE
 	if (parameters.weightSparse > 0) {
 		float initialResidual = EvalResidual(input, state, parameters, timer);
 		printf("initial sparse = %f*%f = %f\n", parameters.weightSparse, initialResidual / parameters.weightSparse, initialResidual);
@@ -991,7 +1021,9 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 			//	int a = 5;
 			//}
 			//!!!debugging
-			PCGIteration(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
+			bool print = input.numberOfImages > 11 && linIter >= parameters.nLinIterations - 2 && parameters.weightDenseDepth > 0;
+			if (print)	printf("lin iter = %d\n", linIter);
+			PCGIteration(input, state, parameters, linIter == parameters.nLinIterations - 1, timer, print); //debugging
 
 			//linearResidual = EvalLinearRes(input, state, parameters);
 			//linConvergenceAnalysis[idx++] = linearResidual;
@@ -1002,7 +1034,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		//!!!debugging
 
 		//!!!DEBUGGING
-#ifdef PRINT_RESIDUALS
+#ifdef PRINT_RESIDUALS_SPARSE
 		if (parameters.weightSparse > 0) {
 			float residual = EvalResidual(input, state, parameters, timer);
 			printf("[niter %d] weight * sparse = %f*%f = %f\t[#corr = %d]\n", nIter, parameters.weightSparse, residual / parameters.weightSparse, residual, input.numberOfCorrespondences);

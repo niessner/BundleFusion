@@ -79,11 +79,11 @@ void Bundler::processInput()
 		else {
 			if (framePastLast == 10) {
 #ifdef USE_GLOBAL_DENSE_AT_END
-				//m_SubmapManager.setEndSolveGlobalDenseWeights();
-				saveGlobalSiftManagerAndCacheToFile("debug/global");
-				saveCompleteTrajectory("debug/curTrajectory.bin");
-				std::cout << "waiting..." << std::endl;
-				getchar();
+				m_SubmapManager.setEndSolveGlobalDenseWeights();
+				//saveGlobalSiftManagerAndCacheToFile("debug/global");
+				//saveCompleteTrajectory("debug/curTrajectory.bin");
+				//std::cout << "waiting..." << std::endl;
+				//getchar();
 #endif
 			}
 			framePastLast++;
