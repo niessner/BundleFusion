@@ -1213,7 +1213,6 @@ void TestMatching::runOpt()
 	//params
 	const bool savePointClouds = true;
 	const unsigned int maxNumIters = 5;
-	const bool isLocal = false;
 	GlobalBundlingState::get().s_localDenseUseAllPairwise = false;
 
 	//weights...
@@ -1225,6 +1224,8 @@ void TestMatching::runOpt()
 	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = (i + 1.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f); 
+	bool useGlobalDense = true;
+	//bool useGlobalDense = false;
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
@@ -1254,10 +1255,8 @@ void TestMatching::runOpt()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	if (isLocal) sba.setLocalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor);
-	else sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor);
+	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor, useGlobalDense);
 	sba.setLocalDensePairwise(GlobalBundlingState::get().s_localDenseUseAllPairwise);
-	if (!isLocal) sba.setUseGlobalDenseOpt(true);
 	// params
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
@@ -1282,16 +1281,16 @@ void TestMatching::runOpt()
 	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, transforms.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 	////sparse only first
-	//sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f));
-	//sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+	//sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f), false);
+	//sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, false, false, true, true, false);
 	//{
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 	//	float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
 	//	std::cout << "ate rmse = " << transErr << std::endl;
 	//}
 	//now some dense
-	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor);
-	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor, true);
+	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, false, false, true, true, false);
 	//{
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 	//	float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
@@ -1299,7 +1298,7 @@ void TestMatching::runOpt()
 	//}
 	////more dense
 	//sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 10.0f), std::vector<float>(maxNumIters, 0.0f));
-	//sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, true, false);
+	//sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, false, false, true, true, false);
 	//{
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 	//	float transErr = PoseHelper::evaluateAteRmse(transforms, referenceTrajectory);
@@ -1548,9 +1547,13 @@ void TestMatching::testGlobalDense()
 		o << cs.m_trajectory;
 		o.closeStream();
 	}
-	const std::string siftFile = "debug/" + which + ".sift";
-	const std::string cacheFile = "debug/" + which + ".cache";
-	const std::string trajFile = "debug/sift_" + which + ".bin";
+	//const std::string siftFile = "debug/" + which + ".sift";
+	//const std::string cacheFile = "debug/" + which + ".cache";
+	//const std::string trajFile = "debug/sift_" + which + ".bin";
+	//const std::string refTrajFile = "debug/ref_" + which + ".bin";
+	const std::string siftFile = "debug/global.sift";
+	const std::string cacheFile = "debug/global.cache";
+	const std::string trajFile = "debug/curTrajectory.bin";
 	const std::string refTrajFile = "debug/ref_" + which + ".bin";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 
@@ -1560,12 +1563,13 @@ void TestMatching::testGlobalDense()
 		BinaryDataStreamFile s(trajFile, false);
 		s >> trajectoryAll;
 	}
-	{
-		BinaryDataStreamFile s(refTrajFile, false);
-		s >> refTrajectoryAll;
-		mat4f refOffset = refTrajectoryAll.front().getInverse();
-		for (unsigned int i = 0; i < refTrajectoryAll.size(); i++) refTrajectoryAll[i] = refOffset * refTrajectoryAll[i];
-	}
+	loadTrajectory("E:/Work/VolumetricSFS/tracking/ICLNUIM/livingRoom1.gt.freiburg", refTrajectoryAll);
+	//{
+	//	BinaryDataStreamFile s(refTrajFile, false);
+	//	s >> refTrajectoryAll;
+	//	mat4f refOffset = refTrajectoryAll.front().getInverse();
+	//	for (unsigned int i = 0; i < refTrajectoryAll.size(); i++) refTrajectoryAll[i] = refOffset * refTrajectoryAll[i];
+	//}
 	size_t numTransforms = std::min(trajectoryAll.size(), refTrajectoryAll.size());
 	for (unsigned int i = 0; i < numTransforms; i += submapSize) {
 		trajectoryKeys.push_back(trajectoryAll[i]);
@@ -1587,6 +1591,7 @@ void TestMatching::testGlobalDense()
 	{
 		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
 		std::cout << "[ init ate rmse = " << transErr << " ]" << std::endl;
+		evaluateTrajectory(submapSize, trajectoryAll, trajectoryKeys, refTrajectoryAll);
 		std::cout << std::endl;
 	}
 
@@ -1605,8 +1610,8 @@ void TestMatching::testGlobalDense()
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
 	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.5f);  for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
@@ -1662,33 +1667,32 @@ void TestMatching::testGlobalDense()
 	//}
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 
-	//first sparse
-	sba.setUseGlobalDenseOpt(false); sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f));
-	for (unsigned int i = 0; i < 8; i++) {
-		bool remove = (i % numPerRemove) == (numPerRemove - 1);
-		sba.align(m_siftManager, &cudaCache, d_transforms, 4, numPCGIts, useVerify, isLocal, false, true, remove, false);
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
-		std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
-		std::cout << std::endl;
-	}
-	getchar();
-
-	//sba.setUseGlobalDenseOpt(true);
-	//sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor); //some dense
-	//for (unsigned int i = 0; i < maxNumOutIts; i++) {
-	//	//if (i > 1) sba.setGlobalWeights(weightsSparse, weightsDenseDepthEnd, weightsDenseColorEnd);
-	//	//if (i > 1) sba.setGlobalWeights(weightsSparse, weightsDenseDepthEnd, weightsDenseColor);
-	//	//if (i > 0) sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColorEnd);
-
-	//	bool remove = false;//(i % numPerRemove) == (numPerRemove - 1);
-	//	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, remove, false);
-
+	////first sparse
+	//sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f), false);
+	//for (unsigned int i = 0; i < 8; i++) {
+	//	bool remove = (i % numPerRemove) == (numPerRemove - 1);
+	//	sba.align(m_siftManager, &cudaCache, d_transforms, 4, numPCGIts, useVerify, isLocal, false, true, remove, false);
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 	//	float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
 	//	std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
 	//	std::cout << std::endl;
 	//}
+	//getchar();
+
+	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor, true); //some dense
+	for (unsigned int i = 0; i < maxNumOutIts; i++) {
+		//if (i > 1) sba.setGlobalWeights(weightsSparse, weightsDenseDepthEnd, weightsDenseColorEnd);
+		//if (i > 1) sba.setGlobalWeights(weightsSparse, weightsDenseDepthEnd, weightsDenseColor);
+		//if (i > 0) sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColorEnd);
+
+		bool remove = false;//(i % numPerRemove) == (numPerRemove - 1);
+		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, remove, false);
+
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+		std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
+		std::cout << std::endl;
+	}
 
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 	//SiftVisualization::saveToPointCloud("debug/opt.ply", &cudaCache, trajectoryKeys, true);
@@ -1760,6 +1764,42 @@ void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector
 	std::cout << "*********************************" << std::endl;
 	std::cout << "[ all ] ate rmse = " << transErr << std::endl;
 	std::cout << "*********************************" << std::endl;
+	PoseHelper::saveToPoseFile("debug/optAll.txt", transforms);
+}
+
+void TestMatching::trajDEBUG() const
+{
+	const std::string which = "liv1"; //"liv2clean"
+
+	const std::string siftFile = "debug/" + which + ".sift";
+	const std::string cacheFile = "debug/" + which + ".cache";
+	const std::string trajFile = "debug/sift_" + which + ".bin";
+	const std::string refTrajFile = "debug/ref_" + which + ".bin";
+	if (!(util::fileExists(siftFile) && util::fileExists(cacheFile) && util::fileExists(trajFile) && util::fileExists(refTrajFile))) {
+		std::cerr << "ERROR: files for " << which << " do not exist" << std::endl;
+		getchar();
+	}
+
+	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
+	std::vector<mat4f> trajectoryAll, refTrajectoryAll;
+	{
+		BinaryDataStreamFile s(trajFile, false);
+		s >> trajectoryAll;
+	}
+	{
+		BinaryDataStreamFile s(refTrajFile, false);
+		s >> refTrajectoryAll;
+		mat4f refOffset = refTrajectoryAll.front().getInverse();
+		for (unsigned int i = 0; i < refTrajectoryAll.size(); i++) refTrajectoryAll[i] = refOffset * refTrajectoryAll[i];
+	}
+	size_t numTransforms = math::min(trajectoryAll.size(), refTrajectoryAll.size());
+	if (trajectoryAll.size() > numTransforms) trajectoryAll.resize(numTransforms);
+	if (refTrajectoryAll.size() > numTransforms) refTrajectoryAll.resize(numTransforms);
+
+	float transErr = PoseHelper::evaluateAteRmse(trajectoryAll, refTrajectoryAll);
+	std::cout << "[ all ] ate rmse = " << transErr << std::endl;
+	//PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryAll);
+	//PoseHelper::saveToPoseFile("debug/ref.txt", refTrajectoryAll);
 }
 
 

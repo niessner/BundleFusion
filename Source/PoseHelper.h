@@ -30,6 +30,24 @@ namespace PoseHelper {
 		}
 		vec3f evs;
 		mat4f align = EigenWrapperf::kabsch(pts, refPts, evs);
+
+		//!!!debugging
+		//Eigen::Matrix3f W; W.setZero();
+		//for (unsigned int i = 0; i < pts.size(); i++) {
+		//	W += Eigen::Vector3f(refPts[i].x, refPts[i].y, refPts[i].z) * Eigen::Vector3f(pts[i].x, pts[i].y, pts[i].z).transpose();
+		//}
+		//W.transposeInPlace();
+		//Eigen::JacobiSVD<Eigen::Matrix3f> svd(W, Eigen::ComputeThinU | Eigen::ComputeThinV);
+		//Eigen::Matrix3f U = svd.matrixU(); //v
+		//Eigen::Vector3f d = svd.singularValues(); //s
+		//Eigen::Matrix3f Vh = svd.matrixV(); //w
+		//Eigen::Matrix3f S = Eigen::MatrixXf::Identity(3, 3);
+		//if (U.determinant() * Vh.determinant() < 0)
+		//	S(2, 2) = -1;
+		//Eigen::Matrix3f rot = U * S * Vh;
+		//mat3f align = mat3f(rot.data()).getTranspose();
+		//!!!debugging
+
 		float err = 0.0f;
 		for (unsigned int i = 0; i < pts.size(); i++) {
 			vec3f p0 = align * pts[i];
@@ -69,6 +87,7 @@ namespace PoseHelper {
 
 		float psi, theta, phi; // x,y,z axis angles
 		if (R(2, 0) > -1+eps && R(2, 0) < 1-eps) { // R(2, 0) != +/- 1
+		//if (abs(R(2, 0) - 1) > eps && abs(R(2, 0) + 1) > eps) { // R(2, 0) != +/- 1
 			theta = -asin(R(2, 0)); // \pi - theta
 			float costheta = cos(theta);
 			psi = atan2(R(2, 1) / costheta, R(2, 2) / costheta);
@@ -78,7 +97,9 @@ namespace PoseHelper {
 		}
 		else {
 			phi = 0;
-			if (abs(R(2, 0) + 1) < eps) { // R(2, 0) == - 1
+			if (R(2, 0) <= -1 + eps) {
+			//if (abs(R(2, 0) + 1) < eps) { // R(2, 0) == - 1
+			//if (abs(R(2, 0) + 1) > eps) {
 				theta = ml::math::PIf / 2.0f;
 				psi = phi + atan2(R(0, 1), R(0, 2));
 			}

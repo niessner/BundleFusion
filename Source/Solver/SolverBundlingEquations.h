@@ -5,6 +5,7 @@
 
 
 #include "GlobalDefines.h"
+#include <math_constants.h>
 
 #ifndef USE_LIE_SPACE
 
@@ -373,27 +374,27 @@ __inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned
 				//!!!DEBUGGING
 				if (isnan(dii)) printf("ERROR addtolocalsystem (%d,%d)(%d,%d) %f %f %f\n", vi, vj, i, j, jacobianBlockRow_i(i), jacobianBlockRow_i(j), weight);
 				//!!!DEBUGGING
-				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii); 
+				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
 			}
 			if (vj > 0) {
 				float djj = jacobianBlockRow_j(i) * jacobianBlockRow_j(j) * weight;
 				//!!!DEBUGGING
 				if (isnan(djj)) printf("ERROR addtolocalsystem (%d,%d)(%d,%d) %f %f %f\n", vi, vj, i, j, jacobianBlockRow_j(i), jacobianBlockRow_j(j), weight);
 				//!!!DEBUGGING
-				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj); 
+				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
 			}
 			if (vi > 0 && vj > 0) {
 				float dij = jacobianBlockRow_i(i) * jacobianBlockRow_j(j) * weight;
 				//!!!DEBUGGING
 				if (isnan(dij)) printf("ERROR addtolocalsystem (%d,%d)(%d,%d) %f %f %f\n", vi, vj, i, j, jacobianBlockRow_i(i), jacobianBlockRow_j(j), weight);
 				//!!!DEBUGGING
-				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij); 
+				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
 				if (i != j)	{
 					float dji = jacobianBlockRow_i(j) * jacobianBlockRow_j(i) * weight;
 					//!!!DEBUGGING
 					if (isnan(dji)) printf("ERROR addtolocalsystem (%d,%d)(%d,%d) %f %f %f\n", vi, vj, i, j, jacobianBlockRow_i(j), jacobianBlockRow_j(i), weight);
 					//!!!DEBUGGING
-					atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji); 
+					atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji);
 				}
 			}
 		}
@@ -465,5 +466,44 @@ __inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState&
 //	outRot.x = warpReduce(outRot.x);	 outRot.y = warpReduce(outRot.y);	  outRot.z = warpReduce(outRot.z);
 //	outTrans.x = warpReduce(outTrans.x); outTrans.y = warpReduce(outTrans.y); outTrans.z = warpReduce(outTrans.z);
 //}
+
+///////////////////////////////////////////////////////////////////
+// camera functions
+///////////////////////////////////////////////////////////////////
+__inline__ __device__ bool computeAngleDiff(const float4x4& transform, float angleThresh)
+{
+	float3 x = normalize(make_float3(1.0f, 1.0f, 1.0f)); 
+	float3 v = transform.getFloat3x3() * x;
+	float angle = acos(clamp(dot(x, v), -1.0f, 1.0f));
+	if (fabs(angle) < angleThresh) return true;
+	return false;
+
+	// decompose to z-y-x euler angles
+	//const float eps = 0.0001f;
+
+	//float psi, theta, phi; // x,y,z axis angles
+	//if (transform(2, 0) > -1 + eps && transform(2, 0) < 1 - eps) { // R(2, 0) != +/- 1
+	//	theta = -asin(transform(2, 0)); // \pi - theta
+	//	float costheta = cos(theta);
+	//	psi = atan2(transform(2, 1) / costheta, transform(2, 2) / costheta);
+	//	phi = atan2(transform(1, 0) / costheta, transform(0, 0) / costheta);
+	//}
+	//else {
+	//	phi = 0;
+	//	if (transform(2, 0) <= -1 + eps) {
+	//		theta = CUDART_PI_F / 2.0f;
+	//		psi = phi + atan2(transform(0, 1), transform(0, 2));
+	//	}
+	//	else {	// R(2, 0) == 1
+	//		theta = -CUDART_PI_F / 2.0f;
+	//		psi = -phi + atan2(-transform(0, 1), -transform(0, 2));
+	//	}
+	//}
+
+	//float3 rot = make_float3(psi, theta, phi);
+	//if (fabs(rot.x) < angleThresh && fabs(rot.y) < angleThresh && fabs(rot.z) < angleThresh)
+	//	return true;
+	//return false;
+}
 
 #endif

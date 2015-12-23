@@ -90,8 +90,39 @@ public:
 
 	void printCacheFrames(const std::string& dir) const;
 
+	void trajDEBUG() const;
+
 private:
 	void evaluateTrajectory(unsigned int submapSize, const std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll);
+	void loadTrajectory(const std::string& filename, std::vector<mat4f>& trajectory)
+	{
+		std::string line;
+		std::ifstream s(filename);
+		if (s.is_open()) {
+			while (getline(s, line)) {
+				if (line[0] == '#') continue; // comment
+				std::vector<std::string> l = util::split(line, ' '); //l[0] = timestamp
+				vec3f translation;
+				quatf rotation;
+				for (unsigned int i = 0; i < 3; i++)
+					util::convertTo(l[i + 1], translation[i]);
+				vec4f q;
+				for (unsigned int i = 0; i < 4; i++)
+					util::convertTo(l[i + 4], q[i]);
+				rotation = quatf(q.w, q.x, q.y, q.z);
+
+				mat4f transform = mat4f::identity();
+				transform.setTranslationVector(translation);
+				transform.setRotation(rotation.matrix3x3());
+				trajectory.push_back(transform);
+			}
+			s.close();
+		}
+		else {
+			std::cout << "ERROR opening file " << filename << std::endl;
+			getchar();
+		}
+	}
 
 	// for global offline matching
 	void detectKeys(const std::vector<ColorImageR8G8B8A8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager) const;

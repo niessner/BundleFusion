@@ -30,24 +30,21 @@ SBA::SBA()
 	m_localWeightsDenseDepth.resize(maxNumIts);
 	for (unsigned int i = 0; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = i + 1.0f;
 	m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //TODO turn on
+
+	m_globalWeightsMutex.lock();
 	m_globalWeightsSparse.resize(maxNumIts, 1.0f);
-	m_globalWeightsDenseDepth.resize(maxNumIts, 1.0f);
+	//m_globalWeightsDenseDepth.resize(maxNumIts, 1.0f);
+	m_globalWeightsDenseDepth.resize(maxNumIts, 0.5f);
 	for (unsigned int i = 0; i < 3; i++) m_globalWeightsDenseDepth[i] = 0.0f;
 	m_globalWeightsDenseColor.resize(maxNumIts, 0.0f); //TODO turn on
-
-	////sparse only
-	//m_localWeightsSparse.resize(maxNumIts, 1.0f);
-	//m_localWeightsDenseDepth.resize(maxNumIts, 0.0f);
-	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f);
-	//m_globalWeightsSparse.resize(maxNumIts, 1.0f);
-	//m_globalWeightsDenseDepth.resize(maxNumIts, 0.0f);
-	//m_globalWeightsDenseColor.resize(maxNumIts, 0.0f);
 
 #ifdef USE_GLOBAL_DENSE_EVERY_FRAME
 	m_bUseGlobalDenseOpt = true;
 #else
 	m_bUseGlobalDenseOpt = false;
 #endif
+	m_globalWeightsMutex.unlock();
+
 	m_bUseLocalDensePairwise = true;
 }
 
@@ -65,22 +62,26 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	std::vector<float> weightsDenseDepth, weightsDenseColor, weightsSparse;
 	if (isLocal) {
 		weightsSparse = m_localWeightsSparse;
-		cache = NULL; //to turn off
-		weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
-		//usePairwise = m_bUseLocalDensePairwise; //turn on
-		//weightsDenseDepth = m_localWeightsDenseDepth;
-		//weightsDenseColor = m_localWeightsDenseColor;
+		//cache = NULL; //to turn off
+		//weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
+		usePairwise = m_bUseLocalDensePairwise; //turn on
+		weightsDenseDepth = m_localWeightsDenseDepth;
+		weightsDenseColor = m_localWeightsDenseColor;
 	}
 	else {
 		usePairwise = true; //always global dense pairwise
-		weightsSparse = m_globalWeightsSparse;
+
 		if (!m_bUseGlobalDenseOpt) {
+			weightsSparse = m_globalWeightsSparse;
 			cache = NULL;
 			weightsDenseDepth = std::vector<float>(m_globalWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
 		}
 		else {
+			m_globalWeightsMutex.lock();
+			weightsSparse = m_globalWeightsSparse;
 			weightsDenseDepth = m_globalWeightsDenseDepth;
 			weightsDenseColor = m_globalWeightsDenseColor;
+			m_globalWeightsMutex.unlock();
 		}
 	}
 

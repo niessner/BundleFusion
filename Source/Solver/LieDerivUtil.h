@@ -290,7 +290,7 @@ __inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& ti, const floa
 		dInverse(6, 2) = 1;
 		dInverse(7, 5) = 1;
 		dInverse(8, 8) = 1;
-		matNxM<1, 3> trans; trans(0) = -ti(0, 3); trans(1) = -ti(1, 3); trans(2) = -ti(2, 3);
+		matNxM<1, 3> trans; trans(0) = -ti(0, 3); trans(1) = -ti(1, 3); trans(2) = -ti(2, 3); // i3 comp -t
 		matNxM<3, 9> part = id.composeDEBUG(trans);
 		for (unsigned int r = 0; r < 3; r++) {
 			for (unsigned int c = 0; c < 9; c++)
@@ -298,7 +298,7 @@ __inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& ti, const floa
 		}
 		for (unsigned int r = 0; r < 3; r++) {
 			for (unsigned int c = 0; c < 3; c++)
-				dInverse(9 + r, 9 + c) = -ti(c, r);
+				dInverse(9 + r, 9 + c) = -ti(c, r); //-r^T
 		}
 	}
 	matNxM<12, 6> dTransform; dTransform.setZero();
@@ -311,7 +311,7 @@ __inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& ti, const floa
 			float3x3 m = VectorToSkewSymmetricMatrix(make_float3(ti(0, k), ti(1, k), ti(2, k)));
 			for (unsigned int r = 0; r < 3; r++) {
 				for (unsigned int c = 0; c < 3; c++)
-					dTransform(3 * k + r, 3 + c) = -m(r, c);
+					dTransform(3 * k + r, 3 + c) = -m(r, c); //-[col]_x
 			}
 		}
 	}

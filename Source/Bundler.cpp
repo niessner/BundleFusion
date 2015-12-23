@@ -74,14 +74,19 @@ void Bundler::processInput()
 		static unsigned int framePastLast = 0;
 		if (framePastLast == 0 && m_currentState.m_localToSolve == -1) {
 			if (!m_SubmapManager.isLastLocalFrame(curFrame)) prepareLocalSolve(curFrame, true);
-#ifdef USE_GLOBAL_DENSE_AT_END
-			m_SubmapManager.setGlobalDenseSolve(true);
-#endif
 			framePastLast++;
 		}
 		else {
-			if (framePastLast >= 10) m_SubmapManager.setEndSolveGlobalDenseWeights();
-			else framePastLast++;
+			if (framePastLast == 10) {
+#ifdef USE_GLOBAL_DENSE_AT_END
+				//m_SubmapManager.setEndSolveGlobalDenseWeights();
+				saveGlobalSiftManagerAndCacheToFile("debug/global");
+				saveCompleteTrajectory("debug/curTrajectory.bin");
+				std::cout << "waiting..." << std::endl;
+				getchar();
+#endif
+			}
+			framePastLast++;
 		}
 		return; // nothing new to process
 	}

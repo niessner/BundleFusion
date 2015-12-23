@@ -51,21 +51,21 @@ public:
 	}
 	void printConvergence(const std::string& filename) const;
 
-	void setLocalWeights(const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor) {
-		m_localWeightsSparse = weightsSparse;
-		m_localWeightsDenseDepth = weightsDenseDepth;
-		m_localWeightsDenseColor = weightsDenseColor;
-	}
-	void setGlobalWeights(const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor) {
+	//void setLocalWeights(const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor) {
+	//	m_localWeightsSparse = weightsSparse;
+	//	m_localWeightsDenseDepth = weightsDenseDepth;
+	//	m_localWeightsDenseColor = weightsDenseColor;
+	//}
+	void setGlobalWeights(const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor, bool useGlobalDenseOpt) {
+		m_globalWeightsMutex.lock();
 		m_globalWeightsSparse = weightsSparse;
 		m_globalWeightsDenseDepth = weightsDenseDepth;
 		m_globalWeightsDenseColor = weightsDenseColor;
+		m_bUseGlobalDenseOpt = useGlobalDenseOpt;
+		m_globalWeightsMutex.unlock();
 	}
 	void setLocalDensePairwise(bool b) {
 		m_bUseLocalDensePairwise = b;
-	}
-	void setUseGlobalDenseOpt(bool b) {
-		m_bUseGlobalDenseOpt = b;
 	}
 
 private:
@@ -106,6 +106,7 @@ private:
 	std::vector<float> m_globalWeightsSparse;
 	std::vector<float> m_globalWeightsDenseDepth;
 	std::vector<float> m_globalWeightsDenseColor;
+	std::mutex m_globalWeightsMutex;
 
 	CUDASolverBundling* m_solver;
 
