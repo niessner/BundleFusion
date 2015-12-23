@@ -1218,12 +1218,12 @@ void TestMatching::runOpt()
 	//weights...
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	std::vector<float> weightsSparse(maxNumIters, 0.0f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); 
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); 
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = (i + 1.0f);
-	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f); 
+	std::vector<float> weightsDenseColor(maxNumIters, 1.0f); 
 	bool useGlobalDense = true;
 	//bool useGlobalDense = false;
 
@@ -1264,7 +1264,7 @@ void TestMatching::runOpt()
 	// initial transforms
 	std::vector<mat4f> transforms(numImages, mat4f::identity());
 	// rand init
-	RNG::global.init(0, 1, 2, 3); const float maxTrans = 0.1f; const float maxRot = 7.0f; //const float maxTrans = 0.03f; const float maxRot = 3.0f; //for rgb only convergence radius not so large
+	RNG::global.init(0, 1, 2, 3); /*const float maxTrans = 0.1f; const float maxRot = 7.0f;*/ const float maxTrans = 0.05f; const float maxRot = 5.0f; //for rgb only convergence radius not so large
 	for (unsigned int i = 1; i < transforms.size(); i++) {
 		float tx = RNG::global.uniform(0.0f, maxTrans); if (RNG::global.uniform(0, 1) == 0) tx = -tx;
 		float ty = RNG::global.uniform(0.0f, maxTrans); if (RNG::global.uniform(0, 1) == 0) ty = -ty;
@@ -1547,13 +1547,9 @@ void TestMatching::testGlobalDense()
 		o << cs.m_trajectory;
 		o.closeStream();
 	}
-	//const std::string siftFile = "debug/" + which + ".sift";
-	//const std::string cacheFile = "debug/" + which + ".cache";
-	//const std::string trajFile = "debug/sift_" + which + ".bin";
-	//const std::string refTrajFile = "debug/ref_" + which + ".bin";
-	const std::string siftFile = "debug/global.sift";
-	const std::string cacheFile = "debug/global.cache";
-	const std::string trajFile = "debug/curTrajectory.bin";
+	const std::string siftFile = "debug/" + which + ".sift";
+	const std::string cacheFile = "debug/" + which + ".cache";
+	const std::string trajFile = "debug/sift_" + which + ".bin";
 	const std::string refTrajFile = "debug/ref_" + which + ".bin";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 
@@ -1609,12 +1605,12 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.5f);  for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
+	std::vector<float> weightsDenseColor(maxNumIters, 0.5f);  for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 
 	//std::vector<float> weightsDenseDepthEnd(maxNumIters, 3.0f);
 	//std::vector<float> weightsDenseColorEnd(maxNumIters, 2.0f);
@@ -1667,17 +1663,17 @@ void TestMatching::testGlobalDense()
 	//}
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 
-	////first sparse
-	//sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f), false);
-	//for (unsigned int i = 0; i < 8; i++) {
-	//	bool remove = (i % numPerRemove) == (numPerRemove - 1);
-	//	sba.align(m_siftManager, &cudaCache, d_transforms, 4, numPCGIts, useVerify, isLocal, false, true, remove, false);
-	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-	//	float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
-	//	std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
-	//	std::cout << std::endl;
-	//}
-	//getchar();
+	//first sparse
+	sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f), false);
+	for (unsigned int i = 0; i < 8; i++) {
+		bool remove = (i % numPerRemove) == (numPerRemove - 1);
+		sba.align(m_siftManager, &cudaCache, d_transforms, 4, numPCGIts, useVerify, isLocal, false, true, remove, false);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+		std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
+		std::cout << std::endl;
+	}
+	getchar();
 
 	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor, true); //some dense
 	for (unsigned int i = 0; i < maxNumOutIts; i++) {

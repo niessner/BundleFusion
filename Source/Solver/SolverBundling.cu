@@ -11,7 +11,7 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-//#define PRINT_RESIDUALS_SPARSE
+#define PRINT_RESIDUALS_SPARSE
 #define PRINT_RESIDUALS_DENSE
 //!!!DEBUGGING
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
@@ -110,7 +110,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		float4x4 transform = invTransform_i * transform_j;
 
 		//!!!debugging
-		if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
+		//if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
 		//!!!debugging
 
 		// find correspondence
@@ -156,7 +156,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 		imPairIdx = i;
 	}
 	if (input.d_validImages[i] == 0 || input.d_validImages[j] == 0) return;
-	float imPairWeight = state.d_denseCorrCounts[imPairIdx];
+	float imPairWeight = state.d_denseCorrCounts[imPairIdx]; 
 	if (imPairWeight == 0.0f) return;
 
 	const unsigned int idx = threadIdx.y * THREADS_PER_BLOCK_DENSE_DEPTH_X + threadIdx.x;
@@ -212,16 +212,6 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 					jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
 					jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
 			}
-			if (false) {//if (i == 1 && j == 2 && x == 18 && y == 1) {
-				printf("(%d,%d) (%d,%d)\n", i, j, x, y);
-				printf("transform j:\n");
-				transform_j.print();
-				printf("inv transform j:\n");
-				invTransform_j.print();
-				printf("residual = %f\nweight = %f\n", res, weight);
-				if (i > 0) printf("jac i: %f %f %f, %f %f %f\n", jacobianBlockRow_i(0), jacobianBlockRow_i(1), jacobianBlockRow_i(2), jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5));
-				if (j > 0) printf("jac j: %f %f %f, %f %f %f\n", jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2), jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
-			}
 			//!!!debugging
 
 			addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
@@ -232,8 +222,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				const float2 intensityDerivTgt = input.d_cacheFrames[i].d_intensityDerivsDownsampled[tgtIdx];
 				float diffIntensity = input.d_cacheFrames[i].d_intensityDownsampled[tgtIdx] - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
 				if (intensityDerivTgt.x != MINF && abs(diffIntensity) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin) {
-					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
-					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, invTransform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					//weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
 					weight = 1.0f;
 
@@ -250,18 +240,14 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 							jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
 					}
 #ifdef PRINT_RESIDUALS_DENSE
-					if (input.numberOfImages > 11) {//!!!debugging
-						atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * res * res);
-						atomicAdd(state.d_corrCountColor, 1);
-					}//!!!debugging
+					atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * res * res);
+					atomicAdd(state.d_corrCountColor, 1);
 #endif
 				}
 			}
 #ifdef PRINT_RESIDUALS_DENSE
-			if (input.numberOfImages > 11) {//!!!debugging
-				atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
-				atomicAdd(state.d_corrCount, 1);
-			}//!!!debugging
+			atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
+			atomicAdd(state.d_corrCount, 1);
 #endif
 		} // found correspondence
 	} // valid image pixel
@@ -286,12 +272,10 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 
 	//!!!debugging
 #ifdef PRINT_RESIDUALS_DENSE
-	if (input.numberOfImages > 11) {//!!!debugging
-		cutilSafeCall(cudaMemset(state.d_corrCount, 0, sizeof(int)));
-		cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
-		cutilSafeCall(cudaMemset(state.d_corrCountColor, 0, sizeof(int)));
-		cutilSafeCall(cudaMemset(state.d_sumResidualColor, 0, sizeof(float)));
-	}//!!!debugging
+	cutilSafeCall(cudaMemset(state.d_corrCount, 0, sizeof(int)));
+	cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
+	cutilSafeCall(cudaMemset(state.d_corrCountColor, 0, sizeof(int)));
+	cutilSafeCall(cudaMemset(state.d_sumResidualColor, 0, sizeof(float)));
 #endif
 	//!!!debugging
 
@@ -360,20 +344,18 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 			printf("\n");
 		}
 #ifdef PRINT_RESIDUALS_DENSE
-		if (input.numberOfImages > 11) {//!!!debugging
-			if (parameters.weightDenseDepth > 0) {
-				float sumResidual; int corrCount;
-				cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
-				cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
-				printf("\tdense depth: weights * residual = %f * %f = %f\t[#corr = %d, %d images]\n", parameters.weightDenseDepth, sumResidual / parameters.weightDenseDepth, sumResidual, corrCount, input.numberOfImages);
-			}
-			if (parameters.weightDenseColor > 0) {
-				float sumResidual; int corrCount;
-				cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidualColor, sizeof(float), cudaMemcpyDeviceToHost));
-				cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCountColor, sizeof(int), cudaMemcpyDeviceToHost));
-				printf("\tdense color: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseColor, sumResidual / parameters.weightDenseColor, sumResidual, corrCount);
-			}
-		}//!!!debugging
+		if (parameters.weightDenseDepth > 0) {
+			float sumResidual; int corrCount;
+			cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
+			cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
+			printf("\tdense depth: weights * residual = %f * %f = %f\t[#corr = %d, %d images]\n", parameters.weightDenseDepth, sumResidual / parameters.weightDenseDepth, sumResidual, corrCount, input.numberOfImages);
+		}
+		if (parameters.weightDenseColor > 0) {
+			float sumResidual; int corrCount;
+			cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidualColor, sizeof(float), cudaMemcpyDeviceToHost));
+			cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCountColor, sizeof(int), cudaMemcpyDeviceToHost));
+			printf("\tdense color: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseColor, sumResidual / parameters.weightDenseColor, sumResidual, corrCount);
+		}
 #endif
 		const unsigned int flipgrid = (sizeJtJ + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
 		FlipJtJ_Kernel << <flipgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(sizeJtJ, sizeJtr, state.d_denseJtJ);

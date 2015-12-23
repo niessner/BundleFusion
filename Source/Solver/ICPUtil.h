@@ -3,13 +3,12 @@
 
 #include "GlobalDefines.h"
 
-#ifndef USE_LIE_SPACE
-
 #include <cutil_inline.h>
 #include <cutil_math.h>
 #include <device_functions.h>
 
 #include "../../SiftGPU/cuda_SimpleMatrixUtil.h"
+
 
 // color stuff
 inline __device__ mat2x3 dCameraToScreen(const float4& p, float fx, float fy)
@@ -25,6 +24,7 @@ inline __device__ mat2x3 dCameraToScreen(const float4& p, float fx, float fy)
 	return res;
 }
 
+#ifndef USE_LIE_SPACE
 
 inline __device__ float2 dehomogenize(const float3& v)
 {
