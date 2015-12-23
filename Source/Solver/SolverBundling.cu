@@ -193,8 +193,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 			const float4 camPosSrc = input.d_cacheFrames[j].d_cameraposDownsampled[srcIdx];
 			matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
 #ifdef USE_LIE_SPACE
-			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, transform_j, camPosSrc, normalTgt);
-			//if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
+			//if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, transform_j, camPosSrc, normalTgt);
+			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
 			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
 #else
 			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
@@ -222,7 +222,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				const float2 intensityDerivTgt = input.d_cacheFrames[i].d_intensityDerivsDownsampled[tgtIdx];
 				float diffIntensity = input.d_cacheFrames[i].d_intensityDownsampled[tgtIdx] - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
 				if (intensityDerivTgt.x != MINF && abs(diffIntensity) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin) {
-					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+					//if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, invTransform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, invTransform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					//weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
 					weight = 1.0f;
@@ -348,7 +349,7 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 			float sumResidual; int corrCount;
 			cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
 			cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
-			printf("\tdense depth: weights * residual = %f * %f = %f\t[#corr = %d, %d images]\n", parameters.weightDenseDepth, sumResidual / parameters.weightDenseDepth, sumResidual, corrCount, input.numberOfImages);
+			printf("\tdense depth: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseDepth, sumResidual / parameters.weightDenseDepth, sumResidual, corrCount);
 		}
 		if (parameters.weightDenseColor > 0) {
 			float sumResidual; int corrCount;

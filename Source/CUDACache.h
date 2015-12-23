@@ -136,6 +136,16 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_intensityOrigDown, cachedFrames[i].d_intensityOrigDown, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
 		}
 	}
+	//!debugging only
+	void reFilterCachedIntensityFrames(const float sigma) {
+		if (sigma == m_filterIntensitySigma) return;
+		std::cout << "re-filtering intensity (sigma = " << sigma << ")" << std::endl;
+		m_filterIntensitySigma = sigma;
+		for (unsigned int i = 0; i < m_cache.size(); i++) {
+			if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(m_cache[i].d_intensityDownsampled, m_cache[i].d_intensityOrigDown, m_filterIntensitySigma, m_width, m_height);
+			else CUDAImageUtil::copy(m_cache[i].d_intensityDownsampled, m_cache[i].d_intensityOrigDown, m_width, m_height);
+		}
+	}
 
 private:
 
