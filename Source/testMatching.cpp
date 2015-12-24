@@ -1230,10 +1230,13 @@ void TestMatching::runOpt()
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
-	std::vector<mat4f> referenceTrajectory = m_referenceTrajectory;
-	mat4f offset = referenceTrajectory.front().getInverse();
-	for (unsigned int i = 0; i < referenceTrajectory.size(); i++) referenceTrajectory[i] = offset * referenceTrajectory[i];
-
+	const std::string refFilename = "E:/Work/VolumetricSFS/tracking/ICLNUIM/livingRoom1.gt.freiburg"; std::vector<mat4f> referenceTrajectory;
+	loadTrajectory(refFilename, referenceTrajectory);
+	referenceTrajectory.resize(numImages);
+	if (numImages == 2) {
+		mat4f offset = referenceTrajectory.front().getInverse();
+		for (unsigned int i = 0; i < referenceTrajectory.size(); i++) referenceTrajectory[i] = offset * referenceTrajectory[i];
+	}
 	//create cache
 	CUDACache cudaCache(GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight, numImages, m_intrinsicsDownsampled);
 	cudaCache.setCachedFrames(m_cachedFrames);

@@ -40,7 +40,7 @@ __global__ void FlipJtJ_Kernel(unsigned int total, unsigned int dim, float* d_Jt
 __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, const float4x4& transform, const float4x4& intrinsics,
 	const float4* tgtCamPos, const float4* tgtNormals, const float4* srcCamPos, const float4* srcNormals,
-	float depthMin, float depthMax, float4& camPosSrcToTgt, unsigned int& tgtIdx)
+	float depthMin, float depthMax, float4& camPosSrcToTgt, float2& tgtScreenPosf, float4& camPosTgt, float4& normalTgt)
 {
 	const float4 cposj = srcCamPos[idx];
 	//if (debugPrint) printf("cam pos j = %f %f %f\n", cposj.x, cposj.y, cposj.z);
@@ -51,18 +51,18 @@ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigne
 			nrmj = transform * nrmj;
 			camPosSrcToTgt = transform * cposj;
 			float3 proj = intrinsics * make_float3(camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
-			int2 tgtScreenPos = make_int2((int)roundf(proj.x / proj.z), (int)roundf(proj.y / proj.z));
+			tgtScreenPosf = make_float2(proj.x / proj.z, proj.y / proj.z);
+			int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
 			//if (debugPrint) {
 			//	printf("cam pos j2i = %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
 			//	printf("proj %f %f %f -> %f %f\n", proj.x, proj.y, proj.z, proj.x / proj.z, proj.y / proj.z);
 			//	printf("screen pos = %d %d\n", tgtScreenPos.x, tgtScreenPos.y);
 			//}
 			if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
-				tgtIdx = tgtScreenPos.y * imageWidth + tgtScreenPos.x;
-				const float4 camPosTgt = tgtCamPos[tgtIdx];
+				camPosTgt = tgtCamPos[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
 				//if (debugPrint) printf("cam pos i = %f %f %f\n", camPosTgt.x, camPosTgt.y, camPosTgt.z);
 				if (camPosTgt.z > depthMin && camPosTgt.z < depthMax) {
-					const float4 normalTgt = tgtNormals[tgtIdx];
+					normalTgt = tgtNormals[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
 					//if (debugPrint) printf("normal i = %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z);
 					if (normalTgt.x != MINF) {
 						float dist = length(camPosSrcToTgt - camPosTgt);
@@ -114,12 +114,12 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		//!!!debugging
 
 		// find correspondence
-		float4 camPosSrcToTgt; unsigned int tgtIdx;
+		float4 camPosSrcToTgt; float4 camPosTgt; float4 normalTgt; float2 tgtScreenPos;
 		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
 			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
-			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, tgtIdx)) { //i tgt, j src
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt)) { //i tgt, j src
 			atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
 		} // found correspondence
 	} // valid image pixel
@@ -176,14 +176,12 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 		float4x4 transform = invTransform_i * transform_j;
 
 		// find correspondence
-		float4 camPosSrcToTgt; unsigned int tgtIdx;
+		float4 camPosSrcToTgt; float4 camPosTgt; float4 normalTgt; float2 tgtScreenPos;
 		if (findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
 			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
-			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, tgtIdx)) { //i tgt, j src
-			const float4 camPosTgt = input.d_cacheFrames[i].d_cameraposDownsampled[tgtIdx];
-			const float4 normalTgt = input.d_cacheFrames[i].d_normalsDownsampled[tgtIdx];
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt)) { //i tgt, j src
 			// point-to-plane residual
 			float4 diff = camPosTgt - camPosSrcToTgt;
 			float res = dot(diff, normalTgt);
@@ -219,8 +217,9 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 
 			// color term
 			if (useColor) {
-				const float2 intensityDerivTgt = input.d_cacheFrames[i].d_intensityDerivsDownsampled[tgtIdx];
-				float diffIntensity = input.d_cacheFrames[i].d_intensityDownsampled[tgtIdx] - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
+				const float2 intensityDerivTgt = bilinearInterpolationFloat2NoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDerivsDownsampled, input.denseDepthWidth, input.denseDepthHeight);
+				const float intensityTgt = bilinearInterpolationFloatNoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDownsampled, input.denseDepthWidth, input.denseDepthHeight);
+				float diffIntensity = intensityTgt - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
 				if (intensityDerivTgt.x != MINF && abs(diffIntensity) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin) {
 					//if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, invTransform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);

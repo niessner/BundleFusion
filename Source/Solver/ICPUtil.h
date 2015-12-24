@@ -24,6 +24,65 @@ inline __device__ mat2x3 dCameraToScreen(const float4& p, float fx, float fy)
 	return res;
 }
 
+//! doesn't check for invalid
+inline __device__ float bilinearInterpolationFloatNoChecks(float x, float y, float* d_input, unsigned int imageWidth, unsigned int imageHeight)
+{
+	const int2 p00 = make_int2(floor(x), floor(y));
+	const int2 p01 = p00 + make_int2(0.0f, 1.0f);
+	const int2 p10 = p00 + make_int2(1.0f, 0.0f);
+	const int2 p11 = p00 + make_int2(1.0f, 1.0f);
+
+	const float alpha = x - p00.x;
+	const float beta = y - p00.y;
+
+	float s0 = 0.0f; float w0 = 0.0f;
+	if (p00.x < imageWidth && p00.y < imageHeight) { float v00 = d_input[p00.y*imageWidth + p00.x]; /*if(v00.x != MINF && v00.y != MINF && v00.z != MINF)*/ { s0 += (1.0f - alpha)*v00; w0 += (1.0f - alpha); } }
+	if (p10.x < imageWidth && p10.y < imageHeight) { float v10 = d_input[p10.y*imageWidth + p10.x]; /*if(v10.x != MINF && v10.y != MINF && v10.z != MINF)*/ { s0 += alpha *v10; w0 += alpha; } }
+
+	float s1 = 0.0f; float w1 = 0.0f;
+	if (p01.x < imageWidth && p01.y < imageHeight) { float v01 = d_input[p01.y*imageWidth + p01.x]; /*if(v01.x != MINF && v01.y != MINF && v01.z != MINF)*/ { s1 += (1.0f - alpha)*v01; w1 += (1.0f - alpha); } }
+	if (p11.x < imageWidth && p11.y < imageHeight) { float v11 = d_input[p11.y*imageWidth + p11.x]; /*if(v11.x != MINF && v11.y != MINF && v11.z != MINF)*/ { s1 += alpha *v11; w1 += alpha; } }
+
+	const float p0 = s0 / w0;
+	const float p1 = s1 / w1;
+
+	float ss = 0.0f; float ww = 0.0f;
+	if (w0 > 0.0f) { ss += (1.0f - beta)*p0; ww += (1.0f - beta); }
+	if (w1 > 0.0f) { ss += beta *p1; ww += beta; }
+
+	if (ww > 0.0f) return ss / ww;
+	else		  return MINF; //should not happen!
+}
+inline __device__ float2 bilinearInterpolationFloat2NoChecks(float x, float y, float2* d_input, unsigned int imageWidth, unsigned int imageHeight)
+{
+	const int2 p00 = make_int2(floor(x), floor(y));
+	const int2 p01 = p00 + make_int2(0.0f, 1.0f);
+	const int2 p10 = p00 + make_int2(1.0f, 0.0f);
+	const int2 p11 = p00 + make_int2(1.0f, 1.0f);
+
+	const float alpha = x - p00.x;
+	const float beta = y - p00.y;
+
+	float2 s0 = make_float2(0.0f); float w0 = 0.0f;
+	if (p00.x < imageWidth && p00.y < imageHeight) { float2 v00 = d_input[p00.y*imageWidth + p00.x]; /*if(v00.x != MINF && v00.y != MINF && v00.z != MINF)*/ { s0 += (1.0f - alpha)*v00; w0 += (1.0f - alpha); } }
+	if (p10.x < imageWidth && p10.y < imageHeight) { float2 v10 = d_input[p10.y*imageWidth + p10.x]; /*if(v10.x != MINF && v10.y != MINF && v10.z != MINF)*/ { s0 += alpha *v10; w0 += alpha; } }
+
+	float2 s1 = make_float2(0.0f); float w1 = 0.0f;
+	if (p01.x < imageWidth && p01.y < imageHeight) { float2 v01 = d_input[p01.y*imageWidth + p01.x]; /*if(v01.x != MINF && v01.y != MINF && v01.z != MINF)*/ { s1 += (1.0f - alpha)*v01; w1 += (1.0f - alpha); } }
+	if (p11.x < imageWidth && p11.y < imageHeight) { float2 v11 = d_input[p11.y*imageWidth + p11.x]; /*if(v11.x != MINF && v11.y != MINF && v11.z != MINF)*/ { s1 += alpha *v11; w1 += alpha; } }
+
+	const float2 p0 = s0 / w0;
+	const float2 p1 = s1 / w1;
+
+	float2 ss = make_float2(0.0f); float ww = 0.0f;
+	if (w0 > 0.0f) { ss += (1.0f - beta)*p0; ww += (1.0f - beta); }
+	if (w1 > 0.0f) { ss += beta *p1; ww += beta; }
+
+	if (ww > 0.0f) return ss / ww;
+	else		  return make_float2(MINF); //should not happen!
+}
+
+
 #ifndef USE_LIE_SPACE
 
 inline __device__ float2 dehomogenize(const float3& v)
