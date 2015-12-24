@@ -619,7 +619,7 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 		while (1);
 	}
 
-	if (timer) timer->startEvent("Init1");
+	if (timer) timer->startEvent("Initialization");
 
 	//!!!DEBUGGING //remember to uncomment the delete...
 	//float3* rRot = new float3[input.numberOfImages]; // -jtf
@@ -638,7 +638,6 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif		
-	if (timer) timer->endEvent();
 
 	//cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
@@ -649,7 +648,6 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr pRot %d\n", i); getchar(); } }
 	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr pTrans %d\n", i); getchar(); } }
 
-	if (timer) timer->startEvent("Init2");
 	PCGInit_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(N, state);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
@@ -666,8 +664,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 // PCG Iteration Parts
 /////////////////////////////////////////////////////////////////////////
 
-//TODO MAKE EFFICIENT
-__global__ void PCGStep_Kernel_Dense(SolverInput input, SolverState state, SolverParameters parameters)
+//inefficient
+__global__ void PCGStep_Kernel_Dense_Brute(SolverInput input, SolverState state, SolverParameters parameters)
 {
 	const unsigned int N = input.numberOfImages;							// Number of block variables
 	const unsigned int x = blockIdx.x;
@@ -675,37 +673,35 @@ __global__ void PCGStep_Kernel_Dense(SolverInput input, SolverState state, Solve
 	if (x > 0 && x < N)
 	{
 		float3 rot, trans;
-		applyJTJDevice(x, state, state.d_denseJtJ, input.numberOfImages, rot, trans); // A x p_k  => J^T x J x p_k 
+		applyJTJDenseBruteDevice(x, state, state.d_denseJtJ, input.numberOfImages, rot, trans); // A x p_k  => J^T x J x p_k 
 
 		state.d_Ap_XRot[x] += rot;
 		state.d_Ap_XTrans[x] += trans;
 	}
 }
-//__global__ void PCGStep_Kernel_Dense(SolverInput input, SolverState state, SolverParameters parameters)
-//{
-//	const unsigned int N = input.numberOfImages;							// Number of block variables
-//	const unsigned int x = blockIdx.x;
-//
-//	//float d = 0.0f;
-//	if (x > 0 && x < N)
-//	{
-//		const unsigned int lane = threadIdx.x % WARP_SIZE;
-//
-//		float3 rot, trans;
-//		applyJTJDenseDevice(x, input, state, parameters, rot, trans, threadIdx.x);			// A x p_k  => J^T x J x p_k 
-//
-//		if (lane == 0)
-//		{
-//			atomicAdd(&state.d_Ap_XRot[x].x, rot.x);
-//			atomicAdd(&state.d_Ap_XRot[x].y, rot.y);
-//			atomicAdd(&state.d_Ap_XRot[x].z, rot.z);
-//
-//			atomicAdd(&state.d_Ap_XTrans[x].x, trans.x);
-//			atomicAdd(&state.d_Ap_XTrans[x].y, trans.y);
-//			atomicAdd(&state.d_Ap_XTrans[x].z, trans.z);
-//		}
-//	}
-//}
+__global__ void PCGStep_Kernel_Dense(SolverInput input, SolverState state, SolverParameters parameters)
+{
+	const unsigned int N = input.numberOfImages;							// Number of block variables
+	const unsigned int x = blockIdx.x;
+	const unsigned int lane = threadIdx.x % WARP_SIZE;
+
+	if (x > 0 && x < N)
+	{
+		float3 rot, trans;
+		applyJTJDenseDevice(x, state, state.d_denseJtJ, input.numberOfImages, rot, trans, threadIdx.x);			// A x p_k  => J^T x J x p_k 
+
+		if (lane == 0)
+		{
+			atomicAdd(&state.d_Ap_XRot[x].x, rot.x);
+			atomicAdd(&state.d_Ap_XRot[x].y, rot.y);
+			atomicAdd(&state.d_Ap_XRot[x].z, rot.z);
+
+			atomicAdd(&state.d_Ap_XTrans[x].x, trans.x);
+			atomicAdd(&state.d_Ap_XTrans[x].y, trans.y);
+			atomicAdd(&state.d_Ap_XTrans[x].z, trans.z);
+		}
+	}
+}
 
 __global__ void PCGStep_Kernel0(SolverInput input, SolverState state, SolverParameters parameters)
 {
@@ -867,12 +863,14 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 #endif
 	}
 	if (useDense) {
-		//PCGStep_Kernel_Dense << < N, THREADS_PER_BLOCK_JT >> >(input, state, parameters);
-		PCGStep_Kernel_Dense << < N, 1 >> >(input, state, parameters); //TODO fix this part
+		if (timer) timer->startEvent("apply JTJ dense");
+		PCGStep_Kernel_Dense << < N, THREADS_PER_BLOCK_JT_DENSE >> >(input, state, parameters);
+		//PCGStep_Kernel_Dense_Brute << < N, 1 >> >(input, state, parameters);
 #ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 #endif
+		if (timer) timer->endEvent();
 	}
 	//!!!debugging
 	//float3* Ap_Rot = new float3[input.numberOfImages];

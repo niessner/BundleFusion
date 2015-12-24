@@ -7,6 +7,9 @@
 #include "GlobalDefines.h"
 #include <math_constants.h>
 
+
+#define THREADS_PER_BLOCK_JT_DENSE 128
+
 #ifndef USE_LIE_SPACE
 
 #define THREADS_PER_BLOCK_JT 128
@@ -404,8 +407,8 @@ __inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned
 	}
 }
 
-//TODO MAKE EFFICIENT
-__inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState& state, float* d_JtJ, unsigned int N, float3& outRot, float3& outTrans)
+//inefficient version
+__inline__ __device__ void applyJTJDenseBruteDevice(unsigned int variableIdx, SolverState& state, float* d_JtJ, unsigned int N, float3& outRot, float3& outTrans)
 {
 	// Compute J^T*d_Jp here
 	outRot = make_float3(0.0f, 0.0f, 0.0f);
@@ -442,40 +445,54 @@ __inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState&
 		outRot += block10 * state.d_pTrans[i] + block11 * state.d_pRot[i];
 	}
 }
-//__inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,
-//	float3& outRot, float3& outTrans, unsigned int threadIdx)
-//{
-//	// Compute J^T*d_Jp here
-//	outRot = make_float3(0.0f, 0.0f, 0.0f);
-//	outTrans = make_float3(0.0f, 0.0f, 0.0f);
-//
-//	int N = input.numberOfImages;
-//
-//	for (int i = threadIdx; i < N; i += THREADS_PER_BLOCK_JT)
-//	{
-//		//(row,col) = (variableIdx + (3/3), i + (3/3))
-//		float3 rotPart = make_float3(
-//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 0],
-//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 1],
-//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 2]);
-//		float3 transPart = make_float3(
-//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 3],
-//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 4],
-//			state.d_depthJtJ[variableIdx * 6 * N + i * 6 + 5]);
-//		outRot += dot(rotPart, state.d_pRot[i]);
-//		outTrans += dot(transPart, state.d_pTrans[i]);
-//	}
-//
-//	outRot.x = warpReduce(outRot.x);	 outRot.y = warpReduce(outRot.y);	  outRot.z = warpReduce(outRot.z);
-//	outTrans.x = warpReduce(outTrans.x); outTrans.y = warpReduce(outTrans.y); outTrans.z = warpReduce(outTrans.z);
-//}
+__inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverState& state, float* d_JtJ, unsigned int N, float3& outRot, float3& outTrans, unsigned int threadIdx)
+{
+	// Compute J^T*d_Jp here
+	outRot = make_float3(0.0f, 0.0f, 0.0f);
+	outTrans = make_float3(0.0f, 0.0f, 0.0f);
+
+	const unsigned int dim = 6 * N;
+
+	unsigned int baseVarIdx = variableIdx * 6;
+	unsigned int i = (threadIdx > 0) ? threadIdx : THREADS_PER_BLOCK_JT_DENSE;
+	for (; i < N; i += THREADS_PER_BLOCK_JT_DENSE) // iterate through (6) row(s) of JtJ
+	{
+		// (row, col) = vars, i
+		unsigned int baseIdx = 6 * i;
+
+		float3x3 block00(
+			d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 2],
+			d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 2],
+			d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 2]);
+		float3x3 block01(
+			d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 0)* dim + baseIdx + 5],
+			d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 1)* dim + baseIdx + 5],
+			d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 2)* dim + baseIdx + 5]);
+		float3x3 block10(
+			d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 2],
+			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 2],
+			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 0], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 1], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 2]);
+		float3x3 block11(
+			d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 3)* dim + baseIdx + 5],
+			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 5],
+			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 5]);
+
+		//outRot += block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
+		//outTrans += block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
+		outTrans += block00 * state.d_pTrans[i] + block01 * state.d_pRot[i];
+		outRot += block10 * state.d_pTrans[i] + block11 * state.d_pRot[i];
+	}
+
+	outRot.x = warpReduce(outRot.x);	 outRot.y = warpReduce(outRot.y);	  outRot.z = warpReduce(outRot.z);
+	outTrans.x = warpReduce(outTrans.x); outTrans.y = warpReduce(outTrans.y); outTrans.z = warpReduce(outTrans.z);
+}
 
 ///////////////////////////////////////////////////////////////////
 // camera functions
 ///////////////////////////////////////////////////////////////////
 __inline__ __device__ bool computeAngleDiff(const float4x4& transform, float angleThresh)
 {
-	float3 x = normalize(make_float3(1.0f, 1.0f, 1.0f)); 
+	float3 x = normalize(make_float3(1.0f, 1.0f, 1.0f));
 	float3 v = transform.getFloat3x3() * x;
 	float angle = acos(clamp(dot(x, v), -1.0f, 1.0f));
 	if (fabs(angle) < angleThresh) return true;
