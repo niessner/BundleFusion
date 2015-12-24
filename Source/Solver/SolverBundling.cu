@@ -99,16 +99,17 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 
 	if (gidx < (input.denseDepthWidth * input.denseDepthHeight)) {
 #ifdef USE_LIE_SPACE
-		float4x4 transform_i = poseToMatrix(state.d_xRot[i], state.d_xTrans[i]);		//TODO HERE
-		float4x4 transform_j = poseToMatrix(state.d_xRot[j], state.d_xTrans[j]);
+		float4x4 transform_i = state.d_xTransforms[i];
+		float4x4 transform_j = state.d_xTransforms[j];
+		float4x4 invTransform_i = state.d_xTransformInverses[i];
+		float4x4 invTransform_j = state.d_xTransformInverses[j];
+		float4x4 transform = invTransform_i * transform_j;
 #else
 		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
 		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
-#endif
-		float4x4 invTransform_i = transform_i.getInverse(); //TODO pre-compute the inverts
-
+		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
 		float4x4 transform = invTransform_i * transform_j;
-
+#endif
 		//!!!debugging
 		if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
 		//!!!debugging
@@ -164,16 +165,17 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 
 	if (srcIdx < (input.denseDepthWidth * input.denseDepthHeight)) {
 #ifdef USE_LIE_SPACE
-		float4x4 transform_i = poseToMatrix(state.d_xRot[i], state.d_xTrans[i]);		//TODO HERE
-		float4x4 transform_j = poseToMatrix(state.d_xRot[j], state.d_xTrans[j]);
+		float4x4 transform_i = state.d_xTransforms[i];
+		float4x4 transform_j = state.d_xTransforms[j];
+		float4x4 invTransform_i = state.d_xTransformInverses[i];
+		float4x4 invTransform_j = state.d_xTransformInverses[j];
+		float4x4 transform = invTransform_i * transform_j;
 #else
 		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
 		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
-#endif
-		float4x4 invTransform_i = transform_i.getInverse(); //TODO precompute this crap
-		float4x4 invTransform_j = transform_j.getInverse(); //TODO precompute this crap
-
+		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
 		float4x4 transform = invTransform_i * transform_j;
+#endif
 
 		// find correspondence
 		float4 camPosSrcToTgt; float4 camPosTgt; float4 normalTgt; float2 tgtScreenPos;
@@ -911,7 +913,7 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 
 }
 
-#ifdef USE_LIE_SPACE
+#ifdef USE_LIE_SPACE //TODO FOR EULER AS WELL?
 ////////////////////////////////////////////////////////////////////
 // matrix <-> pose
 ////////////////////////////////////////////////////////////////////

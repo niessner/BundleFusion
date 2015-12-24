@@ -270,56 +270,6 @@ __inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& A, const float
 
 	return (j0 * j1);
 }
-//__inline__ __device__ matNxM<3, 6> evalLie_derivI(const float4x4& ti, const float4x4& tj, const float3& p)
-//{
-//	//!!!debugging
-//	matNxM<4, 4> D(tj);
-//
-//	matNxM<1, 4> point; point(0) = p.x; point(1) = p.y; point(2) = p.z; point(3) = 1.0f;
-//	matNxM<3, 3> id; id.setIdentity();
-//	matNxM<3, 12> dPoint = point.composeDEBUG(id);
-//	matNxM<12, 12> dMult = D.getTranspose().composeDEBUG(id);
-//	matNxM<12, 12> dInverse; dInverse.setZero();
-//	{
-//		dInverse(0, 0) = 1;	//perm part
-//		dInverse(1, 3) = 1;
-//		dInverse(2, 6) = 1;
-//		dInverse(3, 1) = 1;
-//		dInverse(4, 4) = 1;
-//		dInverse(5, 7) = 1;
-//		dInverse(6, 2) = 1;
-//		dInverse(7, 5) = 1;
-//		dInverse(8, 8) = 1;
-//		matNxM<1, 3> trans; trans(0) = -ti(0, 3); trans(1) = -ti(1, 3); trans(2) = -ti(2, 3); // i3 comp -t
-//		matNxM<3, 9> part = id.composeDEBUG(trans);
-//		for (unsigned int r = 0; r < 3; r++) {
-//			for (unsigned int c = 0; c < 9; c++)
-//				dInverse(9 + r, c) = part(r, c);
-//		}
-//		for (unsigned int r = 0; r < 3; r++) {
-//			for (unsigned int c = 0; c < 3; c++)
-//				dInverse(9 + r, 9 + c) = -ti(c, r); //-r^T
-//		}
-//	}
-//	matNxM<12, 6> dTransform; dTransform.setZero();
-//	{
-//		for (unsigned int r = 0; r < 3; r++) {
-//			for (unsigned int c = 0; c < 3; c++)
-//				dTransform(9 + r, c) = id(r, c);
-//		}
-//		for (unsigned int k = 0; k < 4; k++) { // col k
-//			float3x3 m = VectorToSkewSymmetricMatrix(make_float3(ti(0, k), ti(1, k), ti(2, k)));
-//			for (unsigned int r = 0; r < 3; r++) {
-//				for (unsigned int c = 0; c < 3; c++)
-//					dTransform(3 * k + r, 3 + c) = -m(r, c); //-[col]_x
-//			}
-//		}
-//	}
-//
-//	matNxM<3, 6> res = dPoint * (dMult * (dInverse * dTransform));
-//	return res;
-//}
-//!!!debugging
 
 /////////////////////////////////////////////////////////////////////////
 // deriv for Tj: (A * e^e * D) * p; A = Ti^{-1}; D = Tj

@@ -83,8 +83,8 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 		int corrIdx = input.d_variablesToCorrespondences[variableIdx*input.maxCorrPerImage + i];
 		const EntryJ& corr = input.d_correspondences[corrIdx];
 		if (corr.isValid()) {
-			const float4x4 TI = poseToMatrix(state.d_xRot[corr.imgIdx_i], state.d_xTrans[corr.imgIdx_i]); //TODO precompute this at the beginnning of each iteration??
-			const float4x4 TJ = poseToMatrix(state.d_xRot[corr.imgIdx_j], state.d_xTrans[corr.imgIdx_j]);
+			const float4x4 TI = state.d_xTransforms[corr.imgIdx_i];
+			const float4x4 TJ = state.d_xTransforms[corr.imgIdx_j];
 
 			float3 worldP; float variableSign = 1;
 			if (variableIdx != corr.imgIdx_i)
@@ -167,8 +167,8 @@ __inline__ __device__ void applyJTDevice(unsigned int variableIdx, SolverInput& 
 		int corrIdx = input.d_variablesToCorrespondences[variableIdx*input.maxCorrPerImage + i];
 		const EntryJ& corr = input.d_correspondences[corrIdx];
 		if (corr.isValid()) {
-			const float4x4 TI = poseToMatrix(state.d_xRot[corr.imgIdx_i], state.d_xTrans[corr.imgIdx_i]); //TODO precompute this at the beginnning of each iteration??
-			const float4x4 TJ = poseToMatrix(state.d_xRot[corr.imgIdx_j], state.d_xTrans[corr.imgIdx_j]);
+			const float4x4 TI = state.d_xTransforms[corr.imgIdx_i];
+			const float4x4 TJ = state.d_xTransforms[corr.imgIdx_j];
 
 			float3 worldP;
 			float  variableSign = 1;
@@ -203,7 +203,7 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 	if (corr.isValid()) {
 		if (corr.imgIdx_i > 0)	// get transform 0
 		{
-			const float4x4 TI = poseToMatrix(state.d_xRot[corr.imgIdx_i], state.d_xTrans[corr.imgIdx_i]); //TODO precompute this at the beginnning of each iteration??
+			const float4x4 TI = state.d_xTransforms[corr.imgIdx_i];
 			const float3 worldP = TI * corr.pos_i;
 			const float3 da = evalLie_dAlpha(worldP);
 			const float3 db = evalLie_dBeta(worldP);
@@ -215,7 +215,7 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 
 		if (corr.imgIdx_j > 0)	// get transform 1
 		{
-			const float4x4 TJ = poseToMatrix(state.d_xRot[corr.imgIdx_j], state.d_xTrans[corr.imgIdx_j]); //TODO precompute this at the beginnning of each iteration??
+			const float4x4 TJ = state.d_xTransforms[corr.imgIdx_j];
 			const float3 worldP = TJ * corr.pos_j;
 			const float3 da = evalLie_dAlpha(worldP);
 			const float3 db = evalLie_dBeta(worldP);
