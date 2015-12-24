@@ -43,5 +43,7 @@ public:
 
 	static void saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory, bool saveFrameByFrame = false);
 	static void computePointCloud(PointCloudf& pc, const ColorImageR8G8B8A8& color, const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal, const mat4f& transform);
+
+	static void saveCamerasToPLY(const std::string& filename, const std::vector<mat4f>& trajectory);
 private:
 };

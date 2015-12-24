@@ -507,6 +507,8 @@ void CALLBACK OnKeyboard( UINT nChar, bool bKeyDown, bool bAltDown, void* pUserC
 				std::vector<mat4f> trajectory;
 				g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
 				((BinaryDumpReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
+				BinaryDataStreamFile s("debug/opt.trajectory", true);
+				s << trajectory; s.closeStream();
 				std::cout << "press key to continue" << std::endl; getchar();
 			} else {
 				std::cout << "Cannot evaluate trajectory (sensorIdx != 3)" << std::endl;

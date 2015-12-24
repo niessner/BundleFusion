@@ -11,8 +11,8 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-#define PRINT_RESIDUALS_SPARSE
-#define PRINT_RESIDUALS_DENSE
+//#define PRINT_RESIDUALS_SPARSE
+//#define PRINT_RESIDUALS_DENSE
 //!!!DEBUGGING
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
@@ -110,7 +110,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		float4x4 transform = invTransform_i * transform_j;
 
 		//!!!debugging
-		//if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
+		if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
 		//!!!debugging
 
 		// find correspondence

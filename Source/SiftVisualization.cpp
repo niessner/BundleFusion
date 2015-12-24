@@ -416,3 +416,24 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 		PointCloudIOf::saveToFile(filename, pc);
 	}
 }
+
+void SiftVisualization::saveCamerasToPLY(const std::string& filename, const std::vector<mat4f>& trajectory)
+{
+	const float radius = 0.05f;
+	const vec3f up = vec3f::eY;
+	const vec3f look = -vec3f::eZ;
+
+	MeshDataf meshData;
+	for (unsigned int i = 0; i < trajectory.size(); i++) {
+		const mat4f& t = trajectory[i];
+		const vec3f eye = t.getTranslation();
+		MeshDataf eyeMesh = Shapesf::sphere(radius, eye, 10, 10, vec4f(0.0f, 1.0f, 0.0f, 1.0f)).getMeshData(); // green for eye
+		MeshDataf upMesh = Shapesf::cylinder(eye, eye + t.getRotation() * up, radius, 10, 10, vec4f(0.0f, 0.0f, 1.0f, 1.0f)).getMeshData(); // blue for up
+		MeshDataf lookMesh = Shapesf::cylinder(eye, eye + t.getRotation() * look, radius, 10, 10, vec4f(1.0f, 0.0f, 1.0f, 0.0f)).getMeshData(); // red for look
+
+		meshData.merge(eyeMesh);
+		meshData.merge(upMesh);
+		meshData.merge(lookMesh);
+	}
+	MeshIOf::saveToFile(filename, meshData);
+}

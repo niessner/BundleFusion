@@ -1212,15 +1212,15 @@ void TestMatching::runOpt()
 
 	//params
 	const bool savePointClouds = false;
-	const unsigned int maxNumIters = 8;
+	const unsigned int maxNumIters = 4;
 	GlobalBundlingState::get().s_localDenseUseAllPairwise = false;
 
 	//weights...
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	//std::vector<float> weightsSparse(maxNumIters, 0.0f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); 
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = (i + 1.0f) * 0.1f;
@@ -1230,12 +1230,15 @@ void TestMatching::runOpt()
 
 	const unsigned int numImages = (unsigned int)m_colorImages.size();
 
-	const std::string refFilename = "E:/Work/VolumetricSFS/tracking/ICLNUIM/livingRoom1.gt.freiburg"; std::vector<mat4f> referenceTrajectory;
-	loadTrajectory(refFilename, referenceTrajectory);
-	referenceTrajectory.resize(numImages);
-	if (numImages == 2) {
-		mat4f offset = referenceTrajectory.front().getInverse();
-		for (unsigned int i = 0; i < referenceTrajectory.size(); i++) referenceTrajectory[i] = offset * referenceTrajectory[i];
+	//const std::string refFilename = "E:/Work/VolumetricSFS/tracking/ICLNUIM/livingRoom1.gt.freiburg"; std::vector<mat4f> referenceTrajectory;
+	//std::cout << "loading reference trajectory from " << refFilename << "... "; loadTrajectory(refFilename, referenceTrajectory); std::cout << "done" << std::endl;
+	//referenceTrajectory.resize(numImages);
+	std::vector<mat4f> referenceTrajectory = m_referenceTrajectory;
+	mat4f offset = referenceTrajectory.front().getInverse();
+	for (unsigned int i = 0; i < referenceTrajectory.size(); i++) referenceTrajectory[i] = offset * referenceTrajectory[i];
+		if (savePointClouds) {
+		std::cout << "saving ref to point cloud... "; SiftVisualization::saveToPointCloud("debug/ref.ply", m_depthImages, m_colorImages, referenceTrajectory, m_depthCalibration.m_IntrinsicInverse); std::cout << "done" << std::endl;
+		//SiftVisualization::saveCamerasToPLY("debug/refCameras.ply", referenceTrajectory);
 	}
 	//create cache
 	CUDACache cudaCache(GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight, numImages, m_intrinsicsDownsampled);
