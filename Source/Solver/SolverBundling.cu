@@ -156,7 +156,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 		imPairIdx = i;
 	}
 	if (input.d_validImages[i] == 0 || input.d_validImages[j] == 0) return;
-	float imPairWeight = state.d_denseCorrCounts[imPairIdx]; 
+	float imPairWeight = state.d_denseCorrCounts[imPairIdx];
 	if (imPairWeight == 0.0f) return;
 
 	const unsigned int idx = threadIdx.y * THREADS_PER_BLOCK_DENSE_DEPTH_X + threadIdx.x;

@@ -113,8 +113,8 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 	//pTrans *= parameters.weightSparse;
 
 	// add dense term	//TODO templating!
-	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
-	uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
+	uint3 transIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
+	uint3 rotIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
 	resRot -= make_float3(state.d_denseJtr[rotIndices.x], state.d_denseJtr[rotIndices.y], state.d_denseJtr[rotIndices.z]); //minus since -Jtf, weight already built in
 	resTrans -= make_float3(state.d_denseJtr[transIndices.x], state.d_denseJtr[transIndices.y], state.d_denseJtr[transIndices.z]); //minus since -Jtf, weight already built in
 	// preconditioner
@@ -239,11 +239,13 @@ __inline__ __device__ void computeJacobianBlockRow_i(matNxM<1, 6>& jacBlockRow, 
 	float3 n = make_float3(normalTgt.x, normalTgt.y, normalTgt.z);
 
 	matNxM<3, 6> jac = evalLie_derivI(invTransform_j, transform_i, p);
-	for (unsigned int i = 0; i < 3; i++) {
-		jacBlockRow(i) = -dot(make_float3(jac(0, i + 3), jac(1, i + 3), jac(2, i + 3)), n); //rot
-		jacBlockRow(i+3) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);			//trans
+	//for (unsigned int i = 0; i < 3; i++) {
+	//	jacBlockRow(i) = -dot(make_float3(jac(0, i + 3), jac(1, i + 3), jac(2, i + 3)), n); //rot
+	//	jacBlockRow(i+3) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);			//trans
+	//}
+	for (unsigned int i = 0; i < 6; i++) {
+		jacBlockRow(i) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n); //rot
 	}
-
 }
 //__inline__ __device__ void computeJacobianBlockRow_i(matNxM<1, 6>& jacBlockRow, const float4x4& transform_i,
 //	const float4x4& transform_j, const float4& camPosSrc, const float4& normalTgt)
@@ -265,13 +267,16 @@ __inline__ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, 
 	float3 n = make_float3(normalTgt.x, normalTgt.y, normalTgt.z);
 
 	matNxM<3, 6> jac = evalLie_derivJ(invTransform_i, transform_j, p);
-	for (unsigned int i = 0; i < 3; i++) {
-		jacBlockRow(i) = -dot(make_float3(jac(0, i+3), jac(1, i+3), jac(2, i+3)), n);	//rot
-		jacBlockRow(i+3) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);		//trans
+	//for (unsigned int i = 0; i < 3; i++) {
+	//	jacBlockRow(i) = -dot(make_float3(jac(0, i+3), jac(1, i+3), jac(2, i+3)), n);	//rot
+	//	jacBlockRow(i+3) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n);		//trans
+	//}
+	for (unsigned int i = 0; i < 6; i++) {
+		jacBlockRow(i) = -dot(make_float3(jac(0, i), jac(1, i), jac(2, i)), n); //rot
 	}
 }
 ////////////////////////////////////////
-// dense depth term
+// dense color term
 ////////////////////////////////////////
 __inline__ __device__ float computeColorDProjLookup(const float4& dx, const float4& camPosSrcToTgt, const float2& intensityDerivTgt, const float2& colorFocalLength)
 {
@@ -308,15 +313,16 @@ __inline__ __device__ void computeJacobianBlockIntensityRow_i(matNxM<1, 6>& jacB
 	matNxM<3, 6> jac = evalLie_derivI(invTransform_j, transform_i, p);					//TODO shared compute here with depth and j
 	mat2x3 dProj = dCameraToScreen(camPosSrcToTgt, colorFocal.x, colorFocal.y);
 	mat1x2 dColorB(intensityDerivTgt);
-	matNxM<1, 6> tmp = dColorB * (dProj * jac);
-	for (unsigned int i = 0; i < 3; i++) {
-		//float4 dRot = make_float4(jac(0, i + 3), jac(1, i + 3), jac(2, i + 3), 0.0f); //w coord not used
-		//jacBlockRow(i) = computeColorDProjLookup(dRot, camPosSrcToTgt, intensityDerivTgt, colorFocal);
-		//float4 dTrans = make_float4(jac(0, i), jac(1, i), jac(2, i), 0.0f);
-		//jacBlockRow(i + 3) = computeColorDProjLookup(dTrans, camPosSrcToTgt, intensityDerivTgt, colorFocal);
-		jacBlockRow(i) = tmp(i + 3);
-		jacBlockRow(i + 3) = tmp(i);
-	}
+	//matNxM<1, 6> tmp = dColorB * (dProj * jac);
+	//for (unsigned int i = 0; i < 3; i++) {
+	//	//float4 dRot = make_float4(jac(0, i + 3), jac(1, i + 3), jac(2, i + 3), 0.0f); //w coord not used
+	//	//jacBlockRow(i) = computeColorDProjLookup(dRot, camPosSrcToTgt, intensityDerivTgt, colorFocal);
+	//	//float4 dTrans = make_float4(jac(0, i), jac(1, i), jac(2, i), 0.0f);
+	//	//jacBlockRow(i + 3) = computeColorDProjLookup(dTrans, camPosSrcToTgt, intensityDerivTgt, colorFocal);
+	//	jacBlockRow(i) = tmp(i + 3);
+	//	jacBlockRow(i + 3) = tmp(i);
+	//}
+	jacBlockRow = dColorB * (dProj * jac);
 }
 __inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacBlockRow, const float2& colorFocal, const float4x4& invTransform_i,
 	const float4x4& transform_j, const float4& camPosSrc, const float4& camPosSrcToTgt, const float2& intensityDerivTgt)
@@ -326,17 +332,18 @@ __inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacB
 	matNxM<3, 6> jac = evalLie_derivJ(invTransform_i, transform_j, p);			//TODO shared compute here with depth and j
 	mat2x3 dProj = dCameraToScreen(camPosSrcToTgt, colorFocal.x, colorFocal.y);
 	mat1x2 dColorB(intensityDerivTgt);
-	matNxM<1, 6> tmp = dColorB * (dProj * jac);
-	for (unsigned int i = 0; i < 3; i++) {
-		//float4 dRot = make_float4(jac(0, i + 3), jac(1, i + 3), jac(2, i + 3), 0.0f);
-		//jacBlockRow(i) = computeColorDProjLookup(dRot, camPosSrcToTgt, intensityDerivTgt, colorFocal);
-		//float4 dTrans = make_float4(jac(0, i), jac(1, i), jac(2, i), 0.0f);
-		//jacBlockRow(i + 3) = computeColorDProjLookup(dTrans, camPosSrcToTgt, intensityDerivTgt, colorFocal);
-		jacBlockRow(i) = tmp(i + 3);
-		jacBlockRow(i + 3) = tmp(i);
-	}
+	//matNxM<1, 6> tmp = dColorB * (dProj * jac);
+	//for (unsigned int i = 0; i < 3; i++) {
+	//	//float4 dRot = make_float4(jac(0, i + 3), jac(1, i + 3), jac(2, i + 3), 0.0f);
+	//	//jacBlockRow(i) = computeColorDProjLookup(dRot, camPosSrcToTgt, intensityDerivTgt, colorFocal);
+	//	//float4 dTrans = make_float4(jac(0, i), jac(1, i), jac(2, i), 0.0f);
+	//	//jacBlockRow(i + 3) = computeColorDProjLookup(dTrans, camPosSrcToTgt, intensityDerivTgt, colorFocal);
+	//	jacBlockRow(i) = tmp(i + 3);
+	//	jacBlockRow(i + 3) = tmp(i);
+	//}
+	jacBlockRow = dColorB * (dProj * jac);
 
-	//one transform only!
+	////one transform only!
 	//float gz2 = camPosSrcToTgt.z * camPosSrcToTgt.z;
 	//matNxM<2, 6> j; j.setZero();
 	//j(0, 0) = colorFocal.x / camPosSrcToTgt.z;
@@ -351,12 +358,12 @@ __inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacB
 	//j(0, 5) = -colorFocal.x * camPosSrcToTgt.y / camPosSrcToTgt.z;
 	//j(1, 5) = colorFocal.y * camPosSrcToTgt.x / camPosSrcToTgt.z;
 	//mat1x2 iDeriv; iDeriv(0) = intensityDerivTgt.x; iDeriv(1) = intensityDerivTgt.y;
-	//matNxM<1, 6> tmp = iDeriv *  j;
-
-	//for (unsigned int i = 0; i < 3; i++) {
-	//	jacBlockRow(i) = tmp(i + 3);
-	//	jacBlockRow(i + 3) = tmp(i);
-	//}
+	////matNxM<1, 6> tmp = iDeriv *  j;
+	////for (unsigned int i = 0; i < 3; i++) {
+	////	jacBlockRow(i) = tmp(i + 3);
+	////	jacBlockRow(i + 3) = tmp(i);
+	////}
+	//jacBlockRow = iDeriv *  j;
 }
 #endif
 

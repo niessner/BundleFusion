@@ -239,7 +239,7 @@ int main(int argc, char** argv)
 		//!!!DEBUGGING
 		if (true) {
 			TestMatching test;
-			test.loadFromSensor("debug/livingroom1/11noise.sensor", "", 1);
+			test.loadFromSensor("debug/livingroom1/2noise.sensor", "", 1);
 			test.runOpt();
 			//test.testGlobalDense();
 

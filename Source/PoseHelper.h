@@ -11,6 +11,13 @@ namespace PoseHelper {
 		size_t numTransforms = math::min(trajectory.size(), referenceTrajectory.size());
 		if (numTransforms < 3) {
 			std::cout << "cannot evaluate with < 3 transforms" << std::endl;
+			if (numTransforms == 2) {
+				if (referenceTrajectory[0].getTranslation().length() > 0.0001f) {
+					std::cout << "cannot evaluate 2 with reference[0] not identity" << std::endl;
+					return -std::numeric_limits<float>::infinity();
+				}
+				return vec3f::dist(trajectory[1].getTranslation(), referenceTrajectory[1].getTranslation());
+			}
 			return -std::numeric_limits<float>::infinity();
 		}
 		std::vector<vec3f> pts, refPts; vec3f ptsMean(0.0f), refPtsMean(0.0f);
@@ -268,8 +275,10 @@ namespace PoseHelper {
 			rottrans -= rot * ((t | rot) / 24);
 		rottrans *= 1.0f / (2 * shtot);
 
-		for (int i = 0; i < 3; i++) result[i] = rot[i];
-		for (int i = 0; i < 3; i++) result[3 + i] = rottrans[i];
+		//for (int i = 0; i < 3; i++) result[i] = rot[i];
+		//for (int i = 0; i < 3; i++) result[3 + i] = rottrans[i];
+		for (int i = 0; i < 3; i++) result[i] = rottrans[i];
+		for (int i = 0; i < 3; i++) result[3 + i] = rot[i];
 		return result;
 	}
 
@@ -282,8 +291,10 @@ namespace PoseHelper {
 		static const float one_6th = 1.0f / 6.0f;
 		static const float one_20th = 1.0f / 20.0f;
 
-		vec3f mu_xyz = vec3f(mu[3], mu[4], mu[5]);
-		vec3f w = mu.getVec3();
+		//vec3f mu_xyz = vec3f(mu[3], mu[4], mu[5]);
+		//vec3f w = mu.getVec3();
+		vec3f mu_xyz = mu.getVec3();
+		vec3f w = vec3f(mu[3], mu[4], mu[5]);
 
 		const float theta_sq = w.lengthSq(); // w*w;
 		const float theta = std::sqrt(theta_sq);

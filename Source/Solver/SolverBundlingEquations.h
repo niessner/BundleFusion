@@ -435,8 +435,10 @@ __inline__ __device__ void applyJTJDevice(unsigned int variableIdx, SolverState&
 			d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 4)* dim + baseIdx + 5],
 			d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 3], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 4], d_JtJ[(baseVarIdx + 5)* dim + baseIdx + 5]);
 
-		outRot += block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
-		outTrans += block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
+		//outRot += block00 * state.d_pRot[i] + block01 * state.d_pTrans[i];
+		//outTrans += block10 * state.d_pRot[i] + block11 * state.d_pTrans[i];
+		outTrans += block00 * state.d_pTrans[i] + block01 * state.d_pRot[i];
+		outRot += block10 * state.d_pTrans[i] + block11 * state.d_pRot[i];
 	}
 }
 //__inline__ __device__ void applyJTJDenseDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, const SolverParameters& parameters,
