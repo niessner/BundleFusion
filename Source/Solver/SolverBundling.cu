@@ -266,7 +266,6 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 #endif
 	//!!!debugging
 
-	//TODO move this call into parameters.useDense and template the JTF computation with sparse/dense
 	const unsigned int maxDenseImPairs = input.numberOfImages * input.numberOfImages;
 	cutilSafeCall(cudaMemset(state.d_denseCorrCounts, 0, sizeof(float) * maxDenseImPairs));
 	cutilSafeCall(cudaMemset(state.d_denseJtJ, 0, sizeof(float) * sizeJtJ)); //TODO check if necessary
@@ -274,104 +273,103 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
-#endif		
-
-	if (parameters.useDense) {
-		FindDenseCorrespondences_Kernel << <grid, block >> >(input, state, parameters);
-#ifdef _DEBUG
-		cutilSafeCall(cudaDeviceSynchronize());
-		cutilCheckMsg(__FUNCTION__);
-#endif
-		//!!!DEBUGGING //remember the delete!
-		//float* denseCorrCounts = new float[maxDenseImPairs];
-		//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
-		//unsigned int totalCount = 0;
-		//for (unsigned int i = 0; i < maxDenseImPairs; i++) { totalCount += (unsigned int)denseCorrCounts[i]; }
-		//printf("total count = %d\n", totalCount);
-		//!!!DEBUGGING
-		int wgrid = (maxDenseImPairs + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
-		WeightDenseCorrespondences_Kernel << < wgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(maxDenseImPairs, state);
-#ifdef _DEBUG
-		cutilSafeCall(cudaDeviceSynchronize());
-		cutilCheckMsg(__FUNCTION__);
-#endif
-		//!!!DEBUGGING
-		//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
-		//if (denseCorrCounts) delete[] denseCorrCounts;
-		//!!!DEBUGGING
-
-		if (parameters.weightDenseDepth > 0.0f) {
-			if (parameters.weightDenseColor > 0.0f) BuildDenseSystem_Kernel<true, true> << <grid, block >> >(input, state, parameters);
-			else									BuildDenseSystem_Kernel<true, false> << <grid, block >> >(input, state, parameters);
-		}
-		else {
-			BuildDenseSystem_Kernel<false, true> << <grid, block >> >(input, state, parameters);
-		}
-#ifdef _DEBUG
-		cutilSafeCall(cudaDeviceSynchronize());
-		cutilCheckMsg(__FUNCTION__);
 #endif
 
-		//!!!debugging
-		bool debugPrint = false;
-		float* h_JtJ = NULL;
-		float* h_Jtr = NULL;
-		if (debugPrint) {
-			h_JtJ = new float[sizeJtJ];
-			h_Jtr = new float[sizeJtr];
-			cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-			//printf("JtJ:\n");
-			//for (unsigned int i = 0; i < 6 * N; i++) {
-			//	for (unsigned int j = 0; j < 6 * N; j++)
-			//		printf(" %f,", h_JtJ[j * 6 * N + i]);
-			//	printf("\n");
-			//}
-			printf("Jtr:\n");
-			for (unsigned int i = 0; i < 6 * N; i++) {
-				printf(" %f,", h_Jtr[i]);
-			}
-			printf("\n");
-		}
-#ifdef PRINT_RESIDUALS_DENSE
-		if (parameters.weightDenseDepth > 0) {
-			float sumResidual; int corrCount;
-			cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
-			printf("\tdense depth: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseDepth, sumResidual / parameters.weightDenseDepth, sumResidual, corrCount);
-		}
-		if (parameters.weightDenseColor > 0) {
-			float sumResidual; int corrCount;
-			cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidualColor, sizeof(float), cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCountColor, sizeof(int), cudaMemcpyDeviceToHost));
-			printf("\tdense color: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseColor, sumResidual / parameters.weightDenseColor, sumResidual, corrCount);
-		}
-#endif
-		const unsigned int flipgrid = (sizeJtJ + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
-		FlipJtJ_Kernel << <flipgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(sizeJtJ, sizeJtr, state.d_denseJtJ);
+	FindDenseCorrespondences_Kernel << <grid, block >> >(input, state, parameters);
 #ifdef _DEBUG
-		cutilSafeCall(cudaDeviceSynchronize());
-		cutilCheckMsg(__FUNCTION__);
-#endif	
-		//if (debugPrint) {
-		//	cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-		//	cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-		//	printf("JtJ:\n");
-		//	for (unsigned int i = 0; i < 6 * N; i++) {
-		//		for (unsigned int j = 0; j < 6 * N; j++)
-		//			printf(" %f,", h_JtJ[j * 6 * N + i]);
-		//		printf("\n");
-		//	}
-		//	printf("Jtr:\n");
-		//	for (unsigned int i = 0; i < 6 * N; i++) {
-		//		printf(" %f,", h_Jtr[i]);
-		//	}
-		//	printf("\n\n");
-		//	if (h_JtJ) delete[] h_JtJ;
-		//	if (h_Jtr) delete[] h_Jtr;
-		//}
-		//!!!debugging
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+	//!!!DEBUGGING //remember the delete!
+	//float* denseCorrCounts = new float[maxDenseImPairs];
+	//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
+	//unsigned int totalCount = 0;
+	//for (unsigned int i = 0; i < maxDenseImPairs; i++) { totalCount += (unsigned int)denseCorrCounts[i]; }
+	//printf("total count = %d\n", totalCount);
+	//!!!DEBUGGING
+	int wgrid = (maxDenseImPairs + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
+	WeightDenseCorrespondences_Kernel << < wgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(maxDenseImPairs, state);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+	//!!!DEBUGGING
+	//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
+	//if (denseCorrCounts) delete[] denseCorrCounts;
+	//!!!DEBUGGING
+
+	if (parameters.weightDenseDepth > 0.0f) {
+		if (parameters.weightDenseColor > 0.0f) BuildDenseSystem_Kernel<true, true> << <grid, block >> >(input, state, parameters);
+		else									BuildDenseSystem_Kernel<true, false> << <grid, block >> >(input, state, parameters);
 	}
+	else {
+		BuildDenseSystem_Kernel<false, true> << <grid, block >> >(input, state, parameters);
+	}
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+
+	//!!!debugging
+	bool debugPrint = false;
+	float* h_JtJ = NULL;
+	float* h_Jtr = NULL;
+	if (debugPrint) {
+		h_JtJ = new float[sizeJtJ];
+		h_Jtr = new float[sizeJtr];
+		cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
+		//printf("JtJ:\n");
+		//for (unsigned int i = 0; i < 6 * N; i++) {
+		//	for (unsigned int j = 0; j < 6 * N; j++)
+		//		printf(" %f,", h_JtJ[j * 6 * N + i]);
+		//	printf("\n");
+		//}
+		printf("Jtr:\n");
+		for (unsigned int i = 0; i < 6 * N; i++) {
+			printf(" %f,", h_Jtr[i]);
+		}
+		printf("\n");
+	}
+#ifdef PRINT_RESIDUALS_DENSE
+	if (parameters.weightDenseDepth > 0) {
+		float sumResidual; int corrCount;
+		cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidual, sizeof(float), cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCount, sizeof(int), cudaMemcpyDeviceToHost));
+		printf("\tdense depth: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseDepth, sumResidual / parameters.weightDenseDepth, sumResidual, corrCount);
+	}
+	if (parameters.weightDenseColor > 0) {
+		float sumResidual; int corrCount;
+		cutilSafeCall(cudaMemcpy(&sumResidual, state.d_sumResidualColor, sizeof(float), cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(&corrCount, state.d_corrCountColor, sizeof(int), cudaMemcpyDeviceToHost));
+		printf("\tdense color: weights * residual = %f * %f = %f\t[#corr = %d]\n", parameters.weightDenseColor, sumResidual / parameters.weightDenseColor, sumResidual, corrCount);
+	}
+#endif
+	const unsigned int flipgrid = (sizeJtJ + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
+	FlipJtJ_Kernel << <flipgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(sizeJtJ, sizeJtr, state.d_denseJtJ);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif	
+	//if (debugPrint) {
+	//	cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
+	//	cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
+	//	printf("JtJ:\n");
+	//	for (unsigned int i = 0; i < 6 * N; i++) {
+	//		for (unsigned int j = 0; j < 6 * N; j++)
+	//			printf(" %f,", h_JtJ[j * 6 * N + i]);
+	//		printf("\n");
+	//	}
+	//	printf("Jtr:\n");
+	//	for (unsigned int i = 0; i < 6 * N; i++) {
+	//		printf(" %f,", h_Jtr[i]);
+	//	}
+	//	printf("\n\n");
+	//	if (h_JtJ) delete[] h_JtJ;
+	//	if (h_Jtr) delete[] h_Jtr;
+	//}
+	//!!!debugging
+
 	if (timer) timer->endEvent();
 }
 
@@ -966,7 +964,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 #ifdef USE_LIE_SPACE
 		convertPosesToMatricesCU(state.d_xRot, state.d_xTrans, input.numberOfImages, state.d_xTransforms, state.d_xTransformInverses);
 #endif
-		BuildDenseSystem(input, state, parameters, timer);
+		if (parameters.useDense) BuildDenseSystem(input, state, parameters, timer);
 		Initialization(input, state, parameters, timer);
 
 		if (parameters.weightSparse > 0.0f) {
@@ -1006,7 +1004,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	//if (xRot) delete[] xRot;
 	//if (xTrans) delete[] xTrans;
 	//!!!debugging
-		}
+}
 
 ////////////////////////////////////////////////////////////////////
 // build variables to correspondences lookup
