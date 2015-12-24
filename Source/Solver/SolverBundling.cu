@@ -11,8 +11,8 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-//#define PRINT_RESIDUALS_SPARSE
-//#define PRINT_RESIDUALS_DENSE
+#define PRINT_RESIDUALS_SPARSE
+#define PRINT_RESIDUALS_DENSE
 //!!!DEBUGGING
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
@@ -140,7 +140,7 @@ __global__ void WeightDenseCorrespondences_Kernel(unsigned int N, SolverState st
 	}
 }
 
-template<bool useColor>
+template<bool useDepth, bool useColor>
 __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, SolverParameters parameters)
 {
 	// image indices
@@ -182,73 +182,58 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt)) { //i tgt, j src
-			// point-to-plane residual
-			float4 diff = camPosTgt - camPosSrcToTgt;
-			float res = dot(diff, normalTgt);
-			float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-
-			// point-to-plane jacobian
 			const float4 camPosSrc = input.d_cacheFrames[j].d_cameraposDownsampled[srcIdx];
-			matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
+			if (useDepth) {
+				// point-to-plane residual
+				float4 diff = camPosTgt - camPosSrcToTgt;
+				float res = dot(diff, normalTgt);
+				float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
+
+				// point-to-plane jacobian
+				matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
 #ifdef USE_LIE_SPACE
-			//if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, transform_j, camPosSrc, normalTgt);
-			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
-			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
+				//if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, transform_j, camPosSrc, normalTgt);
+				if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
+				if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
 #else
-			if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
-			if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
+				if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
+				if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
 #endif
 
-			//!!!debugging
-			const unsigned int x = srcIdx % input.denseDepthWidth; const unsigned int y = srcIdx / input.denseDepthWidth;
-			if (i > 0 && (isnan(jacobianBlockRow_i(0)) || isnan(jacobianBlockRow_i(1)) || isnan(jacobianBlockRow_i(2)) || isnan(jacobianBlockRow_i(3)) || isnan(jacobianBlockRow_i(4)) || isnan(jacobianBlockRow_i(5))) ||
-				j > 0 && (isnan(jacobianBlockRow_j(0)) || isnan(jacobianBlockRow_j(1)) || isnan(jacobianBlockRow_j(2)) || isnan(jacobianBlockRow_j(3)) || isnan(jacobianBlockRow_j(4)) || isnan(jacobianBlockRow_j(5))) ||
-				isnan(res) || isnan(weight)) {
-				printf("ERROR NaN (%d,%d,%d,%d) %f %f | (%f %f %f %f %f %f) (%f %f %f %f %f %f)\n", i, j, x, y, res, weight,
-					jacobianBlockRow_i(0), jacobianBlockRow_i(1), jacobianBlockRow_i(2),
-					jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5),
-					jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
-					jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
+				addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
+					jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight * imPairWeight);
+#ifdef PRINT_RESIDUALS_DENSE
+				atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
+				atomicAdd(state.d_corrCount, 1);
+#endif
 			}
-			//!!!debugging
-
-			addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
-				jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight * imPairWeight);
-
 			// color term
 			if (useColor) {
 				const float2 intensityDerivTgt = bilinearInterpolationFloat2NoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDerivsDownsampled, input.denseDepthWidth, input.denseDepthHeight);
 				const float intensityTgt = bilinearInterpolationFloatNoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDownsampled, input.denseDepthWidth, input.denseDepthHeight);
 				float diffIntensity = intensityTgt - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
 				if (intensityDerivTgt.x != MINF && abs(diffIntensity) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin) {
+					matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
+#ifdef USE_LIE_SPACE
 					//if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, invTransform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, invTransform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
-					//weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
-					weight = 1.0f;
+#else
+					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+#endif
+					float weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
+					//float weight = 1.0f;
 
 					addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
 						jacobianBlockRow_i, jacobianBlockRow_j, i, j, diffIntensity, parameters.weightDenseColor * weight * imPairWeight);
 
-					if (i > 0 && (isnan(jacobianBlockRow_i(0)) || isnan(jacobianBlockRow_i(1)) || isnan(jacobianBlockRow_i(2)) || isnan(jacobianBlockRow_i(3)) || isnan(jacobianBlockRow_i(4)) || isnan(jacobianBlockRow_i(5))) ||
-						j > 0 && (isnan(jacobianBlockRow_j(0)) || isnan(jacobianBlockRow_j(1)) || isnan(jacobianBlockRow_j(2)) || isnan(jacobianBlockRow_j(3)) || isnan(jacobianBlockRow_j(4)) || isnan(jacobianBlockRow_j(5))) ||
-						isnan(diffIntensity) || isnan(weight)) {
-						printf("ERROR NaN color (%d,%d,%d,%d) %f %f | (%f %f %f %f %f %f) (%f %f %f %f %f %f)\n", i, j, x, y, diffIntensity, weight,
-							jacobianBlockRow_i(0), jacobianBlockRow_i(1), jacobianBlockRow_i(2),
-							jacobianBlockRow_i(3), jacobianBlockRow_i(4), jacobianBlockRow_i(5),
-							jacobianBlockRow_j(0), jacobianBlockRow_j(1), jacobianBlockRow_j(2),
-							jacobianBlockRow_j(3), jacobianBlockRow_j(4), jacobianBlockRow_j(5));
-					}
 #ifdef PRINT_RESIDUALS_DENSE
-					atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * res * res);
+					atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * diffIntensity * diffIntensity);
 					atomicAdd(state.d_corrCountColor, 1);
 #endif
 				}
 			}
-#ifdef PRINT_RESIDUALS_DENSE
-			atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
-			atomicAdd(state.d_corrCount, 1);
-#endif
 		} // found correspondence
 	} // valid image pixel
 }
@@ -313,10 +298,13 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 		//if (denseCorrCounts) delete[] denseCorrCounts;
 		//!!!DEBUGGING
 
-		if (parameters.weightDenseColor > 0.0f)
-			BuildDenseSystem_Kernel<true> << <grid, block >> >(input, state, parameters);
-		else
-			BuildDenseSystem_Kernel<false> << <grid, block >> >(input, state, parameters);
+		if (parameters.weightDenseDepth > 0.0f) {
+			if (parameters.weightDenseColor > 0.0f) BuildDenseSystem_Kernel<true, true> << <grid, block >> >(input, state, parameters);
+			else									BuildDenseSystem_Kernel<true, false> << <grid, block >> >(input, state, parameters);
+		}
+		else {
+			BuildDenseSystem_Kernel<false, true> << <grid, block >> >(input, state, parameters);
+		}
 #ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
@@ -578,6 +566,7 @@ extern "C" int countHighResiduals(SolverInput& input, SolverState& state, Solver
 // http://en.wikipedia.org/wiki/Conjugate_gradient_method
 // This code is an implementation of their PCG pseudo code
 
+template<bool useDense>
 __global__ void PCGInit_Kernel1(SolverInput input, SolverState state, SolverParameters parameters)
 {
 	const unsigned int N = input.numberOfImages;
@@ -587,7 +576,7 @@ __global__ void PCGInit_Kernel1(SolverInput input, SolverState state, SolverPara
 	if (x > 0 && x < N)
 	{
 		float3 resRot, resTrans;
-		evalMinusJTFDevice(x, input, state, parameters, resRot, resTrans);  // residuum = J^T x -F - A x delta_0  => J^T x -F, since A x x_0 == 0 
+		evalMinusJTFDevice<useDense>(x, input, state, parameters, resRot, resTrans);  // residuum = J^T x -F - A x delta_0  => J^T x -F, since A x x_0 == 0 
 
 		state.d_rRot[x] = resRot;											// store for next iteration
 		state.d_rTrans[x] = resTrans;										// store for next iteration
@@ -643,7 +632,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 	cutilCheckMsg(__FUNCTION__);
 #endif		
 
-	PCGInit_Kernel1 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state, parameters);
+	if (parameters.useDense) PCGInit_Kernel1<true> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state, parameters);
+	else PCGInit_Kernel1<false> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state, parameters);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
@@ -845,6 +835,7 @@ __global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 	}
 }
 
+template<bool useSparse, bool useDense>
 void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& parameters, bool lastIteration, CUDATimer *timer)
 {
 	const unsigned int N = input.numberOfImages;	// Number of block variables
@@ -861,7 +852,7 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	cutilSafeCall(cudaMemset(state.d_scanAlpha, 0, sizeof(float) * 2));
 
 	// sparse part
-	if (parameters.weightSparse > 0.0f) {
+	if (useSparse) {
 		const unsigned int Ncorr = input.numberOfCorrespondences;
 		const int blocksPerGridCorr = (Ncorr + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 		PCGStep_Kernel0 << <blocksPerGridCorr, THREADS_PER_BLOCK >> >(input, state, parameters);
@@ -875,7 +866,7 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 		cutilCheckMsg(__FUNCTION__);
 #endif
 	}
-	if (parameters.useDense) {
+	if (useDense) {
 		//PCGStep_Kernel_Dense << < N, THREADS_PER_BLOCK_JT >> >(input, state, parameters);
 		PCGStep_Kernel_Dense << < N, 1 >> >(input, state, parameters); //TODO fix this part
 #ifdef _DEBUG
@@ -920,6 +911,28 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 
 }
 
+#ifdef USE_LIE_SPACE
+////////////////////////////////////////////////////////////////////
+// matrix <-> pose
+////////////////////////////////////////////////////////////////////
+__global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs)
+{
+	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < numTransforms) {
+		poseToMatrix(d_rot[idx], d_trans[idx], d_transforms[idx]);
+		d_transformInvs[idx] = d_transforms[idx].getInverse();
+	}
+}
+void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs)
+{
+	convertPosesToMatricesCU_Kernel << <(numTransforms + 8 - 1) / 8, 8 >> >(d_rot, d_trans, numTransforms, d_transforms, d_transformInvs);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////
 // Main GN Solver Loop
 ////////////////////////////////////////////////////////////////////
@@ -928,10 +941,8 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 {
 	if (convergenceAnalysis) {
 		float initialResidual = EvalResidual(input, state, parameters, timer);
-		//printf("initial = %f\n", initialResidual);
 		convergenceAnalysis[0] = initialResidual; // initial residual
 	}
-	//unsigned int idx = 0;
 
 	//!!!DEBUGGING
 #ifdef PRINT_RESIDUALS_SPARSE
@@ -950,41 +961,25 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		parameters.weightDenseDepth = input.weightsDenseDepth[nIter];
 		parameters.weightDenseColor = input.weightsDenseColor[nIter];
 		parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
-
+#ifdef USE_LIE_SPACE
+		convertPosesToMatricesCU(state.d_xRot, state.d_xTrans, input.numberOfImages, state.d_xTransforms, state.d_xTransformInverses);
+#endif
 		BuildDenseSystem(input, state, parameters, timer);
 		Initialization(input, state, parameters, timer);
 
-		//float linearResidual = EvalLinearRes(input, state, parameters);
-		//linConvergenceAnalysis[idx++] = linearResidual;
-
-		for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
-		{
-			//!!!debugging
-			//if (linIter == parameters.nLinIterations - 1) {
-			//	cutilSafeCall(cudaMemcpy(xRot, state.d_deltaRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-			//	cutilSafeCall(cudaMemcpy(xTrans, state.d_deltaTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-			//	//char buffer [50];
-			//	//sprintf (buffer, "debug/delta-%d.txt", nIter);
-			//	//FILE* pf = fopen(buffer, "w");
-			//	//if (pf == NULL) { printf("failed to open %s for writing\n", buffer); getchar(); }
-			//	//fprintf(pf, "delta rot:\n");
-			//	//for (unsigned int i = 1; i < input.numberOfImages; i++) { 
-			//	//	if (isnan(xRot[i].x) || isnan(xRot[i].y) || isnan(xRot[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
-			//	//	fprintf(pf, "%d: %f %f %f\n", i, xRot[i].x, xRot[i].y, xRot[i].z);
-			//	//}
-			//	//fprintf(pf, "delta trans:\n");
-			//	//for (unsigned int i = 1; i < input.numberOfImages; i++) { 
-			//	//	if (isnan(xTrans[i].x) || isnan(xTrans[i].y) || isnan(xTrans[i].z)) { printf("NaN in input delta rot %d\n", i); getchar(); }
-			//	//	fprintf(pf, "%d: %f %f %f\n", i, xTrans[i].x, xTrans[i].y, xTrans[i].z);
-			//	//}
-			//	//fclose(pf);
-			//	int a = 5;
-			//}
-			//!!!debugging
-			PCGIteration(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
-
-			//linearResidual = EvalLinearRes(input, state, parameters);
-			//linConvergenceAnalysis[idx++] = linearResidual;
+		if (parameters.weightSparse > 0.0f) {
+			if (parameters.useDense) {
+				for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
+					PCGIteration<true, true>(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
+			}
+			else {
+				for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
+					PCGIteration<true, false>(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
+			}
+		}
+		else {
+			for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
+				PCGIteration<false, true>(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
 		}
 		//!!!debugging
 		//cutilSafeCall(cudaMemcpy(xRot, state.d_xRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
@@ -1003,14 +998,13 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		if (convergenceAnalysis) {
 			float residual = EvalResidual(input, state, parameters, timer);
 			convergenceAnalysis[nIter + 1] = residual;
-			//printf("[niter %d] %f\n", nIter, residual);
 		}
 	}
 	//!!!debugging
 	//if (xRot) delete[] xRot;
 	//if (xTrans) delete[] xTrans;
 	//!!!debugging
-}
+		}
 
 ////////////////////////////////////////////////////////////////////
 // build variables to correspondences lookup

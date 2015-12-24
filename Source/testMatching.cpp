@@ -1218,13 +1218,13 @@ void TestMatching::runOpt()
 	//weights...
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	//std::vector<float> weightsSparse(maxNumIters, 0.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f); 
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = (i + 1.0f) * 0.1f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.5f);	for (unsigned int i = 0; i < 2; i++) weightsDenseColor[i] = 0.0f;
+	std::vector<float> weightsDenseColor(maxNumIters, 0.1f);	for (unsigned int i = 0; i < 2; i++) weightsDenseColor[i] = 0.0f;
 	bool useGlobalDense = true;
 	//bool useGlobalDense = false;
 

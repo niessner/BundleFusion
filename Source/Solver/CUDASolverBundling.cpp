@@ -13,9 +13,9 @@ extern "C" int countHighResiduals(SolverInput& input, SolverState& state, Solver
 
 extern "C" void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
-CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxNumResiduals) 
+CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxNumResiduals)
 	: m_maxNumberOfImages(maxNumberOfImages)
-, THREADS_PER_BLOCK(512) // keep consistent with the GPU
+	, THREADS_PER_BLOCK(512) // keep consistent with the GPU
 {
 	m_timer = NULL;
 	//if (GlobalBundlingState::get().s_enableDetailedTimings) m_timer = new CUDATimer();
@@ -46,7 +46,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_precondionerRot, sizeof(float3)*numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_precondionerTrans, sizeof(float3)*numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_sumResidual, sizeof(float)));
-	unsigned int n = (maxNumResiduals*3 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+	unsigned int n = (maxNumResiduals * 3 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_maxResidual, sizeof(float) * n));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_maxResidualIndex, sizeof(int) * n));
 	m_solverState.h_maxResidual = new float[n];
@@ -66,6 +66,13 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCountColor, sizeof(int)));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_sumResidualColor, sizeof(float)));
 
+#ifdef USE_LIE_SPACE
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_xTransforms, sizeof(float4x4)*m_maxNumberOfImages));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_xTransformInverses, sizeof(float4x4)*m_maxNumberOfImages));
+#else
+	m_solverState.d_xTransforms = NULL;
+	m_solverState.d_xTransformInverses = NULL;
+#endif
 	//!!!DEBUGGING
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_deltaRot, -1, sizeof(float3)*numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_deltaTrans, -1, sizeof(float3)*numberOfVariables));
@@ -129,17 +136,20 @@ CUDASolverBundling::~CUDASolverBundling()
 
 	MLIB_CUDA_SAFE_FREE(d_variablesToCorrespondences);
 	MLIB_CUDA_SAFE_FREE(d_numEntriesPerRow);
-	
+
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_countHighResidual);
-	
+
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_denseJtJ);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_denseJtr);
+
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_xTransforms);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_xTransformInverses);
 
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
 }
 
 void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, int* d_validImages, unsigned int numberOfImages,
-	unsigned int nNonLinearIterations, unsigned int nLinearIterations, const CUDACache* cudaCache, 
+	unsigned int nNonLinearIterations, unsigned int nLinearIterations, const CUDACache* cudaCache,
 	const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor, bool usePairwiseDense,
 	float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,
 	bool rebuildJT, bool findMaxResidual)
@@ -287,7 +297,7 @@ bool CUDASolverBundling::getMaxResidual(EntryJ* d_correspondences, ml::vec2ui& i
 	if (m_timer) m_timer->endEvent();
 
 	if (m_solverState.h_maxResidual[0] > MAX_RESIDUAL) { // remove!
-		
+
 		return true;
 	}
 

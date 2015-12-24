@@ -87,6 +87,9 @@ struct SolverState
 	float* d_denseJtr;
 	float* d_denseCorrCounts;
 
+	float4x4* d_xTransforms;
+	float4x4* d_xTransformInverses;
+
 	//!!!DEBUGGING
 	int* d_corrCount;
 	int* d_corrCountColor;

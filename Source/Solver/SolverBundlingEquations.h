@@ -64,6 +64,7 @@ __inline__ __device__ float evalFDevice(unsigned int corrIdx, SolverInput& input
 // applyJT : this function is called per variable and evaluates each residual influencing that variable (i.e., each energy term per variable)
 ////////////////////////////////////////
 
+template<bool useDense>
 __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverInput& input, SolverState& state, SolverParameters& parameters, float3& resRot, float3& resTrans)
 {
 	float3 rRot = make_float3(0.0f, 0.0f, 0.0f);
@@ -110,24 +111,24 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 	}
 	resRot = -parameters.weightSparse * rRot;
 	resTrans = -parameters.weightSparse * rTrans;
-	pRot *= parameters.weightSparse;
-	pTrans *= parameters.weightSparse;
+	//pRot *= parameters.weightSparse;
+	//pTrans *= parameters.weightSparse;
 
-	// add dense term
-	uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
-	uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
-	resRot -= make_float3(state.d_denseJtr[rotIndices.x], state.d_denseJtr[rotIndices.y], state.d_denseJtr[rotIndices.z]); //minus since -Jtf, weight already built in
-	resTrans -= make_float3(state.d_denseJtr[transIndices.x], state.d_denseJtr[transIndices.y], state.d_denseJtr[transIndices.z]); //minus since -Jtf, weight already built in
-	// preconditioner
-	pRot += make_float3(
-		state.d_denseJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
-		state.d_denseJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
-		state.d_denseJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
-	pTrans += make_float3(
-		state.d_denseJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
-		state.d_denseJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
-		state.d_denseJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
-	// end dense part
+	if (useDense) {// add dense term
+		uint3 rotIndices = make_uint3(variableIdx * 6 + 0, variableIdx * 6 + 1, variableIdx * 6 + 2);
+		uint3 transIndices = make_uint3(variableIdx * 6 + 3, variableIdx * 6 + 4, variableIdx * 6 + 5);
+		resRot -= make_float3(state.d_denseJtr[rotIndices.x], state.d_denseJtr[rotIndices.y], state.d_denseJtr[rotIndices.z]); //minus since -Jtf, weight already built in
+		resTrans -= make_float3(state.d_denseJtr[transIndices.x], state.d_denseJtr[transIndices.y], state.d_denseJtr[transIndices.z]); //minus since -Jtf, weight already built in
+		//// preconditioner
+		//pRot += make_float3(
+		//	state.d_denseJtJ[rotIndices.x * input.numberOfImages * 6 + rotIndices.x],
+		//	state.d_denseJtJ[rotIndices.y * input.numberOfImages * 6 + rotIndices.y],
+		//	state.d_denseJtJ[rotIndices.z * input.numberOfImages * 6 + rotIndices.z]);
+		//pTrans += make_float3(
+		//	state.d_denseJtJ[transIndices.x * input.numberOfImages * 6 + transIndices.x],
+		//	state.d_denseJtJ[transIndices.y * input.numberOfImages * 6 + transIndices.y],
+		//	state.d_denseJtJ[transIndices.z * input.numberOfImages * 6 + transIndices.z]);
+	}// end dense part
 
 	// Preconditioner depends on last solution P(input.d_x)
 	if (pRot.x > FLOAT_EPSILON)   state.d_precondionerRot[variableIdx].x = 1.0f / pRot.x;
