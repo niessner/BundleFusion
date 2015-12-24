@@ -100,14 +100,21 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		//!!!debugging
 
 		// find correspondence
+		float count = 0.0f;
 		float4 camPosSrcToTgt; float4 camPosTgt; float4 normalTgt; float2 tgtScreenPos;
 		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
 			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt)) { //i tgt, j src
-			atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
+			//atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
+			count += 1.0f;
 		} // found correspondence
+		count = warpReduce(count);
+		if (idx % WARP_SIZE == 0)
+		{
+			atomicAdd(&state.d_denseCorrCounts[imPairIdx], count);
+		}
 	} // valid image pixel
 }
 
