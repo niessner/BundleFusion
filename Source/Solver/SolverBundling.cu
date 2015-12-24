@@ -11,8 +11,8 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-#define PRINT_RESIDUALS_SPARSE
-#define PRINT_RESIDUALS_DENSE
+//#define PRINT_RESIDUALS_SPARSE
+//#define PRINT_RESIDUALS_DENSE
 //!!!DEBUGGING
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
@@ -28,11 +28,6 @@ __global__ void FlipJtJ_Kernel(unsigned int total, unsigned int dim, float* d_Jt
 		const unsigned int x = idx % dim;
 		const unsigned int y = idx / dim;
 		if (x > y) {
-			//!!!debugging
-			if (y * dim + x >= total || x * dim + y >= total) {
-				printf("ERROR FlipJtJ: (%d,%d) [%d,%d] out of bounds!\n", x, y, total, dim);
-			}
-			//!!!debugging
 			d_JtJ[y * dim + x] = d_JtJ[x * dim + y];
 		}
 	}
@@ -43,31 +38,21 @@ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigne
 	float depthMin, float depthMax, float4& camPosSrcToTgt, float2& tgtScreenPosf, float4& camPosTgt, float4& normalTgt)
 {
 	const float4 cposj = srcCamPos[idx];
-	//if (debugPrint) printf("cam pos j = %f %f %f\n", cposj.x, cposj.y, cposj.z);
 	if (cposj.z > depthMin && cposj.z < depthMax) {
 		float4 nrmj = srcNormals[idx];
-		//if (debugPrint) printf("normal j = %f %f %f\n", nrmj.x, nrmj.y, nrmj.z);
 		if (nrmj.x != MINF) {
 			nrmj = transform * nrmj;
 			camPosSrcToTgt = transform * cposj;
 			float3 proj = intrinsics * make_float3(camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
 			tgtScreenPosf = make_float2(proj.x / proj.z, proj.y / proj.z);
 			int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
-			//if (debugPrint) {
-			//	printf("cam pos j2i = %f %f %f\n", camPosSrcToTgt.x, camPosSrcToTgt.y, camPosSrcToTgt.z);
-			//	printf("proj %f %f %f -> %f %f\n", proj.x, proj.y, proj.z, proj.x / proj.z, proj.y / proj.z);
-			//	printf("screen pos = %d %d\n", tgtScreenPos.x, tgtScreenPos.y);
-			//}
 			if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
 				camPosTgt = tgtCamPos[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
-				//if (debugPrint) printf("cam pos i = %f %f %f\n", camPosTgt.x, camPosTgt.y, camPosTgt.z);
 				if (camPosTgt.z > depthMin && camPosTgt.z < depthMax) {
 					normalTgt = tgtNormals[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
-					//if (debugPrint) printf("normal i = %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z);
 					if (normalTgt.x != MINF) {
 						float dist = length(camPosSrcToTgt - camPosTgt);
 						float dNormal = dot(nrmj, normalTgt);
-						//if (debugPrint) printf("dist = %f, dnormal = %f\n", dist, dNormal);
 						if (dNormal >= normalThresh && dist <= distThresh) {
 							return true;
 						}
@@ -451,7 +436,7 @@ __global__ void EvalResidualDevice(SolverInput input, SolverState state, SolverP
 
 	float residual = 0.0f;
 	if (x < N) {
-		residual = evalFDevice(x, input, state, parameters, x == 0);
+		residual = evalFDevice(x, input, state, parameters);
 		//float out = warpReduce(residual);
 		//unsigned int laneid;
 		////This command gets the lane ID within the current warp
@@ -951,6 +936,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 #endif
 	//float3* xRot = new float3[input.numberOfImages];	//remember the delete!
 	//float3* xTrans = new float3[input.numberOfImages];
+	timer = new CUDATimer();
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
@@ -1001,6 +987,10 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	//!!!debugging
 	//if (xRot) delete[] xRot;
 	//if (xTrans) delete[] xTrans;
+	if (timer) {
+		timer->evaluate(true, true);
+		delete timer;
+	}
 	//!!!debugging
 }
 

@@ -232,15 +232,6 @@ __inline__ __device__ float3 applyJDevice(unsigned int corrIdx, SolverInput& inp
 __inline__ __device__ void computeJacobianBlockRow_i(matNxM<1, 6>& jacBlockRow, const float3& angles, const float3& translation,
 	const float4x4& transform_j, const float4& camPosSrc, const float4& normalTgt)
 {
-	//!!!DEBUGGING
-	if (isnan(camPosSrc.x) || isnan(camPosSrc.y) || isnan(camPosSrc.z) || isnan(camPosSrc.w)) {
-		printf("ERROR jac i: camPosSrc = %f %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z, camPosSrc.w);
-	}
-	if (isnan(normalTgt.x) || isnan(normalTgt.y) || isnan(normalTgt.z) || isnan(normalTgt.w)) {
-		printf("ERROR jac i: camPosSrc = %f %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z, normalTgt.w);
-	}
-	//!!!DEBUGGING
-
 	float4 world = transform_j * camPosSrc;
 	//alpha
 	float4x4 dx = evalRtInverse_dAlpha(angles, translation);
@@ -264,15 +255,6 @@ __inline__ __device__ void computeJacobianBlockRow_i(matNxM<1, 6>& jacBlockRow, 
 __inline__ __device__ void computeJacobianBlockRow_j(matNxM<1, 6>& jacBlockRow, const float3& angles, const float3& translation,
 	const float4x4& invTransform_i, const float4& camPosSrc, const float4& normalTgt)
 {
-	//!!!DEBUGGING
-	if (isnan(camPosSrc.x) || isnan(camPosSrc.y) || isnan(camPosSrc.z) || isnan(camPosSrc.w)) {
-		printf("ERROR jac j: camPosSrc = %f %f %f %f\n", camPosSrc.x, camPosSrc.y, camPosSrc.z, camPosSrc.w);
-	}
-	if (isnan(normalTgt.x) || isnan(normalTgt.y) || isnan(normalTgt.z) || isnan(normalTgt.w)) {
-		printf("ERROR jac j: camPosSrc = %f %f %f %f\n", normalTgt.x, normalTgt.y, normalTgt.z, normalTgt.w);
-	}
-	//!!!DEBUGGING
-
 	float4x4 dx; dx.setIdentity();
 	//alpha
 	dx.setFloat3x3(evalR_dAlpha(angles));
@@ -375,29 +357,17 @@ __inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned
 		for (unsigned int j = i; j < 6; j++) {
 			if (vi > 0) {
 				float dii = jacobianBlockRow_i(i) * jacobianBlockRow_i(j) * weight;
-				//!!!DEBUGGING
-				if (isnan(dii)) printf("ERROR addtolocalsystem (%d,%d)(%d,%d) %f %f %f\n", vi, vj, i, j, jacobianBlockRow_i(i), jacobianBlockRow_i(j), weight);
-				//!!!DEBUGGING
 				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
 			}
 			if (vj > 0) {
 				float djj = jacobianBlockRow_j(i) * jacobianBlockRow_j(j) * weight;
-				//!!!DEBUGGING
-				if (isnan(djj)) printf("ERROR addtolocalsystem (%d,%d)(%d,%d) %f %f %f\n", vi, vj, i, j, jacobianBlockRow_j(i), jacobianBlockRow_j(j), weight);
-				//!!!DEBUGGING
 				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
 			}
 			if (vi > 0 && vj > 0) {
 				float dij = jacobianBlockRow_i(i) * jacobianBlockRow_j(j) * weight;
-				//!!!DEBUGGING
-				if (isnan(dij)) printf("ERROR addtolocalsystem (%d,%d)(%d,%d) %f %f %f\n", vi, vj, i, j, jacobianBlockRow_i(i), jacobianBlockRow_j(j), weight);
-				//!!!DEBUGGING
 				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
 				if (i != j)	{
 					float dji = jacobianBlockRow_i(j) * jacobianBlockRow_j(i) * weight;
-					//!!!DEBUGGING
-					if (isnan(dji)) printf("ERROR addtolocalsystem (%d,%d)(%d,%d) %f %f %f\n", vi, vj, i, j, jacobianBlockRow_i(j), jacobianBlockRow_j(i), weight);
-					//!!!DEBUGGING
 					atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji);
 				}
 			}
