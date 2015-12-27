@@ -12,8 +12,10 @@ CUDACache::CUDACache(unsigned int widthDownSampled, unsigned int heightDownSampl
 	m_intrinsics = intrinsics;
 	m_intrinsicsInv = m_intrinsics.getInverse();
 
-	d_intensityHelper = NULL;
-	m_filterIntensitySigma = GlobalBundlingState::get().s_colorSigma;
+	d_filterHelperDown = NULL;
+	m_filterIntensitySigma = GlobalBundlingState::get().s_colorDownSigma;
+	m_filterDepthSigmaD = GlobalBundlingState::get().s_depthDownSigmaD;
+	m_filterDepthSigmaR = GlobalBundlingState::get().s_depthDownSigmaR;
 
 	alloc();
 	m_currentFrame = 0;
@@ -25,6 +27,10 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 {
 	CUDACachedFrame& frame = m_cache[m_currentFrame];
 	CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, m_width, m_height, d_depth, inputDepthWidth, inputDepthHeight);
+	if (m_filterDepthSigmaD > 0.0f) {
+		CUDAImageUtil::gaussFilterDepthMap(d_filterHelperDown, frame.d_depthDownsampled, m_filterDepthSigmaD, m_filterDepthSigmaR, m_width, m_height);
+		std::swap(frame.d_depthDownsampled, d_filterHelperDown);
+	}
 	//CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
 
 	CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(frame.d_cameraposDownsampled, frame.d_depthDownsampled, *(float4x4*)&m_intrinsicsInv, m_width, m_height);
@@ -32,12 +38,12 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 
 	//CUDAImageUtil::jointBilateralFilterFloatMap(frame.d_colorDownsampled)
 
-	CUDAImageUtil::resampleToIntensity(d_intensityHelper, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
+	CUDAImageUtil::resampleToIntensity(d_filterHelperDown, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
 	//!!!debugging
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.d_intensityOrigDown, d_intensityHelper, sizeof(float)*m_width*m_height, cudaMemcpyDeviceToDevice));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.d_intensityOrigDown, d_filterHelperDown, sizeof(float)*m_width*m_height, cudaMemcpyDeviceToDevice));
 	//!!!debugging
-	if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, m_filterIntensitySigma, m_width, m_height);
-	else std::swap(frame.d_intensityDownsampled, d_intensityHelper);
+	if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, m_filterIntensitySigma, m_width, m_height);
+	else std::swap(frame.d_intensityDownsampled, d_filterHelperDown);
 	CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, m_width, m_height);
 
 	m_currentFrame++;

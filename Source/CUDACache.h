@@ -7,8 +7,8 @@ class CUDACache {
 public:
 
 	CUDACache(unsigned int widthDownSampled, unsigned int heightDownSampled, unsigned int maxNumImages, const mat4f& intrinsics);
-	~CUDACache() { 
-		free(); 
+	~CUDACache() {
+		free();
 	}
 
 	void storeFrame(const float* d_depth, unsigned int inputDepthWidth, unsigned int inputDepthHeight,
@@ -157,7 +157,7 @@ private:
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_cache, sizeof(CUDACachedFrame)*m_maxNumImages));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_cache, m_cache.data(), sizeof(CUDACachedFrame)*m_maxNumImages, cudaMemcpyHostToDevice));
 
-		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityHelper, sizeof(float)*m_width*m_height));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filterHelperDown, sizeof(float)*m_width*m_height));
 	}
 
 	void free() {
@@ -166,7 +166,7 @@ private:
 		}
 		m_cache.clear();
 		MLIB_CUDA_SAFE_FREE(d_cache);
-		MLIB_CUDA_SAFE_FREE(d_intensityHelper);
+		MLIB_CUDA_SAFE_FREE(d_filterHelperDown);
 
 		m_currentFrame = 0;
 	}
@@ -182,6 +182,8 @@ private:
 	std::vector < CUDACachedFrame > m_cache;
 	CUDACachedFrame*				d_cache;
 
-	float* d_intensityHelper; //for intensity filtering
+	float* d_filterHelperDown; //for intensity filtering
 	float m_filterIntensitySigma;
+	float m_filterDepthSigmaD;
+	float m_filterDepthSigmaR;
 };

@@ -64,6 +64,7 @@ public:
 	void runOpt();
 	void analyzeLocalOpts();
 	void testGlobalDense();
+	void runLocalOpts();
 	//debug
 	void saveCacheFramesToSensorFile(const std::string& filename) const;
 

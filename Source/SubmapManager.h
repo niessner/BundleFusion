@@ -160,16 +160,8 @@ public:
 		finishLocalOpt();
 		mutex_nextLocal.unlock();
 	}
-	void setEndSolveGlobalDenseWeights() { //TODO fix this hack
-		const unsigned int maxNumIts = GlobalBundlingState::get().s_numGlobalNonLinIterations;
-		std::vector<float> sparseWeights(maxNumIts, 1.0f);
-		std::vector<float> denseDepthWeights(maxNumIts, 0.5f);
-		//std::vector<float> denseDepthWeights(maxNumIts, 1.0f);
-		//for (unsigned int i = 0; i < maxNumIts; i++) denseDepthWeights[i] = i + 1.0f;
-		std::vector<float> denseColorWeights(maxNumIts, 0.0f); //TODO here
-		m_SparseBundler.setGlobalWeights(sparseWeights, denseDepthWeights, denseColorWeights, true);
-		std::cout << "set end solve global dense weights (" << denseDepthWeights.front() << ")" << std::endl;
-	}
+		//TODO fix this hack
+	void setEndSolveGlobalDenseWeights();
 
 
 private:

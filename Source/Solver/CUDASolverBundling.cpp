@@ -11,7 +11,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 
 extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
-extern "C" void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
+extern "C" void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
 CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxNumResiduals)
 	: m_maxNumberOfImages(maxNumberOfImages)

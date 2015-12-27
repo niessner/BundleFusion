@@ -486,6 +486,26 @@ inline __device__ float4 getValueNearestNeighbour(const float x, const float y, 
 
 	return inputMap[v*imageWidth + u];
 }
+
+//wrt tx, ty, tz, a, b, c
+inline __device__ matNxM<12, 6> evalRtDeriv(float CosAlpha, float CosBeta, float CosGamma, float SinAlpha, float SinBeta, float SinGamma, float x, float y, float z)
+{
+	matNxM<12, 6> deriv; deriv.setZero();
+	deriv(9, 0) = 1.0f;		//d tx
+	deriv(10, 1) = 1.0f;	//d ty
+	deriv(11, 2) = 1.0f;	//d tz
+
+	deriv(0, 3) = 0.0f;														deriv(0, 4) = -SinBeta * CosGamma;									deriv(0, 5) = -CosBeta * SinGamma;	//d cy * cz
+	deriv(1, 3) = 0.0f;														deriv(1, 4) = -SinBeta * SinGamma;									deriv(1, 5) = CosBeta * SinGamma;	//d cy * sz
+	deriv(2, 3) = 0.0f;														deriv(2, 4) = -CosBeta;												deriv(2, 5) = 0.0f;					//d -sy
+	deriv(3, 3) = CosGamma * CosAlpha * SinBeta + SinAlpha * SinGamma;		deriv(3, 4) = CosGamma * SinAlpha * CosBeta - CosAlpha * SinGamma;	deriv(3, 5) = -SinGamma * SinAlpha * SinBeta - CosAlpha * CosGamma; //d cz*sx*sy-cx*sz
+	deriv(4, 3) = -SinAlpha * CosGamma + CosAlpha * SinBeta * SinGamma;		deriv(4, 4) = CosAlpha * CosGamma + CosAlpha * SinBeta * SinGamma;	deriv(4, 5) = -CosAlpha * SinGamma + SinAlpha * SinBeta * CosGamma; // d cx*cz+sx*sy*sz
+	deriv(5, 3) = CosAlpha * CosBeta;										deriv(5, 4) = -SinBeta * SinAlpha;									deriv(5, 5) = 0.0f;					//d cy*sx
+	deriv(6, 3) = -SinAlpha * CosGamma * SinBeta + CosAlpha * SinGamma;		deriv(6, 4) = CosAlpha * CosGamma * CosBeta + SinAlpha * SinGamma;	deriv(6, 5) = -CosAlpha * SinGamma * SinBeta + SinAlpha * CosGamma; //d cx*cz*sy+sx*sz
+	deriv(7, 3) = -CosGamma * SinAlpha - CosAlpha * SinBeta * SinGamma;		deriv(7, 4) = -CosGamma * SinAlpha + CosAlpha * CosBeta * SinGamma; deriv(7, 5) = SinGamma * SinAlpha + CosAlpha * SinBeta * CosGamma;  //d -cz*sx+cx*sy*sz
+	deriv(8, 3) = -SinAlpha * CosBeta;										deriv(8, 4) = -CosAlpha * SinBeta;									deriv(8, 5) = 0.0f;					//d cx*cy
+}
+
 #endif //USE_LIE_SPACE
 
 #endif // _ICP_UTIL_

@@ -80,11 +80,13 @@ void Bundler::processInput()
 			if (framePastLast == 10) {
 #ifdef USE_GLOBAL_DENSE_AT_END
 				m_SubmapManager.setEndSolveGlobalDenseWeights();
+
 				//saveGlobalSiftManagerAndCacheToFile("debug/global");
 				//saveCompleteTrajectory("debug/curTrajectory.bin");
 				//std::cout << "waiting..." << std::endl;
 				//getchar();
 #endif
+				//GlobalBundlingState::get().s_numOptPerResidualRemoval = 1; //!!!debugging
 			}
 			framePastLast++;
 		}
@@ -271,12 +273,12 @@ void Bundler::getCurrentFrame()
 	//		}
 	//	}
 	//}
-	//if (m_bundlerInputData.m_bFilterDepthValues) {
-	//	CUDAImageUtil::gaussFilterFloatMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth,
-	//		m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,
-	//		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
-	//	std::swap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper);
-	//}
+	if (m_bundlerInputData.m_bFilterDepthValues) {
+		CUDAImageUtil::gaussFilterDepthMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth,
+			m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,
+			m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
+		std::swap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper);
+	}
 }
 
 void Bundler::saveDEBUG()

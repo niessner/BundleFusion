@@ -50,7 +50,9 @@
 	X(bool, s_useLocalVerify) \
 	X(bool, s_localDenseUseAllPairwise) \
 	X(unsigned int, s_numOptPerResidualRemoval) \
-	X(float, s_colorSigma)
+	X(float, s_colorDownSigma) \
+	X(float, s_depthDownSigmaD) \
+	X(float, s_depthDownSigmaR)
 
 using namespace ml;
 

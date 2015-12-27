@@ -96,7 +96,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		float4x4 transform = invTransform_i * transform_j;
 #endif
 		//!!!debugging
-		if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
+		//if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
 		//!!!debugging
 
 		// find correspondence
@@ -195,7 +195,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 #endif
 
 				addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
-					jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight * imPairWeight);
+					jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight * imPairWeight, idx);
 #ifdef PRINT_RESIDUALS_DENSE
 				atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
 				atomicAdd(state.d_corrCount, 1);
@@ -217,10 +217,9 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 #endif
 					float weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
-					//float weight = 1.0f;
 
 					addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
-						jacobianBlockRow_i, jacobianBlockRow_j, i, j, diffIntensity, parameters.weightDenseColor * weight * imPairWeight);
+						jacobianBlockRow_i, jacobianBlockRow_j, i, j, diffIntensity, parameters.weightDenseColor * weight * imPairWeight, idx);
 
 #ifdef PRINT_RESIDUALS_DENSE
 					atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * diffIntensity * diffIntensity);
@@ -233,12 +232,16 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 }
 
 extern "C"
-void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
+void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
 	const unsigned int N = input.numberOfImages;
 
 	const int threadsPerBlock = THREADS_PER_BLOCK_DENSE_DEPTH_X * THREADS_PER_BLOCK_DENSE_DEPTH_Y;
 	const int reductionGlobal = (input.denseDepthWidth*input.denseDepthHeight + threadsPerBlock - 1) / threadsPerBlock;
+	if (threadsPerBlock * reductionGlobal != input.denseDepthWidth*input.denseDepthHeight) {
+		printf("ERROR downsamp image size %d %d must be divisible by threadsPerBlock %d %d\n",
+			input.denseDepthWidth, input.denseDepthHeight, THREADS_PER_BLOCK_DENSE_DEPTH_X, THREADS_PER_BLOCK_DENSE_DEPTH_Y);
+	}
 	const int sizeJtr = 6 * N;
 	const int sizeJtJ = sizeJtr * sizeJtr;
 
@@ -311,12 +314,14 @@ void BuildDenseSystem(SolverInput& input, SolverState& state, SolverParameters& 
 		h_Jtr = new float[sizeJtr];
 		cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
 		cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-		//printf("JtJ:\n");
+		printf("JtJ:\n");
 		//for (unsigned int i = 0; i < 6 * N; i++) {
 		//	for (unsigned int j = 0; j < 6 * N; j++)
-		//		printf(" %f,", h_JtJ[j * 6 * N + i]);
-		//	printf("\n");
-		//}
+		for (unsigned int i = 6 * 1; i < 6 * 2; i++) {
+			for (unsigned int j = 6 * 1; j < 6 * 2; j++)
+				printf(" %f,", h_JtJ[j * 6 * N + i]);
+			printf("\n");
+		}
 		printf("Jtr:\n");
 		for (unsigned int i = 0; i < 6 * N; i++) {
 			printf(" %f,", h_Jtr[i]);
@@ -943,7 +948,6 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 #endif
 	//float3* xRot = new float3[input.numberOfImages];	//remember the delete!
 	//float3* xTrans = new float3[input.numberOfImages];
-	timer = new CUDATimer();
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
@@ -994,10 +998,6 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	//!!!debugging
 	//if (xRot) delete[] xRot;
 	//if (xTrans) delete[] xTrans;
-	if (timer) {
-		timer->evaluate(true, true);
-		delete timer;
-	}
 	//!!!debugging
 }
 
