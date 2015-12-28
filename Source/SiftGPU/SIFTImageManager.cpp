@@ -219,8 +219,8 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 		std::vector<int> currNumFilteredMatchesPerImagePair(maxImageMatches);
 		std::vector<float> currFilteredMatchDistances(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 		std::vector<uint2> currFilteredMatchKeyPointIndices(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-		std::vector<float4x4> currFilteredTransforms(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-		std::vector<float4x4> currFilteredTransformsInv(maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+		std::vector<float4x4> currFilteredTransforms(maxImageMatches);
+		std::vector<float4x4> currFilteredTransformsInv(maxImageMatches);
 
 		in.read((char*)currNumFilteredMatchesPerImagePair.data(), sizeof(int)*maxImageMatches);
 		in.read((char*)currFilteredMatchDistances.data(), sizeof(float)*maxImageMatches*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
@@ -398,6 +398,9 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 	for (unsigned int i = 0; i < m_globNumResiduals; i++) {
 		const EntryJ& corr = correspondences[i];
 		if (corr.isValid()) {
+			//!!!debugging
+			//if (corr.imgIdx_j == m_submapSize) continue; // i always less than j
+			//!!!debugging
 			const uint2& keyIndices = correspondenceKeyIndices[i];
 			uint2 k0 = make_uint2(corr.imgIdx_i, keyIndices.x);
 			uint2 k1 = make_uint2(corr.imgIdx_j, keyIndices.y);
@@ -411,7 +414,7 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 
 				int2 pixLocDiscretized = make_int2((int)round((loc.x + widthSIFT) / (float)pixelDistThresh), (int)round((loc.y + heightSIFT) / (float)pixelDistThresh));
 				int linIdx = pixLocDiscretized.y * (widthSIFT * padding) + pixLocDiscretized.x;
-				if (linIdx >= 0 && linIdx < imageMarker.size() && !imageMarker[linIdx]) {
+				if (pixLocDiscretized.x >= 0 && pixLocDiscretized.y >= 0 && linIdx >= 0 && linIdx < imageMarker.size() && !imageMarker[linIdx]) {
 
 					SIFTKeyPoint key;
 					key.pos = loc;

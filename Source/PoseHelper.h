@@ -22,7 +22,7 @@ namespace PoseHelper {
 		}
 		std::vector<vec3f> pts, refPts; vec3f ptsMean(0.0f), refPtsMean(0.0f);
 		for (unsigned int i = 0; i < numTransforms; i++) {
-			if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) {
+			if (trajectory[i][0] != -std::numeric_limits<float>::infinity() && referenceTrajectory[i][0] != -std::numeric_limits<float>::infinity()) {
 				pts.push_back(trajectory[i].getTranslation());
 				refPts.push_back(referenceTrajectory[i].getTranslation());
 				ptsMean += pts.back();
@@ -37,24 +37,6 @@ namespace PoseHelper {
 		}
 		vec3f evs;
 		mat4f align = EigenWrapperf::kabsch(pts, refPts, evs);
-
-		//!!!debugging
-		//Eigen::Matrix3f W; W.setZero();
-		//for (unsigned int i = 0; i < pts.size(); i++) {
-		//	W += Eigen::Vector3f(refPts[i].x, refPts[i].y, refPts[i].z) * Eigen::Vector3f(pts[i].x, pts[i].y, pts[i].z).transpose();
-		//}
-		//W.transposeInPlace();
-		//Eigen::JacobiSVD<Eigen::Matrix3f> svd(W, Eigen::ComputeThinU | Eigen::ComputeThinV);
-		//Eigen::Matrix3f U = svd.matrixU(); //v
-		//Eigen::Vector3f d = svd.singularValues(); //s
-		//Eigen::Matrix3f Vh = svd.matrixV(); //w
-		//Eigen::Matrix3f S = Eigen::MatrixXf::Identity(3, 3);
-		//if (U.determinant() * Vh.determinant() < 0)
-		//	S(2, 2) = -1;
-		//Eigen::Matrix3f rot = U * S * Vh;
-		//mat3f align = mat3f(rot.data()).getTranspose();
-		//!!!debugging
-
 		float err = 0.0f;
 		for (unsigned int i = 0; i < pts.size(); i++) {
 			vec3f p0 = align * pts[i];
@@ -64,6 +46,52 @@ namespace PoseHelper {
 		}
 		float rmse = std::sqrt(err / pts.size());
 		return rmse;
+	}
+
+	static std::vector<std::pair<unsigned int, float>> evaluateErr2PerImage(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory) {
+		std::vector<std::pair<unsigned int, float>> errors;
+
+		size_t numTransforms = math::min(trajectory.size(), referenceTrajectory.size());
+		if (numTransforms < 3) {
+			std::cout << "cannot evaluate with < 3 transforms" << std::endl;
+			if (numTransforms == 2) {
+				if (referenceTrajectory[0].getTranslation().length() > 0.0001f) {
+					std::cout << "cannot evaluate 2 with reference[0] not identity" << std::endl;
+					return errors;
+				}
+				errors.push_back(std::make_pair(0u, vec3f::dist(trajectory[1].getTranslation(), referenceTrajectory[1].getTranslation())));
+				return errors;
+			}
+			return errors;
+		}
+		std::vector<vec3f> pts, refPts; vec3f ptsMean(0.0f), refPtsMean(0.0f);
+		std::vector<unsigned int> imageIndices;
+		for (unsigned int i = 0; i < numTransforms; i++) {
+			if (trajectory[i][0] != -std::numeric_limits<float>::infinity() && referenceTrajectory[i][0] != -std::numeric_limits<float>::infinity()) {
+				pts.push_back(trajectory[i].getTranslation());
+				refPts.push_back(referenceTrajectory[i].getTranslation());
+				ptsMean += pts.back();
+				refPtsMean += refPts.back();
+				imageIndices.push_back(i);
+			}
+		}
+		ptsMean /= (float)pts.size();
+		refPtsMean /= (float)refPts.size();
+		for (unsigned int i = 0; i < pts.size(); i++) {
+			pts[i] -= ptsMean;
+			refPts[i] -= refPtsMean;
+		}
+		vec3f evs;
+		mat4f align = EigenWrapperf::kabsch(pts, refPts, evs);
+
+		errors.resize(numTransforms);
+		for (unsigned int i = 0; i < pts.size(); i++) {
+			vec3f p0 = align * pts[i];
+			vec3f p1 = refPts[i];
+			float dist2 = vec3f::distSq(p0, p1);
+			errors[i] = std::make_pair(imageIndices[i], dist2);
+		}
+		return errors;
 	}
 
 	static void saveToPoseFile(const std::string filename, const std::vector<mat4f>& trajectory) {

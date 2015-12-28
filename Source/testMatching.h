@@ -64,9 +64,9 @@ public:
 	void runOpt();
 	void analyzeLocalOpts();
 	void testGlobalDense();
-	void runLocalOpts();
+	//void runLocalOpts();
 	//debug
-	void saveCacheFramesToSensorFile(const std::string& filename) const;
+	void compareDEBUG();
 
 	// match within first numFrames of sensorFile
 	void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));
@@ -90,8 +90,6 @@ public:
 	void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
 
 	void printCacheFrames(const std::string& dir) const;
-
-	void trajDEBUG() const;
 
 private:
 	void evaluateTrajectory(unsigned int submapSize, const std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll);

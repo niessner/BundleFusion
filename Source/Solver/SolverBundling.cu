@@ -96,7 +96,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		float4x4 transform = invTransform_i * transform_j;
 #endif
 		//!!!debugging
-		//if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
+		if (!computeAngleDiff(transform, 0.5f)) return; //~30 degrees
 		//!!!debugging
 
 		// find correspondence

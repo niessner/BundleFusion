@@ -53,6 +53,9 @@ public:
 		s << m_intrinsicsInv;
 		s << m_currentFrame;
 		s << m_maxNumImages;
+		//s << m_filterIntensitySigma;
+		//s << m_filterDepthSigmaD;
+		//s << m_filterDepthSigmaR;
 		DepthImage32 depth(m_width, m_height);
 		ColorImageR32G32B32A32 camPos(m_width, m_height), normals(m_width, m_height);
 		//ColorImageR8G8B8A8 color(m_width, m_height);
@@ -90,6 +93,9 @@ public:
 		s >> m_intrinsicsInv;
 		s >> m_currentFrame;
 		s >> m_maxNumImages;
+		//s >> m_filterIntensitySigma;
+		//s >> m_filterDepthSigmaD;
+		//s >> m_filterDepthSigmaR;
 		if (m_maxNumImages > oldMaxNumImages || m_width > oldWidth || m_height > oldHeight) {
 			free();
 			alloc();
@@ -137,14 +143,27 @@ public:
 		}
 	}
 	//!debugging only
-	void reFilterCachedIntensityFrames(const float sigma) {
-		if (sigma == m_filterIntensitySigma) return;
-		std::cout << "re-filtering intensity (sigma = " << sigma << ")" << std::endl;
-		m_filterIntensitySigma = sigma;
-		for (unsigned int i = 0; i < m_cache.size(); i++) {
-			if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(m_cache[i].d_intensityDownsampled, m_cache[i].d_intensityOrigDown, m_filterIntensitySigma, m_width, m_height);
-			else CUDAImageUtil::copy(m_cache[i].d_intensityDownsampled, m_cache[i].d_intensityOrigDown, m_width, m_height);
+	void reFilterCachedFrames(float intensitySigma, float depthSigmaD, float depthSigmaR) {
+		if (intensitySigma != m_filterIntensitySigma) {
+			std::cout << "re-filtering intensity (sigma = " << intensitySigma << ")" << std::endl;
+			m_filterIntensitySigma = intensitySigma;
+			for (unsigned int i = 0; i < m_cache.size(); i++) {
+				if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(m_cache[i].d_intensityDownsampled, m_cache[i].d_intensityOrigDown, m_filterIntensitySigma, m_width, m_height);
+				else CUDAImageUtil::copy(m_cache[i].d_intensityDownsampled, m_cache[i].d_intensityOrigDown, m_width, m_height);
+			}
 		}
+		//if (depthSigmaD != m_filterDepthSigmaD || depthSigmaR != m_filterDepthSigmaR) {
+			std::cout << "re-filtering depth (" << depthSigmaD << ", " << depthSigmaR << ")" << std::endl;
+			m_filterDepthSigmaD = depthSigmaD;
+			m_filterDepthSigmaR = depthSigmaR;
+			for (unsigned int i = 0; i < m_cache.size(); i++) {
+				if (m_filterDepthSigmaD > 0.0f) {
+					CUDAImageUtil::gaussFilterDepthMap(d_filterHelperDown, m_cache[i].d_depthDownsampled, m_filterDepthSigmaD, m_filterDepthSigmaR, m_width, m_height);
+					std::swap(d_filterHelperDown, m_cache[i].d_depthDownsampled);
+				}
+				else CUDAImageUtil::copy(m_cache[i].d_intensityDownsampled, m_cache[i].d_intensityOrigDown, m_width, m_height);
+			}
+		//}
 	}
 
 private:

@@ -32,7 +32,7 @@ SBA::SBA()
 	m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //no color
 	//// for tum data
 	//m_localWeightsSparse.resize(maxNumIts, 1.0f);
-	//m_localWeightsDenseDepth.resize(maxNumIts, 0.0f); //for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
+	//m_localWeightsDenseDepth.resize(maxNumIts, 0.0f); for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
 	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
 
 	m_globalWeightsMutex.lock();
@@ -70,10 +70,10 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	std::vector<float> weightsDenseDepth, weightsDenseColor, weightsSparse;
 	if (isLocal) {
 		weightsSparse = m_localWeightsSparse;
+		usePairwise = m_bUseLocalDensePairwise; 
 		//cache = NULL; //to turn off
 		//weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
-		usePairwise = m_bUseLocalDensePairwise; //turn on
-		weightsDenseDepth = m_localWeightsDenseDepth;
+		weightsDenseDepth = m_localWeightsDenseDepth; //turn on
 		weightsDenseColor = m_localWeightsDenseColor;
 	}
 	else {

@@ -697,7 +697,6 @@ void SubmapManager::saveGlobalSiftManagerAndCache(const std::string& prefix) con
 {
 	const std::string siftFile = prefix + ".sift";
 	const std::string cacheFile = prefix + ".cache";
-
 	m_global->saveToFile(siftFile);
 	m_globalCache->saveToFile(cacheFile);
 }

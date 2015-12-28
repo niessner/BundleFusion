@@ -1470,65 +1470,115 @@ void TestMatching::analyzeLocalOpts()
 	//TODO actually run the optimizations
 
 	// find local where error(test0) > error(test1)
-	const std::string testFile = "debug/fr1_desk.trajectory";//"dump/recording.sensor"; //sparse+dense
-	const std::string refFile = "../data/tum/fr1_desk.sensor";
+	//const std::string test0File = "dump/recording.sensor"; //sparse+dense
+	//const std::string test1File = "dump/fr3_office.sensor"; //sparse
+	//const std::string refFile   = "../data/tum/fr3_office_depth.sensor"; //reference
+	const std::string test0File = "debug/test0.trajectory"; //sparse+dense
+	const std::string test1File = "debug/test1.trajectory"; //sparse
+	const std::string refFile   = "debug/ref.trajectory"; //reference
 
-	std::vector<mat4f> testTrajectory, referenceTrajectory;
-	const std::string testExt = util::getFileExtension(testFile);
-	if (testExt == "sensor") {
+	std::cout << "loading trajectories... ";
+	std::vector<mat4f> test0Trajectory, test1Trajectory, referenceTrajectory;
+	if (util::getFileExtension(test0File) == "sensor") {
 		CalibratedSensorData cs;
-		BinaryDataStreamFile s(testFile, false);
-		s >> cs;
-		testTrajectory = cs.m_trajectory;
+		BinaryDataStreamFile s(test0File, false);
+		s >> cs; s.closeStream();
+		test0Trajectory = cs.m_trajectory;
+		BinaryDataStreamFile sout("debug/test0.trajectory", true);
+		sout << test0Trajectory; sout.closeStream();
+	} else {
+		BinaryDataStreamFile s(test0File, false);
+		s >> test0Trajectory;
 	}
-	else if (testExt == "trajectory") {
-		BinaryDataStreamFile s(testFile, false);
-		s >> testTrajectory;
+	if (util::getFileExtension(test1File) == "sensor") {
+		CalibratedSensorData cs;
+		BinaryDataStreamFile s(test1File, false);
+		s >> cs; s.closeStream();
+		test1Trajectory = cs.m_trajectory;
+		BinaryDataStreamFile sout("debug/test1.trajectory", true);
+		sout << test1Trajectory; sout.closeStream();
+	} else {
+		BinaryDataStreamFile s(test1File, false);
+		s >> test1Trajectory;
 	}
-	{
+	if (util::getFileExtension(refFile) == "sensor") {
 		CalibratedSensorData cs;
 		BinaryDataStreamFile s(refFile, false);
-		s >> cs;
+		s >> cs; s.closeStream();
 		referenceTrajectory = cs.m_trajectory;
+		BinaryDataStreamFile sout("debug/ref.trajectory", true);
+		sout << referenceTrajectory; sout.closeStream();
+	} else {
+		BinaryDataStreamFile s(refFile, false);
+		s >> referenceTrajectory;
 	}
+	std::cout << "done!" << std::endl;
 
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
-	std::vector<std::pair<unsigned int, float>> localErrors;
+	std::vector<float> errors0, errors1;
+	std::vector<std::pair<unsigned int, float>> badIndices;
+	std::vector<std::pair<unsigned int, float>> goodIndices;
 	for (unsigned int i = 0; i < referenceTrajectory.size(); i += submapSize) {
 		unsigned int numTransforms = std::min(submapSize, (int)referenceTrajectory.size() - i);
-		std::vector<mat4f> local(numTransforms), refLocalTrajectory(numTransforms);
-		mat4f offset = testTrajectory[i].getInverse();
+		std::vector<mat4f> local0(numTransforms), local1(numTransforms), refLocalTrajectory(numTransforms);
+		mat4f offset0 = test0Trajectory[i].getInverse();
+		mat4f offset1 = test1Trajectory[i].getInverse();
 		mat4f refOffset = referenceTrajectory[i].getInverse();
 		for (unsigned int t = 0; t < numTransforms; t++) {
-			local[t] = offset * testTrajectory[i + t];
+			local0[t] = offset0 * test0Trajectory[i + t];
+			local1[t] = offset1 * test1Trajectory[i + t];
 			refLocalTrajectory[t] = refOffset * referenceTrajectory[i + t];
 		}
-		float err = PoseHelper::evaluateAteRmse(local, refLocalTrajectory);
-		localErrors.push_back(std::make_pair(i, err));
+		float err0 = PoseHelper::evaluateAteRmse(local0, refLocalTrajectory);
+		errors0.push_back(err0);
+		float err1 = PoseHelper::evaluateAteRmse(local1, refLocalTrajectory);
+		errors1.push_back(err1);
+
+		if (err0 > err1) badIndices.push_back(std::make_pair(i, err0 - err1));
+		else goodIndices.push_back(std::make_pair(i, err1 - err0));
 	}
-	std::sort(localErrors.begin(), localErrors.end(), [](const std::pair<unsigned int, float> &left, const std::pair<unsigned int, float> &right) {
+	std::sort(badIndices.begin(), badIndices.end(), [](const std::pair<unsigned int, float> &left, const std::pair<unsigned int, float> &right) {
+		return fabs(left.second) > fabs(right.second);
+	});
+	std::sort(goodIndices.begin(), goodIndices.end(), [](const std::pair<unsigned int, float> &left, const std::pair<unsigned int, float> &right) {
 		return fabs(left.second) > fabs(right.second);
 	});
 
-	float totalErr = PoseHelper::evaluateAteRmse(testTrajectory, referenceTrajectory);
+	float totalErr0 = PoseHelper::evaluateAteRmse(test0Trajectory, referenceTrajectory);
+	float totalErr1 = PoseHelper::evaluateAteRmse(test1Trajectory, referenceTrajectory);
 
 	//compare global keys
-	std::vector<mat4f> testKeys, refKeys;
+	std::vector<mat4f> test0Keys, test1Keys, refKeys;
 	for (unsigned int i = 0; i < referenceTrajectory.size(); i += submapSize) {
-		testKeys.push_back(testTrajectory[i]);
+		test0Keys.push_back(test0Trajectory[i]);
+		test1Keys.push_back(test1Trajectory[i]);
 		refKeys.push_back(referenceTrajectory[i]);
 	}
-	float keysErr = PoseHelper::evaluateAteRmse(testKeys, refKeys);
+	float keysErr0 = PoseHelper::evaluateAteRmse(test0Keys, refKeys);
+	float keysErr1 = PoseHelper::evaluateAteRmse(test1Keys, refKeys);
 
-	std::cout << "keys error = " << keysErr << std::endl;
-	std::cout << "total error = " << totalErr << std::endl;
+	std::cout << "sparse+dense:" << std::endl << "\ttotal error = " << totalErr0 << std::endl << "\tkeys error = " << keysErr0 << std::endl;
+	std::cout << "sparse:" << std::endl << "\ttotal error = " << totalErr1 << std::endl << "\tkeys error = " << keysErr1 << std::endl;
 
+	//compose trajectory
+	std::vector<mat4f> composed;
+	for (unsigned int i = 0; i < test0Trajectory.size(); i += submapSize) {
+		unsigned int numTransforms = std::min(submapSize, (int)referenceTrajectory.size() - i);
+		mat4f offset = test0Trajectory[i].getInverse();
+		mat4f newOffset = test1Trajectory[i];
+		for (unsigned int t = 0; t < numTransforms; t++) {
+			mat4f trans = newOffset * offset * test0Trajectory[i + t];
+			composed.push_back(trans);
+		}
+	}
+	float compErr = PoseHelper::evaluateAteRmse(composed, referenceTrajectory);
+	std::cout << "composed error = " << compErr << std::endl;
 	int a = 5;
 }
 
 void TestMatching::testGlobalDense()
 {
-	const std::string which = "fr1_desk"; //"liv2clean"
+	const std::string which = "fr3_office"; //"liv2clean"
 
 	if (false) {
 		std::cout << "check if need to update ref trajectory! (press key to continue)" << std::endl;
@@ -1538,7 +1588,8 @@ void TestMatching::testGlobalDense()
 		//BinaryDataStreamFile s("../data/iclnuim/livingroom1.sensor", false);
 		//BinaryDataStreamFile s("../data/iclnuim/livingroom2_nonoise.sensor", false);
 		//BinaryDataStreamFile s("../data/iclnuim/livingroom2.sensor", false);
-		BinaryDataStreamFile s("../data/tum/fr1_desk.sensor", false);
+		//BinaryDataStreamFile s("../data/tum/fr1_desk.sensor", false);
+		BinaryDataStreamFile s("../data/tum/fr3_office_depth.sensor", false);
 		s >> cs;
 		s.closeStream();
 		BinaryDataStreamFile o("debug/ref_" + which + ".bin", true);
@@ -1548,7 +1599,7 @@ void TestMatching::testGlobalDense()
 	const std::string siftFile = "debug/" + which + ".sift";
 	const std::string cacheFile = "debug/" + which + ".cache";
 	//const std::string trajFile = "debug/sift_" + which + ".bin";
-	const std::string trajFile = "debug/fr1_desk.trajectory";
+	const std::string trajFile = "debug/opt_" + which + ".bin";
 	const std::string refTrajFile = "debug/ref_" + which + ".bin";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 
@@ -1579,7 +1630,7 @@ void TestMatching::testGlobalDense()
 	std::cout << "loading cache from file... ";
 	cudaCache.loadFromFile(cacheFile);
 	std::cout << "done" << std::endl;
-	cudaCache.reFilterCachedIntensityFrames(GlobalBundlingState::get().s_colorDownSigma);
+	cudaCache.reFilterCachedFrames(GlobalBundlingState::get().s_colorDownSigma, GlobalBundlingState::get().s_depthDownSigmaD, GlobalBundlingState::get().s_depthDownSigmaR);
 	const unsigned int numImages = m_siftManager->getNumImages();
 	MLIB_ASSERT(refTrajectoryKeys.size() == numImages);
 
@@ -1595,22 +1646,22 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 2;
+	const unsigned int maxNumOutIts = 8;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 100;
 	const bool useVerify = true;
 	const bool isLocal = false;
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
-	//std::vector<float> weightsSparse(maxNumIters, 0.0f);
-	std::vector<float> weightsSparse(maxNumIters, 1.0f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	std::vector<float> weightsSparse(maxNumIters, 0.0f);
+	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.1f);  //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.1f);  //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 
 	//std::vector<float> weightsDenseDepthEnd(maxNumIters, 3.0f);
 	//std::vector<float> weightsDenseColorEnd(maxNumIters, 2.0f);
@@ -1685,16 +1736,16 @@ void TestMatching::testGlobalDense()
 		std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
 		std::cout << std::endl;
 	}
-	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor, true); //some dense color
-	for (unsigned int i = 0; i < maxNumOutIts; i++) {
-		bool remove = false;//(i % numPerRemove) == (numPerRemove - 1);
-		sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, remove, false);
+	//sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor, true); //some dense color
+	//for (unsigned int i = 0; i < maxNumOutIts; i++) {
+	//	bool remove = false;//(i % numPerRemove) == (numPerRemove - 1);
+	//	sba.align(m_siftManager, &cudaCache, d_transforms, maxNumIters, numPCGIts, useVerify, isLocal, false, true, remove, false);
 
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
-		std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
-		std::cout << std::endl;
-	}
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+	//	float transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+	//	std::cout << "[ ate rmse = " << transErr << " ]" << std::endl;
+	//	std::cout << std::endl;
+	//}
 
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
 	//SiftVisualization::saveToPointCloud("debug/opt.ply", &cudaCache, trajectoryKeys, true);
@@ -1712,41 +1763,6 @@ void TestMatching::testGlobalDense()
 	PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryKeys);
 
 	int a = 5;
-}
-
-void TestMatching::saveCacheFramesToSensorFile(const std::string& filename) const
-{
-	if (m_cachedFrames.empty()) {
-		std::cout << "no cached frames to save!" << std::endl;
-		return;
-	}
-
-	CalibratedSensorData cs;
-	cs.m_DepthImageWidth = GlobalBundlingState::get().s_downsampledWidth;
-	cs.m_DepthImageHeight = GlobalBundlingState::get().s_downsampledHeight;
-	cs.m_ColorImageWidth = cs.m_DepthImageWidth;
-	cs.m_ColorImageHeight = cs.m_DepthImageHeight;
-	cs.m_CalibrationColor.setMatrices(m_intrinsicsDownsampled, mat4f::identity());
-	cs.m_CalibrationDepth.setMatrices(m_intrinsicsDownsampled, mat4f::identity());
-
-	//actual 
-	ColorImageR8G8B8A8 tmpColor(cs.m_ColorImageWidth, cs.m_ColorImageHeight);
-	for (unsigned int i = 0; i < m_cachedFrames.size(); i++) {
-		float* depth = new float[cs.m_DepthImageWidth * cs.m_DepthImageHeight];
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depth, m_cachedFrames[i].d_depthDownsampled, sizeof(float)*cs.m_DepthImageWidth*cs.m_DepthImageHeight, cudaMemcpyDeviceToHost));
-		vec4uc* color = new vec4uc[cs.m_ColorImageWidth * cs.m_ColorImageHeight];
-		m_colorImages[i].subSample(cs.m_ColorImageWidth, cs.m_ColorImageHeight, tmpColor);
-		memcpy(color, tmpColor.getPointer(), sizeof(vec4uc)*cs.m_ColorImageWidth*cs.m_ColorImageHeight);
-
-		cs.m_DepthImages.push_back(depth);
-		cs.m_ColorImages.push_back(color);
-	}
-	cs.m_DepthNumFrames = (unsigned int)cs.m_DepthImages.size();
-	cs.m_ColorNumFrames = (unsigned int)cs.m_ColorImages.size();
-
-	BinaryDataStreamFile s(filename, true);
-	s << cs;
-	s.closeStream();
 }
 
 void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll)
@@ -1769,64 +1785,116 @@ void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector
 	PoseHelper::saveToPoseFile("debug/optAll.txt", transforms);
 }
 
-void TestMatching::trajDEBUG() const
+void TestMatching::compareDEBUG()
 {
-	const std::string which = "liv1"; //"liv2clean"
-
-	const std::string siftFile = "debug/" + which + ".sift";
-	const std::string cacheFile = "debug/" + which + ".cache";
-	const std::string trajFile = "debug/sift_" + which + ".bin";
-	const std::string refTrajFile = "debug/ref_" + which + ".bin";
-	if (!(util::fileExists(siftFile) && util::fileExists(cacheFile) && util::fileExists(trajFile) && util::fileExists(refTrajFile))) {
-		std::cerr << "ERROR: files for " << which << " do not exist" << std::endl;
-		getchar();
-	}
-
+	const std::string& ref = "fr3_office_sparse";
+	const std::string& test = "fr3_office";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
-	std::vector<mat4f> trajectoryAll, refTrajectoryAll;
+	//trajectories
+	std::vector<mat4f> optTrajectoryRef, optTrajectoryTest, referenceTrajectory;
 	{
-		BinaryDataStreamFile s(trajFile, false);
-		s >> trajectoryAll;
+		BinaryDataStreamFile s("debug/opt_" + ref + ".bin", false);
+		s >> optTrajectoryRef;
 	}
 	{
-		BinaryDataStreamFile s(refTrajFile, false);
-		s >> refTrajectoryAll;
-		mat4f refOffset = refTrajectoryAll.front().getInverse();
-		for (unsigned int i = 0; i < refTrajectoryAll.size(); i++) refTrajectoryAll[i] = refOffset * refTrajectoryAll[i];
+		BinaryDataStreamFile s("debug/ref_fr3_office.bin", false);
+		s >> referenceTrajectory;
 	}
-	size_t numTransforms = math::min(trajectoryAll.size(), refTrajectoryAll.size());
-	if (trajectoryAll.size() > numTransforms) trajectoryAll.resize(numTransforms);
-	if (refTrajectoryAll.size() > numTransforms) refTrajectoryAll.resize(numTransforms);
-
-	float transErr = PoseHelper::evaluateAteRmse(trajectoryAll, refTrajectoryAll);
-	std::cout << "[ all ] ate rmse = " << transErr << std::endl;
-	//PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryAll);
-	//PoseHelper::saveToPoseFile("debug/ref.txt", refTrajectoryAll);
-}
-
-void TestMatching::runLocalOpts()
-{
-	const std::string inputFile = "../data/tum/fr1_desk.sensor";
-	CalibratedSensorData cs; std::vector<mat4f> referenceTrajectory;
 	{
-		BinaryDataStreamFile s(inputFile, false);
-		s >> cs;
+		BinaryDataStreamFile s("debug/opt_" + test + ".bin", false);
+		s >> optTrajectoryTest;
 	}
-	referenceTrajectory = cs.m_trajectory;
-	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 
-	// run all local opts
-	std::vector<float> localErrors;
-	for (unsigned int f = 0; f < cs.m_ColorNumFrames; f+=submapSize) {
-		const unsigned int numImages = std::min(submapSize + 1, cs.m_ColorNumFrames - submapSize * f);
-		if (numImages < 2) break;
+	SIFTImageManager siftManagerTest(GlobalBundlingState::get().s_submapSize, GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
 
-		// cs data
-		for (unsigned int i = f * submapSize; i < f * submapSize + numImages; i++) {
+	std::cout << "loading sift from file... ";
+	m_siftManager->loadFromFile("debug/" + ref + ".sift");
+	siftManagerTest.loadFromFile("debug/" + test + ".sift");
+	std::cout << "done" << std::endl;
 
+	const unsigned int numImages = m_siftManager->getNumImages();
+	std::cout << "[ #images = " << numImages << " ]" << std::endl;
+	std::cout << "#correspondences reference = " << m_siftManager->getNumGlobalCorrespondences() << std::endl;
+	std::cout << "#correspondences test = " << siftManagerTest.getNumGlobalCorrespondences() << std::endl;
+
+	//stats for correspondences
+	std::vector<EntryJ> refCorr(m_siftManager->getNumGlobalCorrespondences());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(refCorr.data(), m_siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ) * refCorr.size(), cudaMemcpyDeviceToHost));
+	std::vector<EntryJ> testCorr(siftManagerTest.getNumGlobalCorrespondences());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(testCorr.data(), siftManagerTest.getGlobalCorrespondencesDEBUG(), sizeof(EntryJ) * testCorr.size(), cudaMemcpyDeviceToHost));
+
+	std::vector<unsigned int> numCorrPerImageRef(numImages), numCorrPerImageTest(numImages);
+	for (unsigned int i = 0; i < refCorr.size(); i++) {
+		const EntryJ& corr = refCorr[i];
+		if (corr.isValid()) {
+			numCorrPerImageRef[corr.imgIdx_i]++;
+			numCorrPerImageRef[corr.imgIdx_j]++;
 		}
 	}
+	for (unsigned int i = 0; i < testCorr.size(); i++) {
+		const EntryJ& corr = testCorr[i];
+		if (corr.isValid()) {
+			numCorrPerImageTest[corr.imgIdx_i]++;
+			numCorrPerImageTest[corr.imgIdx_j]++;
+		}
+	}
+	std::vector<mat4f> optKeysRef, refKeys, optKeysTest; 
+	size_t numTransforms = math::min(math::min(optTrajectoryRef.size(), referenceTrajectory.size()), optTrajectoryTest.size());
+	for (unsigned int i = 0; i < numTransforms; i += submapSize) {
+		optKeysRef.push_back(optTrajectoryRef[i]);
+		optKeysTest.push_back(optTrajectoryTest[i]);
+		refKeys.push_back(referenceTrajectory[i]);
+	}
+	std::vector<std::pair<unsigned int, float>> err2PerImageRef = PoseHelper::evaluateErr2PerImage(optKeysRef, refKeys);
+	std::vector<std::pair<unsigned int, float>> err2PerImageTest = PoseHelper::evaluateErr2PerImage(optKeysTest, refKeys);
+
+	std::vector<unsigned int> numKeysRef(numImages), numKeysTest(numImages);
+	for (unsigned int i = 0; i < numImages; i++) {
+		numKeysRef[i] = m_siftManager->getNumKeyPointsPerImage(i);
+		numKeysTest[i] = siftManagerTest.getNumKeyPointsPerImage(i);
+	}
+
+	{
+		std::ofstream s("debug/statsRef.txt");
+		s << "ref" << std::endl;
+		s << "image\terror2\t#corr\t#keys" << std::endl;
+		for (unsigned int i = 0; i < err2PerImageRef.size(); i++)
+			s << err2PerImageRef[i].first << "\t" << err2PerImageRef[i].second << "\t" << numCorrPerImageRef[err2PerImageRef[i].first] << "\t" << numKeysRef[err2PerImageRef[i].first] << std::endl;
+		s.close();
+	}
+	{
+		std::ofstream s("debug/statsTest.txt");
+		s << "test" << std::endl;
+		s << "image\terror2\t#corr\t#keys" << std::endl;
+		for (unsigned int i = 0; i < err2PerImageTest.size(); i++)
+			s << err2PerImageTest[i].first << "\t" << err2PerImageTest[i].second << "\t" << numCorrPerImageTest[err2PerImageTest[i].first] << "\t" << numKeysTest[err2PerImageTest[i].first] << std::endl;
+		s.close();
+	}
 }
+
+//void TestMatching::runLocalOpts()
+//{
+//	const std::string inputFile = "../data/tum/fr1_desk.sensor";
+//	CalibratedSensorData cs; std::vector<mat4f> referenceTrajectory;
+//	{
+//		BinaryDataStreamFile s(inputFile, false);
+//		s >> cs;
+//	}
+//	referenceTrajectory = cs.m_trajectory;
+//	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
+//
+//	// run all local opts
+//	std::vector<float> localErrors;
+//	for (unsigned int f = 0; f < cs.m_ColorNumFrames; f+=submapSize) {
+//		const unsigned int numImages = std::min(submapSize + 1, cs.m_ColorNumFrames - submapSize * f);
+//		if (numImages < 2) break;
+//
+//		// cs data
+//		for (unsigned int i = f * submapSize; i < f * submapSize + numImages; i++) {
+//
+//		}
+//	}
+//}
 
 
 

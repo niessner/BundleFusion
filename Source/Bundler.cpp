@@ -86,7 +86,7 @@ void Bundler::processInput()
 				//std::cout << "waiting..." << std::endl;
 				//getchar();
 #endif
-				//GlobalBundlingState::get().s_numOptPerResidualRemoval = 1; //!!!debugging
+				//m_SubmapManager.setNumOptPerResidualRemoval(100); //!!!debugging
 			}
 			framePastLast++;
 		}

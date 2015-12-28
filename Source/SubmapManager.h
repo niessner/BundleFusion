@@ -162,6 +162,7 @@ public:
 	}
 		//TODO fix this hack
 	void setEndSolveGlobalDenseWeights();
+	void setNumOptPerResidualRemoval(unsigned int n) { m_numOptPerResidualRemoval = n; }
 
 
 private:
