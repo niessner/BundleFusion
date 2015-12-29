@@ -220,6 +220,8 @@ public:
 	void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
 		const std::vector<float*>& depthFrames, unsigned int depthWidth, unsigned int depthHeight,
 		const float4x4& colorIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const;
+	void computeTracks(const std::vector<EntryJ>& correspondences, const std::vector<uint2>& correspondenceKeyIndices,
+		std::vector< std::vector<std::pair<uint2, float3>> >& tracks) const;
 
 	static void TestSVDDebugCU(const float3x3& m);
 

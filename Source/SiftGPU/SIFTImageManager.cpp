@@ -365,8 +365,90 @@ void SIFTImageManager::initializeMatching()
 	}
 }
 
+void findTrack(const std::vector< std::vector<std::pair<uint2, float3>> >& corrPerKey, std::vector<bool>& marker, std::vector<std::pair<uint2, float3>>& track, unsigned int curKey)
+{
+	for (unsigned int i = 0; i < corrPerKey[curKey].size(); i++) {
+		const auto& c = corrPerKey[curKey][i];
+		if (!marker[c.first.y]) { //not assigned to a track already
+			track.push_back(c);
+			marker[c.first.y] = true;
+			findTrack(corrPerKey, marker, track, c.first.y);
+		}
+	}
+}
+
+void SIFTImageManager::computeTracks(const std::vector<EntryJ>& correspondences, const std::vector<uint2>& correspondenceKeyIndices,
+	std::vector< std::vector<std::pair<uint2, float3>> >& tracks) const {
+	tracks.clear();
+	const unsigned int numImages = getNumImages();
+	std::vector< std::vector<std::pair<uint2, float3>> > corrPerKey(m_numKeyPoints); //(image,keyIndex)
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (corr.isValid() && corr.imgIdx_j) {
+			const uint2& keyIndices = correspondenceKeyIndices[i];
+			corrPerKey[keyIndices.x].push_back(std::make_pair(make_uint2(corr.imgIdx_j, keyIndices.y), corr.pos_j));
+			corrPerKey[keyIndices.y].push_back(std::make_pair(make_uint2(corr.imgIdx_i, keyIndices.x), corr.pos_i));
+		}
+	}
+
+	std::vector<bool> marker(m_numKeyPoints, false);
+	for (unsigned int i = 0; i < numImages; i++) {
+		for (unsigned int k = 0; k < m_numKeyPointsPerImage[i]; k++) {
+			std::vector<std::pair<uint2, float3>> track;
+			findTrack(corrPerKey, marker, track, m_numKeyPointsPerImagePrefixSum[i] + k);
+			if (!track.empty()) tracks.push_back(track);
+		}
+	}
+}
+
 //void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
-//	const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& colorIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const
+//	const std::vector<float*>& depthFrames, unsigned int depthWidth, unsigned int depthHeight,
+//	const float4x4& colorIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const
+//{
+//	//const unsigned int overlapImageIndex = getNumImages() - 1; // overlap frame
+//
+//	std::vector<EntryJ> correspondences(m_globNumResiduals);
+//	cutilSafeCall(cudaMemcpy(correspondences.data(), d_globMatches, sizeof(EntryJ) * m_globNumResiduals, cudaMemcpyDeviceToHost));
+//	std::vector<uint2> correspondenceKeyIndices(m_globNumResiduals);
+//	cutilSafeCall(cudaMemcpy(correspondenceKeyIndices.data(), d_globMatchesKeyPointIndices, sizeof(uint2) * m_globNumResiduals, cudaMemcpyDeviceToHost));
+//	std::vector<float4x4> transforms(getNumImages());
+//	cutilSafeCall(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*transforms.size(), cudaMemcpyDeviceToHost));
+//
+//	std::vector<SIFTKeyPoint> allKeys;
+//	getSIFTKeyPointsDEBUG(allKeys);
+//	std::vector<SIFTKeyPointDesc> allDesc;
+//	getSIFTKeyPointDescsDEBUG(allDesc);
+//
+//	std::vector<SIFTKeyPoint> curKeys;	std::vector<SIFTKeyPointDesc> curDesc;
+//
+//	std::vector< std::vector<std::pair<uint2, float3>> > tracks;
+//	computeTracks(correspondences, correspondenceKeyIndices, tracks);
+//	for (unsigned int t = 0; t < tracks.size(); t++) {
+//		const auto& repKey = tracks[t].front(); //arbitrarily pick a key for the descriptor
+//		float3 pos = make_float3(0.0f); unsigned int num = 0;
+//		for (unsigned int i = 0; i < tracks[t].size(); i++) {
+//			pos += transforms[tracks[t][i].first.x] * tracks[t][i].second;
+//			num++;
+//		}
+//		pos /= (float)num; //average track locations
+//		//project to first frame
+//		pos = colorIntrinsics * pos;
+//		float2 loc = make_float2(pos.x / pos.z, pos.y / pos.z);
+//		SIFTKeyPoint key;
+//		key.pos = loc;
+//		key.scale = allKeys[repKey.first.y].scale;
+//		key.depth = pos.z;
+//		curKeys.push_back(key);
+//		// desc
+//		curDesc.push_back(allDesc[repKey.first.y]);
+//	} // track
+//
+//	unsigned int numKeys = (unsigned int)curKeys.size();
+//	SIFTImageGPU& cur = global->createSIFTImageGPU();
+//	cutilSafeCall(cudaMemcpy(cur.d_keyPoints, curKeys.data(), sizeof(SIFTKeyPoint) * numKeys, cudaMemcpyHostToDevice));
+//	cutilSafeCall(cudaMemcpy(cur.d_keyPointDescs, curDesc.data(), sizeof(SIFTKeyPointDesc) * numKeys, cudaMemcpyHostToDevice));
+//	global->finalizeSIFTImageGPU(numKeys);
+//}
 void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
 	const std::vector<float*>& depthFrames, unsigned int depthWidth, unsigned int depthHeight,
 	const float4x4& colorIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const

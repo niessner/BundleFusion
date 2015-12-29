@@ -7,8 +7,8 @@ typedef ml::vec6f Pose;
 
 namespace PoseHelper {
 
-	static float evaluateAteRmse(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory) {
-		size_t numTransforms = math::min(trajectory.size(), referenceTrajectory.size());
+	static float evaluateAteRmse(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory, unsigned int numTransforms = (unsigned int)-1) {
+		if (numTransforms == (unsigned int)-1) numTransforms = (unsigned int)math::min(trajectory.size(), referenceTrajectory.size());
 		if (numTransforms < 3) {
 			std::cout << "cannot evaluate with < 3 transforms" << std::endl;
 			if (numTransforms == 2) {

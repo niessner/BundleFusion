@@ -8,6 +8,7 @@ class CUDAImageManager;
 
 class SiftVisualization {
 public:
+	static void printKey(const std::string& filename, const CUDACache* cudaCache, const SIFTImageManager* siftManager, unsigned int frame);
 	static void printKey(const std::string& filename, const ColorImageR8G8B8A8& image, const SIFTImageManager* siftManager, unsigned int frame);
 	static void printKey(const std::string& filename, CUDAImageManager* cudaImageManager, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame);
 

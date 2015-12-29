@@ -443,8 +443,8 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		//m_SubmapManager.optLocal->unlock();
 		mutex_nextLocal.unlock();
 
-		//unsigned int gframe = (unsigned int)global->getNumImages() - 1;
-		//printKey("debug/keys/" + std::to_string(gframe) + ".png", gframe*submapSize, global, gframe);
+		//unsigned int gframe = (unsigned int)m_global->getNumImages() - 1;
+		//SiftVisualization::printKey("debug/keys/" + std::to_string(gframe) + ".png", m_globalCache, m_global, gframe);
 
 		// match with every other global
 		if (m_global->getNumImages() > 1) {

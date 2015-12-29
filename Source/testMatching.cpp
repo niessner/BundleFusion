@@ -1787,8 +1787,8 @@ void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector
 
 void TestMatching::compareDEBUG()
 {
-	const std::string& ref = "fr3_office_sparse";
-	const std::string& test = "fr3_office";
+	const std::string& ref = "liv2_sd";
+	const std::string& test = "liv2_sdT";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	//trajectories
 	std::vector<mat4f> optTrajectoryRef, optTrajectoryTest, referenceTrajectory;
@@ -1797,7 +1797,7 @@ void TestMatching::compareDEBUG()
 		s >> optTrajectoryRef;
 	}
 	{
-		BinaryDataStreamFile s("debug/ref_fr3_office.bin", false);
+		BinaryDataStreamFile s("debug/ref_liv2.bin", false);
 		s >> referenceTrajectory;
 	}
 	{
@@ -1823,21 +1823,50 @@ void TestMatching::compareDEBUG()
 	std::vector<EntryJ> testCorr(siftManagerTest.getNumGlobalCorrespondences());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(testCorr.data(), siftManagerTest.getGlobalCorrespondencesDEBUG(), sizeof(EntryJ) * testCorr.size(), cudaMemcpyDeviceToHost));
 
-	std::vector<unsigned int> numCorrPerImageRef(numImages), numCorrPerImageTest(numImages);
+	std::vector<unsigned int> numImCorrPerImageRef(numImages), numImCorrPerImageTest(numImages);	
+	std::vector< std::vector<bool> > markers(numImages); for (unsigned int i = 0; i < numImages; i++) markers[i].resize(numImages, false);
 	for (unsigned int i = 0; i < refCorr.size(); i++) {
 		const EntryJ& corr = refCorr[i];
 		if (corr.isValid()) {
-			numCorrPerImageRef[corr.imgIdx_i]++;
-			numCorrPerImageRef[corr.imgIdx_j]++;
+			if (!markers[corr.imgIdx_i][corr.imgIdx_j]) {
+				numImCorrPerImageRef[corr.imgIdx_i]++;
+				markers[corr.imgIdx_i][corr.imgIdx_j] = true;
+			}
+			if (!markers[corr.imgIdx_j][corr.imgIdx_i]) {
+				numImCorrPerImageRef[corr.imgIdx_j]++;
+				markers[corr.imgIdx_j][corr.imgIdx_i] = true;
+			}
 		}
 	}
+	markers.clear(); markers.resize(numImages); for (unsigned int i = 0; i < numImages; i++) markers[i].resize(numImages, false);
 	for (unsigned int i = 0; i < testCorr.size(); i++) {
 		const EntryJ& corr = testCorr[i];
 		if (corr.isValid()) {
-			numCorrPerImageTest[corr.imgIdx_i]++;
-			numCorrPerImageTest[corr.imgIdx_j]++;
+			if (!markers[corr.imgIdx_i][corr.imgIdx_j]) {
+				numImCorrPerImageTest[corr.imgIdx_i]++;
+				markers[corr.imgIdx_i][corr.imgIdx_j] = true;
+			}
+			if (!markers[corr.imgIdx_j][corr.imgIdx_i]) {
+				numImCorrPerImageTest[corr.imgIdx_j]++;
+				markers[corr.imgIdx_j][corr.imgIdx_i] = true;
+			}
 		}
 	}
+	//std::vector<unsigned int> numCorrPerImageRef(numImages), numCorrPerImageTest(numImages);
+	//for (unsigned int i = 0; i < refCorr.size(); i++) {
+	//	const EntryJ& corr = refCorr[i];
+	//	if (corr.isValid()) {
+	//		numCorrPerImageRef[corr.imgIdx_i]++;
+	//		numCorrPerImageRef[corr.imgIdx_j]++;
+	//	}
+	//}
+	//for (unsigned int i = 0; i < testCorr.size(); i++) {
+	//	const EntryJ& corr = testCorr[i];
+	//	if (corr.isValid()) {
+	//		numCorrPerImageTest[corr.imgIdx_i]++;
+	//		numCorrPerImageTest[corr.imgIdx_j]++;
+	//	}
+	//}
 	std::vector<mat4f> optKeysRef, refKeys, optKeysTest; 
 	size_t numTransforms = math::min(math::min(optTrajectoryRef.size(), referenceTrajectory.size()), optTrajectoryTest.size());
 	for (unsigned int i = 0; i < numTransforms; i += submapSize) {
@@ -1854,20 +1883,35 @@ void TestMatching::compareDEBUG()
 		numKeysTest[i] = siftManagerTest.getNumKeyPointsPerImage(i);
 	}
 
+	std::vector<float> errPerKeyRef(numImages, 0.0f), errPerKeyTest(numImages, 0.0f);
+	for (unsigned int i = 3; i < optKeysRef.size(); i++) {
+		errPerKeyRef[i] = PoseHelper::evaluateAteRmse(optKeysRef, refKeys, i);
+		errPerKeyTest[i] = PoseHelper::evaluateAteRmse(optKeysTest, refKeys, i);
+	}
+
+	float totalErrRef = PoseHelper::evaluateAteRmse(optTrajectoryRef, referenceTrajectory);
+	float totalErrTest = PoseHelper::evaluateAteRmse(optTrajectoryTest, referenceTrajectory);
+	float keysErrRef = PoseHelper::evaluateAteRmse(optKeysRef, refKeys);
+	float keysErrTest = PoseHelper::evaluateAteRmse(optKeysTest, refKeys);
+	std::cout << "total error sparse = " << totalErrRef << std::endl;
+	std::cout << "keys error sparse = " << keysErrRef << std::endl;
+	std::cout << std::endl;
+	std::cout << "total error sparse/dense = " << totalErrTest << std::endl;
+	std::cout << "keys error sparse/dense = " << keysErrTest << std::endl;
 	{
 		std::ofstream s("debug/statsRef.txt");
 		s << "ref" << std::endl;
-		s << "image\terror2\t#corr\t#keys" << std::endl;
+		s << "image\terror2\t#corr\t#keys\terr per key" << std::endl;
 		for (unsigned int i = 0; i < err2PerImageRef.size(); i++)
-			s << err2PerImageRef[i].first << "\t" << err2PerImageRef[i].second << "\t" << numCorrPerImageRef[err2PerImageRef[i].first] << "\t" << numKeysRef[err2PerImageRef[i].first] << std::endl;
+			s << err2PerImageRef[i].first << "\t" << err2PerImageRef[i].second << "\t" << numImCorrPerImageRef[err2PerImageRef[i].first] << "\t" << numKeysRef[err2PerImageRef[i].first] << "\t" << errPerKeyRef[err2PerImageRef[i].first] << std::endl;
 		s.close();
 	}
 	{
 		std::ofstream s("debug/statsTest.txt");
 		s << "test" << std::endl;
-		s << "image\terror2\t#corr\t#keys" << std::endl;
+		s << "image\terror2\t#corr\t#keys\terr per key" << std::endl;
 		for (unsigned int i = 0; i < err2PerImageTest.size(); i++)
-			s << err2PerImageTest[i].first << "\t" << err2PerImageTest[i].second << "\t" << numCorrPerImageTest[err2PerImageTest[i].first] << "\t" << numKeysTest[err2PerImageTest[i].first] << std::endl;
+			s << err2PerImageTest[i].first << "\t" << err2PerImageTest[i].second << "\t" << numImCorrPerImageTest[err2PerImageTest[i].first] << "\t" << numKeysTest[err2PerImageTest[i].first] << "\t" << errPerKeyTest[err2PerImageTest[i].first] << std::endl;
 		s.close();
 	}
 }

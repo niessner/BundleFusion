@@ -71,10 +71,10 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (isLocal) {
 		weightsSparse = m_localWeightsSparse;
 		usePairwise = m_bUseLocalDensePairwise; 
-		//cache = NULL; //to turn off
-		//weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
-		weightsDenseDepth = m_localWeightsDenseDepth; //turn on
-		weightsDenseColor = m_localWeightsDenseColor;
+		cache = NULL; //to turn off
+		weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
+		//weightsDenseDepth = m_localWeightsDenseDepth; //turn on
+		//weightsDenseColor = m_localWeightsDenseColor;
 	}
 	else {
 		usePairwise = true; //always global dense pairwise

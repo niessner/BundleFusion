@@ -44,44 +44,44 @@ void BinaryDumpReader::createFirstConnected()
 	std::cout << m_data << std::endl;
 
 	//fr1
-	//m_data.m_CalibrationDepth.m_Intrinsic = mat4f(
-	//	591.1f, 0.0f, 319.5f, 0.0f,
-	//	0.0f, 590.1f, 239.5f, 0.0f,
-	//	0.0f, 0.0f, 331.0f, 0.0f,
-	//	0.0f, 0.0f, 0.0f, 234.0f);
-	//m_data.m_CalibrationDepth.m_IntrinsicInverse = m_data.m_CalibrationDepth.m_Intrinsic.getInverse();
-	//m_data.m_CalibrationColor.m_Intrinsic = mat4f(
-	//	517.3f, 0.0f, 319.5f, 0.0f,
-	//	0.0f, 516.5f, 239.5f, 0.0f,
-	//	0.0f, 0.0f, 318.6f, 0.0f,
-	//	0.0f, 0.0f, 0.0f, 255.3f);
-	//m_data.m_CalibrationColor.m_IntrinsicInverse = m_data.m_CalibrationColor.m_Intrinsic.getInverse();
+	m_data.m_CalibrationDepth.m_Intrinsic = mat4f(
+		591.1f, 0.0f, 331.0f, 0.0f,
+		0.0f, 590.1f, 234.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f);
+	m_data.m_CalibrationDepth.m_IntrinsicInverse = m_data.m_CalibrationDepth.m_Intrinsic.getInverse();
+	m_data.m_CalibrationColor.m_Intrinsic = mat4f(
+		517.3f, 0.0f, 318.6f, 0.0f,
+		0.0f, 516.5f, 255.3f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f);
+	m_data.m_CalibrationColor.m_IntrinsicInverse = m_data.m_CalibrationColor.m_Intrinsic.getInverse();
 	//fr2
-	//m_data.m_CalibrationDepth.m_Intrinsic =mat4f(		// fr2 
-	//	580.8f, 0.0f, 319.5f, 0.0f,
-	//	0.0f, 581.8f, 239.5f, 0.0f,
-	//	0.0f, 0.0f, 308.8f, 0.0f,
-	//	0.0f, 0.0f, 0.0f, 253.0f);
+	//m_data.m_CalibrationDepth.m_Intrinsic = mat4f(		// fr2 
+	//	580.8f, 0.0f, 308.8f, 0.0f,
+	//	0.0f, 581.8f, 253.0f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f);
 	//m_data.m_CalibrationDepth.m_IntrinsicInverse = m_data.m_CalibrationDepth.m_Intrinsic.getInverse();
 	//m_data.m_CalibrationColor.m_Intrinsic = mat4f(		// fr2 
-	//	520.9f, 0.0f, 319.5f, 0.0f,
-	//	0.0f, 521.0f, 239.5f, 0.0f,
-	//	0.0f, 0.0f, 325.1f, 0.0f,
-	//	0.0f, 0.0f, 0.0f, 249.7f);
+	//	520.9f, 0.0f, 325.1f, 0.0f,
+	//	0.0f, 521.0f, 249.7f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f);
 	//m_data.m_CalibrationColor.m_IntrinsicInverse = m_data.m_CalibrationColor.m_Intrinsic.getInverse();
 	//fr3
-	m_data.m_CalibrationDepth.m_Intrinsic = mat4f(		// fr3 
-		567.6f, 0.0f, 319.5f, 0.0f,
-		0.0f, 570.2f, 239.5f, 0.0f,
-		0.0f, 0.0f, 324.7f, 0.0f,
-		0.0f, 0.0f, 0.0f, 250.1f);
-	m_data.m_CalibrationDepth.m_IntrinsicInverse = m_data.m_CalibrationDepth.m_Intrinsic.getInverse();
-	m_data.m_CalibrationColor.m_Intrinsic = mat4f(		// fr3 
-		535.4f, 0.0f, 319.5f, 0.0f,
-		0.0f, 539.2f, 239.5f, 0.0f,
-		0.0f, 0.0f, 320.1f, 0.0f,
-		0.0f, 0.0f, 0.0f, 247.6f);
-	m_data.m_CalibrationColor.m_IntrinsicInverse = m_data.m_CalibrationColor.m_Intrinsic.getInverse();
+	//m_data.m_CalibrationDepth.m_Intrinsic = mat4f(		// fr3 
+	//	567.6f, 0.0f, 324.7f, 0.0f,
+	//	0.0f, 570.2f, 250.1f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f);
+	//m_data.m_CalibrationDepth.m_IntrinsicInverse = m_data.m_CalibrationDepth.m_Intrinsic.getInverse();
+	//m_data.m_CalibrationColor.m_Intrinsic = mat4f(		// fr3 
+	//	535.4f, 0.0f, 320.1f, 0.0f,
+	//	0.0f, 539.2f, 247.6f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f);
+	//m_data.m_CalibrationColor.m_IntrinsicInverse = m_data.m_CalibrationColor.m_Intrinsic.getInverse();
 
 	RGBDSensor::init(m_data.m_DepthImageWidth, m_data.m_DepthImageHeight, std::max(m_data.m_ColorImageWidth,1u), std::max(m_data.m_ColorImageHeight,1u), 1);
 	initializeDepthIntrinsics(m_data.m_CalibrationDepth.m_Intrinsic(0,0), m_data.m_CalibrationDepth.m_Intrinsic(1,1), m_data.m_CalibrationDepth.m_Intrinsic(0,2), m_data.m_CalibrationDepth.m_Intrinsic(1,2));

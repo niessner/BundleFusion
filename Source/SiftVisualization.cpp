@@ -6,6 +6,17 @@
 #include "CUDAImageManager.h"
 
 
+void SiftVisualization::printKey(const std::string& filename, const CUDACache* cudaCache, const SIFTImageManager* siftManager, unsigned int frame)
+{
+	const std::vector<CUDACachedFrame>& frames = cudaCache->getCacheFrames();
+	ColorImageR32 intensityImage(cudaCache->getWidth(), cudaCache->getHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getPointer(), frames[frame].d_intensityOrigDown, sizeof(float)*intensityImage.getNumPixels(), cudaMemcpyDeviceToHost));
+	ColorImageR8G8B8A8 image(intensityImage);
+	image.reSample(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
+
+	printKey(filename, image, siftManager, frame);
+}
+
 void SiftVisualization::printKey(const std::string& filename, CUDAImageManager* cudaImageManager, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame)
 {
 	//TODO get color cpu for these functions

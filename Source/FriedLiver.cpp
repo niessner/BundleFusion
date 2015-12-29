@@ -242,8 +242,8 @@ int main(int argc, char** argv)
 			//test.loadFromSensor("debug/fr1_desk/test.sensor", "", 1);
 			//test.runOpt();
 			//test.analyzeLocalOpts();
-			test.testGlobalDense();
-			//test.compareDEBUG();
+			//test.testGlobalDense();
+			test.compareDEBUG();
 
 			std::cout << "done!" << std::endl;
 			getchar();
