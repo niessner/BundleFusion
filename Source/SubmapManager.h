@@ -28,7 +28,7 @@ class SubmapManager {
 public:
 	SubmapManager();
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
-		unsigned int submapSize, const CUDAImageManager* imageManager, unsigned int numTotalFrames = (unsigned int)-1);
+		unsigned int submapSize, const CUDAImageManager* imageManager, const RGBDSensor* sensor, unsigned int numTotalFrames = (unsigned int)-1);
 
 	void setTotalNumFrames(unsigned int n) {
 		m_numTotalFrames = n;
@@ -83,9 +83,9 @@ public:
 	void getCacheIntrinsics(float4x4& intrinsics, float4x4& intrinsicsInv);
 
 	//! run sift for current local
-	unsigned int runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth,
+	unsigned int runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepthFilt,
 		unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor,
-		unsigned int colorWidth, unsigned int colorHeight);
+		unsigned int colorWidth, unsigned int colorHeight, const float* d_inputDepthRaw);
 	//! valid if at least frames 0, 1 valid
 	bool isCurrentLocalValidChunk();
 	unsigned int getNumNextLocalFrames();

@@ -164,9 +164,9 @@ public:
 		const unsigned int bufferDimDepthInput = m_RGBDSensor->getDepthWidth()*m_RGBDSensor->getDepthHeight();
 		const unsigned int bufferDimColorInput = m_RGBDSensor->getColorWidth()*m_RGBDSensor->getColorHeight();
 
-		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthInput, sizeof(float)*bufferDimDepthInput));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthInputRaw, sizeof(float)*bufferDimDepthInput));
+		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthInputFiltered, sizeof(float)*bufferDimDepthInput));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_colorInput, sizeof(uchar4)*bufferDimColorInput));
-		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthErodeHelper, sizeof(float)*bufferDimDepthInput));
 
 		m_currFrame = 0;
 
@@ -202,9 +202,9 @@ public:
 	~CUDAImageManager() {
 		reset();
 
-		MLIB_CUDA_SAFE_FREE(d_depthInput);
+		MLIB_CUDA_SAFE_FREE(d_depthInputRaw);
+		MLIB_CUDA_SAFE_FREE(d_depthInputFiltered);
 		MLIB_CUDA_SAFE_FREE(d_colorInput);
-		MLIB_CUDA_SAFE_FREE(d_depthErodeHelper);
 
 		ManagedRGBDInputFrame::globalFree();
 	}
@@ -218,8 +218,9 @@ public:
 
 	bool process();
 
-	void copyToBundling(float* d_depth, uchar4* d_color) {
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, d_depthInput, sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyDeviceToDevice));
+	void copyToBundling(float* d_depthRaw, float* d_depthFilt, uchar4* d_color) {
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depthRaw, d_depthInputRaw, sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyDeviceToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depthFilt, d_depthInputFiltered, sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyDeviceToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, d_colorInput, sizeof(uchar4)*m_RGBDSensor->getColorWidth()*m_RGBDSensor->getColorHeight(), cudaMemcpyDeviceToDevice));
 	}
 
@@ -311,10 +312,9 @@ private:
 	unsigned int m_heightIntegration;
 
 	//! temporary GPU storage for inputting the current frame
-	float*	d_depthInput;
+	float*	d_depthInputRaw;
 	uchar4*	d_colorInput;
-
-	float* d_depthErodeHelper;
+	float*	d_depthInputFiltered;
 
 	//! all image data on the GPU
 	//std::vector<CUDARGBDInputFrame>	m_data;

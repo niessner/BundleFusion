@@ -123,6 +123,39 @@ void CUDAImageUtil::resampleFloat(float* d_output, unsigned int outputWidth, uns
 #endif
 }
 
+__global__ void resampleFloat4_Kernel(float4* d_output, unsigned int outputWidth, unsigned int outputHeight, const float4* d_input, unsigned int inputWidth, unsigned int inputHeight)
+{
+	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x < outputWidth && y < outputHeight)
+	{
+		const float scaleWidth = (float)inputWidth / (float)outputWidth;
+		const float scaleHeight = (float)inputHeight / (float)outputHeight;
+
+		const unsigned int xInput = (unsigned int)(x*scaleWidth + 0.5f);
+		const unsigned int yInput = (unsigned int)(y*scaleHeight + 0.5f);
+
+		if (xInput < inputWidth && yInput < inputHeight) {
+			d_output[y*outputWidth + x] = d_input[yInput*inputWidth + xInput];
+			//d_output[y*outputWidth + x] = bilinearInterpolationFloat(x*scaleWidth, y*scaleHeight, d_input, inputWidth, inputHeight);
+		}
+	}
+}
+void CUDAImageUtil::resampleFloat4(float4* d_output, unsigned int outputWidth, unsigned int outputHeight, const float4* d_input, unsigned int inputWidth, unsigned int inputHeight) {
+
+	const dim3 gridSize((outputWidth + T_PER_BLOCK - 1) / T_PER_BLOCK, (outputHeight + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	resampleFloat4_Kernel << <gridSize, blockSize >> >(d_output, outputWidth, outputHeight, d_input, inputWidth, inputHeight);
+
+#ifdef _DEBUG
+	MLIB_CUDA_SAFE_CALL(cudaDeviceSynchronize());
+	MLIB_CUDA_CHECK_ERR(__FUNCTION__);
+#endif
+}
+
+
 
 __global__ void resampleUCHAR4_Kernel(uchar4* d_output, unsigned int outputWidth, unsigned int outputHeight, const uchar4* d_input, unsigned int inputWidth, unsigned int inputHeight)
 {
@@ -284,7 +317,7 @@ void CUDAImageUtil::computeIntensityDerivatives(float2* d_output, float* d_input
 // Convert Depth to Camera Space Positions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__global__ void convertDepthFloatToCameraSpaceFloat4_Kernel(float4* d_output, float* d_input, float4x4 intrinsicsInv, unsigned int width, unsigned int height)
+__global__ void convertDepthFloatToCameraSpaceFloat4_Kernel(float4* d_output, const float* d_input, float4x4 intrinsicsInv, unsigned int width, unsigned int height)
 {
 	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -303,7 +336,7 @@ __global__ void convertDepthFloatToCameraSpaceFloat4_Kernel(float4* d_output, fl
 	}
 }
 
-void CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(float4* d_output, float* d_input, const float4x4& intrinsicsInv, unsigned int width, unsigned int height)
+void CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(float4* d_output, const float* d_input, const float4x4& intrinsicsInv, unsigned int width, unsigned int height)
 {
 	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
@@ -321,7 +354,7 @@ void CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(float4* d_output, float
 // Compute Normal Map
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__global__ void computeNormals_Kernel(float4* d_output, float4* d_input, unsigned int width, unsigned int height)
+__global__ void computeNormals_Kernel(float4* d_output, const float4* d_input, unsigned int width, unsigned int height)
 {
 	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -351,7 +384,7 @@ __global__ void computeNormals_Kernel(float4* d_output, float4* d_input, unsigne
 	}
 }
 
-void CUDAImageUtil::computeNormals(float4* d_output, float4* d_input, unsigned int width, unsigned int height)
+void CUDAImageUtil::computeNormals(float4* d_output, const float4* d_input, unsigned int width, unsigned int height)
 {
 	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
@@ -496,7 +529,7 @@ void CUDAImageUtil::erodeDepthMap(float* d_output, float* d_input, int structure
 // Gauss Filter Float Map
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__global__ void gaussFilterDepthMapDevice(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+__global__ void gaussFilterDepthMapDevice(float* d_output, const float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
 {
 	const int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -536,7 +569,7 @@ __global__ void gaussFilterDepthMapDevice(float* d_output, float* d_input, float
 	if (sumWeight > 0.0f) d_output[y*width + x] = sum / sumWeight;
 }
 
-void CUDAImageUtil::gaussFilterDepthMap(float* d_output, float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+void CUDAImageUtil::gaussFilterDepthMap(float* d_output, const float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
 {
 	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
@@ -548,7 +581,7 @@ void CUDAImageUtil::gaussFilterDepthMap(float* d_output, float* d_input, float s
 #endif
 }
 
-__global__ void gaussFilterIntensityDevice(float* d_output, float* d_input, float sigmaD, unsigned int width, unsigned int height)
+__global__ void gaussFilterIntensityDevice(float* d_output, const float* d_input, float sigmaD, unsigned int width, unsigned int height)
 {
 	const int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -586,7 +619,7 @@ __global__ void gaussFilterIntensityDevice(float* d_output, float* d_input, floa
 	if (sumWeight > 0.0f) d_output[y*width + x] = sum / sumWeight;
 }
 
-void CUDAImageUtil::gaussFilterIntensity(float* d_output, float* d_input, float sigmaD, unsigned int width, unsigned int height)
+void CUDAImageUtil::gaussFilterIntensity(float* d_output, const float* d_input, float sigmaD, unsigned int width, unsigned int height)
 {
 	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);

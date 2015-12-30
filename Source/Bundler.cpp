@@ -31,7 +31,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 	m_submapSize = GlobalBundlingState::get().s_submapSize;
 	m_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, m_submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage,
-		m_submapSize, m_CudaImageManager);
+		m_submapSize, m_CudaImageManager, m_RGBDSensor);
 	//TODO fix
 	if (GlobalAppState::get().s_sensorIdx == 3) {
 		m_SubmapManager.setTotalNumFrames(((BinaryDumpReader*)m_RGBDSensor)->getNumTotalFrames());
@@ -99,8 +99,9 @@ void Bundler::processInput()
 
 	// run SIFT & process cuda cache
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
-	const unsigned int curLocalFrame = m_SubmapManager.runSIFT(curFrame, m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepth,
-		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
+	const unsigned int curLocalFrame = m_SubmapManager.runSIFT(curFrame, m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.d_inputDepthFilt,
+		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight,
+		m_bundlerInputData.d_inputDepthRaw);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = s_timer.getElapsedTimeMS(); }
 
 	// match with every other local
@@ -254,7 +255,7 @@ void Bundler::saveIntegrateTrajectory(const std::string& filename)
 
 void Bundler::getCurrentFrame()
 {
-	m_CudaImageManager->copyToBundling(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_inputColor);
+	m_CudaImageManager->copyToBundling(m_bundlerInputData.d_inputDepthRaw, m_bundlerInputData.d_inputDepthFilt, m_bundlerInputData.d_inputColor);
 	CUDAImageUtil::resampleToIntensity(m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT,
 		m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
 
@@ -273,12 +274,12 @@ void Bundler::getCurrentFrame()
 	//		}
 	//	}
 	//}
-	if (m_bundlerInputData.m_bFilterDepthValues) {
-		CUDAImageUtil::gaussFilterDepthMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth,
-			m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,
-			m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
-		std::swap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper);
-	}
+	//if (m_bundlerInputData.m_bFilterDepthValues) {
+	//	CUDAImageUtil::gaussFilterDepthMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepthFilt,
+	//		m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,
+	//		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
+	//	std::swap(m_bundlerInputData.d_inputDepthFilt, m_bundlerInputData.d_depthErodeHelper);
+	//}
 }
 
 void Bundler::saveDEBUG()

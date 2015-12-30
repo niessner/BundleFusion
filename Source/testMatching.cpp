@@ -769,10 +769,13 @@ void TestMatching::createCachedFrames()
 
 	allocCachedFrames((unsigned int)m_colorImages.size(), width, height);
 
-	float* d_depth = NULL; float* d_depthErodeHelper = NULL; uchar4* d_color = NULL; float* d_filterHelperDown = NULL;
+	float* d_depth = NULL; float* d_depthErodeHelper = NULL; uchar4* d_color = NULL;
+	float4* d_helperCamPos = NULL; float4* d_helperNormal = NULL; float* d_filterHelperDown = NULL;
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depth, sizeof(float) * m_widthDepth * m_heightDepth));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_color, sizeof(uchar4) * m_widthSift * m_heightSift));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthErodeHelper, sizeof(float) * m_widthDepth * m_heightDepth));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_helperCamPos, sizeof(float4) * m_widthDepth * m_heightDepth));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_helperNormal, sizeof(float4) * m_widthDepth * m_heightDepth));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filterHelperDown, sizeof(float) * width * height));
 
 	float intensityFilterSigma = GlobalBundlingState::get().s_colorDownSigma;
@@ -799,14 +802,20 @@ void TestMatching::createCachedFrames()
 			CUDAImageUtil::gaussFilterDepthMap(d_depthErodeHelper, d_depth, GlobalBundlingState::get().s_depthSigmaD, GlobalBundlingState::get().s_depthSigmaR, m_widthDepth, m_heightDepth);
 			std::swap(d_depth, d_depthErodeHelper);
 		}
-		if (erode) MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_depthImages[i].getPointer(), d_depth, sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost));
+		if (erode) MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_depthImages[i].getPointer(), d_depth, sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost)); //for vis only
 
 		CUDACachedFrame& frame = m_cachedFrames[i];
-		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 		if (depthFilterSigmaD > 0.0f) {
-			CUDAImageUtil::gaussFilterDepthMap(d_filterHelperDown, frame.d_depthDownsampled, depthFilterSigmaD, depthFilterSigmaR, width, height);
-			std::swap(frame.d_depthDownsampled, d_filterHelperDown);
+			CUDAImageUtil::gaussFilterDepthMap(d_depthErodeHelper, d_depth, depthFilterSigmaD, depthFilterSigmaR, m_widthDepth, m_heightDepth);
+			std::swap(d_depthErodeHelper, d_depth);
 		}
+		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(d_helperCamPos, d_depth, MatrixConversion::toCUDA(m_intrinsicsDownsampled.getInverse()), m_widthDepth, m_heightDepth);
+		CUDAImageUtil::resampleFloat4(frame.d_cameraposDownsampled, width, height, d_helperCamPos, m_widthDepth, m_heightDepth);
+
+		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
+		CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
+
+		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 		//CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, width, height, d_color, m_widthSift, m_heightSift);
 
 		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(frame.d_cameraposDownsampled, frame.d_depthDownsampled,
@@ -822,6 +831,8 @@ void TestMatching::createCachedFrames()
 	MLIB_CUDA_SAFE_FREE(d_depth);
 	MLIB_CUDA_SAFE_FREE(d_color);
 	MLIB_CUDA_SAFE_FREE(d_depthErodeHelper);
+	MLIB_CUDA_SAFE_FREE(d_helperCamPos);
+	MLIB_CUDA_SAFE_FREE(d_helperNormal);
 	MLIB_CUDA_SAFE_FREE(d_filterHelperDown);
 	std::cout << "done!" << std::endl;
 }
@@ -1249,7 +1260,7 @@ void TestMatching::runOpt()
 		//SiftVisualization::saveCamerasToPLY("debug/refCameras.ply", referenceTrajectory);
 	}
 	//create cache
-	CUDACache cudaCache(GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight, numImages, m_intrinsicsDownsampled);
+	CUDACache cudaCache(m_depthImages.front().getWidth(), m_depthImages.front().getHeight(), GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight, numImages, m_intrinsicsDownsampled);
 	cudaCache.setCachedFrames(m_cachedFrames);
 
 	//TODO incorporate valid images
@@ -1645,7 +1656,7 @@ void TestMatching::testGlobalDense()
 	std::cout << "loading sift from file... ";
 	m_siftManager->loadFromFile(siftFile);
 	std::cout << "done" << std::endl;
-	CUDACache cudaCache(GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight,
+	CUDACache cudaCache(640, 480, GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight,
 		GlobalBundlingState::get().s_maxNumImages, mat4f::identity());
 	std::cout << "loading cache from file... ";
 	cudaCache.loadFromFile(cacheFile);

@@ -49,7 +49,7 @@ void SubmapManager::initSIFT(unsigned int widthSift, unsigned int heightSift)
 }
 
 void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage, unsigned int submapSize,
-	const CUDAImageManager* imageManager, unsigned int numTotalFrames /*= (unsigned int)-1*/)
+	const CUDAImageManager* imageManager, const RGBDSensor* sensor, unsigned int numTotalFrames /*= (unsigned int)-1*/)
 {
 	initSIFT(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
@@ -57,19 +57,16 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, maxNumResiduals);
 
 	// cache
+	const unsigned int cacheInputWidth = sensor->getDepthWidth();
+	const unsigned int cacheInputHeight = sensor->getDepthHeight();
 	const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth;
 	const unsigned int downSampHeight = GlobalBundlingState::get().s_downsampledHeight;
 
-	const float scaleWidth = (float)downSampWidth / (float)imageManager->getIntegrationWidth();
-	const float scaleHeight = (float)downSampHeight / (float)imageManager->getIntegrationHeight();
-	mat4f intrinsicsDownsampled = imageManager->getIntrinsics();
-	intrinsicsDownsampled._m00 *= scaleWidth;  intrinsicsDownsampled._m02 *= scaleWidth;
-	intrinsicsDownsampled._m11 *= scaleHeight; intrinsicsDownsampled._m12 *= scaleHeight;
-
-	m_currentLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
-	m_nextLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
-	m_optLocalCache = new CUDACache(downSampWidth, downSampHeight, maxNumLocalImages, intrinsicsDownsampled);
-	m_globalCache = new CUDACache(downSampWidth, downSampHeight, maxNumGlobalImages, intrinsicsDownsampled);
+	const mat4f inputIntrinsics = sensor->getDepthIntrinsics();
+	m_currentLocalCache = new CUDACache(cacheInputWidth, cacheInputHeight, downSampWidth, downSampHeight, maxNumLocalImages, inputIntrinsics);
+	m_nextLocalCache = new CUDACache(cacheInputWidth, cacheInputHeight, downSampWidth, downSampHeight, maxNumLocalImages, inputIntrinsics);
+	m_optLocalCache = new CUDACache(cacheInputWidth, cacheInputHeight, downSampWidth, downSampHeight, maxNumLocalImages, inputIntrinsics);
+	m_globalCache = new CUDACache(cacheInputWidth, cacheInputHeight, downSampWidth, downSampHeight, maxNumGlobalImages, inputIntrinsics);
 
 	m_numTotalFrames = numTotalFrames;
 	m_submapSize = submapSize;
@@ -141,17 +138,17 @@ SubmapManager::~SubmapManager()
 	}
 }
 
-unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepth, unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor, unsigned int colorWidth, unsigned int colorHeight)
+unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIFT, const float* d_inputDepthFilt, unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor, unsigned int colorWidth, unsigned int colorHeight, const float* d_inputDepthRaw)
 {
 	SIFTImageGPU& curImage = m_currentLocal->createSIFTImageGPU();
-	int success = m_sift->RunSIFT(d_intensitySIFT, d_inputDepth);
+	int success = m_sift->RunSIFT(d_intensitySIFT, d_inputDepthFilt);
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection");
-	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(curImage, d_inputDepth);
+	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(curImage, d_inputDepthFilt);
 	m_currentLocal->finalizeSIFTImageGPU(numKeypoints);
 
 	// process cuda cache
 	const unsigned int curLocalFrame = m_currentLocal->getNumImages() - 1;
-	m_currentLocalCache->storeFrame(d_inputDepth, depthWidth, depthHeight, d_inputColor, colorWidth, colorHeight);
+	m_currentLocalCache->storeFrame(d_inputDepthRaw, depthWidth, depthHeight, d_inputColor, colorWidth, colorHeight);
 	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_fuseDepthImages[curLocalFrame], d_inputDepth, sizeof(float)*depthWidth*depthHeight, cudaMemcpyDeviceToDevice));
 	//if (curLocalFrame == 1 && curFrame > 1) std::swap(m_fuseDepthImages[0], m_fuseDepthImages[m_submapSize]); // init next
 
@@ -211,6 +208,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		siftManager->SortKeyPointMatchesCU(curFrame);
 
 		//!!!DEBUGGING
+		//_debugPrintMatches = true;
 		const bool printDebug = _debugPrintMatches && !isLocal;
 		const std::string suffix = "Global/";
 		std::vector<unsigned int> _numRawMatches;

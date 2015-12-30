@@ -62,35 +62,37 @@ bool CUDAImageManager::process()
 	////////////////////////////////////////////////////////////////////////////////////
 
 	const unsigned int bufferDimDepthInput = m_RGBDSensor->getDepthWidth()*m_RGBDSensor->getDepthHeight();
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depthInput, m_RGBDSensor->getDepthFloat(), sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyHostToDevice));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depthInputRaw, m_RGBDSensor->getDepthFloat(), sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyHostToDevice));
 	if (GlobalBundlingState::get().s_erodeSIFTdepth) {
 		unsigned int numIter = 2;
 		numIter = 2 * ((numIter + 1) / 2);
 		for (unsigned int i = 0; i < numIter; i++) {
 			if (i % 2 == 0) {
-				CUDAImageUtil::erodeDepthMap(d_depthErodeHelper, d_depthInput, 3,
+				CUDAImageUtil::erodeDepthMap(d_depthInputFiltered, d_depthInputRaw, 3,
 					m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight(), 0.05f, 0.3f);
 			}
 			else {
-				CUDAImageUtil::erodeDepthMap(d_depthInput, d_depthErodeHelper, 3,
+				CUDAImageUtil::erodeDepthMap(d_depthInputRaw, d_depthInputFiltered, 3,
 					m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight(), 0.05f, 0.3f);
 			}
 		}
 	}
 	if (GlobalBundlingState::get().s_depthFilter) { //smooth
-		CUDAImageUtil::gaussFilterDepthMap(d_depthErodeHelper, d_depthInput, GlobalBundlingState::get().s_depthSigmaD, GlobalBundlingState::get().s_depthSigmaR,
+		CUDAImageUtil::gaussFilterDepthMap(d_depthInputFiltered, d_depthInputRaw, GlobalBundlingState::get().s_depthSigmaD, GlobalBundlingState::get().s_depthSigmaR,
 			m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
-		std::swap(d_depthInput, d_depthErodeHelper);
+	}
+	else {
+		CUDAImageUtil::copy<float>(d_depthInputFiltered, d_depthInputRaw, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
 	}
 
 	if ((m_RGBDSensor->getDepthWidth() == m_widthIntegration) && (m_RGBDSensor->getDepthHeight() == m_heightIntegration)) {
 		if (ManagedRGBDInputFrame::s_bIsOnGPU) {
-			CUDAImageUtil::copy<float>(frame.m_depthIntegration, d_depthInput, m_widthIntegration, m_heightIntegration);
+			CUDAImageUtil::copy<float>(frame.m_depthIntegration, d_depthInputFiltered, m_widthIntegration, m_heightIntegration);
 			//std::swap(frame.m_depthIntegration, d_depthInput);
 		}
 		else {
 			if (GlobalBundlingState::get().s_erodeSIFTdepth) {
-				MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_depthIntegration, d_depthInput, sizeof(float)*bufferDimDepthInput, cudaMemcpyDeviceToHost));
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_depthIntegration, d_depthInputFiltered, sizeof(float)*bufferDimDepthInput, cudaMemcpyDeviceToHost));
 			}
 			else {
 				memcpy(frame.m_depthIntegration, m_RGBDSensor->getDepthFloat(), sizeof(float)*bufferDimDepthInput);
@@ -99,36 +101,14 @@ bool CUDAImageManager::process()
 	}
 	else {
 		if (ManagedRGBDInputFrame::s_bIsOnGPU) {
-			CUDAImageUtil::resampleFloat(frame.m_depthIntegration, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
+			CUDAImageUtil::resampleFloat(frame.m_depthIntegration, m_widthIntegration, m_heightIntegration, d_depthInputFiltered, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
 		}
 		else {
-			CUDAImageUtil::resampleFloat(frame.s_depthIntegrationGlobal, m_widthIntegration, m_heightIntegration, d_depthInput, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
+			CUDAImageUtil::resampleFloat(frame.s_depthIntegrationGlobal, m_widthIntegration, m_heightIntegration, d_depthInputFiltered, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.m_depthIntegration, frame.s_depthIntegrationGlobal, sizeof(float)*m_widthIntegration*m_heightIntegration, cudaMemcpyDeviceToHost));
 			frame.s_activeDepthGPU = &frame;
 		}
 	}
-
-	//!!!DEBUGGING
-	//{
-	//	DepthImage32 dImage(m_widthIntegration, m_heightIntegration);
-	//	ColorImageR8G8B8A8 cImage(m_widthIntegration, m_heightIntegration);
-	//	if (ManagedRGBDInputFrame::s_bIsOnGPU) {
-	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(dImage.getPointer(), frame.m_depthIntegration, sizeof(float)*m_widthIntegration*m_heightIntegration, cudaMemcpyDeviceToHost));
-	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(cImage.getPointer(), frame.m_colorIntegration, sizeof(vec4uc)*m_widthIntegration*m_heightIntegration, cudaMemcpyDeviceToHost));
-	//	}
-	//	else {
-	//		memcpy(dImage.getPointer(), frame.m_depthIntegration, sizeof(float)*m_widthIntegration*m_heightIntegration);
-	//		memcpy(cImage.getPointer(), frame.m_colorIntegration, sizeof(vec4uc)*m_widthIntegration*m_heightIntegration);
-	//	}
-	//	FreeImageWrapper::saveImage("debug/test.png", ColorImageR32G32B32(dImage));
-	//	PointCloudf pc;
-	//	SiftVisualization::computePointCloud(pc, dImage.getPointer(), m_widthIntegration, m_heightIntegration,
-	//		cImage.getPointer(), m_widthIntegration, m_heightIntegration, m_intrinsicsInv, mat4f::identity());
-	//	PointCloudIOf::saveToFile("debug/test.ply", pc);
-	//	std::cout << "waiting..." << std::endl;
-	//	getchar();
-	//}
-	//!!!DEBUGGING
 
 	//////////////////////////////////////////////////////////////////////////////////////
 	//// SIFT Intensity Image

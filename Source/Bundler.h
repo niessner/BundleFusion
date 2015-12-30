@@ -18,7 +18,7 @@ public:
 		unsigned int			m_inputDepthWidth, m_inputDepthHeight;
 		unsigned int			m_inputColorWidth, m_inputColorHeight;
 		unsigned int			m_widthSIFT, m_heightSIFT;
-		float*					d_inputDepth;
+		float*					d_inputDepthFilt, *d_inputDepthRaw;
 		uchar4*					d_inputColor;
 		float*					d_intensitySIFT;
 		mat4f					m_SIFTIntrinsics;
@@ -32,7 +32,7 @@ public:
 			m_inputDepthWidth = 0;	m_inputDepthHeight = 0;
 			m_inputColorWidth = 0;	m_inputColorHeight = 0;
 			m_widthSIFT = 0;		m_heightSIFT = 0;
-			d_inputDepth = NULL;
+			d_inputDepthFilt = NULL;d_inputDepthRaw = NULL;
 			d_inputColor = NULL;
 			d_intensitySIFT = NULL;
 			d_depthErodeHelper = NULL;
@@ -44,7 +44,8 @@ public:
 			m_inputColorHeight = sensor->getColorHeight();
 			m_widthSIFT = GlobalBundlingState::get().s_widthSIFT;
 			m_heightSIFT = GlobalBundlingState::get().s_heightSIFT;
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepth, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepthFilt, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepthRaw, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthErodeHelper, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputColor, sizeof(uchar4)*m_inputColorWidth*m_inputColorHeight));
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
@@ -62,7 +63,8 @@ public:
 			m_fBilateralFilterSigmaD = GlobalBundlingState::get().s_depthSigmaD;
 		}
 		~BundlerInputData() {
-			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepth));
+			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepthFilt));
+			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepthRaw));
 			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputColor));
 			MLIB_CUDA_SAFE_CALL(cudaFree(d_intensitySIFT));
 			MLIB_CUDA_SAFE_CALL(cudaFree(d_depthErodeHelper));

@@ -117,7 +117,6 @@ void TrajectoryManager::confirmIntegration(unsigned int frameIdx)
 bool TrajectoryManager::getTopFromReIntegrateList(mat4f& oldTransform, mat4f& newTransform, unsigned int& frameIdx)
 {
 	if (m_toReIntegrateList.empty())	return false;
-	assert(m_toReIntegrateList.front()->type == TrajectoryFrame::ReIntegration);
 
 	m_mutexUpdateTransforms.lock();
 	while (!m_toReIntegrateList.empty()) { // some may have been invalidated in the meantime by updateOptimizedTransforms
@@ -127,6 +126,7 @@ bool TrajectoryManager::getTopFromReIntegrateList(mat4f& oldTransform, mat4f& ne
 		oldTransform = f->integratedTransform;
 		m_toReIntegrateList.pop_front();
 		if (newTransform[0] != -std::numeric_limits<float>::infinity()) {
+			assert(f->type == TrajectoryFrame::ReIntegration);
 			f->integratedTransform = newTransform;
 			break;
 		} // otherwise will be added to the deintegrate list next time
@@ -138,6 +138,10 @@ bool TrajectoryManager::getTopFromReIntegrateList(mat4f& oldTransform, mat4f& ne
 bool TrajectoryManager::getTopFromIntegrateList(mat4f& trans, unsigned int& frameIdx)
 {
 	if (m_toIntegrateList.empty())	return false;
+	if (m_toIntegrateList.front()->type != TrajectoryFrame::NotIntegrated_WithTransform) {
+		std::cout << "ERROR NEED TO CHECK FOR INVALIDATE INTEGRATE LIST ELEMENTS" << std::endl;
+		getchar();
+	}
 	assert(m_toIntegrateList.front()->type == TrajectoryFrame::NotIntegrated_WithTransform);
 
 	m_mutexUpdateTransforms.lock();
