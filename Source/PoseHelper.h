@@ -29,6 +29,10 @@ namespace PoseHelper {
 				refPtsMean += refPts.back();
 			}
 		}
+		if (pts.size() == 0) {
+			std::cout << "ERROR no points to evaluate" << std::endl;
+			return -std::numeric_limits<float>::infinity();
+		}
 		ptsMean /= (float)pts.size();
 		refPtsMean /= (float)refPts.size();
 		for (unsigned int i = 0; i < pts.size(); i++) {

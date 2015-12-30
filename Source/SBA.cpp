@@ -34,6 +34,7 @@ SBA::SBA()
 	//m_localWeightsSparse.resize(maxNumIts, 1.0f);
 	//m_localWeightsDenseDepth.resize(maxNumIts, 0.0f); for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
 	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
+	//for (unsigned int i = 0; i < 2; i++) m_localWeightsSparse[maxNumIts - i - 1] = 0.0f; // turn off sparse at end
 
 	m_globalWeightsMutex.lock();
 	m_globalWeightsSparse.resize(maxNumIts, 1.0f);
@@ -104,8 +105,8 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 		std::vector<vec3f> rot(numImages), trans(numImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
-		for (unsigned int i = 0; i < numImages; i++) { if (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z)) { printf("NaN input pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
-		for (unsigned int i = 0; i < numImages; i++) { if (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z)) { printf("NaN input pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
+		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z))) { printf("NaN input pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
+		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z))) { printf("NaN input pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
 	}
 	//!!!debugging
 
@@ -131,8 +132,8 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 		std::vector<vec3f> rot(numImages), trans(numImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
-		for (unsigned int i = 0; i < numImages; i++) { if (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z)) { printf("NaN out pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
-		for (unsigned int i = 0; i < numImages; i++) { if (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z)) { printf("NaN out pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
+		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z))) { printf("NaN out pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
+		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z))) { printf("NaN out pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
 	}
 	//!!!debugging
 

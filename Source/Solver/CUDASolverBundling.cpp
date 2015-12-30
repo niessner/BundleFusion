@@ -178,7 +178,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.weightSparse = weightsSparse.front();
 	parameters.weightDenseDepth = weightsDenseDepth.front();
 	parameters.weightDenseColor = weightsDenseColor.front();
-	parameters.denseDistThresh = 0.15f; //TODO params
+	parameters.denseDistThresh = 0.1f; //TODO params
 	parameters.denseNormalThresh = 0.97f;
 	parameters.denseColorThresh = 0.1f;
 	parameters.denseColorGradientMin = 0.005f;

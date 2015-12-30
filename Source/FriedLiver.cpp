@@ -239,11 +239,11 @@ int main(int argc, char** argv)
 		//!!!DEBUGGING
 		if (false) {
 			TestMatching test;
-			//test.loadFromSensor("debug/fr1_desk/test.sensor", "", 1);
-			//test.runOpt();
+			test.loadFromSensor("../data/tum/fr3_office_250.sensor", "", 1);
+			test.runOpt();
 			//test.analyzeLocalOpts();
 			//test.testGlobalDense();
-			test.compareDEBUG();
+			//test.compareDEBUG();
 
 			std::cout << "done!" << std::endl;
 			getchar();

@@ -162,8 +162,10 @@ public:
 				if (m_filterDepthSigmaD > 0.0f) {
 					CUDAImageUtil::gaussFilterDepthMap(d_filterHelperDown, m_cache[i].d_depthDownsampled, m_filterDepthSigmaD, m_filterDepthSigmaR, m_width, m_height);
 					std::swap(d_filterHelperDown, m_cache[i].d_depthDownsampled);
+
+					CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(m_cache[i].d_cameraposDownsampled, m_cache[i].d_depthDownsampled, *(float4x4*)&m_intrinsicsInv, m_width, m_height);
+					CUDAImageUtil::computeNormals(m_cache[i].d_normalsDownsampled, m_cache[i].d_cameraposDownsampled, m_width, m_height);
 				}
-				else CUDAImageUtil::copy(m_cache[i].d_intensityDownsampled, m_cache[i].d_intensityOrigDown, m_width, m_height);
 			}
 		//}
 	}
