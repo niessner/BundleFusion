@@ -187,7 +187,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				float4 diff = camPosTgt - camPosSrcToTgt;
 				float res = dot(diff, normalTgt);
 				//float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-				float weight = max(0.0f, (1.0f - camPosTgt.z / 2.0f));
+				float weight = max(0.0f, (1.0f - camPosTgt.z / 2.5f));
 
 				// point-to-plane jacobian
 				matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
@@ -223,6 +223,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 #endif
 					float weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
+					//float weight = max(0.0f, (1.0f - camPosTgt.z / 2.0f));
 
 					addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
 						jacobianBlockRow_i, jacobianBlockRow_j, i, j, diffIntensity, parameters.weightDenseColor * weight * imPairWeight, idx);
