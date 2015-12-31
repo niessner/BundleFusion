@@ -1591,11 +1591,12 @@ void TestMatching::testGlobalDense()
 {
 	//const std::string which = "fr1_desk_f20";
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
-	const std::string which = "fr2_xyz";
-	const std::string whichRef = "fr2_xyz";
+	//const std::string which = "fr2_xyz";
+	//const std::string whichRef = "fr2_xyz";
 	//const std::string which = "fr3_office";
 	//const std::string whichRef = "fr3_office";
-	//const std::string which = "fr3_nstn";
+	const std::string which = "fr3_nstn";
+	const std::string whichRef = "fr3_nstn";
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
 		std::cout << "check if need to update ref trajectory! (press key to continue)" << std::endl;
@@ -1678,20 +1679,20 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 4;
+	const unsigned int maxNumOutIts = 2;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
-	std::vector<float> weightsSparse(maxNumIters, 0.0f);
+	std::vector<float> weightsSparse(maxNumIters, 5.0f);
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.3f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.1f);  //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 

@@ -187,7 +187,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				float4 diff = camPosTgt - camPosSrcToTgt;
 				float res = dot(diff, normalTgt);
 				//float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-				float weight = max(0.0f, (1.0f - camPosTgt.z / 2.5f));
+				float weight = max(0.0f, (1.0f - camPosTgt.z / 4.0f));
 
 				// point-to-plane jacobian
 				matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
