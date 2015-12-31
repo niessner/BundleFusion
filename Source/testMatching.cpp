@@ -1595,7 +1595,7 @@ void TestMatching::testGlobalDense()
 	//const std::string whichRef = "fr2_xyz";
 	//const std::string which = "fr3_office";
 	//const std::string whichRef = "fr3_office";
-	const std::string which = "fr3_nstn";
+	const std::string which = "fr3_nstn2";
 	const std::string whichRef = "fr3_nstn";
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
@@ -1679,7 +1679,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 2;
+	const unsigned int maxNumOutIts = 4;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
