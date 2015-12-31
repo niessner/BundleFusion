@@ -26,10 +26,10 @@ SBA::SBA()
 	m_bUseComprehensiveFrameInvalidation = false;
 
 	const unsigned int maxNumIts = std::max(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numLocalNonLinIterations);
-	m_localWeightsSparse.resize(maxNumIts, 1.0f);
-	m_localWeightsDenseDepth.resize(maxNumIts);
-	for (unsigned int i = 0; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = (i + 1.0f);
-	m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //no color
+	//m_localWeightsSparse.resize(maxNumIts, 1.0f);
+	//m_localWeightsDenseDepth.resize(maxNumIts);
+	//for (unsigned int i = 0; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = (i + 1.0f);
+	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //no color
 	//// for tum data
 	//m_localWeightsSparse.resize(maxNumIts, 1.0f);
 	//m_localWeightsDenseDepth.resize(maxNumIts, 0.0f); for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
@@ -72,10 +72,10 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (isLocal) {
 		weightsSparse = m_localWeightsSparse;
 		usePairwise = m_bUseLocalDensePairwise; 
-		cache = NULL; //to turn off
-		weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
-		//weightsDenseDepth = m_localWeightsDenseDepth; //turn on
-		//weightsDenseColor = m_localWeightsDenseColor;
+		//cache = NULL; //to turn off
+		//weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
+		weightsDenseDepth = m_localWeightsDenseDepth; //turn on
+		weightsDenseColor = m_localWeightsDenseColor;
 	}
 	else {
 		usePairwise = true; //always global dense pairwise
