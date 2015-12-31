@@ -7,18 +7,18 @@ typedef ml::vec6f Pose;
 
 namespace PoseHelper {
 
-	static float evaluateAteRmse(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory, unsigned int numTransforms = (unsigned int)-1) {
+	static std::pair<float, unsigned int> evaluateAteRmse(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory, unsigned int numTransforms = (unsigned int)-1) {
 		if (numTransforms == (unsigned int)-1) numTransforms = (unsigned int)math::min(trajectory.size(), referenceTrajectory.size());
 		if (numTransforms < 3) {
 			std::cout << "cannot evaluate with < 3 transforms" << std::endl;
 			if (numTransforms == 2) {
 				if (referenceTrajectory[0].getTranslation().length() > 0.0001f) {
 					std::cout << "cannot evaluate 2 with reference[0] not identity" << std::endl;
-					return -std::numeric_limits<float>::infinity();
+					return std::make_pair(-std::numeric_limits<float>::infinity(), 2);
 				}
-				return vec3f::dist(trajectory[1].getTranslation(), referenceTrajectory[1].getTranslation());
+				return std::make_pair(vec3f::dist(trajectory[1].getTranslation(), referenceTrajectory[1].getTranslation()), 2);
 			}
-			return -std::numeric_limits<float>::infinity();
+			return std::make_pair(-std::numeric_limits<float>::infinity(), numTransforms);
 		}
 		std::vector<vec3f> pts, refPts; vec3f ptsMean(0.0f), refPtsMean(0.0f);
 		for (unsigned int i = 0; i < numTransforms; i++) {
@@ -31,7 +31,7 @@ namespace PoseHelper {
 		}
 		if (pts.size() == 0) {
 			std::cout << "ERROR no points to evaluate" << std::endl;
-			return -std::numeric_limits<float>::infinity();
+			return std::make_pair(-std::numeric_limits<float>::infinity(), 0);
 		}
 		ptsMean /= (float)pts.size();
 		refPtsMean /= (float)refPts.size();
@@ -49,7 +49,8 @@ namespace PoseHelper {
 			err += dist2;
 		}
 		float rmse = std::sqrt(err / pts.size());
-		return rmse;
+		unsigned int num = (unsigned int)pts.size();
+		return std::make_pair(rmse, num);
 	}
 
 	static std::vector<std::pair<unsigned int, float>> evaluateErr2PerImage(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory) {

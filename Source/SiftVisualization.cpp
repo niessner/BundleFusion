@@ -287,12 +287,12 @@ ml::vec3f SiftVisualization::getNormal(const float* depth, unsigned int width, u
 	return ret;
 }
 
-void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, unsigned int depthWidth, unsigned int depthHeight, const vec4uc* color, unsigned int colorWidth, unsigned int colorHeight, const mat4f& depthIntrinsicsInv, const mat4f& transform)
+void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, unsigned int depthWidth, unsigned int depthHeight, const vec4uc* color, unsigned int colorWidth, unsigned int colorHeight, const mat4f& depthIntrinsicsInv, const mat4f& transform, float maxDepth)
 {
 	for (unsigned int y = 0; y < depthHeight; y++) {
 		for (unsigned int x = 0; x < depthWidth; x++) {
 			vec3f p = depthToCamera(depthIntrinsicsInv, depth, depthWidth, depthHeight, x, y);
-			if (p.x != -std::numeric_limits<float>::infinity()) {
+			if (p.x != -std::numeric_limits<float>::infinity() && p.z < maxDepth) {
 
 				vec3f n = getNormal(depth, depthWidth, depthHeight, depthIntrinsicsInv, x, y);
 				if (n.x != -std::numeric_limits<float>::infinity()) {
@@ -320,12 +320,12 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, u
 }
 
 void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B8A8& color,
-	const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal, const mat4f& transform)
+	const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal, const mat4f& transform, float maxDepth)
 {
 	for (unsigned int y = 0; y < camPos.getHeight(); y++) {
 		for (unsigned int x = 0; x < camPos.getWidth(); x++) {
 			const vec4f& p = camPos(x, y);
-			if (p.x != -std::numeric_limits<float>::infinity()) {
+			if (p.x != -std::numeric_limits<float>::infinity() && p.z < maxDepth) {
 
 				const vec4f& n = normal(x, y);
 				if (n.x != -std::numeric_limits<float>::infinity()) {
@@ -338,11 +338,9 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 					else {
 						c = vec3f(color(x, y).getVec3()) / 255.0f;
 					}
-					if (!(c.x == 0 && c.y == 0 && c.z == 0)) {
-						pc.m_points.push_back(p.getVec3());
-						pc.m_normals.push_back(n.getVec3());
-						pc.m_colors.push_back(vec4f(c.x, c.y, c.z, 1.0f));
-					}
+					pc.m_points.push_back(p.getVec3());
+					pc.m_normals.push_back(n.getVec3());
+					pc.m_colors.push_back(vec4f(c.x, c.y, c.z, 1.0f));
 				} // valid normal
 			} // valid depth
 		} // x
@@ -358,25 +356,33 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 }
 
 void SiftVisualization::saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
-	const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, bool saveFrameByFrame /*= false*/)
+	const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, float maxDepth, bool saveFrameByFrame /*= false*/)
 {
-	MLIB_ASSERT(depthImages.size() > 0 && depthImages.size() == colorImages.size() && depthImages.size() == trajectory.size());
+	std::cout << "#depth = " << depthImages.size() << ", #color = " << colorImages.size() << ", #traj = " << trajectory.size() << std::endl;
+	MLIB_ASSERT(depthImages.size() > 0 && depthImages.size() == colorImages.size() && depthImages.size() <= trajectory.size());
 	const unsigned int depthWidth = depthImages.front().getWidth();
 	const unsigned int depthHeight = depthImages.front().getHeight();
 	const unsigned int colorWidth = colorImages.front().getWidth();
 	const unsigned int colorHeight = colorImages.front().getHeight();
 
-	std::list<PointCloudf> pcs;
+	std::list<PointCloudf> pcs; std::vector<unsigned int> frameIdxs;
 	for (unsigned int i = 0; i < depthImages.size(); i++) {
-		pcs.push_back(PointCloudf());
-		computePointCloud(pcs.back(), depthImages[i].getPointer(), depthWidth, depthHeight, colorImages[i].getPointer(), colorWidth, colorHeight, depthIntrinsicsInv, trajectory[i]);
+		if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) {
+			pcs.push_back(PointCloudf());
+			computePointCloud(pcs.back(), depthImages[i].getPointer(), depthWidth, depthHeight, colorImages[i].getPointer(), colorWidth, colorHeight, depthIntrinsicsInv, trajectory[i], maxDepth);
+			frameIdxs.push_back(i);
+		}
 	}
 
-	const std::string prefix = util::removeExtensions(filename); unsigned int idx = 0;
+	const std::string prefix = util::directoryFromPath(filename) + "frames/"; unsigned int idx = 0;
+	if (saveFrameByFrame) {
+		if (!util::directoryExists(prefix)) util::makeDirectory(prefix);
+		std::cout << "saving frames to " << prefix << std::endl;
+	}
 	PointCloudf pc;
 	for (const auto& p : pcs) {
 		if (saveFrameByFrame) {
-			PointCloudIOf::saveToFile(prefix + std::to_string(idx) + ".ply", p);
+			PointCloudIOf::saveToFile(prefix + std::to_string(frameIdxs[idx]) + ".ply", p);
 			idx++;
 		}
 		pc.m_points.insert(pc.m_points.end(), p.m_points.begin(), p.m_points.end());
@@ -387,10 +393,11 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const std:
 }
 
 
-void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory, bool saveFrameByFrame /*= false*/)
+void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory, float maxDepth, bool saveFrameByFrame /*= false*/)
 {
-	const unsigned int numFrames = (unsigned int)cache->getCacheFrames().size();
-	MLIB_ASSERT(numFrames == trajectory.size());
+	const unsigned int numFrames = cache->getNumFrames();
+	std::cout << "#cache frames = " << numFrames << "#traj = " << trajectory.size() << std::endl;
+	MLIB_ASSERT(numFrames <= trajectory.size());
 	const unsigned int width = cache->getWidth();
 	const unsigned int height = cache->getHeight();
 
@@ -398,7 +405,7 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 	ColorImageR32G32B32A32 camPos(width, height), normals(width, height);
 	ColorImageR8G8B8A8 color(width, height);
 	ColorImageR32 intensity(width, height);
-	std::list<PointCloudf> pcs;
+	std::list<PointCloudf> pcs; std::vector<unsigned int> frameIdxs;
 	for (unsigned int i = 0; i < numFrames; i++) {
 		if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) {
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPos.getPointer(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*camPos.getNumPixels(), cudaMemcpyDeviceToHost));
@@ -407,14 +414,15 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 			color = ColorImageR8G8B8A8(intensity);
 
 			pcs.push_back(PointCloudf());
-			computePointCloud(pcs.back(), color, camPos, normals, trajectory[i]);
+			computePointCloud(pcs.back(), color, camPos, normals, trajectory[i], maxDepth);
+			frameIdxs.push_back(i);
 		}
 	}
 	if (saveFrameByFrame) {
 		const std::string prefix = util::removeExtensions(filename);
 		unsigned int idx = 0;
 		for (const auto& p : pcs) {
-			PointCloudIOf::saveToFile(prefix + "_" + std::to_string(idx) + ".ply", p);
+			PointCloudIOf::saveToFile(prefix + "_" + std::to_string(frameIdxs[idx]) + ".ply", p);
 			idx++;
 		}
 	}

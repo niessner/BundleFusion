@@ -12,6 +12,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
 extern "C" void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
+extern "C" void convertLiePosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs);
 
 CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxNumResiduals)
 	: m_maxNumberOfImages(maxNumberOfImages)
@@ -218,6 +219,9 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	}
 	//!!!debugging
 	//if (parameters.weightDenseDepth > 0) {
+	//	std::vector<int> validImages(solverInput.numberOfImages);
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(validImages.data(), solverInput.d_validImages, sizeof(int)*solverInput.numberOfImages, cudaMemcpyDeviceToHost));
+	//	convertLiePosesToMatricesCU(m_solverState.d_xRot, m_solverState.d_xTrans, solverInput.numberOfImages, m_solverState.d_xTransforms, m_solverState.d_xTransformInverses);
 	//	BuildDenseSystem(solverInput, m_solverState, parameters, NULL);
 	//	std::vector<float> imPairWeights(numberOfImages * numberOfImages);
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairWeights.data(), m_solverState.d_denseCorrCounts, sizeof(float)*imPairWeights.size(), cudaMemcpyDeviceToHost));
@@ -229,6 +233,26 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	//			count++;
 	//		}
 	//	}
+	//	// mark diagonal
+	//	for (unsigned int i = 0; i < numberOfImages; i++) {
+	//		corrImage(i, i) = vec3uc(255, 0, 0); // red
+	//	}
+	//	// mark invalid
+	//	for (unsigned int i = 0; i < numberOfImages; i++) {
+	//		if (validImages[i] == 0) {
+	//			for (unsigned int k = 0; k < i; k++)
+	//				corrImage(i, k) = vec3uc(0, 255, 0); //green
+	//			for (unsigned int k = i + 1; k < numberOfImages; k++)
+	//				corrImage(k, i) = vec3uc(0, 255, 0); //green
+	//		}
+	//	}
+
+	//	const unsigned int query = 32; std::vector<unsigned int> connections;
+	//	for (unsigned int i = 0; i < numberOfImages; i++) {
+	//		if (imPairWeights[i*numberOfImages + query] > 0 || imPairWeights[query*numberOfImages + i] > 0)
+	//			connections.push_back(i);
+	//	}
+
 	//	std::cout << "count = " << count << std::endl;
 	//	FreeImageWrapper::saveImage("debug/corr.png", corrImage);
 	//	std::cout << "waiting..." << std::endl; getchar();

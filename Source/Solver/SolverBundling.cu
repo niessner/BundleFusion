@@ -11,8 +11,8 @@
 #include <conio.h>
 
 //!!!DEBUGGING
-//#define PRINT_RESIDUALS_SPARSE
-//#define PRINT_RESIDUALS_DENSE
+#define PRINT_RESIDUALS_SPARSE
+#define PRINT_RESIDUALS_DENSE
 //!!!DEBUGGING
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
@@ -96,7 +96,9 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		float4x4 transform = invTransform_i * transform_j;
 #endif
 		//!!!debugging
-		if (!computeAngleDiff(transform, 0.35f)) return; //~20 degrees
+		//if (!computeAngleDiff(transform, 1.05f)) return; //~60 degrees
+		//if (!computeAngleDiff(transform, 0.8f)) return; //~45 degrees
+		if (!computeAngleDiff(transform, 0.52f)) return; //~30 degrees
 		//!!!debugging
 
 		// find correspondence
@@ -125,7 +127,7 @@ __global__ void WeightDenseCorrespondences_Kernel(unsigned int N, SolverState st
 		// apply ln to weights
 		float x = state.d_denseCorrCounts[idx];
 		if (x > 0) {
-			if (x < 400) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
 			else {
 				state.d_denseCorrCounts[idx] = 1.0f / min(logf(x), 9.0f); // natural log //TODO PARAMS
 			}
@@ -181,7 +183,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				// point-to-plane residual
 				float4 diff = camPosTgt - camPosSrcToTgt;
 				float res = dot(diff, normalTgt);
-				float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
+				//float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
+				float weight = max(0.0f, (1.0f - camPosTgt.z / 2.0f));
 
 				// point-to-plane jacobian
 				matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
@@ -815,6 +818,7 @@ __global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 
 		if (lastIteration)
 		{
+			//if (input.d_validImages[x]) { //not really necessary
 #ifdef USE_LIE_SPACE //TODO just keep that matrix transforms around
 			float3 rot, trans;
 			computeLieUpdate(state.d_deltaRot[x], state.d_deltaTrans[x], state.d_xRot[x], state.d_xTrans[x], rot, trans);
@@ -824,6 +828,7 @@ __global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 			state.d_xRot[x] = state.d_xRot[x] + state.d_deltaRot[x];
 			state.d_xTrans[x] = state.d_xTrans[x] + state.d_deltaTrans[x];
 #endif
+			//}
 		}
 	}
 }
@@ -910,7 +915,7 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 ////////////////////////////////////////////////////////////////////
 // matrix <-> pose
 ////////////////////////////////////////////////////////////////////
-__global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs)
+__global__ void convertLiePosesToMatricesCU_Kernel(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs)
 {
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < numTransforms) {
@@ -918,9 +923,10 @@ __global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float
 		d_transformInvs[idx] = d_transforms[idx].getInverse();
 	}
 }
-void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs)
+extern "C"
+void convertLiePosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs)
 {
-	convertPosesToMatricesCU_Kernel << <(numTransforms + 8 - 1) / 8, 8 >> >(d_rot, d_trans, numTransforms, d_transforms, d_transformInvs);
+	convertLiePosesToMatricesCU_Kernel << <(numTransforms + 8 - 1) / 8, 8 >> >(d_rot, d_trans, numTransforms, d_transforms, d_transformInvs);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
@@ -957,7 +963,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		parameters.weightDenseColor = input.weightsDenseColor[nIter];
 		parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
 #ifdef USE_LIE_SPACE
-		convertPosesToMatricesCU(state.d_xRot, state.d_xTrans, input.numberOfImages, state.d_xTransforms, state.d_xTransformInverses);
+		convertLiePosesToMatricesCU(state.d_xRot, state.d_xTrans, input.numberOfImages, state.d_xTransforms, state.d_xTransformInverses);
 #endif
 		if (parameters.useDense) BuildDenseSystem(input, state, parameters, timer);
 		Initialization(input, state, parameters, timer);

@@ -52,20 +52,6 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 
 	CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, m_width, m_height, d_inputDepth, inputDepthWidth, inputDepthHeight);
 
-	//!!!debugging
-	//float4* testCamPos = NULL;
-	//float4* testNormals = NULL;
-	//MLIB_CUDA_SAFE_CALL(cudaMalloc(&testCamPos, sizeof(float4)*m_width*m_height));
-	//MLIB_CUDA_SAFE_CALL(cudaMalloc(&testNormals, sizeof(float4)*m_width*m_height));
-	//CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(testCamPos, frame.d_depthDownsampled, *(float4x4*)&m_intrinsicsInv, m_width, m_height);
-	//CUDAImageUtil::computeNormals(testNormals, testCamPos, m_width, m_height);
-	////MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.d_cameraposDownsampled, testCamPos, sizeof(float4)*m_width*m_height, cudaMemcpyDeviceToDevice));
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.d_normalsDownsampled, testNormals, sizeof(float4)*m_width*m_height, cudaMemcpyDeviceToDevice));
-
-	//MLIB_CUDA_SAFE_FREE(testCamPos);
-	//MLIB_CUDA_SAFE_FREE(testNormals);
-	//!!!debugging
-
 	//CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
 	//CUDAImageUtil::jointBilateralFilterFloatMap(frame.d_colorDownsampled)
 

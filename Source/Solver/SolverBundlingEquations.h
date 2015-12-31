@@ -540,6 +540,7 @@ __inline__ __device__ bool computeAngleDiff(const float4x4& transform, float ang
 	float3 x = normalize(make_float3(1.0f, 1.0f, 1.0f));
 	float3 v = transform.getFloat3x3() * x;
 	float angle = acos(clamp(dot(x, v), -1.0f, 1.0f));
+
 	if (fabs(angle) < angleThresh) return true;
 	return false;
 

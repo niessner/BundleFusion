@@ -9,9 +9,9 @@
 #define POSESIZE 6
 
 extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned int numTransforms,
-	float3* d_rot, float3* d_trans);
+	float3* d_rot, float3* d_trans, int* d_validImages);
 
-extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms);
+extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, int* d_validImages);
 
 Timer SBA::s_timer;
 
@@ -72,10 +72,10 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (isLocal) {
 		weightsSparse = m_localWeightsSparse;
 		usePairwise = m_bUseLocalDensePairwise; 
-		cache = NULL; //to turn off
-		weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
-		//weightsDenseDepth = m_localWeightsDenseDepth; //turn on
-		//weightsDenseColor = m_localWeightsDenseColor;
+		//cache = NULL; //to turn off
+		//weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
+		weightsDenseDepth = m_localWeightsDenseDepth; //turn on
+		weightsDenseColor = m_localWeightsDenseColor;
 	}
 	else {
 		usePairwise = true; //always global dense pairwise
@@ -97,8 +97,8 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 
 	unsigned int numImages = siftManager->getNumImages();
-	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans);
 	if (isStart) MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages, siftManager->getValidImages().data(), sizeof(int)*numImages, cudaMemcpyHostToDevice));
+	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans, d_validImages);
 
 	//!!!debugging
 	{
@@ -137,7 +137,7 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	}
 	//!!!debugging
 
-	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms);
+	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, d_validImages);
 
 	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve += s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve += curIt * maxNumIters; }
 }

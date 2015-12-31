@@ -73,22 +73,22 @@ __device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& m
 #endif
 
 __global__ void convertMatricesToPosesCU_Kernel(const float4x4* d_transforms, unsigned int numTransforms,
-	float3* d_rot, float3* d_trans)
+	float3* d_rot, float3* d_trans, int* d_validImages)
 {
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (idx < numTransforms) {
+	if (idx < numTransforms && d_validImages[idx]) {
 		matrixToPose(d_transforms[idx], d_rot[idx], d_trans[idx]);
 	}
 }
 
 
 extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned int numTransforms,
-	float3* d_rot, float3* d_trans)
+	float3* d_rot, float3* d_trans, int* d_validImages)
 {
 	const unsigned int N = numTransforms;
 
-	convertMatricesToPosesCU_Kernel << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(d_transforms, numTransforms, d_rot, d_trans);
+	convertMatricesToPosesCU_Kernel << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(d_transforms, numTransforms, d_rot, d_trans, d_validImages);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
@@ -98,20 +98,20 @@ extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned 
 
 
 
-__global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms)
+__global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, int* d_validImages)
 {
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (idx < numImages) {
+	if (idx < numImages && d_validImages[idx]) {
 		poseToMatrix(d_rot[idx], d_trans[idx], d_transforms[idx]);
 	}
 }
 
-extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms)
+extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, int* d_validImages)
 {
 	const unsigned int N = numImages;
 
-	convertPosesToMatricesCU_Kernel << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(d_rot, d_trans, numImages, d_transforms);
+	convertPosesToMatricesCU_Kernel << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(d_rot, d_trans, numImages, d_transforms, d_validImages);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());

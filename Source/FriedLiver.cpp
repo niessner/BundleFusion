@@ -237,12 +237,12 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (false) {
+		if (true) {
 			TestMatching test;
-			test.loadFromSensor("../data/tum/fr3_office_250.sensor", "", 1);
-			test.runOpt();
+			//test.loadFromSensor("../data/tum/fr3_office_250.sensor", "", 1);
+			//test.runOpt();
 			//test.analyzeLocalOpts();
-			//test.testGlobalDense();
+			test.testGlobalDense();
 			//test.compareDEBUG();
 
 			std::cout << "done!" << std::endl;

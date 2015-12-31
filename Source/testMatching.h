@@ -89,7 +89,9 @@ public:
 	void saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices = std::vector<unsigned int>()) const;
 	void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
 
-	void printCacheFrames(const std::string& dir) const;
+	void printCacheFrames(const std::string& dir, const CUDACache* cache = NULL) const;
+
+	void loadCachedFramesFromSensor(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames);
 
 private:
 	void evaluateTrajectory(unsigned int submapSize, const std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll);

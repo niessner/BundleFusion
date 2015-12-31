@@ -46,6 +46,8 @@ public:
 	const mat4f& getIntrinsics() const { return m_intrinsics; }
 	const mat4f& getIntrinsicsInv() const { return m_intrinsicsInv; }
 
+	unsigned int getNumFrames() const { return m_currentFrame + 1; }
+
 	//! warning: untested!
 	void saveToFile(const std::string& filename) const {
 		BinaryDataStreamFile s(filename, true);
@@ -130,7 +132,14 @@ public:
 	}
 
 	//!debugging only
-	void setCachedFrames(const std::vector<CUDACachedFrame> cachedFrames) {
+	std::vector<CUDACachedFrame>& getCachedFramesDEBUG() { return m_cache; }
+	void setCurrentFrame(unsigned int c) { m_currentFrame = c; }
+	void setIntrinsics(const mat4f& inputIntrinsics, const mat4f& intrinsics) { 
+		m_inputIntrinsics = inputIntrinsics; m_inputIntrinsicsInv = inputIntrinsics.getInverse();
+		m_intrinsics = intrinsics; m_intrinsicsInv = intrinsics.getInverse();
+	}
+	//!debugging only
+	void setCachedFrames(const std::vector<CUDACachedFrame>& cachedFrames) {
 		MLIB_ASSERT(cachedFrames.size() <= m_cache.size());
 		for (unsigned int i = 0; i < cachedFrames.size(); i++) {
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_depthDownsampled, cachedFrames[i].d_depthDownsampled, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
