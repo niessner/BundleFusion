@@ -1685,7 +1685,7 @@ void TestMatching::testGlobalDense()
 	const bool isLocal = false;
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
-	std::vector<float> weightsSparse(maxNumIters, 1.5f);
+	std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);

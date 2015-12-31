@@ -47,9 +47,11 @@ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigne
 			tgtScreenPosf = make_float2(proj.x / proj.z, proj.y / proj.z);
 			int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
 			if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
-				camPosTgt = tgtCamPos[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
+				//camPosTgt = tgtCamPos[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
+				camPosTgt = bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtCamPos, imageWidth, imageHeight);
 				if (camPosTgt.z > depthMin && camPosTgt.z < depthMax) {
-					normalTgt = tgtNormals[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
+					//normalTgt = tgtNormals[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
+					normalTgt = bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtNormals, imageWidth, imageHeight);
 					if (normalTgt.x != MINF) {
 						float dist = length(camPosSrcToTgt - camPosTgt);
 						float dNormal = dot(nrmj, normalTgt);
