@@ -68,26 +68,25 @@ public:
 	//debug
 	void compareDEBUG();
 
-	// match within first numFrames of sensorFile
-	void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));
-
-	void matchFrame(unsigned int frame, bool print, bool checkReference);
-	// matches last frame and optimizes
-	void debugOptimizeGlobal();
-	void checkCorrespondences();
-	void printKeys();
-	void debugMatchInfo();
+	//// match within first numFrames of sensorFile
+	//void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));
+	//void matchFrame(unsigned int frame, bool print, bool checkReference);
+	//// matches last frame and optimizes
+	//void debugOptimizeGlobal();
+	//void checkCorrespondences();
+	//void printKeys();
+	//void debugMatchInfo();
 
 	//! debug hack
 	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames = vec2ui((unsigned int)-1));
 
-	void save(const std::string& filename) const;
-	void load(const std::string& filename, const std::string siftFile);
+	//void save(const std::string& filename) const;
+	//void load(const std::string& filename, const std::string siftFile);
 
-	void test();
+	//void test();
 
-	void saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices = std::vector<unsigned int>()) const;
-	void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
+	//void saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices = std::vector<unsigned int>()) const;
+	//void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
 
 	void printCacheFrames(const std::string& dir, const CUDACache* cache = NULL) const;
 

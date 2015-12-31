@@ -218,45 +218,43 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		solverInput.colorFocalLength = make_float2(-std::numeric_limits<float>::infinity());
 	}
 	//!!!debugging
-	//if (parameters.weightDenseDepth > 0) {
-	//	std::vector<int> validImages(solverInput.numberOfImages);
-	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(validImages.data(), solverInput.d_validImages, sizeof(int)*solverInput.numberOfImages, cudaMemcpyDeviceToHost));
-	//	convertLiePosesToMatricesCU(m_solverState.d_xRot, m_solverState.d_xTrans, solverInput.numberOfImages, m_solverState.d_xTransforms, m_solverState.d_xTransformInverses);
-	//	BuildDenseSystem(solverInput, m_solverState, parameters, NULL);
-	//	std::vector<float> imPairWeights(numberOfImages * numberOfImages);
-	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairWeights.data(), m_solverState.d_denseCorrCounts, sizeof(float)*imPairWeights.size(), cudaMemcpyDeviceToHost));
-	//	ColorImageR8G8B8 corrImage(numberOfImages, numberOfImages); unsigned int count = 0;
-	//	for (unsigned int i = 0; i < imPairWeights.size(); i++) {
-	//		if (imPairWeights[i] > 0) {
-	//			vec3f c = BaseImageHelper::convertDepthToRGB(imPairWeights[i], 0.0f, 1.0f) * 255.0f;
-	//			corrImage.getPointer()[i] = vec3uc(c);
-	//			count++;
-	//		}
-	//	}
-	//	// mark diagonal
-	//	for (unsigned int i = 0; i < numberOfImages; i++) {
-	//		corrImage(i, i) = vec3uc(255, 0, 0); // red
-	//	}
-	//	// mark invalid
-	//	for (unsigned int i = 0; i < numberOfImages; i++) {
-	//		if (validImages[i] == 0) {
-	//			for (unsigned int k = 0; k < i; k++)
-	//				corrImage(i, k) = vec3uc(0, 255, 0); //green
-	//			for (unsigned int k = i + 1; k < numberOfImages; k++)
-	//				corrImage(k, i) = vec3uc(0, 255, 0); //green
-	//		}
-	//	}
-
-	//	const unsigned int query = 32; std::vector<unsigned int> connections;
-	//	for (unsigned int i = 0; i < numberOfImages; i++) {
-	//		if (imPairWeights[i*numberOfImages + query] > 0 || imPairWeights[query*numberOfImages + i] > 0)
-	//			connections.push_back(i);
-	//	}
-
-	//	std::cout << "count = " << count << std::endl;
-	//	FreeImageWrapper::saveImage("debug/corr.png", corrImage);
-	//	std::cout << "waiting..." << std::endl; getchar();
-	//}
+	if (false && parameters.weightDenseDepth > 0) {
+		std::vector<int> validImages(solverInput.numberOfImages);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(validImages.data(), solverInput.d_validImages, sizeof(int)*solverInput.numberOfImages, cudaMemcpyDeviceToHost));
+		convertLiePosesToMatricesCU(m_solverState.d_xRot, m_solverState.d_xTrans, solverInput.numberOfImages, m_solverState.d_xTransforms, m_solverState.d_xTransformInverses);
+		BuildDenseSystem(solverInput, m_solverState, parameters, NULL);
+		std::vector<float> imPairWeights(numberOfImages * numberOfImages);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairWeights.data(), m_solverState.d_denseCorrCounts, sizeof(float)*imPairWeights.size(), cudaMemcpyDeviceToHost));
+		ColorImageR8G8B8 corrImage(numberOfImages, numberOfImages); unsigned int count = 0;
+		for (unsigned int i = 0; i < imPairWeights.size(); i++) {
+			if (imPairWeights[i] > 0) {
+				vec3f c = BaseImageHelper::convertDepthToRGB(imPairWeights[i], 0.0f, 1.0f) * 255.0f;
+				corrImage.getPointer()[i] = vec3uc(c);
+				count++;
+			}
+		}
+		// mark diagonal
+		for (unsigned int i = 0; i < numberOfImages; i++) {
+			corrImage(i, i) = vec3uc(255, 0, 0); // red
+		}
+		// mark invalid
+		for (unsigned int i = 0; i < numberOfImages; i++) {
+			if (validImages[i] == 0) {
+				for (unsigned int k = 0; k < i; k++)
+					corrImage(i, k) = vec3uc(0, 255, 0); //green
+				for (unsigned int k = i + 1; k < numberOfImages; k++)
+					corrImage(k, i) = vec3uc(0, 255, 0); //green
+			}
+		}
+		//const unsigned int query = 32; std::vector<unsigned int> connections;
+		//for (unsigned int i = 0; i < numberOfImages; i++) {
+		//	if (imPairWeights[i*numberOfImages + query] > 0 || imPairWeights[query*numberOfImages + i] > 0)
+		//		connections.push_back(i);
+		//}
+		std::cout << "count = " << count << std::endl;
+		FreeImageWrapper::saveImage("debug/corr.png", corrImage);
+		std::cout << "waiting..." << std::endl; getchar();
+	}
 	//!!!debugging
 
 

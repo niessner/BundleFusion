@@ -53,6 +53,35 @@ namespace PoseHelper {
 		return std::make_pair(rmse, num);
 	}
 
+	static mat4f getAlignmentBetweenTrajectories(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory, unsigned int numTransforms = (unsigned int)-1) {
+		mat4f ret; ret.setZero(-std::numeric_limits<float>::infinity());
+		if (numTransforms == (unsigned int)-1) numTransforms = (unsigned int)math::min(trajectory.size(), referenceTrajectory.size());
+		if (numTransforms < 3) {
+			std::cout << "cannot evaluate with < 3 transforms" << std::endl;
+			if (numTransforms == 2) {
+				if (referenceTrajectory[0].getTranslation().length() > 0.0001f) {
+					std::cout << "cannot evaluate 2 with reference[0] not identity" << std::endl;
+					return ret;
+				}
+				return ret;
+			}
+			return ret;
+		}
+		std::vector<vec3f> pts, refPts;
+		for (unsigned int i = 0; i < numTransforms; i++) {
+			if (trajectory[i][0] != -std::numeric_limits<float>::infinity() && referenceTrajectory[i][0] != -std::numeric_limits<float>::infinity()) {
+				pts.push_back(trajectory[i].getTranslation());
+				refPts.push_back(referenceTrajectory[i].getTranslation());
+			}
+		}
+		if (pts.size() == 0) {
+			std::cout << "ERROR no points to evaluate" << std::endl;
+			return ret;
+		}
+		vec3f evs;
+		return EigenWrapperf::kabsch(pts, refPts, evs);
+	}
+
 	static std::vector<std::pair<unsigned int, float>> evaluateErr2PerImage(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory) {
 		std::vector<std::pair<unsigned int, float>> errors;
 
@@ -69,22 +98,14 @@ namespace PoseHelper {
 			}
 			return errors;
 		}
-		std::vector<vec3f> pts, refPts; vec3f ptsMean(0.0f), refPtsMean(0.0f);
+		std::vector<vec3f> pts, refPts;
 		std::vector<unsigned int> imageIndices;
 		for (unsigned int i = 0; i < numTransforms; i++) {
 			if (trajectory[i][0] != -std::numeric_limits<float>::infinity() && referenceTrajectory[i][0] != -std::numeric_limits<float>::infinity()) {
 				pts.push_back(trajectory[i].getTranslation());
 				refPts.push_back(referenceTrajectory[i].getTranslation());
-				ptsMean += pts.back();
-				refPtsMean += refPts.back();
 				imageIndices.push_back(i);
 			}
-		}
-		ptsMean /= (float)pts.size();
-		refPtsMean /= (float)refPts.size();
-		for (unsigned int i = 0; i < pts.size(); i++) {
-			pts[i] -= ptsMean;
-			refPts[i] -= refPtsMean;
 		}
 		vec3f evs;
 		mat4f align = EigenWrapperf::kabsch(pts, refPts, evs);

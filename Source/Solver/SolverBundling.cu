@@ -99,6 +99,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		//if (!computeAngleDiff(transform, 1.05f)) return; //~60 degrees
 		//if (!computeAngleDiff(transform, 0.8f)) return; //~45 degrees
 		if (!computeAngleDiff(transform, 0.52f)) return; //~30 degrees
+		//if (!computeAngleDiff(transform, 0.35f)) return; //~20 degrees
 		//!!!debugging
 
 		// find correspondence
@@ -184,7 +185,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				float4 diff = camPosTgt - camPosSrcToTgt;
 				float res = dot(diff, normalTgt);
 				//float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-				float weight = max(0.0f, (1.0f - camPosTgt.z / 2.0f));
+				float weight = max(0.0f, (1.0f - camPosTgt.z / 2.5f));
 
 				// point-to-plane jacobian
 				matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;

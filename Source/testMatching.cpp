@@ -8,6 +8,7 @@
 #include "ImageHelper.h"
 #include "GlobalAppState.h"
 #include "SiftGPU/SiftCameraParams.h"
+#include "SBA.h"
 
 #include "testMatching.h"
 
@@ -46,176 +47,176 @@ TestMatching::~TestMatching()
 	freeCachedFrames();
 }
 
-void TestMatching::match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames /*= vec2ui((unsigned int)-1)*/)
-{
-	loadFromSensor(sensorFile, "", 1, frames);
-	const unsigned int numFrames = (unsigned int)m_colorImages.size();
+//void TestMatching::match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames /*= vec2ui((unsigned int)-1)*/)
+//{
+//	loadFromSensor(sensorFile, "", 1, frames);
+//	const unsigned int numFrames = (unsigned int)m_colorImages.size();
+//
+//	if (!loadFile.empty() && util::fileExists(loadFile)) {
+//
+//	}
+//	else { // recomputing!
+//		bool printColorImages = false;
+//		if (printColorImages) {
+//			const std::string colorDir = "debug/color/"; if (!util::directoryExists(colorDir)) util::makeDirectory(colorDir);
+//			for (unsigned int i = 0; i < numFrames; i++)
+//				FreeImageWrapper::saveImage(colorDir + std::to_string(i) + ".png", m_colorImages[i]);
+//		}
+//
+//		// detect keypoints
+//		detectKeys(m_colorImages, m_depthImages, m_siftManager);
+//
+//		bool printKeys = true;
+//		if (printKeys) {
+//			const std::string keysDir = "debug/keys/"; if (!util::directoryExists(keysDir)) util::makeDirectory(keysDir);
+//			for (unsigned int i = 0; i < numFrames; i++)
+//				SiftVisualization::printKey(keysDir + std::to_string(i) + ".png", m_colorImages[i], m_siftManager, i);
+//		}
+//
+//		// match
+//		matchAll(true, outDir);
+//	}
+//
+//	bool filter = true;
+//	if (filter) {
+//		if (m_stage == HAS_MATCHES) {
+//			std::vector<vec2ui> imagePairMatchesFiltered;
+//			filterImagePairMatches(imagePairMatchesFiltered, true, "debug/matchesFilt/");
+//		}
+//		if (m_stage == FILTERED_IMPAIR_MATCHES) {
+//			filterBySurfaceArea(false);//(true, "debug/matchesSA/");
+//		}
+//	}
+//}
 
-	if (!loadFile.empty() && util::fileExists(loadFile)) {
-
-	}
-	else { // recomputing!
-		bool printColorImages = false;
-		if (printColorImages) {
-			const std::string colorDir = "debug/color/"; if (!util::directoryExists(colorDir)) util::makeDirectory(colorDir);
-			for (unsigned int i = 0; i < numFrames; i++)
-				FreeImageWrapper::saveImage(colorDir + std::to_string(i) + ".png", m_colorImages[i]);
-		}
-
-		// detect keypoints
-		detectKeys(m_colorImages, m_depthImages, m_siftManager);
-
-		bool printKeys = true;
-		if (printKeys) {
-			const std::string keysDir = "debug/keys/"; if (!util::directoryExists(keysDir)) util::makeDirectory(keysDir);
-			for (unsigned int i = 0; i < numFrames; i++)
-				SiftVisualization::printKey(keysDir + std::to_string(i) + ".png", m_colorImages[i], m_siftManager, i);
-		}
-
-		// match
-		matchAll(true, outDir);
-	}
-
-	bool filter = true;
-	if (filter) {
-		if (m_stage == HAS_MATCHES) {
-			std::vector<vec2ui> imagePairMatchesFiltered;
-			filterImagePairMatches(imagePairMatchesFiltered, true, "debug/matchesFilt/");
-		}
-		if (m_stage == FILTERED_IMPAIR_MATCHES) {
-			filterBySurfaceArea(false);//(true, "debug/matchesSA/");
-		}
-	}
-}
-
-void TestMatching::load(const std::string& filename, const std::string siftFile)
-{
-	if (!util::fileExists(siftFile)) throw MLIB_EXCEPTION(siftFile + " does not exist");
-	m_siftManager->loadFromFile(siftFile);
-
-	if (filename.empty() || !util::fileExists(filename)) {
-		std::cout << "warning: " << filename << " does not exist, need to re-compute" << std::endl;
-		return;
-	}
-	BinaryDataStreamFile s(filename, false);
-	unsigned int numImages;
-	s >> numImages;
-	s >> m_origMatches;
-	s.readData((BYTE*)&m_stage, sizeof(int));
-	std::cout << "load: stage " << m_stage << std::endl;
-	for (unsigned int i = 1; i < numImages; i++) { // no matches for image 0
-		if (m_stage >= HAS_MATCHES) {
-			const bool filtered = false;
-			std::vector<unsigned int> numMatchesPerImagePair;
-			std::vector<float> matchDistancesPerImagePair;
-			std::vector<vec2ui> matchKeyIndicesPerImagePair;
-			s >> numMatchesPerImagePair;
-			s >> matchDistancesPerImagePair;
-			s >> matchKeyIndicesPerImagePair;
-			MLIB_ASSERT(numMatchesPerImagePair.size() == i && matchDistancesPerImagePair.size() == i*MAX_MATCHES_PER_IMAGE_PAIR_RAW && matchKeyIndicesPerImagePair.size() == i*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
-
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getNumMatchesCUDA(i, filtered), numMatchesPerImagePair.data(), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchDistsCUDA(i, filtered), matchDistancesPerImagePair.data(), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchKeyIndicesCUDA(i, filtered), matchKeyIndicesPerImagePair.data(), sizeof(uint2)*matchKeyIndicesPerImagePair.size(), cudaMemcpyHostToDevice));
-		}
-		if (m_stage >= FILTERED_IMPAIR_MATCHES) {
-			const bool filtered = true;
-			std::vector<unsigned int> numMatchesPerImagePair;
-			std::vector<float> matchDistancesPerImagePair;
-			std::vector<vec2ui> matchKeyIndicesPerImagePair;
-			s >> numMatchesPerImagePair;
-			s >> matchDistancesPerImagePair;
-			s >> matchKeyIndicesPerImagePair;
-			MLIB_ASSERT(numMatchesPerImagePair.size() == i && matchDistancesPerImagePair.size() == i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED && matchKeyIndicesPerImagePair.size() == i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getNumMatchesCUDA(i, filtered), numMatchesPerImagePair.data(), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchDistsCUDA(i, filtered), matchDistancesPerImagePair.data(), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchKeyIndicesCUDA(i, filtered), matchKeyIndicesPerImagePair.data(), sizeof(uint2)*matchKeyIndicesPerImagePair.size(), cudaMemcpyHostToDevice));
-		}
-	}
-	s.closeStream();
-}
-
-void TestMatching::save(const std::string& filename) const
-{
-	std::cout << "saving orig matches... ";
-	BinaryDataStreamFile s(filename, true);
-	unsigned int numImages = m_siftManager->getNumImages();
-	s << numImages;
-	s << m_origMatches;
-	s.writeData((const BYTE*)&m_stage, sizeof(int));
-	for (unsigned int i = 1; i < numImages; i++) { // no matches for image 0
-		if (m_stage >= HAS_MATCHES) {
-			const bool filtered = false;
-			std::vector<unsigned int> numMatchesPerImagePair(i);
-			std::vector<float> matchDistancesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
-			std::vector<vec2ui> matchKeyIndicesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
-
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatchesPerImagePair.data(), getNumMatchesCUDA(i, filtered), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDistancesPerImagePair.data(), getMatchDistsCUDA(i, filtered), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchKeyIndicesPerImagePair.data(), getMatchKeyIndicesCUDA(i, filtered), sizeof(uint2)*matchKeyIndicesPerImagePair.size(), cudaMemcpyDeviceToHost));
-
-			s << numMatchesPerImagePair;
-			s << matchDistancesPerImagePair;
-			s << matchKeyIndicesPerImagePair;
-		}
-		if (m_stage >= FILTERED_IMPAIR_MATCHES) {
-			const bool filtered = true;
-			std::vector<unsigned int> numMatchesPerImagePair(i);
-			std::vector<float> matchDistancesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-			std::vector<vec2ui> matchKeyIndicesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatchesPerImagePair.data(), getNumMatchesCUDA(i, filtered), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDistancesPerImagePair.data(), getMatchDistsCUDA(i, filtered), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchKeyIndicesPerImagePair.data(), getMatchKeyIndicesCUDA(i, filtered), sizeof(uint2)*matchKeyIndicesPerImagePair.size(), cudaMemcpyDeviceToHost));
-
-			s << numMatchesPerImagePair;
-			s << matchDistancesPerImagePair;
-			s << matchKeyIndicesPerImagePair;
-		}
-	}
-	s.closeStream();
-	std::cout << "done!" << std::endl;
-}
-
-void TestMatching::test()
-{
-	if (m_stage < HAS_MATCHES) {
-		matchAll();
-		save("debug/matchAll.bin");
-	}
-	//!!!DEBUGGING
-	//std::vector<vec2ui> matches = { vec2ui(0, 2) };
-	//printMatches("debug/", matches, false);
-	//std::cout << "waiting..." << std::endl;
-	//getchar();
-	//!!!DEBUGGING
-
-	unsigned int numImages = m_siftManager->getNumImages();
-
-	std::vector<vec2ui> imagePairMatchesFiltered;
-	filterImagePairMatches(imagePairMatchesFiltered);
-
-	//!!!DEBUGGING
-	//std::vector<vec2ui> matches = { vec2ui(94, 98), vec2ui(118, 119), vec2ui(118, 121), vec2ui(118, 133), vec2ui(118, 134), vec2ui(152, 155), vec2ui(156, 157), vec2ui(161, 163), vec2ui(165, 171), vec2ui(165, 174) };
-	std::vector<vec2ui> matches = { vec2ui(104, 125) };
-	printMatches("debug/", matches, true);
-	//saveMatchToPLY("debug/", vec2ui(118, 135), true);
-	std::cout << "waiting..." << std::endl;
-	getchar();
-	//!!!DEBUGGING
-
-	// compare to reference
-	std::vector<vec2ui> falsePositives, falseNegatives;
-	checkFiltered(imagePairMatchesFiltered, falsePositives, falseNegatives);
-
-	std::cout << "#false positives = " << falsePositives.size() << std::endl;
-	std::cout << "#false negatives = " << falseNegatives.size() << std::endl;
-
-	// visualize
-	printMatches("debug/falsePositives/", falsePositives, true);
-	printMatches("debug/falseNegatives/", falseNegatives, false);
-}
+//void TestMatching::load(const std::string& filename, const std::string siftFile)
+//{
+//	if (!util::fileExists(siftFile)) throw MLIB_EXCEPTION(siftFile + " does not exist");
+//	m_siftManager->loadFromFile(siftFile);
+//
+//	if (filename.empty() || !util::fileExists(filename)) {
+//		std::cout << "warning: " << filename << " does not exist, need to re-compute" << std::endl;
+//		return;
+//	}
+//	BinaryDataStreamFile s(filename, false);
+//	unsigned int numImages;
+//	s >> numImages;
+//	s >> m_origMatches;
+//	s.readData((BYTE*)&m_stage, sizeof(int));
+//	std::cout << "load: stage " << m_stage << std::endl;
+//	for (unsigned int i = 1; i < numImages; i++) { // no matches for image 0
+//		if (m_stage >= HAS_MATCHES) {
+//			const bool filtered = false;
+//			std::vector<unsigned int> numMatchesPerImagePair;
+//			std::vector<float> matchDistancesPerImagePair;
+//			std::vector<vec2ui> matchKeyIndicesPerImagePair;
+//			s >> numMatchesPerImagePair;
+//			s >> matchDistancesPerImagePair;
+//			s >> matchKeyIndicesPerImagePair;
+//			MLIB_ASSERT(numMatchesPerImagePair.size() == i && matchDistancesPerImagePair.size() == i*MAX_MATCHES_PER_IMAGE_PAIR_RAW && matchKeyIndicesPerImagePair.size() == i*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
+//
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getNumMatchesCUDA(i, filtered), numMatchesPerImagePair.data(), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyHostToDevice));
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchDistsCUDA(i, filtered), matchDistancesPerImagePair.data(), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyHostToDevice));
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchKeyIndicesCUDA(i, filtered), matchKeyIndicesPerImagePair.data(), sizeof(uint2)*matchKeyIndicesPerImagePair.size(), cudaMemcpyHostToDevice));
+//		}
+//		if (m_stage >= FILTERED_IMPAIR_MATCHES) {
+//			const bool filtered = true;
+//			std::vector<unsigned int> numMatchesPerImagePair;
+//			std::vector<float> matchDistancesPerImagePair;
+//			std::vector<vec2ui> matchKeyIndicesPerImagePair;
+//			s >> numMatchesPerImagePair;
+//			s >> matchDistancesPerImagePair;
+//			s >> matchKeyIndicesPerImagePair;
+//			MLIB_ASSERT(numMatchesPerImagePair.size() == i && matchDistancesPerImagePair.size() == i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED && matchKeyIndicesPerImagePair.size() == i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+//
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getNumMatchesCUDA(i, filtered), numMatchesPerImagePair.data(), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyHostToDevice));
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchDistsCUDA(i, filtered), matchDistancesPerImagePair.data(), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyHostToDevice));
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(getMatchKeyIndicesCUDA(i, filtered), matchKeyIndicesPerImagePair.data(), sizeof(uint2)*matchKeyIndicesPerImagePair.size(), cudaMemcpyHostToDevice));
+//		}
+//	}
+//	s.closeStream();
+//}
+//
+//void TestMatching::save(const std::string& filename) const
+//{
+//	std::cout << "saving orig matches... ";
+//	BinaryDataStreamFile s(filename, true);
+//	unsigned int numImages = m_siftManager->getNumImages();
+//	s << numImages;
+//	s << m_origMatches;
+//	s.writeData((const BYTE*)&m_stage, sizeof(int));
+//	for (unsigned int i = 1; i < numImages; i++) { // no matches for image 0
+//		if (m_stage >= HAS_MATCHES) {
+//			const bool filtered = false;
+//			std::vector<unsigned int> numMatchesPerImagePair(i);
+//			std::vector<float> matchDistancesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
+//			std::vector<vec2ui> matchKeyIndicesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_RAW);
+//
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatchesPerImagePair.data(), getNumMatchesCUDA(i, filtered), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDistancesPerImagePair.data(), getMatchDistsCUDA(i, filtered), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyDeviceToHost));
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchKeyIndicesPerImagePair.data(), getMatchKeyIndicesCUDA(i, filtered), sizeof(uint2)*matchKeyIndicesPerImagePair.size(), cudaMemcpyDeviceToHost));
+//
+//			s << numMatchesPerImagePair;
+//			s << matchDistancesPerImagePair;
+//			s << matchKeyIndicesPerImagePair;
+//		}
+//		if (m_stage >= FILTERED_IMPAIR_MATCHES) {
+//			const bool filtered = true;
+//			std::vector<unsigned int> numMatchesPerImagePair(i);
+//			std::vector<float> matchDistancesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+//			std::vector<vec2ui> matchKeyIndicesPerImagePair(i*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+//
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatchesPerImagePair.data(), getNumMatchesCUDA(i, filtered), sizeof(int)*numMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDistancesPerImagePair.data(), getMatchDistsCUDA(i, filtered), sizeof(float)*matchDistancesPerImagePair.size(), cudaMemcpyDeviceToHost));
+//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchKeyIndicesPerImagePair.data(), getMatchKeyIndicesCUDA(i, filtered), sizeof(uint2)*matchKeyIndicesPerImagePair.size(), cudaMemcpyDeviceToHost));
+//
+//			s << numMatchesPerImagePair;
+//			s << matchDistancesPerImagePair;
+//			s << matchKeyIndicesPerImagePair;
+//		}
+//	}
+//	s.closeStream();
+//	std::cout << "done!" << std::endl;
+//}
+//
+//void TestMatching::test()
+//{
+//	if (m_stage < HAS_MATCHES) {
+//		matchAll();
+//		save("debug/matchAll.bin");
+//	}
+//	//!!!DEBUGGING
+//	//std::vector<vec2ui> matches = { vec2ui(0, 2) };
+//	//printMatches("debug/", matches, false);
+//	//std::cout << "waiting..." << std::endl;
+//	//getchar();
+//	//!!!DEBUGGING
+//
+//	unsigned int numImages = m_siftManager->getNumImages();
+//
+//	std::vector<vec2ui> imagePairMatchesFiltered;
+//	filterImagePairMatches(imagePairMatchesFiltered);
+//
+//	//!!!DEBUGGING
+//	//std::vector<vec2ui> matches = { vec2ui(94, 98), vec2ui(118, 119), vec2ui(118, 121), vec2ui(118, 133), vec2ui(118, 134), vec2ui(152, 155), vec2ui(156, 157), vec2ui(161, 163), vec2ui(165, 171), vec2ui(165, 174) };
+//	std::vector<vec2ui> matches = { vec2ui(104, 125) };
+//	printMatches("debug/", matches, true);
+//	//saveMatchToPLY("debug/", vec2ui(118, 135), true);
+//	std::cout << "waiting..." << std::endl;
+//	getchar();
+//	//!!!DEBUGGING
+//
+//	// compare to reference
+//	std::vector<vec2ui> falsePositives, falseNegatives;
+//	checkFiltered(imagePairMatchesFiltered, falsePositives, falseNegatives);
+//
+//	std::cout << "#false positives = " << falsePositives.size() << std::endl;
+//	std::cout << "#false negatives = " << falseNegatives.size() << std::endl;
+//
+//	// visualize
+//	printMatches("debug/falsePositives/", falsePositives, true);
+//	printMatches("debug/falseNegatives/", falseNegatives, false);
+//}
 
 void TestMatching::matchAll(bool print /*= false*/, const std::string outDir /*= ""*/)
 {
@@ -573,28 +574,28 @@ void TestMatching::loadFromSensor(const std::string& sensorFile, const std::stri
 	createCachedFrames();
 }
 
-void TestMatching::saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices /*= std::vector<unsigned int>()*/) const
-{
-	std::cout << "computing point cloud..." << std::endl;
-	std::vector<unsigned int> pointCloudFrameIndices;
-	if (frameIndices.empty()) {
-		for (unsigned int i = 0; i < m_colorImages.size(); i++) pointCloudFrameIndices.push_back(i);
-	}
-	else {
-		pointCloudFrameIndices = frameIndices;
-	}
-
-	PointCloudf pc;
-	unsigned int width = m_depthImages[0].getWidth();
-	float scaleWidth = (float)m_colorImages[0].getWidth() / (float)m_depthImages[0].getWidth();
-	float scaleHeight = (float)m_colorImages[0].getHeight() / (float)m_depthImages[0].getHeight();
-	for (unsigned int k = 0; k < pointCloudFrameIndices.size(); k++) {
-		recordPointCloud(pc, pointCloudFrameIndices[k]);
-	} // frames
-	std::cout << "saving to file... ";
-	PointCloudIOf::saveToFile(filename, pc);
-	std::cout << "done!" << std::endl;
-}
+//void TestMatching::saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices /*= std::vector<unsigned int>()*/) const
+//{
+//	std::cout << "computing point cloud..." << std::endl;
+//	std::vector<unsigned int> pointCloudFrameIndices;
+//	if (frameIndices.empty()) {
+//		for (unsigned int i = 0; i < m_colorImages.size(); i++) pointCloudFrameIndices.push_back(i);
+//	}
+//	else {
+//		pointCloudFrameIndices = frameIndices;
+//	}
+//
+//	PointCloudf pc;
+//	unsigned int width = m_depthImages[0].getWidth();
+//	float scaleWidth = (float)m_colorImages[0].getWidth() / (float)m_depthImages[0].getWidth();
+//	float scaleHeight = (float)m_colorImages[0].getHeight() / (float)m_depthImages[0].getHeight();
+//	for (unsigned int k = 0; k < pointCloudFrameIndices.size(); k++) {
+//		recordPointCloud(pc, pointCloudFrameIndices[k]);
+//	} // frames
+//	std::cout << "saving to file... ";
+//	PointCloudIOf::saveToFile(filename, pc);
+//	std::cout << "done!" << std::endl;
+//}
 
 void TestMatching::recordPointCloud(PointCloudf& pc, unsigned int frame) const
 {
@@ -624,25 +625,25 @@ void TestMatching::recordPointCloud(PointCloudf& pc, unsigned int frame) const
 	} // depth pixels
 }
 
-void TestMatching::saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const
-{
-	std::cout << "saving match " << imageIndices << "... ";
-	// frames
-	PointCloudf pc0, pc1;
-	recordPointCloud(pc0, imageIndices.x);
-	recordPointCloud(pc1, imageIndices.y);
-	PointCloudIOf::saveToFile(dir + std::to_string(imageIndices.x) + ".ply", pc0);
-	PointCloudIOf::saveToFile(dir + std::to_string(imageIndices.y) + ".ply", pc1);
-
-	// keys
-	vec4f red(1.0f, 0.0f, 0.0f, 1.0f);
-	vec4f green(0.0f, 1.0f, 0.0f, 1.0f);
-	MeshDataf keys0, keys1;
-	recordKeysMeshData(keys0, keys1, imageIndices, filtered, red, green);
-	MeshIOf::saveToFile(dir + std::to_string(imageIndices.x) + "-keys.ply", keys0);
-	MeshIOf::saveToFile(dir + std::to_string(imageIndices.y) + "-keys.ply", keys1);
-	std::cout << "done!" << std::endl;
-}
+//void TestMatching::saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const
+//{
+//	std::cout << "saving match " << imageIndices << "... ";
+//	// frames
+//	PointCloudf pc0, pc1;
+//	recordPointCloud(pc0, imageIndices.x);
+//	recordPointCloud(pc1, imageIndices.y);
+//	PointCloudIOf::saveToFile(dir + std::to_string(imageIndices.x) + ".ply", pc0);
+//	PointCloudIOf::saveToFile(dir + std::to_string(imageIndices.y) + ".ply", pc1);
+//
+//	// keys
+//	vec4f red(1.0f, 0.0f, 0.0f, 1.0f);
+//	vec4f green(0.0f, 1.0f, 0.0f, 1.0f);
+//	MeshDataf keys0, keys1;
+//	recordKeysMeshData(keys0, keys1, imageIndices, filtered, red, green);
+//	MeshIOf::saveToFile(dir + std::to_string(imageIndices.x) + "-keys.ply", keys0);
+//	MeshIOf::saveToFile(dir + std::to_string(imageIndices.y) + "-keys.ply", keys1);
+//	std::cout << "done!" << std::endl;
+//}
 
 void TestMatching::recordKeysMeshData(MeshDataf& keys0, MeshDataf& keys1, const vec2ui& imageIndices, bool filtered, const vec4f& color0, const vec4f& color1) const
 {
@@ -904,321 +905,321 @@ void TestMatching::filterByDenseVerify(bool print /*= false*/, const std::string
 	m_stage = FILTERED_DV;
 }
 
-void TestMatching::matchFrame(unsigned int frame, bool print, bool checkReference)
-{
-	if (m_colorImages.front().getWidth() != m_widthSift) {
-		std::cout << "ERROR haven't implemented the resampling for color/sift res" << std::endl;
-		while (1);
-	}
-
-	SiftMatchGPU* siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
-	siftMatcher->InitSiftMatch();
-	const float ratioMax = GlobalBundlingState::get().s_siftMatchRatioMaxGlobal;
-	const float matchThresh = GlobalBundlingState::get().s_siftMatchThresh;
-	unsigned int numImages = m_siftManager->getNumImages();
-	const bool filtered = false;
-	const unsigned int minNumMatches = GlobalBundlingState::get().s_minNumMatchesGlobal;
-
-	std::cout << "matching frame " << frame << "... ";
-	Timer t;
-
-	// match frame cur to all previous
-	SIFTImageGPU& curImage = m_siftManager->getImageGPU(frame);
-	int num2 = (int)m_siftManager->getNumKeyPointsPerImage(frame);
-	if (num2 == 0) {
-		std::cout << "no keypoints for frame " << frame << "!" << std::endl;
-		SAFE_DELETE(siftMatcher); return;
-	}
-
-	// match to all previous
-	for (unsigned int prev = 0; prev < frame; prev++) {
-		SIFTImageGPU& prevImage = m_siftManager->getImageGPU(prev);
-		int num1 = (int)m_siftManager->getNumKeyPointsPerImage(prev);
-		if (num1 == 0) {
-			MLIB_CUDA_SAFE_CALL(cudaMemset(m_siftManager->d_currNumMatchesPerImagePair + prev, 0, sizeof(int)));
-			continue;
-		}
-
-		uint2 keyPointOffset = make_uint2(0, 0);
-		ImagePairMatch& imagePairMatch = m_siftManager->getImagePairMatchDEBUG(prev, frame, keyPointOffset);
-
-		siftMatcher->SetDescriptors(0, num1, (unsigned char*)prevImage.d_keyPointDescs);
-		siftMatcher->SetDescriptors(1, num2, (unsigned char*)curImage.d_keyPointDescs);
-		siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset, matchThresh, ratioMax);
-	}  // prev frames
-
-	t.stop();
-	std::cout << "done! (" << t.getElapsedTimeMS() << " ms)" << std::endl;
-
-	// print matches
-	//if (print) SiftVisualization::printMatches("debug/", m_siftManager, m_colorImages, frame, false);
-
-	SAFE_DELETE(siftMatcher);
-	// debug output
-	std::vector<unsigned int> numMatchesRaw; unsigned int countRawMatch = 0;
-	m_siftManager->getNumRawMatchesDEBUG(numMatchesRaw);
-	for (unsigned int i = 0; i < numMatchesRaw.size(); i++) {
-		if (numMatchesRaw[i] > 0) countRawMatch++;
-	}
-	std::cout << "RAW: found matches to " << countRawMatch << std::endl;
-
-	//filter
-	MLIB_ASSERT(frame == m_siftManager->getNumImages() - 1); // TODO make this a param
-	//SIFTMatchFilter::filterKeyPointMatches(m_siftManager, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse), minNumMatches);
-	m_siftManager->FilterKeyPointMatchesCU(frame, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse),
-		GlobalBundlingState::get().s_minNumMatchesGlobal, GlobalBundlingState::get().s_maxKabschResidual2, false);
-
-	// debug output
-	std::vector<unsigned int> numMatchesFiltKey; unsigned int countFiltKeyMatch = 0;
-	m_siftManager->getNumFiltMatchesDEBUG(numMatchesFiltKey);
-	for (unsigned int i = 0; i < numMatchesFiltKey.size(); i++) {
-		if (numMatchesFiltKey[i] > 0) countFiltKeyMatch++;
-	}
-	std::cout << "FILT_KEY: found matches to " << countFiltKeyMatch << std::endl;
-
-	m_siftManager->FilterMatchesBySurfaceAreaCU(frame, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse), GlobalBundlingState::get().s_surfAreaPcaThresh);
-
-	// debug output
-	std::vector<unsigned int> numMatchesFiltSA; unsigned int countFiltSAMatch = 0;
-	m_siftManager->getNumFiltMatchesDEBUG(numMatchesFiltSA);
-	for (unsigned int i = 0; i < numMatchesFiltSA.size(); i++) {
-		if (numMatchesFiltSA[i] > 0) countFiltSAMatch++;
-	}
-	std::cout << "FILT_SA: found matches to " << countFiltSAMatch << std::endl;
-
-	//{ //!!!DEBUGGING
-	//	vec2ui imageIndices(0, frame);
-	//	std::vector<float4x4> transforms(frame); MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), m_siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*frame, cudaMemcpyDeviceToHost));
-	//	float4x4 transformPrvToCur = transforms[imageIndices.x];
-	//	SiftVisualization::saveImPairToPointCloud("debug/", m_cachedFrames, GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight,
-	//		imageIndices, MatrixConversion::toMlib(transformPrvToCur));
-	//	SIFTMatchFilter::visualizeProjError(m_siftManager, imageIndices, m_cachedFrames, MatrixConversion::toCUDA(m_intrinsicsDownsampled),
-	//		transformPrvToCur.getInverse(), 0.1f, 3.0f);
-	//}
-
-	m_siftManager->FilterMatchesByDenseVerifyCU(frame, GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight,
-		MatrixConversion::toCUDA(m_intrinsicsDownsampled), d_cachedFrames, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
-		GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh,
-		//GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax); //TODO PARAMS
-		0.1f, 3.0f);
-
-	if (checkReference) {
-		std::cout << "CHECKING MATCHES WITH REFERENCE TRAJECTORY..." << std::endl;
-		// check with trajectory
-		const float maxResidualThres2 = 0.05 * 0.05;
-
-		// get data
-		std::vector<SIFTKeyPoint> keys;
-		keys.resize(m_siftManager->m_numKeyPoints);
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(keys.data(), m_siftManager->d_keyPoints, sizeof(SIFTKeyPoint) * keys.size(), cudaMemcpyDeviceToHost));
-
-		std::vector<unsigned int> numMatchesFilt; std::vector<float> matchDistsFilt; std::vector<uint2> matchKeyIndicesFilt;
-		m_siftManager->getNumFiltMatchesDEBUG(numMatchesFilt);
-		unsigned int countMatchFrames = 0;
-		for (unsigned int i = 0; i < numMatchesFilt.size(); i++) {
-			if (numMatchesFilt[i] > 0) countMatchFrames++;
-		}
-		std::cout << "\tfound matches to " << countMatchFrames << std::endl;
-
-		// compare to reference trajectory
-		for (unsigned int i = 0; i < numMatchesFilt.size(); i++) {
-			const vec2ui imageIndices(i, frame);
-			bool ok = true;
-			if (m_referenceTrajectory[imageIndices.x][0] == -std::numeric_limits<float>::infinity() ||
-				m_referenceTrajectory[imageIndices.y][0] == -std::numeric_limits<float>::infinity()) {
-				std::cout << "warning: no reference trajectory for " << imageIndices << std::endl;
-				ok = false; // just classify as bad
-			}
-			const mat4f refTransform = m_referenceTrajectory[imageIndices.y].getInverse() * m_referenceTrajectory[imageIndices.x]; // src to tgt
-
-			std::vector<vec3f> srcPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED), tgtPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
-
-			m_siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(i, matchKeyIndicesFilt, matchDistsFilt);
-			getSrcAndTgtPts(keys.data(), matchKeyIndicesFilt.data(), numMatchesFilt[i],
-				(float3*)srcPts.data(), (float3*)tgtPts.data(), MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse));
-			float maxRes = 0.0f;
-			for (unsigned int m = 0; m < numMatchesFilt[i]; m++) {
-				vec3f d = refTransform * srcPts[m] - tgtPts[m];
-				float res = d | d;
-				if (res > maxRes) maxRes = res;
-			}
-			if (maxRes > maxResidualThres2) { // bad
-				SiftVisualization::printMatch(m_siftManager, "debug/" + std::to_string(i) + "-" + std::to_string(frame) + ".png",
-					imageIndices, m_colorImages[i], m_colorImages[frame], GlobalBundlingState::get().s_siftMatchThresh, true, -1);
-			}
-		}
-	}
-	std::cout << "DONE" << std::endl;
-}
-
-#include "SBA.h"
-void TestMatching::debugOptimizeGlobal()
-{
-	unsigned int numFrames = m_siftManager->getNumImages();
-	unsigned int lastFrame = numFrames - 1;
-
-	const std::string initialTrajectoryFile = "debug/test208.trajectory";
-	std::cout << "using initial trajectory: " << initialTrajectoryFile << std::endl;
-	std::vector<mat4f> globTrajectory;
-	{
-		BinaryDataStreamFile s(initialTrajectoryFile, false);
-		s >> globTrajectory;
-	}
-	MLIB_ASSERT(globTrajectory.size() == m_siftManager->getNumImages());
-
-	// trajectory
-	float4x4* d_globalTrajectory = NULL;
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globalTrajectory, sizeof(float4x4)*m_siftManager->getNumImages()));
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory, globTrajectory.data(), sizeof(float4x4)*globTrajectory.size(), cudaMemcpyHostToDevice));
-
-	//std::cout << "saving init to point cloud... ";
-	//SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
-	//std::cout << "done!" << std::endl;
-
-	const unsigned int numNonLinIters = 4;
-	const unsigned int numLinIters = 100;
-
-	// optimize
-	SBA bundler;
-	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
-	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
-	bundler.init(m_siftManager->getNumImages(), maxNumResiduals);
-	const bool useVerify = false;
-
-	bool isStart = true;
-	bool isEnd = true;
-	bool isScanDone = false;
-	for (unsigned int i = 0; i < 10; i++) {
-		bundler.align(m_siftManager, NULL, d_globalTrajectory, numNonLinIters, numLinIters,
-			useVerify, false, false, isStart, isEnd, isScanDone);
-
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globTrajectory.data(), d_globalTrajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
-
-		//if (i % 10 == 0) {
-		std::cout << "saving opt " << i << " to point cloud... ";
-		SiftVisualization::saveToPointCloud("debug/opt" + std::to_string(i) + ".ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
-		std::cout << "done!" << std::endl;
-		//}
-	}
-
-	MLIB_CUDA_SAFE_FREE(d_globalTrajectory);
-
-	int a = 5;
-}
-
-void TestMatching::checkCorrespondences()
-{
-	MLIB_ASSERT(!m_referenceTrajectory.empty());
-	const std::string outDir = "debug/_checkCorr/"; if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
-	const std::string inspectDir = "debug/_checkCorr/inspect/"; if (!util::directoryExists(inspectDir)) util::makeDirectory(inspectDir);
-
-	// debug hack
-	m_siftManager->AddCurrToResidualsCU(m_siftManager->getNumImages() - 1, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse));
-
-	std::cout << "CHECKING MATCHES WITH REFERENCE TRAJECTORY..." << std::endl;
-	// check with trajectory
-	const float maxResidualThres2 = 0.05f * 0.05f;
-	const float inspectMaxResThresh2 = 0.1f * 0.1f;
-	const unsigned int numImages = m_siftManager->getNumImages();
-
-	// get data
-	unsigned int numCorr = m_siftManager->getNumGlobalCorrespondences();
-	std::vector<EntryJ> correspondences(numCorr);
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), m_siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ)*numCorr, cudaMemcpyDeviceToHost));
-	std::cout << "#corr = " << numCorr << std::endl;
-
-	unsigned int badCount = 0;
-
-	// compare to reference trajectory
-	for (unsigned int i = 0; i < correspondences.size(); i++) {
-		const EntryJ& corr = correspondences[i];
-		if (!corr.isValid()) continue;
-
-		const vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
-		bool ok = true;
-		if (m_referenceTrajectory[imageIndices.x][0] == -std::numeric_limits<float>::infinity() ||
-			m_referenceTrajectory[imageIndices.y][0] == -std::numeric_limits<float>::infinity()) {
-			std::cout << "warning: no reference trajectory for " << imageIndices << std::endl;
-			ok = false; // just classify as bad
-		}
-		else {
-			const mat4f refTransform = m_referenceTrajectory[imageIndices.y].getInverse() * m_referenceTrajectory[imageIndices.x]; // src to tgt
-
-			vec3f src(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z);
-			vec3f tgt(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
-			vec3f d = refTransform * src - tgt;
-			float res = d | d;
-
-			if (res > maxResidualThres2) { // bad
-				const std::string dir = (res > inspectMaxResThresh2) ? inspectDir : outDir;
-				SiftVisualization::printMatch(dir + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y) + ".png",
-					corr, m_colorImages[imageIndices.x], m_colorImages[imageIndices.y], m_colorCalibration.m_Intrinsic);
-				ok = false;
-			}
-		}
-		if (!ok) badCount++;
-	}
-	std::cout << "found " << badCount << " bad correspondences" << std::endl;
-
-	// check if missing links
-	std::vector<unsigned int> numMatchesToPrev(numImages, 0);
-	for (unsigned int i = 0; i < correspondences.size(); i++) {
-		const EntryJ& corr = correspondences[i];
-		if (!corr.isValid()) continue;
-		MLIB_ASSERT(corr.imgIdx_i < corr.imgIdx_j);
-		numMatchesToPrev[corr.imgIdx_i]++;
-	}
-	for (unsigned int i = 1; i < numMatchesToPrev.size(); i++) {
-		if (numMatchesToPrev[i] == 0) {
-			std::cout << "image " << i << " has no matches to previous!" << std::endl;
-		}
-	}
-	std::cout << "DONE" << std::endl;
-}
-
-void TestMatching::printKeys()
-{
-	const std::string outDir = "debug/keys/"; if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
-	const unsigned int numImages = m_siftManager->getNumImages();
-
-	for (unsigned int i = 0; i < numImages; i++) {
-		SiftVisualization::printKey(outDir + std::to_string(i) + ".png", m_colorImages[i], m_siftManager, i);
-	}
-	std::cout << "DONE" << std::endl;
-}
-
-void TestMatching::debugMatchInfo()
-{
-	const std::string outDir = "debug/_checkCorr/inspect/full/";
-	if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
-
-	const std::vector<vec2ui> imagePairs = { vec2ui(39, 207), vec2ui(53, 206), vec2ui(55, 206), vec2ui(58, 206), vec2ui(59, 207) };
-	std::unordered_map<vec2ui, unsigned int> imagePairSet;
-	for (unsigned int i = 0; i < imagePairs.size(); i++) imagePairSet[imagePairs[i]] = i;
-
-	std::vector<std::vector<float3>> imPairSrcPts(imagePairs.size());
-	std::vector<std::vector<float3>> imPairTgtPts(imagePairs.size());
-
-	// collect matches for image pairs from corr array
-	unsigned int numCorr = m_siftManager->getNumGlobalCorrespondences();
-	std::vector<EntryJ> correspondences(numCorr);
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), m_siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ)*numCorr, cudaMemcpyDeviceToHost));
-	std::cout << "#corr = " << numCorr << std::endl;
-
-	for (unsigned int i = 0; i < correspondences.size(); i++) {
-		const EntryJ& corr = correspondences[i];
-		if (!corr.isValid()) continue;
-		vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
-		auto a = imagePairSet.find(imageIndices);
-		if (a != imagePairSet.end()) {
-			unsigned int index = a->second;
-			imPairSrcPts[index].push_back(corr.pos_i);
-			imPairTgtPts[index].push_back(corr.pos_j);
-		}
-	}
-
-	// todo fix this hack
-}
+//void TestMatching::matchFrame(unsigned int frame, bool print, bool checkReference)
+//{
+//	if (m_colorImages.front().getWidth() != m_widthSift) {
+//		std::cout << "ERROR haven't implemented the resampling for color/sift res" << std::endl;
+//		while (1);
+//	}
+//
+//	SiftMatchGPU* siftMatcher = new SiftMatchGPU(GlobalBundlingState::get().s_maxNumKeysPerImage);
+//	siftMatcher->InitSiftMatch();
+//	const float ratioMax = GlobalBundlingState::get().s_siftMatchRatioMaxGlobal;
+//	const float matchThresh = GlobalBundlingState::get().s_siftMatchThresh;
+//	unsigned int numImages = m_siftManager->getNumImages();
+//	const bool filtered = false;
+//	const unsigned int minNumMatches = GlobalBundlingState::get().s_minNumMatchesGlobal;
+//
+//	std::cout << "matching frame " << frame << "... ";
+//	Timer t;
+//
+//	// match frame cur to all previous
+//	SIFTImageGPU& curImage = m_siftManager->getImageGPU(frame);
+//	int num2 = (int)m_siftManager->getNumKeyPointsPerImage(frame);
+//	if (num2 == 0) {
+//		std::cout << "no keypoints for frame " << frame << "!" << std::endl;
+//		SAFE_DELETE(siftMatcher); return;
+//	}
+//
+//	// match to all previous
+//	for (unsigned int prev = 0; prev < frame; prev++) {
+//		SIFTImageGPU& prevImage = m_siftManager->getImageGPU(prev);
+//		int num1 = (int)m_siftManager->getNumKeyPointsPerImage(prev);
+//		if (num1 == 0) {
+//			MLIB_CUDA_SAFE_CALL(cudaMemset(m_siftManager->d_currNumMatchesPerImagePair + prev, 0, sizeof(int)));
+//			continue;
+//		}
+//
+//		uint2 keyPointOffset = make_uint2(0, 0);
+//		ImagePairMatch& imagePairMatch = m_siftManager->getImagePairMatchDEBUG(prev, frame, keyPointOffset);
+//
+//		siftMatcher->SetDescriptors(0, num1, (unsigned char*)prevImage.d_keyPointDescs);
+//		siftMatcher->SetDescriptors(1, num2, (unsigned char*)curImage.d_keyPointDescs);
+//		siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset, matchThresh, ratioMax);
+//	}  // prev frames
+//
+//	t.stop();
+//	std::cout << "done! (" << t.getElapsedTimeMS() << " ms)" << std::endl;
+//
+//	// print matches
+//	//if (print) SiftVisualization::printMatches("debug/", m_siftManager, m_colorImages, frame, false);
+//
+//	SAFE_DELETE(siftMatcher);
+//	// debug output
+//	std::vector<unsigned int> numMatchesRaw; unsigned int countRawMatch = 0;
+//	m_siftManager->getNumRawMatchesDEBUG(numMatchesRaw);
+//	for (unsigned int i = 0; i < numMatchesRaw.size(); i++) {
+//		if (numMatchesRaw[i] > 0) countRawMatch++;
+//	}
+//	std::cout << "RAW: found matches to " << countRawMatch << std::endl;
+//
+//	//filter
+//	MLIB_ASSERT(frame == m_siftManager->getNumImages() - 1); // TODO make this a param
+//	//SIFTMatchFilter::filterKeyPointMatches(m_siftManager, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse), minNumMatches);
+//	m_siftManager->FilterKeyPointMatchesCU(frame, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse),
+//		GlobalBundlingState::get().s_minNumMatchesGlobal, GlobalBundlingState::get().s_maxKabschResidual2, false);
+//
+//	// debug output
+//	std::vector<unsigned int> numMatchesFiltKey; unsigned int countFiltKeyMatch = 0;
+//	m_siftManager->getNumFiltMatchesDEBUG(numMatchesFiltKey);
+//	for (unsigned int i = 0; i < numMatchesFiltKey.size(); i++) {
+//		if (numMatchesFiltKey[i] > 0) countFiltKeyMatch++;
+//	}
+//	std::cout << "FILT_KEY: found matches to " << countFiltKeyMatch << std::endl;
+//
+//	m_siftManager->FilterMatchesBySurfaceAreaCU(frame, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse), GlobalBundlingState::get().s_surfAreaPcaThresh);
+//
+//	// debug output
+//	std::vector<unsigned int> numMatchesFiltSA; unsigned int countFiltSAMatch = 0;
+//	m_siftManager->getNumFiltMatchesDEBUG(numMatchesFiltSA);
+//	for (unsigned int i = 0; i < numMatchesFiltSA.size(); i++) {
+//		if (numMatchesFiltSA[i] > 0) countFiltSAMatch++;
+//	}
+//	std::cout << "FILT_SA: found matches to " << countFiltSAMatch << std::endl;
+//
+//	//{ //!!!DEBUGGING
+//	//	vec2ui imageIndices(0, frame);
+//	//	std::vector<float4x4> transforms(frame); MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), m_siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*frame, cudaMemcpyDeviceToHost));
+//	//	float4x4 transformPrvToCur = transforms[imageIndices.x];
+//	//	SiftVisualization::saveImPairToPointCloud("debug/", m_cachedFrames, GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight,
+//	//		imageIndices, MatrixConversion::toMlib(transformPrvToCur));
+//	//	SIFTMatchFilter::visualizeProjError(m_siftManager, imageIndices, m_cachedFrames, MatrixConversion::toCUDA(m_intrinsicsDownsampled),
+//	//		transformPrvToCur.getInverse(), 0.1f, 3.0f);
+//	//}
+//
+//	m_siftManager->FilterMatchesByDenseVerifyCU(frame, GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight,
+//		MatrixConversion::toCUDA(m_intrinsicsDownsampled), d_cachedFrames, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
+//		GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh,
+//		//GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax); //TODO PARAMS
+//		0.1f, 3.0f);
+//
+//	if (checkReference) {
+//		std::cout << "CHECKING MATCHES WITH REFERENCE TRAJECTORY..." << std::endl;
+//		// check with trajectory
+//		const float maxResidualThres2 = 0.05 * 0.05;
+//
+//		// get data
+//		std::vector<SIFTKeyPoint> keys;
+//		keys.resize(m_siftManager->m_numKeyPoints);
+//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(keys.data(), m_siftManager->d_keyPoints, sizeof(SIFTKeyPoint) * keys.size(), cudaMemcpyDeviceToHost));
+//
+//		std::vector<unsigned int> numMatchesFilt; std::vector<float> matchDistsFilt; std::vector<uint2> matchKeyIndicesFilt;
+//		m_siftManager->getNumFiltMatchesDEBUG(numMatchesFilt);
+//		unsigned int countMatchFrames = 0;
+//		for (unsigned int i = 0; i < numMatchesFilt.size(); i++) {
+//			if (numMatchesFilt[i] > 0) countMatchFrames++;
+//		}
+//		std::cout << "\tfound matches to " << countMatchFrames << std::endl;
+//
+//		// compare to reference trajectory
+//		for (unsigned int i = 0; i < numMatchesFilt.size(); i++) {
+//			const vec2ui imageIndices(i, frame);
+//			bool ok = true;
+//			if (m_referenceTrajectory[imageIndices.x][0] == -std::numeric_limits<float>::infinity() ||
+//				m_referenceTrajectory[imageIndices.y][0] == -std::numeric_limits<float>::infinity()) {
+//				std::cout << "warning: no reference trajectory for " << imageIndices << std::endl;
+//				ok = false; // just classify as bad
+//			}
+//			const mat4f refTransform = m_referenceTrajectory[imageIndices.y].getInverse() * m_referenceTrajectory[imageIndices.x]; // src to tgt
+//
+//			std::vector<vec3f> srcPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED), tgtPts(MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+//
+//			m_siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(i, matchKeyIndicesFilt, matchDistsFilt);
+//			getSrcAndTgtPts(keys.data(), matchKeyIndicesFilt.data(), numMatchesFilt[i],
+//				(float3*)srcPts.data(), (float3*)tgtPts.data(), MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse));
+//			float maxRes = 0.0f;
+//			for (unsigned int m = 0; m < numMatchesFilt[i]; m++) {
+//				vec3f d = refTransform * srcPts[m] - tgtPts[m];
+//				float res = d | d;
+//				if (res > maxRes) maxRes = res;
+//			}
+//			if (maxRes > maxResidualThres2) { // bad
+//				SiftVisualization::printMatch(m_siftManager, "debug/" + std::to_string(i) + "-" + std::to_string(frame) + ".png",
+//					imageIndices, m_colorImages[i], m_colorImages[frame], GlobalBundlingState::get().s_siftMatchThresh, true, -1);
+//			}
+//		}
+//	}
+//	std::cout << "DONE" << std::endl;
+//}
+//
+//
+//void TestMatching::debugOptimizeGlobal()
+//{
+//	unsigned int numFrames = m_siftManager->getNumImages();
+//	unsigned int lastFrame = numFrames - 1;
+//
+//	const std::string initialTrajectoryFile = "debug/test208.trajectory";
+//	std::cout << "using initial trajectory: " << initialTrajectoryFile << std::endl;
+//	std::vector<mat4f> globTrajectory;
+//	{
+//		BinaryDataStreamFile s(initialTrajectoryFile, false);
+//		s >> globTrajectory;
+//	}
+//	MLIB_ASSERT(globTrajectory.size() == m_siftManager->getNumImages());
+//
+//	// trajectory
+//	float4x4* d_globalTrajectory = NULL;
+//	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globalTrajectory, sizeof(float4x4)*m_siftManager->getNumImages()));
+//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory, globTrajectory.data(), sizeof(float4x4)*globTrajectory.size(), cudaMemcpyHostToDevice));
+//
+//	//std::cout << "saving init to point cloud... ";
+//	//SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
+//	//std::cout << "done!" << std::endl;
+//
+//	const unsigned int numNonLinIters = 4;
+//	const unsigned int numLinIters = 100;
+//
+//	// optimize
+//	SBA bundler;
+//	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
+//	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
+//	bundler.init(m_siftManager->getNumImages(), maxNumResiduals);
+//	const bool useVerify = false;
+//
+//	bool isStart = true;
+//	bool isEnd = true;
+//	bool isScanDone = false;
+//	for (unsigned int i = 0; i < 10; i++) {
+//		bundler.align(m_siftManager, NULL, d_globalTrajectory, numNonLinIters, numLinIters,
+//			useVerify, false, false, isStart, isEnd, isScanDone);
+//
+//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(globTrajectory.data(), d_globalTrajectory, sizeof(mat4f)*numFrames, cudaMemcpyDeviceToHost));
+//
+//		//if (i % 10 == 0) {
+//		std::cout << "saving opt " << i << " to point cloud... ";
+//		SiftVisualization::saveToPointCloud("debug/opt" + std::to_string(i) + ".ply", m_depthImages, m_colorImages, globTrajectory, m_depthCalibration.m_IntrinsicInverse);
+//		std::cout << "done!" << std::endl;
+//		//}
+//	}
+//
+//	MLIB_CUDA_SAFE_FREE(d_globalTrajectory);
+//
+//	int a = 5;
+//}
+//
+//void TestMatching::checkCorrespondences()
+//{
+//	MLIB_ASSERT(!m_referenceTrajectory.empty());
+//	const std::string outDir = "debug/_checkCorr/"; if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+//	const std::string inspectDir = "debug/_checkCorr/inspect/"; if (!util::directoryExists(inspectDir)) util::makeDirectory(inspectDir);
+//
+//	// debug hack
+//	m_siftManager->AddCurrToResidualsCU(m_siftManager->getNumImages() - 1, MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse));
+//
+//	std::cout << "CHECKING MATCHES WITH REFERENCE TRAJECTORY..." << std::endl;
+//	// check with trajectory
+//	const float maxResidualThres2 = 0.05f * 0.05f;
+//	const float inspectMaxResThresh2 = 0.1f * 0.1f;
+//	const unsigned int numImages = m_siftManager->getNumImages();
+//
+//	// get data
+//	unsigned int numCorr = m_siftManager->getNumGlobalCorrespondences();
+//	std::vector<EntryJ> correspondences(numCorr);
+//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), m_siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ)*numCorr, cudaMemcpyDeviceToHost));
+//	std::cout << "#corr = " << numCorr << std::endl;
+//
+//	unsigned int badCount = 0;
+//
+//	// compare to reference trajectory
+//	for (unsigned int i = 0; i < correspondences.size(); i++) {
+//		const EntryJ& corr = correspondences[i];
+//		if (!corr.isValid()) continue;
+//
+//		const vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
+//		bool ok = true;
+//		if (m_referenceTrajectory[imageIndices.x][0] == -std::numeric_limits<float>::infinity() ||
+//			m_referenceTrajectory[imageIndices.y][0] == -std::numeric_limits<float>::infinity()) {
+//			std::cout << "warning: no reference trajectory for " << imageIndices << std::endl;
+//			ok = false; // just classify as bad
+//		}
+//		else {
+//			const mat4f refTransform = m_referenceTrajectory[imageIndices.y].getInverse() * m_referenceTrajectory[imageIndices.x]; // src to tgt
+//
+//			vec3f src(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z);
+//			vec3f tgt(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+//			vec3f d = refTransform * src - tgt;
+//			float res = d | d;
+//
+//			if (res > maxResidualThres2) { // bad
+//				const std::string dir = (res > inspectMaxResThresh2) ? inspectDir : outDir;
+//				SiftVisualization::printMatch(dir + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y) + ".png",
+//					corr, m_colorImages[imageIndices.x], m_colorImages[imageIndices.y], m_colorCalibration.m_Intrinsic);
+//				ok = false;
+//			}
+//		}
+//		if (!ok) badCount++;
+//	}
+//	std::cout << "found " << badCount << " bad correspondences" << std::endl;
+//
+//	// check if missing links
+//	std::vector<unsigned int> numMatchesToPrev(numImages, 0);
+//	for (unsigned int i = 0; i < correspondences.size(); i++) {
+//		const EntryJ& corr = correspondences[i];
+//		if (!corr.isValid()) continue;
+//		MLIB_ASSERT(corr.imgIdx_i < corr.imgIdx_j);
+//		numMatchesToPrev[corr.imgIdx_i]++;
+//	}
+//	for (unsigned int i = 1; i < numMatchesToPrev.size(); i++) {
+//		if (numMatchesToPrev[i] == 0) {
+//			std::cout << "image " << i << " has no matches to previous!" << std::endl;
+//		}
+//	}
+//	std::cout << "DONE" << std::endl;
+//}
+//
+//void TestMatching::printKeys()
+//{
+//	const std::string outDir = "debug/keys/"; if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+//	const unsigned int numImages = m_siftManager->getNumImages();
+//
+//	for (unsigned int i = 0; i < numImages; i++) {
+//		SiftVisualization::printKey(outDir + std::to_string(i) + ".png", m_colorImages[i], m_siftManager, i);
+//	}
+//	std::cout << "DONE" << std::endl;
+//}
+//
+//void TestMatching::debugMatchInfo()
+//{
+//	const std::string outDir = "debug/_checkCorr/inspect/full/";
+//	if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+//
+//	const std::vector<vec2ui> imagePairs = { vec2ui(39, 207), vec2ui(53, 206), vec2ui(55, 206), vec2ui(58, 206), vec2ui(59, 207) };
+//	std::unordered_map<vec2ui, unsigned int> imagePairSet;
+//	for (unsigned int i = 0; i < imagePairs.size(); i++) imagePairSet[imagePairs[i]] = i;
+//
+//	std::vector<std::vector<float3>> imPairSrcPts(imagePairs.size());
+//	std::vector<std::vector<float3>> imPairTgtPts(imagePairs.size());
+//
+//	// collect matches for image pairs from corr array
+//	unsigned int numCorr = m_siftManager->getNumGlobalCorrespondences();
+//	std::vector<EntryJ> correspondences(numCorr);
+//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), m_siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ)*numCorr, cudaMemcpyDeviceToHost));
+//	std::cout << "#corr = " << numCorr << std::endl;
+//
+//	for (unsigned int i = 0; i < correspondences.size(); i++) {
+//		const EntryJ& corr = correspondences[i];
+//		if (!corr.isValid()) continue;
+//		vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
+//		auto a = imagePairSet.find(imageIndices);
+//		if (a != imagePairSet.end()) {
+//			unsigned int index = a->second;
+//			imPairSrcPts[index].push_back(corr.pos_i);
+//			imPairTgtPts[index].push_back(corr.pos_j);
+//		}
+//	}
+//
+//	// todo fix this hack
+//}
 
 void TestMatching::runOpt()
 {
@@ -1590,34 +1591,36 @@ void TestMatching::testGlobalDense()
 {
 	//const std::string which = "fr1_desk_f20";
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
-	//const std::string which = "fr2_xyz";
-	const std::string which = "fr3_office";
+	const std::string which = "fr2_xyz";
+	const std::string whichRef = "fr2_xyz";
+	//const std::string which = "fr3_office";
+	//const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_nstn";
-	const std::string origFile = "../data/tum/" + which + ".sensor";
+	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
 		std::cout << "check if need to update ref trajectory! (press key to continue)" << std::endl;
 		getchar();
 
 		CalibratedSensorData cs;
 		BinaryDataStreamFile s(origFile, false);
-		//BinaryDataStreamFile s("../data/tum/out.sensor", false);
 		//BinaryDataStreamFile s("../data/iclnuim/livingroom1.sensor", false);
 		//BinaryDataStreamFile s("../data/iclnuim/livingroom2_nonoise.sensor", false);
 		//BinaryDataStreamFile s("../data/iclnuim/livingroom2.sensor", false);
-		//BinaryDataStreamFile s("../data/tum/fr1_desk_depth.sensor", false);
-		//BinaryDataStreamFile s("../data/tum/fr3_office_depth.sensor", false);
 		s >> cs;
 		s.closeStream();
-		BinaryDataStreamFile o("debug/ref_" + which + ".bin", true);
+		BinaryDataStreamFile o("debug/ref_" + whichRef + ".bin", true);
 		o << cs.m_trajectory;
 		o.closeStream();
+
+		std::cout << "depth intrinsics:" << std::endl << cs.m_CalibrationDepth.m_Intrinsic << std::endl;
+		std::cout << "color intrinsics:" << std::endl << cs.m_CalibrationColor.m_Intrinsic << std::endl;
 	}
 	const std::string siftFile = "debug/" + which + ".sift";
 	const std::string cacheFile = "debug/" + which + ".cache";
 	const std::string trajFile = "debug/opt_" + which + ".bin";
-	const std::string refTrajFile = "debug/ref_" + which + ".bin";
+	const std::string refTrajFile = "debug/ref_" + whichRef + ".bin";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
-	bool savePointClouds = true; const float maxDepth = 1.0f;
+	bool savePointClouds = false; const float maxDepth = 2.0f;
 
 	std::vector<mat4f> trajectoryAll, refTrajectoryAll;
 	std::vector<mat4f> trajectoryKeys, refTrajectoryKeys;
@@ -1675,14 +1678,14 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 1;
+	const unsigned int maxNumOutIts = 4;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
-	std::vector<float> weightsSparse(maxNumIters, 0.0f);
+	std::vector<float> weightsSparse(maxNumIters, 1.5f);
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
@@ -1692,10 +1695,10 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.1f);  //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 
-	if (savePointClouds) {
-		std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
-		std::cout << "saving ref to point cloud... "; SiftVisualization::saveToPointCloud("debug/ref.ply", m_depthImages, m_colorImages, refTrajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
-	}
+	//if (savePointClouds) {
+	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
+	//	std::cout << "saving ref to point cloud... "; SiftVisualization::saveToPointCloud("debug/ref.ply", m_depthImages, m_colorImages, refTrajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
+	//}
 
 	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
 	//{//evaluate initial trajectory
@@ -1777,6 +1780,10 @@ void TestMatching::testGlobalDense()
 	if (savePointClouds) {
 		std::cout << "saving opt to point cloud... "; SiftVisualization::saveToPointCloud("debug/opt.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
 		//std::cout << "saving opt cache to point cloud... "; SiftVisualization::saveToPointCloud("debug/optCache.ply", &cudaCache, trajectoryKeys, maxDepth); std::cout << "done" << std::endl;
+
+		mat4f align = PoseHelper::getAlignmentBetweenTrajectories(trajectoryKeys, refTrajectoryKeys);
+		for (unsigned int i = 0; i < trajectoryKeys.size(); i++) trajectoryKeys[i] = align * trajectoryKeys[i];
+		std::cout << "saving opt align to point cloud... "; SiftVisualization::saveToPointCloud("debug/optAlign.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
 	}
 
 	// compare to reference trajectory
