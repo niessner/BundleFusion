@@ -447,6 +447,9 @@
     <CudaCompile Include="Source\SBA.cu">
       <Filter>SBA</Filter>
     </CudaCompile>
+    <CudaCompile Include="Source\CUDACache.cu">
+      <Filter>Sensors</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\QuadDrawer.hlsl">

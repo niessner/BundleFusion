@@ -179,6 +179,8 @@ public:
 		//}
 	}
 
+	void fuseDepthFrames(CUDACache* globalCache, const int* d_validImages, const float4x4* d_transforms) const;
+
 private:
 
 	void alloc() {

@@ -1590,6 +1590,7 @@ void TestMatching::analyzeLocalOpts()
 void TestMatching::testGlobalDense()
 {
 	//const std::string which = "fr1_desk_f20";
+	//const std::string whichRef = "fr1_desk_from20";
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
 	const std::string which = "fr2_xyz";
 	const std::string whichRef = "fr2_xyz";
@@ -1689,10 +1690,10 @@ void TestMatching::testGlobalDense()
 	std::vector<float> weightsSparse(maxNumIters, 0.0f);
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.1f);
+	std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.1f);  //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 
@@ -1983,7 +1984,7 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 
 	m_stage = INITIALIZED;
 
-	bool debugSave = (numFrames != cs.m_ColorNumFrames) || (skip > 1);
+	bool debugSave = false;//(numFrames != cs.m_ColorNumFrames) || (skip > 1);
 	if (debugSave) {
 		std::cout << "saving debug sensor... ";
 		if (skip > 1) {

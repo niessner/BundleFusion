@@ -1,7 +1,10 @@
 #include "stdafx.h"
 #include "CUDACache.h"
 #include "GlobalBundlingState.h"
+#include "MatrixConversion.h"
 
+extern "C" void fuseCacheFramesCU(const CUDACachedFrame* d_frames, const int* d_validImages, const float4x4& intrinsics, const float4x4* d_transforms,
+	unsigned int numFrames, unsigned int width, unsigned int height, float* d_output, float* d_tmp);
 
 CUDACache::CUDACache(unsigned int widthDepthInput, unsigned int heightDepthInput, unsigned int widthDownSampled, unsigned int heightDownSampled, unsigned int maxNumImages, const mat4f& inputIntrinsics)
 {
@@ -65,4 +68,15 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 	CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, m_width, m_height);
 
 	m_currentFrame++;
+}
+
+void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages, const float4x4* d_transforms) const
+{
+	const unsigned int numFrames = m_currentFrame + 1;
+	const unsigned int globalFrameIdx = globalCache->m_currentFrame + 1;
+
+	CUDACachedFrame& globalFrame = globalCache->m_cache[globalFrameIdx];
+	if (globalFrameIdx + 1 == m_maxNumImages) throw MLIB_EXCEPTION("CUDACache reached max # images!");
+	CUDACachedFrame& tmpFrame = globalCache->m_cache[globalFrameIdx + 1];
+	fuseCacheFramesCU(d_cache, d_validImages, MatrixConversion::toCUDA(m_intrinsics), d_transforms, numFrames, m_width, m_height, globalFrame.d_depthDownsampled, tmpFrame.d_depthDownsampled);
 }

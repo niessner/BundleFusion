@@ -319,6 +319,7 @@
     <ClCompile Include="Source\uplink.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="Source\CUDACache.cu" />
     <CudaCompile Include="Source\CUDAImageUtil.cu" />
     <CudaCompile Include="Source\DepthSensing\CameraUtil.cu" />
     <CudaCompile Include="Source\DepthSensing\CUDAConstant.cu" />

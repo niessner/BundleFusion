@@ -78,7 +78,7 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 		weightsDenseColor = m_localWeightsDenseColor;
 	}
 	else {
-		usePairwise = false; //always global dense pairwise
+		usePairwise = true; //always global dense pairwise
 
 		if (!m_bUseGlobalDenseOpt) {
 			weightsSparse = m_globalWeightsSparse;
