@@ -1,5 +1,10 @@
 #include <iostream>
 
+//!!!DEBUGGING
+#define PRINT_RESIDUALS_SPARSE
+#define PRINT_RESIDUALS_DENSE
+//!!!DEBUGGING
+
 #include "GlobalDefines.h"
 #include "SolverBundlingParameters.h"
 #include "SolverBundlingState.h"
@@ -10,10 +15,6 @@
 
 #include <conio.h>
 
-//!!!DEBUGGING
-#define PRINT_RESIDUALS_SPARSE
-#define PRINT_RESIDUALS_DENSE
-//!!!DEBUGGING
 #define THREADS_PER_BLOCK_DENSE_DEPTH_X 32
 #define THREADS_PER_BLOCK_DENSE_DEPTH_Y 4 
 #define THREADS_PER_BLOCK_DENSE_DEPTH_FLIP 64
@@ -173,68 +174,64 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
 		float4x4 transform = invTransform_i * transform_j;
 #endif
+		
+		// point-to-plane term
+		matNxM<1, 6> depthJacBlockRow_i, depthJacBlockRow_j; depthJacBlockRow_i.setZero(); depthJacBlockRow_j.setZero();
+		float depthRes = 0.0f; float depthWeight = 0.0f;
 
 		// find correspondence
 		float4 camPosSrcToTgt; float4 camPosTgt; float4 normalTgt; float2 tgtScreenPos;
-		if (findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
+		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
 			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
-			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt)) { //i tgt, j src
-			const float4 camPosSrc = input.d_cacheFrames[j].d_cameraposDownsampled[srcIdx];
-			if (useDepth) {
-				// point-to-plane residual
-				float4 diff = camPosTgt - camPosSrcToTgt;
-				float res = dot(diff, normalTgt);
-				//float weight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-				float weight = max(0.0f, (1.0f - camPosTgt.z / 2.5f));
-
-				// point-to-plane jacobian
-				matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+		const float4 camPosSrc = input.d_cacheFrames[j].d_cameraposDownsampled[srcIdx];
+		if (useDepth) {
+			// point-to-plane residual
+			float4 diff = camPosTgt - camPosSrcToTgt;
+			depthRes = dot(diff, normalTgt);
+			//depthWeight = max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
+			depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.5f));
 #ifdef USE_LIE_SPACE
-				//if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, transform_j, camPosSrc, normalTgt);
-				if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
-				if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
+			if (i > 0) computeJacobianBlockRow_i(depthJacBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
+			if (j > 0) computeJacobianBlockRow_j(depthJacBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
 #else
-				if (i > 0) computeJacobianBlockRow_i(jacobianBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
-				if (j > 0) computeJacobianBlockRow_j(jacobianBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
+			if (i > 0) computeJacobianBlockRow_i(depthJacBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
+			if (j > 0) computeJacobianBlockRow_j(depthJacBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
 #endif
 
-				addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
-					jacobianBlockRow_i, jacobianBlockRow_j, i, j, res, parameters.weightDenseDepth * weight * imPairWeight, idx);
-#ifdef PRINT_RESIDUALS_DENSE
-				atomicAdd(state.d_sumResidual, parameters.weightDenseDepth * weight * imPairWeight * res * res);
-				atomicAdd(state.d_corrCount, 1);
-#endif
+			addToLocalSystem(foundCorr, state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
+				depthJacBlockRow_i, depthJacBlockRow_j, i, j, depthRes, depthWeight, idx
+				, state.d_sumResidual, state.d_corrCount);
 			}
-			// color term
-			if (useColor) {
-				const float2 intensityDerivTgt = bilinearInterpolationFloat2NoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDerivsDownsampled, input.denseDepthWidth, input.denseDepthHeight);
-				const float intensityTgt = bilinearInterpolationFloatNoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDownsampled, input.denseDepthWidth, input.denseDepthHeight);
-				float diffIntensity = intensityTgt - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
-				if (intensityDerivTgt.x != MINF && abs(diffIntensity) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin) {
-					matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
-#ifdef USE_LIE_SPACE
-					//if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
-					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, invTransform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
-					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, invTransform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
-#else
-					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
-					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
-#endif
-					float weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
-					//float weight = max(0.0f, (1.0f - camPosTgt.z / 2.0f));
-
-					addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
-						jacobianBlockRow_i, jacobianBlockRow_j, i, j, diffIntensity, parameters.weightDenseColor * weight * imPairWeight, idx);
-
-#ifdef PRINT_RESIDUALS_DENSE
-					atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * diffIntensity * diffIntensity);
-					atomicAdd(state.d_corrCountColor, 1);
-#endif
-				}
-			}
-		} // found correspondence
+//			// color term
+//			if (useColor) {
+//				const float2 intensityDerivTgt = bilinearInterpolationFloat2NoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDerivsDownsampled, input.denseDepthWidth, input.denseDepthHeight);
+//				const float intensityTgt = bilinearInterpolationFloatNoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDownsampled, input.denseDepthWidth, input.denseDepthHeight);
+//				float diffIntensity = intensityTgt - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
+//				if (intensityDerivTgt.x != MINF && abs(diffIntensity) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin) {
+//					matNxM<1, 6> jacobianBlockRow_i, jacobianBlockRow_j;
+//#ifdef USE_LIE_SPACE
+//					//if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+//					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, transform_i, invTransform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+//					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, invTransform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+//#else
+//					if (i > 0) computeJacobianBlockIntensityRow_i(jacobianBlockRow_i, input.colorFocalLength, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+//					if (j > 0) computeJacobianBlockIntensityRow_j(jacobianBlockRow_j, input.colorFocalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
+//#endif
+//					float weight = max(0.0f, 1.0f - abs(diffIntensity) / parameters.denseColorThresh);
+//					//float weight = max(0.0f, (1.0f - camPosTgt.z / 2.0f));
+//
+//					addToLocalSystem(state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
+//						jacobianBlockRow_i, jacobianBlockRow_j, i, j, diffIntensity, parameters.weightDenseColor * weight * imPairWeight, idx);
+//
+//#ifdef PRINT_RESIDUALS_DENSE
+//					atomicAdd(state.d_sumResidualColor, parameters.weightDenseColor * weight * imPairWeight * diffIntensity * diffIntensity);
+//					atomicAdd(state.d_corrCountColor, 1);
+//#endif
+//				}
+//			}
 	} // valid image pixel
 }
 
@@ -313,7 +310,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 #endif
 
 	//!!!debugging
-	bool debugPrint = false;
+	bool debugPrint = true;
 	float* h_JtJ = NULL;
 	float* h_Jtr = NULL;
 	if (debugPrint) {

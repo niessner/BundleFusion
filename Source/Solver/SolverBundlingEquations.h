@@ -349,43 +349,57 @@ __inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacB
 // dense term
 ////////////////////////////////////////
 
-//__inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
-//	unsigned int vi, unsigned int vj, float residual, float weight, unsigned int tidx)
-//{
-//	//fill in bottom half (vi < vj) -> x < y
-//	for (unsigned int i = 0; i < 6; i++) {
-//		for (unsigned int j = i; j < 6; j++) {
-//			float dii = 0.0f;	float djj = 0.0f;	float dij = 0.0f;	float dji = 0.0f;
-//			if (vi > 0) {
-//				dii = jacobianBlockRow_i(i) * jacobianBlockRow_i(j) * weight;
-//			}
-//			if (vj > 0) {
-//				djj = jacobianBlockRow_j(i) * jacobianBlockRow_j(j) * weight;
-//			}
-//			if (vi > 0 && vj > 0) {
-//				dij = jacobianBlockRow_i(i) * jacobianBlockRow_j(j) * weight;
-//				if (i != j)	{
-//					dji = jacobianBlockRow_i(j) * jacobianBlockRow_j(i) * weight;
-//				}
-//			}
-//			dii = warpReduce(dii);	djj = warpReduce(djj);	dij = warpReduce(dij);	dji = warpReduce(dji);
-//			if (tidx % WARP_SIZE == 0) {
-//				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
-//				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
-//				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
-//				atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji);
-//			}
-//		}
-//		float jtri = 0.0f;	float jtrj = 0.0f;
-//		if (vi > 0) jtri = jacobianBlockRow_i(i) * residual * weight;
-//		if (vj > 0) jtrj = jacobianBlockRow_j(i) * residual * weight;
-//		jtri = warpReduce(jtri);	jtrj = warpReduce(jtrj);
-//		if (tidx % WARP_SIZE == 0) {
-//			atomicAdd(&d_Jtr[vi * 6 + i], jtri);
-//			atomicAdd(&d_Jtr[vj * 6 + i], jtrj);
-//		}
-//	}
-//} 
+__inline__ __device__ void addToLocalSystem(bool isValidCorr, float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
+	unsigned int vi, unsigned int vj, float residual, float weight, unsigned int tidx
+	, float* d_sumResidualDEBUG, int* d_numCorrDEBUG)
+{
+	//fill in bottom half (vi < vj) -> x < y
+	for (unsigned int i = 0; i < 6; i++) {
+		for (unsigned int j = i; j < 6; j++) {
+			float dii = 0.0f;	float djj = 0.0f;	float dij = 0.0f;	float dji = 0.0f;
+			if (isValidCorr) {
+				if (vi > 0) {
+					dii = jacobianBlockRow_i(i) * jacobianBlockRow_i(j) * weight;
+				}
+				if (vj > 0) {
+					djj = jacobianBlockRow_j(i) * jacobianBlockRow_j(j) * weight;
+				}
+				if (vi > 0 && vj > 0) {
+					dij = jacobianBlockRow_i(i) * jacobianBlockRow_j(j) * weight;
+					if (i != j)	{
+						dji = jacobianBlockRow_i(j) * jacobianBlockRow_j(i) * weight;
+					}
+				}
+			}
+			dii = warpReduce(dii);	djj = warpReduce(djj);	dij = warpReduce(dij);	dji = warpReduce(dji);
+			if (tidx % WARP_SIZE == 0) {
+				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
+				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
+				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
+				atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji);
+			}
+		}
+		float jtri = 0.0f;	float jtrj = 0.0f;
+		if (isValidCorr) {
+			if (vi > 0) jtri = jacobianBlockRow_i(i) * residual * weight;
+			if (vj > 0) jtrj = jacobianBlockRow_j(i) * residual * weight;
+		}
+		jtri = warpReduce(jtri);	jtrj = warpReduce(jtrj);
+		if (tidx % WARP_SIZE == 0) {
+			atomicAdd(&d_Jtr[vi * 6 + i], jtri);
+			atomicAdd(&d_Jtr[vj * 6 + i], jtrj);
+		}
+	}
+#ifdef PRINT_RESIDUALS_DENSE
+	float res = 0.0f;		int num = 0;
+	if (isValidCorr) { res = weight * residual * residual;     num = 1; }
+	res = warpReduce(res);						num = warpReduce(num);
+	if (tidx % WARP_SIZE == 0) {
+		atomicAdd(d_sumResidualDEBUG, res);
+		atomicAdd(d_numCorrDEBUG, num);
+	}
+#endif
+} 
 ////IS THIS REALLY NECESSARY
 //__inline__ __device__ void addToLocalSystemColor(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
 //	unsigned int vi, unsigned int vj, float residual, float weight, unsigned int tidx)
@@ -424,7 +438,7 @@ __inline__ __device__ void computeJacobianBlockIntensityRow_j(matNxM<1, 6>& jacB
 //		}
 //	}
 //}
-__inline__ __device__ void addToLocalSystem(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
+__inline__ __device__ void addToLocalSystemBrute(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
 	unsigned int vi, unsigned int vj, float residual, float weight, unsigned int threadIdx)
 {
 	//fill in bottom half (vi < vj) -> x < y
