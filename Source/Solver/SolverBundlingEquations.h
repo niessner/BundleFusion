@@ -357,6 +357,9 @@ __inline__ __device__ void addToLocalSystem(bool isValidCorr, float* d_JtJ, floa
 	for (unsigned int i = 0; i < 6; i++) {
 		for (unsigned int j = i; j < 6; j++) {
 			float dii = 0.0f;	float djj = 0.0f;	float dij = 0.0f;	float dji = 0.0f;
+			__shared__ float s_partJtJ[4];
+			if (tidx == 0) { for (unsigned int i = 0; i < 4; i++) s_partJtJ[i] = 0; } //TODO try with first 4 threads for all tidx == 0
+
 			if (isValidCorr) {
 				if (vi > 0) {
 					dii = jacobianBlockRow_i(i) * jacobianBlockRow_i(j) * weight;
@@ -372,22 +375,38 @@ __inline__ __device__ void addToLocalSystem(bool isValidCorr, float* d_JtJ, floa
 				}
 			}
 			dii = warpReduce(dii);	djj = warpReduce(djj);	dij = warpReduce(dij);	dji = warpReduce(dji);
+			__syncthreads();
 			if (tidx % WARP_SIZE == 0) {
-				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
-				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
-				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
-				atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji);
+				atomicAdd(&s_partJtJ[0], dii);
+				atomicAdd(&s_partJtJ[1], djj);
+				atomicAdd(&s_partJtJ[2], dij);
+				atomicAdd(&s_partJtJ[3], dji);
+			}
+			__syncthreads();
+			if (tidx == 0) {
+				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], s_partJtJ[0]);
+				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], s_partJtJ[1]);
+				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], s_partJtJ[2]);
+				atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], s_partJtJ[3]);
 			}
 		}
 		float jtri = 0.0f;	float jtrj = 0.0f;
+		__shared__ float s_partJtr[2];
+		if (tidx == 0) { for (unsigned int i = 0; i < 2; i++) s_partJtr[i] = 0; }
 		if (isValidCorr) {
 			if (vi > 0) jtri = jacobianBlockRow_i(i) * residual * weight;
 			if (vj > 0) jtrj = jacobianBlockRow_j(i) * residual * weight;
 		}
 		jtri = warpReduce(jtri);	jtrj = warpReduce(jtrj);
+		__syncthreads();
 		if (tidx % WARP_SIZE == 0) {
-			atomicAdd(&d_Jtr[vi * 6 + i], jtri);
-			atomicAdd(&d_Jtr[vj * 6 + i], jtrj);
+			atomicAdd(&s_partJtr[0], jtri);
+			atomicAdd(&s_partJtr[1], jtrj);
+		}
+		__syncthreads();
+		if (tidx == 0) {
+			atomicAdd(&d_Jtr[vi * 6 + i], s_partJtr[0]);
+			atomicAdd(&d_Jtr[vj * 6 + i], s_partJtr[1]);
 		}
 	}
 #ifdef PRINT_RESIDUALS_DENSE
@@ -399,70 +418,34 @@ __inline__ __device__ void addToLocalSystem(bool isValidCorr, float* d_JtJ, floa
 		atomicAdd(d_numCorrDEBUG, num);
 	}
 #endif
-} 
-////IS THIS REALLY NECESSARY
-//__inline__ __device__ void addToLocalSystemColor(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
-//	unsigned int vi, unsigned int vj, float residual, float weight, unsigned int tidx)
-//{
-//	//fill in bottom half (vi < vj) -> x < y
-//	for (unsigned int i = 0; i < 6; i++) {
-//		for (unsigned int j = i; j < 6; j++) {
-//			float dii = 0.0f;	float djj = 0.0f;	float dij = 0.0f;	float dji = 0.0f;
-//			if (vi > 0) {
-//				dii = jacobianBlockRow_i(i) * jacobianBlockRow_i(j) * weight;
-//			}
-//			if (vj > 0) {
-//				djj = jacobianBlockRow_j(i) * jacobianBlockRow_j(j) * weight;
-//			}
-//			if (vi > 0 && vj > 0) {
-//				dij = jacobianBlockRow_i(i) * jacobianBlockRow_j(j) * weight;
-//				if (i != j)	{
-//					dji = jacobianBlockRow_i(j) * jacobianBlockRow_j(i) * weight;
-//				}
-//			}
-//			dii = warpReduce(dii);	djj = warpReduce(djj);	dij = warpReduce(dij);	dji = warpReduce(dji);
-//			if (tidx % WARP_SIZE == 0) {
-//				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
-//				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
-//				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
-//				atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji);
-//			}
-//		}
-//		float jtri = 0.0f;	float jtrj = 0.0f;
-//		if (vi > 0) jtri = jacobianBlockRow_i(i) * residual * weight;
-//		if (vj > 0) jtrj = jacobianBlockRow_j(i) * residual * weight;
-//		jtri = warpReduce(jtri);	jtrj = warpReduce(jtrj);
-//		if (tidx % WARP_SIZE == 0) {
-//			atomicAdd(&d_Jtr[vi * 6 + i], jtri);
-//			atomicAdd(&d_Jtr[vj * 6 + i], jtrj);
-//		}
-//	}
-//}
-__inline__ __device__ void addToLocalSystemBrute(float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
+}
+__inline__ __device__ void addToLocalSystemBrute(bool foundCorr, float* d_JtJ, float* d_Jtr, unsigned int dim, const matNxM<1, 6>& jacobianBlockRow_i, const matNxM<1, 6>& jacobianBlockRow_j,
 	unsigned int vi, unsigned int vj, float residual, float weight, unsigned int threadIdx)
 {
-	//fill in bottom half (vi < vj) -> x < y
-	for (unsigned int i = 0; i < 6; i++) {
-		for (unsigned int j = i; j < 6; j++) {
-			if (vi > 0) {
-				float dii = jacobianBlockRow_i(i) * jacobianBlockRow_i(j) * weight;
-				atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
-			}
-			if (vj > 0) {
-				float djj = jacobianBlockRow_j(i) * jacobianBlockRow_j(j) * weight;
-				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
-			}
-			if (vi > 0 && vj > 0) {
-				float dij = jacobianBlockRow_i(i) * jacobianBlockRow_j(j) * weight;
-				atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
-				if (i != j)	{
-					float dji = jacobianBlockRow_i(j) * jacobianBlockRow_j(i) * weight;
-					atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji);
+	if (foundCorr) {
+		//fill in bottom half (vi < vj) -> x < y
+		for (unsigned int i = 0; i < 6; i++) {
+			for (unsigned int j = i; j < 6; j++) {
+				if (vi > 0) {
+					float dii = jacobianBlockRow_i(i) * jacobianBlockRow_i(j) * weight;
+					atomicAdd(&d_JtJ[(vi * 6 + j)*dim + (vi * 6 + i)], dii);
+				}
+				if (vj > 0) {
+					float djj = jacobianBlockRow_j(i) * jacobianBlockRow_j(j) * weight;
+					atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vj * 6 + i)], djj);
+				}
+				if (vi > 0 && vj > 0) {
+					float dij = jacobianBlockRow_i(i) * jacobianBlockRow_j(j) * weight;
+					atomicAdd(&d_JtJ[(vj * 6 + j)*dim + (vi * 6 + i)], dij);
+					if (i != j)	{
+						float dji = jacobianBlockRow_i(j) * jacobianBlockRow_j(i) * weight;
+						atomicAdd(&d_JtJ[(vj * 6 + i)*dim + (vi * 6 + j)], dji);
+					}
 				}
 			}
+			if (vi > 0) atomicAdd(&d_Jtr[vi * 6 + i], jacobianBlockRow_i(i) * residual * weight);
+			if (vj > 0) atomicAdd(&d_Jtr[vj * 6 + i], jacobianBlockRow_j(i) * residual * weight);
 		}
-		if (vi > 0) atomicAdd(&d_Jtr[vi * 6 + i], jacobianBlockRow_i(i) * residual * weight);
-		if (vj > 0) atomicAdd(&d_Jtr[vj * 6 + i], jacobianBlockRow_j(i) * residual * weight);
 	}
 }
 

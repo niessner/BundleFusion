@@ -9,16 +9,15 @@
 #define POSESIZE 6
 
 extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned int numTransforms,
-	float3* d_rot, float3* d_trans, int* d_validImages);
+	float3* d_rot, float3* d_trans, const int* d_validImages);
 
-extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, int* d_validImages);
+extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, const int* d_validImages);
 
 Timer SBA::s_timer;
 
 
 SBA::SBA()
 {
-	d_validImages = NULL;
 	d_xRot = NULL;
 	d_xTrans = NULL;
 	m_solver = NULL;
@@ -97,7 +96,8 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 
 	unsigned int numImages = siftManager->getNumImages();
-	if (isStart) MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages, siftManager->getValidImages().data(), sizeof(int)*numImages, cudaMemcpyHostToDevice));
+	if (isStart) siftManager->updateGPUValidImages();
+	const int* d_validImages = siftManager->getValidImagesGPU();
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans, d_validImages);
 
 	//!!!debugging
@@ -150,7 +150,7 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 
 	// transforms
 	unsigned int numImages = siftManager->getNumImages();
-	m_solver->solve(d_correspondences, m_numCorrespondences, d_validImages, numImages, numNonLinearIterations, numLinearIterations,
+	m_solver->solve(d_correspondences, m_numCorrespondences, siftManager->getValidImagesGPU(), numImages, numNonLinearIterations, numLinearIterations,
 		cudaCache, weightsSparse, weightsDenseDepth, weightsDenseColor, useDensePairwise, d_xRot, d_xTrans, isStart, isEnd); //isStart -> rebuild jt, isEnd -> remove max residual
 
 	bool removed = false;

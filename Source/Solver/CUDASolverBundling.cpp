@@ -147,9 +147,11 @@ CUDASolverBundling::~CUDASolverBundling()
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_xTransformInverses);
 
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_sumResidualColor);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCountColor);
 }
 
-void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, int* d_validImages, unsigned int numberOfImages,
+void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, const int* d_validImages, unsigned int numberOfImages,
 	unsigned int nNonLinearIterations, unsigned int nLinearIterations, const CUDACache* cudaCache,
 	const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor, bool usePairwiseDense,
 	float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,

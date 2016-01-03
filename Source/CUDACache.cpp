@@ -79,4 +79,35 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	if (globalFrameIdx + 1 == m_maxNumImages) throw MLIB_EXCEPTION("CUDACache reached max # images!");
 	CUDACachedFrame& tmpFrame = globalCache->m_cache[globalFrameIdx + 1];
 	fuseCacheFramesCU(d_cache, d_validImages, MatrixConversion::toCUDA(m_intrinsics), d_transforms, numFrames, m_width, m_height, globalFrame.d_depthDownsampled, tmpFrame.d_depthDownsampled);
+
+	//!!!debugging
+	PointCloudf pcOrig;
+	ColorImageR32 intensity(m_width, m_height);
+	ColorImageR32G32B32A32 cpos(m_width, m_height);
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(cpos.getPointer(), m_cache.front().d_cameraposDownsampled, sizeof(float4)*cpos.getNumPixels(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), m_cache.front().d_intensityOrigDown, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	for (unsigned int i = 0; i < cpos.getNumPixels(); i++) {
+		const vec4f& p = cpos.getPointer()[i];
+		if (p.x != -std::numeric_limits<float>::infinity()) {
+			pcOrig.m_points.push_back(p.getVec3());
+			float c = intensity.getPointer()[i];
+			pcOrig.m_colors.push_back(vec4f(c, c, c, 1.0f));
+		}
+	}
+	PointCloudIOf::saveToFile("debug/_orig.ply", pcOrig);
+	
+	//fused
+	PointCloudf pcFuse;
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(cpos.getPointer(), globalFrame.d_cameraposDownsampled, sizeof(float4)*cpos.getNumPixels(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), globalFrame.d_intensityOrigDown, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	for (unsigned int i = 0; i < cpos.getNumPixels(); i++) {
+		const vec4f& p = cpos.getPointer()[i];
+		if (p.x != -std::numeric_limits<float>::infinity()) {
+			pcFuse.m_points.push_back(p.getVec3());
+			float c = intensity.getPointer()[i];
+			pcFuse.m_colors.push_back(vec4f(c, c, c, 1.0f));
+		}
+	}
+	PointCloudIOf::saveToFile("debug/_fuse.ply", pcFuse);
+	//!!!debugging
 }

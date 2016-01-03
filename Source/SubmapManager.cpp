@@ -428,6 +428,11 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		//using cached depth at orig res
 		local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved), m_fuseDepthImages, m_fuseDepthWidth, m_fuseDepthHeight,
 			siftIntrinsicsInv, MatrixConversion::toCUDA(m_fuseDepthIntrinsics), MatrixConversion::toCUDA(m_fuseDepthIntrinsicsInv)); //TODO need GPU version of this
+
+		//!!!debugging
+		//m_nextLocalCache->fuseDepthFrames(m_globalCache)
+		//!!!debugging
+
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = timer.getElapsedTimeMS(); }
 
 		const std::vector<int>& validImagesLocal = local->getValidImages();

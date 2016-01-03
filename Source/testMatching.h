@@ -88,7 +88,7 @@ public:
 	//void saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices = std::vector<unsigned int>()) const;
 	//void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
 
-	void printCacheFrames(const std::string& dir, const CUDACache* cache = NULL) const;
+	void printCacheFrames(const std::string& dir, const CUDACache* cache = NULL, unsigned int numPrint = (unsigned int)-1) const;
 
 	void loadCachedFramesFromSensor(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames);
 

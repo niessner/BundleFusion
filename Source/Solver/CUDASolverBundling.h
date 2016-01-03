@@ -23,7 +23,7 @@ class CUDASolverBundling
 
 		//weightSparse*Esparse + (#iters*weightDenseLinFactor + weightDense)*Edense
 		void solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, 
-			int* d_validImages, unsigned int numberOfImages, 
+			const int* d_validImages, unsigned int numberOfImages, 
 			unsigned int nNonLinearIterations, unsigned int nLinearIterations, const CUDACache* cudaCache,
 			const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor, bool usePairwiseDense,
 			float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,

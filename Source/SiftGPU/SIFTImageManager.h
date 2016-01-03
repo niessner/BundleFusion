@@ -159,6 +159,11 @@ public:
 	const std::vector<int>& getValidImages() const { return m_validImages; }
 	void invalidateFrame(unsigned int frame) { m_validImages[frame] = 0; }
 
+	void updateGPUValidImages() {
+		cutilSafeCall(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int)*getNumImages(), cudaMemcpyHostToDevice));
+	}
+	const int* getValidImagesGPU() const { return d_validImages; }
+
 	//actually debug function...
 	void setValidImagesDEBUG(const std::vector<int>& valid) {
 		m_validImages = valid;

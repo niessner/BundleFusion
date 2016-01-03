@@ -24,7 +24,6 @@ public:
 		unsigned int maxNumImages = maxImages;
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_xRot, sizeof(EntryJ)*maxNumImages));
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_xTrans, sizeof(EntryJ)*maxNumImages));
-		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_validImages, sizeof(int)*maxNumImages));
 
 		m_solver = new CUDASolverBundling(maxImages, maxNumResiduals);
 		m_bVerify = false;
@@ -35,7 +34,6 @@ public:
 	~SBA() {
 		SAFE_DELETE(m_solver);
 
-		MLIB_CUDA_SAFE_FREE(d_validImages);
 		MLIB_CUDA_SAFE_FREE(d_xRot);
 		MLIB_CUDA_SAFE_FREE(d_xTrans);
 	}
@@ -92,7 +90,6 @@ private:
 
 	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	
-	int*			d_validImages; //TODO this is an excess copy of siftimagemanager, to combine just need to regularly update one of them 
 	float3*			d_xRot;
 	float3*			d_xTrans;
 	unsigned int	m_numCorrespondences;

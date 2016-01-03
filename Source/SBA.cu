@@ -73,7 +73,7 @@ __device__ void poseToMatrix(const float3& rot, const float3& trans, float4x4& m
 #endif
 
 __global__ void convertMatricesToPosesCU_Kernel(const float4x4* d_transforms, unsigned int numTransforms,
-	float3* d_rot, float3* d_trans, int* d_validImages)
+	float3* d_rot, float3* d_trans, const int* d_validImages)
 {
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -84,7 +84,7 @@ __global__ void convertMatricesToPosesCU_Kernel(const float4x4* d_transforms, un
 
 
 extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned int numTransforms,
-	float3* d_rot, float3* d_trans, int* d_validImages)
+	float3* d_rot, float3* d_trans, const int* d_validImages)
 {
 	const unsigned int N = numTransforms;
 
@@ -98,7 +98,7 @@ extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned 
 
 
 
-__global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, int* d_validImages)
+__global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, const int* d_validImages)
 {
 	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -107,7 +107,7 @@ __global__ void convertPosesToMatricesCU_Kernel(const float3* d_rot, const float
 	}
 }
 
-extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, int* d_validImages)
+extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms, const int* d_validImages)
 {
 	const unsigned int N = numImages;
 

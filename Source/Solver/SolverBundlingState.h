@@ -19,7 +19,7 @@ struct SolverInput
 	unsigned int maxNumberOfImages;
 	unsigned int maxCorrPerImage;
 
-	int* d_validImages;
+	const int* d_validImages;
 	const CUDACachedFrame* d_cacheFrames;
 	unsigned int denseDepthWidth;
 	unsigned int denseDepthHeight;

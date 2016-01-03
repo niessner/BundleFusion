@@ -1351,20 +1351,21 @@ void TestMatching::runOpt()
 	int a = 5;
 }
 
-void TestMatching::printCacheFrames(const std::string& dir, const CUDACache* cache /*= NULL*/) const
+void TestMatching::printCacheFrames(const std::string& dir, const CUDACache* cache /*= NULL*/, unsigned int numPrint /*= (unsigned int)-1*/) const
 {
 	const std::vector<CUDACachedFrame>& cachedFrames = cache ? cache->getCacheFrames() : m_cachedFrames;
 	if (cachedFrames.empty()) {
 		std::cout << "no cached frames to print!" << std::endl;
 		return;
 	}
+	if (numPrint == (unsigned int)-1) numPrint = (unsigned int)cachedFrames.size();
 	std::cout << "printing cached frames... ";
 	unsigned int width = GlobalBundlingState::get().s_downsampledWidth;
 	unsigned int height = GlobalBundlingState::get().s_downsampledHeight;
 	DepthImage32 depthImage(width, height); ColorImageR32 intensityImage(width, height); BaseImage<vec2f> intensityDerivImage(width, height);
 	ColorImageR32G32B32A32 camPosImage(width, height), normalImage(width, height);
 	ColorImageR32 dx(width, height), dy(width, height);
-	for (unsigned int i = 0; i < cachedFrames.size(); i++) {
+	for (unsigned int i = 0; i < numPrint; i++) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), cachedFrames[i].d_depthDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getPointer(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
@@ -1662,6 +1663,11 @@ void TestMatching::testGlobalDense()
 	}
 	else {
 		loadCachedFramesFromSensor(&cudaCache, origFile, submapSize, (unsigned int)trajectoryKeys.size());
+		//std::cout << "saving cache to point cloud... "; SiftVisualization::saveToPointCloud("debug/cache.ply", &cudaCache, trajectoryKeys, maxDepth); std::cout << "done" << std::endl;
+		//printCacheFrames("debug/cache/", &cudaCache, 10);
+		//cudaCache.saveToFile("debug/tmp.cache");
+		//cudaCache.loadFromFile("debug/tmp.cache");
+		//std::cout << "waiting..." << std::endl; getchar();
 	}
 	std::cout << "done" << std::endl;
 
@@ -1675,7 +1681,7 @@ void TestMatching::testGlobalDense()
 		evaluateTrajectory(submapSize, trajectoryAll, trajectoryKeys, refTrajectoryAll);
 		std::cout << std::endl;
 	}
-	
+
 	SBA sba;
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
@@ -1693,7 +1699,7 @@ void TestMatching::testGlobalDense()
 	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.1f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.1f);  //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 
@@ -1823,8 +1829,9 @@ void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector
 
 void TestMatching::compareDEBUG()
 {
-	const std::string& ref = "liv2_sd";
-	const std::string& test = "liv2_sdT";
+	const std::string ref = "fr3_office";
+	const std::string test = "fr3_office_sT";
+	const std::string refTrajFile = "debug/ref_fr3_office.bin"; 
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	//trajectories
 	std::vector<mat4f> optTrajectoryRef, optTrajectoryTest, referenceTrajectory;
@@ -1833,7 +1840,7 @@ void TestMatching::compareDEBUG()
 		s >> optTrajectoryRef;
 	}
 	{
-		BinaryDataStreamFile s("debug/ref_liv2.bin", false);
+		BinaryDataStreamFile s(refTrajFile, false);
 		s >> referenceTrajectory;
 	}
 	{
@@ -2054,7 +2061,7 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 		}
 		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(d_helperCamPos, d_depth, MatrixConversion::toCUDA(m_depthCalibration.m_IntrinsicInverse), m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_cameraposDownsampled, width, height, d_helperCamPos, m_widthDepth, m_heightDepth);
-		
+
 		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
 
