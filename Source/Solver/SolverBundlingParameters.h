@@ -20,6 +20,7 @@ struct SolverParameters
 	float denseDepthMax;
 
 	bool useDenseDepthAllPairwise; // instead of frame-to-frame
+	unsigned int denseOverlapCheckSubsampleFactor;
 
 	float weightSparse;		
 	float weightDenseDepth;	

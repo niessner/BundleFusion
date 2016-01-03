@@ -30,6 +30,7 @@ public:
 	//no invalid checks!
 	static void computeIntensityDerivatives(float2* d_output, float* d_input, unsigned int width, unsigned int height);
 
+	static void convertNormalsFloat4ToUCHAR4(uchar4* d_output, const float4* d_input, unsigned int width, unsigned int height);
 };
 
 //TODO 

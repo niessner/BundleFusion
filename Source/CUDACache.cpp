@@ -53,6 +53,8 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 	CUDAImageUtil::computeNormals(d_helperNormals, d_helperCamPos, inputDepthWidth, inputDepthHeight);
 	CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, m_width, m_height, d_helperNormals, inputDepthWidth, inputDepthHeight);
 
+	CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, m_width, m_height);
+
 	CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, m_width, m_height, d_inputDepth, inputDepthWidth, inputDepthHeight);
 
 	//CUDAImageUtil::resampleUCHAR4(frame.d_colorDownsampled, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
@@ -60,9 +62,6 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 
 	//color
 	CUDAImageUtil::resampleToIntensity(d_intensityHelper, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
-	//!!!debugging
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(frame.d_intensityOrigDown, d_intensityHelper, sizeof(float)*m_width*m_height, cudaMemcpyDeviceToDevice));
-	//!!!debugging
 	if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, m_filterIntensitySigma, m_width, m_height);
 	else std::swap(frame.d_intensityDownsampled, d_intensityHelper);
 	CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, m_width, m_height);
@@ -85,7 +84,7 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	ColorImageR32 intensity(m_width, m_height);
 	ColorImageR32G32B32A32 cpos(m_width, m_height);
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(cpos.getPointer(), m_cache.front().d_cameraposDownsampled, sizeof(float4)*cpos.getNumPixels(), cudaMemcpyDeviceToHost));
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), m_cache.front().d_intensityOrigDown, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), m_cache.front().d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 	for (unsigned int i = 0; i < cpos.getNumPixels(); i++) {
 		const vec4f& p = cpos.getPointer()[i];
 		if (p.x != -std::numeric_limits<float>::infinity()) {
@@ -99,7 +98,7 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	//fused
 	PointCloudf pcFuse;
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(cpos.getPointer(), globalFrame.d_cameraposDownsampled, sizeof(float4)*cpos.getNumPixels(), cudaMemcpyDeviceToHost));
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), globalFrame.d_intensityOrigDown, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), globalFrame.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 	for (unsigned int i = 0; i < cpos.getNumPixels(); i++) {
 		const vec4f& p = cpos.getPointer()[i];
 		if (p.x != -std::numeric_limits<float>::infinity()) {

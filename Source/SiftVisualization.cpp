@@ -10,7 +10,7 @@ void SiftVisualization::printKey(const std::string& filename, const CUDACache* c
 {
 	const std::vector<CUDACachedFrame>& frames = cudaCache->getCacheFrames();
 	ColorImageR32 intensityImage(cudaCache->getWidth(), cudaCache->getHeight());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getPointer(), frames[frame].d_intensityOrigDown, sizeof(float)*intensityImage.getNumPixels(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getPointer(), frames[frame].d_intensityDownsampled, sizeof(float)*intensityImage.getNumPixels(), cudaMemcpyDeviceToHost));
 	ColorImageR8G8B8A8 image(intensityImage);
 	image.reSample(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 

@@ -60,8 +60,10 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseJtJ, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseJtr, sizeof(float) * 6 * numberOfVariables));
-	m_maxNumDenseImPairs = (m_maxNumberOfImages + 1)*(m_maxNumberOfImages + 1);
+	m_maxNumDenseImPairs = m_maxNumberOfImages * (m_maxNumberOfImages - 1) / 2;
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseCorrCounts, sizeof(float) * m_maxNumDenseImPairs));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_denseOverlappingImages, sizeof(uint2) * m_maxNumDenseImPairs));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_numDenseOverlappingImages, sizeof(int)));
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCount, sizeof(int)));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_corrCountColor, sizeof(int)));
@@ -99,6 +101,8 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseJtJ, -1, sizeof(float) * 36 * numberOfVariables * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseJtr, -1, sizeof(float) * 6 * numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseCorrCounts, -1, sizeof(float) * m_maxNumDenseImPairs));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_denseOverlappingImages, -1, sizeof(uint2) * m_maxNumDenseImPairs));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_numDenseOverlappingImages, -1, sizeof(int)));
 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_corrCount, -1, sizeof(int)));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_corrCountColor, -1, sizeof(int)));
@@ -145,6 +149,8 @@ CUDASolverBundling::~CUDASolverBundling()
 
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_xTransforms);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_xTransformInverses);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_denseOverlappingImages);
+	MLIB_CUDA_SAFE_FREE(m_solverState.d_numDenseOverlappingImages);
 
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_sumResidualColor);
@@ -189,6 +195,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.denseDepthMax = 3.5f; //TODO 
 	parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
 	parameters.useDenseDepthAllPairwise = usePairwiseDense;
+	parameters.denseOverlapCheckSubsampleFactor = 8; // for 160x120 -> 20x15 image
 
 	SolverInput solverInput;
 	solverInput.d_correspondences = d_correspondences;
@@ -209,15 +216,15 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		solverInput.d_cacheFrames = cudaCache->getCacheFramesGPU();
 		solverInput.denseDepthWidth = cudaCache->getWidth(); //TODO constant buffer for this?
 		solverInput.denseDepthHeight = cudaCache->getHeight();
-		solverInput.depthIntrinsics = MatrixConversion::toCUDA(cudaCache->getIntrinsics());
-		solverInput.colorFocalLength = make_float2(solverInput.depthIntrinsics.m11, solverInput.depthIntrinsics.m22);
+		mat4f intrinsics = cudaCache->getIntrinsics();
+		solverInput.depthIntrinsics = make_float4(intrinsics(0, 0), intrinsics(1, 1), intrinsics(0, 2), intrinsics(1, 2));
+		MLIB_ASSERT(solverInput.denseDepthWidth / parameters.denseOverlapCheckSubsampleFactor > 8); //need enough samples
 	}
 	else {
 		solverInput.d_cacheFrames = NULL;
 		solverInput.denseDepthWidth = 0;
 		solverInput.denseDepthHeight = 0;
-		solverInput.depthIntrinsics.setValue(-std::numeric_limits<float>::infinity());
-		solverInput.colorFocalLength = make_float2(-std::numeric_limits<float>::infinity());
+		solverInput.depthIntrinsics = make_float4(-std::numeric_limits<float>::infinity());
 	}
 	//!!!debugging
 	if (false && parameters.weightDenseDepth > 0) {
@@ -225,13 +232,16 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(validImages.data(), solverInput.d_validImages, sizeof(int)*solverInput.numberOfImages, cudaMemcpyDeviceToHost));
 		convertLiePosesToMatricesCU(m_solverState.d_xRot, m_solverState.d_xTrans, solverInput.numberOfImages, m_solverState.d_xTransforms, m_solverState.d_xTransformInverses);
 		BuildDenseSystem(solverInput, m_solverState, parameters, NULL);
-		std::vector<float> imPairWeights(numberOfImages * numberOfImages);
+		std::vector<float> imPairWeights(numberOfImages * (numberOfImages - 1) / 2);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairWeights.data(), m_solverState.d_denseCorrCounts, sizeof(float)*imPairWeights.size(), cudaMemcpyDeviceToHost));
+		std::vector<vec2ui> imPairIndices(numberOfImages * (numberOfImages - 1) / 2);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairIndices.data(), m_solverState.d_denseOverlappingImages, sizeof(uint2)*imPairIndices.size(), cudaMemcpyDeviceToHost));
 		ColorImageR8G8B8 corrImage(numberOfImages, numberOfImages); unsigned int count = 0;
 		for (unsigned int i = 0; i < imPairWeights.size(); i++) {
 			if (imPairWeights[i] > 0) {
 				vec3f c = BaseImageHelper::convertDepthToRGB(imPairWeights[i], 0.0f, 1.0f) * 255.0f;
-				corrImage.getPointer()[i] = vec3uc(c);
+				const vec2ui& images = imPairIndices[i];
+				corrImage(images.y, images.x) = vec3uc(c);
 				count++;
 			}
 		}

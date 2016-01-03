@@ -816,6 +816,8 @@ void TestMatching::createCachedFrames()
 		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
 
+		CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, width, height);
+
 		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 
 		CUDAImageUtil::resampleToIntensity(d_filterHelperDown, width, height, d_color, m_widthSift, m_heightSift);
@@ -1659,7 +1661,7 @@ void TestMatching::testGlobalDense()
 	std::cout << "loading cache from file... ";
 	if (origFile.empty()) {
 		cudaCache.loadFromFile(cacheFile);
-		cudaCache.reFilterCachedFrames(GlobalBundlingState::get().s_colorDownSigma, GlobalBundlingState::get().s_depthDownSigmaD, GlobalBundlingState::get().s_depthDownSigmaR);
+		std::cout << "WARNING: cannot re-filter cached frames" << std::endl; getchar();
 	}
 	else {
 		loadCachedFramesFromSensor(&cudaCache, origFile, submapSize, (unsigned int)trajectoryKeys.size());
@@ -2064,6 +2066,8 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 
 		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
+
+		CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, width, height);
 
 		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 
