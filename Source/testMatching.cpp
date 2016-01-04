@@ -1592,15 +1592,16 @@ void TestMatching::analyzeLocalOpts()
 
 void TestMatching::testGlobalDense()
 {
-	const std::string which = "fr1_desk_f20";
-	const std::string whichRef = "fr1_desk_from20";
+	//const std::string which = "fr1_desk_f20";
+	//const std::string whichRef = "fr1_desk_from20";
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
-	//const std::string which = "fr2_xyz";
-	//const std::string whichRef = "fr2_xyz";
-	//const std::string which = "fr3_office";
-	//const std::string whichRef = "fr3_office";
+	//const std::string which = "fr2_xyz2";
+	//const std::string whichRef = "fr2_xyz_half";
+	const std::string which = "fr3_office_fuseW";
+	const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_nstn2";
 	//const std::string whichRef = "fr3_nstn";
+	bool loadCache = true;
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
 		std::cout << "check if need to update ref trajectory! (press key to continue)" << std::endl;
@@ -1659,7 +1660,7 @@ void TestMatching::testGlobalDense()
 	CUDACache cudaCache(640, 480, GlobalBundlingState::get().s_downsampledWidth, GlobalBundlingState::get().s_downsampledHeight,
 		GlobalBundlingState::get().s_maxNumImages, mat4f::identity());
 	std::cout << "loading cache from file... ";
-	if (origFile.empty()) {
+	if (loadCache) {
 		cudaCache.loadFromFile(cacheFile);
 		std::cout << "WARNING: cannot re-filter cached frames" << std::endl; getchar();
 	}

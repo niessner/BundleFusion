@@ -376,6 +376,10 @@
     <ClInclude Include="Source\Solver\LieDerivUtil.h">
       <Filter>SolverBundling</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Solver\SolverBundlingDenseUtil.h">
+      <Filter>SolverBundling</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\CUDACameraUtil.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

@@ -83,7 +83,7 @@
     <CudaCompile>
       <Include>Include\cutil\inc;$(SolutionDir)</Include>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <CodeGeneration>compute_30,sm_30</CodeGeneration>
+      <CodeGeneration>compute_35,sm_35</CodeGeneration>
       <MaxRegCount>62</MaxRegCount>
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <GPUDebugInfo>false</GPUDebugInfo>
@@ -118,7 +118,7 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <Include>Include\cutil\inc;$(SolutionDir)</Include>
-      <CodeGeneration>compute_30,sm_30</CodeGeneration>
+      <CodeGeneration>compute_35,sm_35</CodeGeneration>
       <MaxRegCount>62</MaxRegCount>
       <FastMath>true</FastMath>
       <Optimization>O3</Optimization>
@@ -139,6 +139,7 @@
     <ClInclude Include="Source\ConditionManager.h" />
     <ClInclude Include="Source\CUDACache.h" />
     <ClInclude Include="Source\CUDACacheUtil.h" />
+    <ClInclude Include="Source\CUDACameraUtil.h" />
     <ClInclude Include="Source\CUDAImageManager.h" />
     <ClInclude Include="Source\CUDAImageUtil.h" />
     <ClInclude Include="Source\DepthSensing\BitArray.h" />
@@ -214,6 +215,7 @@
     <ClInclude Include="Source\Solver\CUDASolverBundling.h" />
     <ClInclude Include="Source\Solver\ICPUtil.h" />
     <ClInclude Include="Source\Solver\LieDerivUtil.h" />
+    <ClInclude Include="Source\Solver\SolverBundlingDenseUtil.h" />
     <ClInclude Include="Source\Solver\SolverBundlingEquations.h" />
     <ClInclude Include="Source\Solver\SolverBundlingParameters.h" />
     <ClInclude Include="Source\Solver\SolverBundlingState.h" />
@@ -334,7 +336,12 @@
     <CudaCompile Include="Source\SiftGPU\CUDASiftConstant.cu" />
     <CudaCompile Include="Source\SiftGPU\ProgramCU.cu" />
     <CudaCompile Include="Source\SiftGPU\SIFTImageManager.cu" />
-    <CudaCompile Include="Source\Solver\SolverBundling.cu" />
+    <CudaCompile Include="Source\Solver\SolverBundling.cu">
+      <MaxRegCount Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">0</MaxRegCount>
+      <MaxRegCount Condition="'$(Configuration)|$(Platform)'=='Release|x64'">0</MaxRegCount>
+      <PtxAsOptionV Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</PtxAsOptionV>
+      <PtxAsOptionV Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</PtxAsOptionV>
+    </CudaCompile>
     <CudaCompile Include="Source\SubmapManager.cu" />
   </ItemGroup>
   <ItemGroup>

@@ -529,6 +529,7 @@ void CUDAImageUtil::erodeDepthMap(float* d_output, float* d_input, int structure
 // Gauss Filter Float Map
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+//template<bool ad
 __global__ void gaussFilterDepthMapDevice(float* d_output, const float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
 {
 	const int x = blockIdx.x*blockDim.x + threadIdx.x;

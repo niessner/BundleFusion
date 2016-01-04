@@ -45,7 +45,7 @@ public:
 	const mat4f& getIntrinsics() const { return m_intrinsics; }
 	const mat4f& getIntrinsicsInv() const { return m_intrinsicsInv; }
 
-	unsigned int getNumFrames() const { return m_currentFrame + 1; }
+	unsigned int getNumFrames() const { return m_currentFrame; }
 
 	//! warning: untested!
 	void saveToFile(const std::string& filename) const {

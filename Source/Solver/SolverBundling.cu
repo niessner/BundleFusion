@@ -195,8 +195,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				float3 diff = camPosTgt - camPosSrcToTgt;
 				depthRes = dot(diff, normalTgt);
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-				depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.0f));
-				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.5f));
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.0f));
+				depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.5f));
 #ifdef USE_LIE_SPACE
 				if (i > 0) computeJacobianBlockRow_i(depthJacBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
 				if (j > 0) computeJacobianBlockRow_j(depthJacBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
@@ -969,7 +969,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 #endif
 	//float3* xRot = new float3[input.numberOfImages];	//remember the delete!
 	//float3* xTrans = new float3[input.numberOfImages];
-	timer = new CUDATimer();
+	//timer = new CUDATimer();
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
@@ -1020,10 +1020,10 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	//!!!debugging
 	//if (xRot) delete[] xRot;
 	//if (xTrans) delete[] xTrans;
-	if (timer) {
-		timer->evaluate(true, false);
-		delete timer;
-	}
+	//if (timer) {
+	//	timer->evaluate(true, false);
+	//	delete timer;
+	//}
 	//!!!debugging
 }
 

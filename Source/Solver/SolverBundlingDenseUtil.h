@@ -8,6 +8,7 @@
 #include <cutil_math.h>
 #include "../SiftGPU/cuda_SimpleMatrixUtil.h"
 #include "ICPUtil.h" //for the bilinear...
+#include "../CUDACameraUtil.h"
 
 //#include "SolverBundlingUtil.h"
 //#include "SolverBundlingState.h"
@@ -17,17 +18,6 @@
 // build jtj/jtr
 ////////////////////////////////////////
 
-__inline__ __device__ float2 cameraToDepth(float fx, float fy, float cx, float cy, const float3& pos)
-{
-	return make_float2(
-		pos.x*fx / pos.z + cx,
-		pos.y*fy / pos.z + cy);
-}
-__inline__ __device__ float3 depthToCamera(float fx, float fy, float cx, float cy, const int2& loc, float depth)	{
-	const float x = ((float)loc.x - cx) / fx;
-	const float y = ((float)loc.y - cy) / fy;
-	return make_float3(depth*x, depth*y, depth);
-}
 __inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, const float4x4& transform, const float4& intrinsics,
 	const float* tgtDepth, const uchar4* tgtNormals, const float* srcDepth, const uchar4* srcNormals,
