@@ -264,20 +264,22 @@ __global__ void computeIntensityDerivatives_Kernel(float2* d_output, float* d_in
 
 	if (x < width && y < height)
 	{
+		d_output[y*width + x] = make_float2(MINF, MINF);
+
 		//derivative
 		if (x > 0 && x < width - 1 && y > 0 && y < height - 1)
 		{ //color always valid here (no invalid checks)
-			float pos00 = d_input[(y - 1)*width + (x - 1)];
-			float pos01 = d_input[(y - 0)*width + (x - 1)];
-			float pos02 = d_input[(y + 1)*width + (x - 1)];
+			float pos00 = d_input[(y - 1)*width + (x - 1)]; if (pos00 == MINF) return;
+			float pos01 = d_input[(y - 0)*width + (x - 1)];	if (pos01 == MINF) return;
+			float pos02 = d_input[(y + 1)*width + (x - 1)];	if (pos02 == MINF) return;
 
-			float pos10 = d_input[(y - 1)*width + (x - 0)];
-			//float pos11 = d_input[(y-0)*width + (x-0)];
-			float pos12 = d_input[(y + 1)*width + (x - 0)];
+			float pos10 = d_input[(y - 1)*width + (x - 0)]; if (pos10 == MINF) return;
+			//float pos11 = d_input[(y-0)*width + (x-0)]; if (pos11 == MINF) return;
+			float pos12 = d_input[(y + 1)*width + (x - 0)]; if (pos12 == MINF) return;
 
-			float pos20 = d_input[(y - 1)*width + (x + 1)];
-			float pos21 = d_input[(y - 0)*width + (x + 1)];
-			float pos22 = d_input[(y + 1)*width + (x + 1)];
+			float pos20 = d_input[(y - 1)*width + (x + 1)]; if (pos20 == MINF) return;
+			float pos21 = d_input[(y - 0)*width + (x + 1)]; if (pos21 == MINF) return;
+			float pos22 = d_input[(y + 1)*width + (x + 1)]; if (pos22 == MINF) return;
 
 			float resU = (-1.0f)*pos00 + (1.0f)*pos20 +
 				(-2.0f)*pos01 + (2.0f)*pos21 +
@@ -289,9 +291,6 @@ __global__ void computeIntensityDerivatives_Kernel(float2* d_output, float* d_in
 			resV /= 8.0f;
 
 			d_output[y*width + x] = make_float2(resU, resV);
-		}
-		else {
-			d_output[y*width + x] = make_float2(MINF, MINF);
 		}
 	}
 }
@@ -397,6 +396,35 @@ void CUDAImageUtil::computeNormals(float4* d_output, const float4* d_input, unsi
 #endif
 }
 
+__global__ void convertNormalsFloat4ToUCHAR4_Kernel(uchar4* d_output, const float4* d_input, unsigned int width, unsigned int height)
+{
+	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x < width && y < height) {
+		d_output[y*width + x] = make_uchar4(0, 0, 0, 0);
+
+		float4 p = d_input[y*width + x];
+
+		if (p.x != MINF)
+		{
+			p = (p + 1.0f) / 2.0f; // -> [0, 1]
+			d_output[y*width + x] = make_uchar4((uchar)round(p.x * 255), (uchar)round(p.y * 255), (uchar)round(p.z * 255), 0);
+		}
+	}
+}
+
+void CUDAImageUtil::convertNormalsFloat4ToUCHAR4(uchar4* d_output, const float4* d_input, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	convertNormalsFloat4ToUCHAR4_Kernel << <gridSize, blockSize >> >(d_output, d_input, width, height);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Joint Bilateral Filter
@@ -425,7 +453,6 @@ __global__ void bilateralFilterUCHAR4_Kernel(uchar4* d_output, uchar4* d_color, 
 	float3 sum = make_float3(0.0f, 0.0f, 0.0f);
 	float sumWeight = 0.0f;
 
-	//const uchar4 center = d_color[y*width+x];
 	const float depthCenter = d_depth[y*width + x];
 	if (depthCenter != MINF)
 	{
@@ -455,7 +482,7 @@ __global__ void bilateralFilterUCHAR4_Kernel(uchar4* d_output, uchar4* d_color, 
 	}
 }
 
-void CUDAImageUtil::jointBilateralFilterFloatMap(uchar4* d_output, uchar4* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+void CUDAImageUtil::jointBilateralFilterColorUCHAR4(uchar4* d_output, uchar4* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
 {
 	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
@@ -467,6 +494,56 @@ void CUDAImageUtil::jointBilateralFilterFloatMap(uchar4* d_output, uchar4* d_inp
 #endif
 }
 
+__global__ void bilateralFilterFloat_Kernel(float* d_output, float* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+{
+	const int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x >= width || y >= height) return;
+
+	const int kernelRadius = (int)ceil(2.0*sigmaD);
+
+	d_output[y*width + x] = MINF;
+
+	float sum = 0.0f;
+	float sumWeight = 0.0f;
+
+	const float depthCenter = d_depth[y*width + x];
+	if (depthCenter != MINF)
+	{
+		for (int m = x - kernelRadius; m <= x + kernelRadius; m++)
+		{
+			for (int n = y - kernelRadius; n <= y + kernelRadius; n++)
+			{
+				if (m >= 0 && n >= 0 && m < width && n < height)
+				{
+					const float cur = d_input[n*width + m];
+					const float currentDepth = d_depth[n*width + m];
+
+					if (currentDepth != MINF && fabs(depthCenter - currentDepth) < sigmaR)
+					{ //const float weight = gaussD(sigmaD, m - x, n - y)*gaussR(sigmaR, currentDepth - depthCenter);
+						const float weight = gaussD(sigmaD, m - x, n - y);
+						sumWeight += weight;
+						sum += weight*cur;
+					}
+				}
+			}
+		}
+
+		if (sumWeight > 0.0f) d_output[y*width + x] = sum / sumWeight;
+	}
+}
+void CUDAImageUtil::jointBilateralFilterFloat(float* d_output, float* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	bilateralFilterFloat_Kernel << <gridSize, blockSize >> >(d_output, d_input, d_depth, sigmaD, sigmaR, width, height);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Erode Depth Map
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -529,7 +606,6 @@ void CUDAImageUtil::erodeDepthMap(float* d_output, float* d_input, int structure
 // Gauss Filter Float Map
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//template<bool ad
 __global__ void gaussFilterDepthMapDevice(float* d_output, const float* d_input, float sigmaD, float sigmaR, unsigned int width, unsigned int height)
 {
 	const int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -632,32 +708,115 @@ void CUDAImageUtil::gaussFilterIntensity(float* d_output, const float* d_input, 
 #endif
 }
 
-__global__ void convertNormalsFloat4ToUCHAR4_Kernel(uchar4* d_output, const float4* d_input, unsigned int width, unsigned int height)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// adaptive gauss filter float map
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+__global__ void adaptiveGaussFilterDepthMap_Kernel(float* d_output, const float* d_input, float sigmaD, float sigmaR,
+	unsigned int width, unsigned int height, float adaptFactor)
 {
-	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
-	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+	const int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
-	if (x < width && y < height) {
-		d_output[y*width + x] = make_uchar4(0, 0, 0, 0);
+	if (x >= width || y >= height) return;
 
-		float4 p = d_input[y*width + x];
 
-		if (p.x != MINF)
+	d_output[y*width + x] = MINF;
+
+	float sum = 0.0f;
+	float sumWeight = 0.0f;
+
+	const float depthCenter = d_input[y*width + x];
+	if (depthCenter != MINF)
+	{
+		const float curSigma = sigmaD / depthCenter * adaptFactor;
+		const int kernelRadius = (int)ceil(2.0*curSigma);
+
+		for (int m = x - kernelRadius; m <= x + kernelRadius; m++)
 		{
-			p = (p + 1.0f) / 2.0f; // -> [0, 1]
-			d_output[y*width + x] = make_uchar4((uchar)round(p.x * 255), (uchar)round(p.y * 255), (uchar)round(p.z * 255), 0);
+			for (int n = y - kernelRadius; n <= y + kernelRadius; n++)
+			{
+				if (m >= 0 && n >= 0 && m < width && n < height)
+				{
+					const float currentDepth = d_input[n*width + m];
+
+					if (currentDepth != MINF && fabs(depthCenter - currentDepth) < sigmaR)
+					{
+						const float weight = gaussD(curSigma, m - x, n - y);
+
+						sumWeight += weight;
+						sum += weight*currentDepth;
+					}
+				}
+			}
 		}
 	}
-}
 
-void CUDAImageUtil::convertNormalsFloat4ToUCHAR4(uchar4* d_output, const float4* d_input, unsigned int width, unsigned int height)
+	if (sumWeight > 0.0f) d_output[y*width + x] = sum / sumWeight;
+}
+void CUDAImageUtil::adaptiveGaussFilterDepthMap(float* d_output, const float* d_input, float sigmaD, float sigmaR, float adaptFactor, unsigned int width, unsigned int height)
 {
 	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
 
-	convertNormalsFloat4ToUCHAR4_Kernel << <gridSize, blockSize >> >(d_output, d_input, width, height);
+	adaptiveGaussFilterDepthMap_Kernel << <gridSize, blockSize >> >(d_output, d_input, sigmaD, sigmaR, width, height, adaptFactor);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
 }
+
+__global__ void adaptiveGaussFilterIntensity_Kernel(float* d_output, const float* d_input, const float* d_depth, float sigmaD,
+	unsigned int width, unsigned int height, float adaptFactor)
+{
+	const int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x >= width || y >= height) return;
+
+	float sum = 0.0f;
+	float sumWeight = 0.0f;
+
+	d_output[y*width + x] = MINF; //(should not be used in the case of no valid depth)
+
+	const float depthCenter = d_depth[y*width + x];
+	if (depthCenter != MINF)
+	{
+		const float curSigma = sigmaD / depthCenter * adaptFactor;
+		const int kernelRadius = (int)ceil(2.0*curSigma);
+
+		for (int m = x - kernelRadius; m <= x + kernelRadius; m++)
+		{
+			for (int n = y - kernelRadius; n <= y + kernelRadius; n++)
+			{
+				if (m >= 0 && n >= 0 && m < width && n < height)
+				{
+					const float currentDepth = d_depth[n*width + m];
+					if (currentDepth != MINF) // && fabs(depthCenter - currentDepth) < sigmaR)
+					{
+						const float current = d_input[n*width + m];
+						const float weight = gaussD(curSigma, m - x, n - y);
+
+						sumWeight += weight;
+						sum += weight*current;
+					}
+				}
+			}
+		}
+	}
+
+	if (sumWeight > 0.0f) d_output[y*width + x] = sum / sumWeight;
+}
+void CUDAImageUtil::adaptiveGaussFilterIntensity(float* d_output, const float* d_input, const float* d_depth, float sigmaD, float adaptFactor, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	adaptiveGaussFilterIntensity_Kernel << <gridSize, blockSize >> >(d_output, d_input, d_depth, sigmaD, width, height, adaptFactor);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
+
+

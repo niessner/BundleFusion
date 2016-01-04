@@ -58,7 +58,7 @@ __global__ void FindImageImageCorr_Kernel(SolverInput input, SolverState state, 
 		// find correspondence
 		__shared__ int foundCorr[1]; foundCorr[0] = 0;
 		__syncthreads();
-		if (findDenseCorr(idx, input.denseDepthWidth, input.denseDepthHeight, 
+		if (findDenseCorr(idx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
 			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
@@ -109,7 +109,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		__shared__ int s_count[numWarps];
 		s_count[0] = 0;
 		int count = 0.0f;
-		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight, 
+		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
 			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
@@ -184,7 +184,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 
 		// find correspondence
 		float3 camPosSrc; float3 camPosSrcToTgt; float3 camPosTgt; float3 normalTgt; float2 tgtScreenPos;
-		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight, 
+		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
@@ -195,8 +195,9 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				float3 diff = camPosTgt - camPosSrcToTgt;
 				depthRes = dot(diff, normalTgt);
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
-				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.0f));
-				depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.5f));
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.0f)); //fr1_desk
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.5f)); //fr3_office
+				depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 3.0f)); //fr3_nstn
 #ifdef USE_LIE_SPACE
 				if (i > 0) computeJacobianBlockRow_i(depthJacBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
 				if (j > 0) computeJacobianBlockRow_j(depthJacBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
@@ -204,20 +205,20 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				if (i > 0) computeJacobianBlockRow_i(depthJacBlockRow_i, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, normalTgt);
 				if (j > 0) computeJacobianBlockRow_j(depthJacBlockRow_j, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, normalTgt);
 #endif
-	}
+			}
 			addToLocalSystem(foundCorr, state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
 				depthJacBlockRow_i, depthJacBlockRow_j, i, j, depthRes, depthWeight, idx
 				, state.d_sumResidual, state.d_corrCount);
 			//addToLocalSystemBrute(foundCorr, state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
 			//	depthJacBlockRow_i, depthJacBlockRow_j, i, j, depthRes, depthWeight, idx);
-}
+		}
 		if (useColor) {
 			bool foundCorrColor = false;
 			if (foundCorr) {
-				const float2 intensityDerivTgt = bilinearInterpolationFloat2NoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDerivsDownsampled, input.denseDepthWidth, input.denseDepthHeight);
-				const float intensityTgt = bilinearInterpolationFloatNoChecks(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDownsampled, input.denseDepthWidth, input.denseDepthHeight);
+				const float2 intensityDerivTgt = bilinearInterpolationFloat2(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDerivsDownsampled, input.denseDepthWidth, input.denseDepthHeight);
+				const float intensityTgt = bilinearInterpolationFloat(tgtScreenPos.x, tgtScreenPos.y, input.d_cacheFrames[i].d_intensityDownsampled, input.denseDepthWidth, input.denseDepthHeight);
 				colorRes = intensityTgt - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
-				foundCorrColor = foundCorr && (intensityDerivTgt.x != MINF && abs(colorRes) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin);
+				foundCorrColor = (intensityDerivTgt.x != MINF && abs(colorRes) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin);
 				if (foundCorrColor) {
 					const float2 focalLength = make_float2(input.depthIntrinsics.x, input.depthIntrinsics.y);
 #ifdef USE_LIE_SPACE
@@ -228,7 +229,6 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 					if (j > 0) computeJacobianBlockIntensityRow_j(colorJacBlockRow_j, focalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 #endif
 					colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, 1.0f - abs(colorRes) / parameters.denseColorThresh);
-					//colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.0f));
 				}
 			}
 			addToLocalSystem(foundCorrColor, state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,
@@ -433,7 +433,7 @@ __global__ void EvalMaxResidualDevice(SolverInput input, SolverState state, Solv
 			state.d_maxResidualIndex[blockIdx.x] = maxResIndex[0];
 		}
 	}
-		}
+}
 
 extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
@@ -497,7 +497,7 @@ float EvalResidual(SolverInput& input, SolverState& state, SolverParameters& par
 	if (timer) timer->endEvent();
 
 	return residual;
-	}
+}
 
 /////////////////////////////////////////////////////////////////////////
 // Eval Linear Residual
@@ -673,7 +673,7 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 
 	//if (rRot) delete[] rRot;
 	//if (rTrans) delete[] rTrans;
-	}
+}
 
 /////////////////////////////////////////////////////////////////////////
 // PCG Iteration Parts
@@ -860,7 +860,7 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	{
 		std::cout << "Too many variables for this block size. Maximum number of variables for two kernel scan: " << THREADS_PER_BLOCK*THREADS_PER_BLOCK << std::endl;
 		while (1);
-}
+	}
 
 	cutilSafeCall(cudaMemset(state.d_scanAlpha, 0, sizeof(float) * 2));
 

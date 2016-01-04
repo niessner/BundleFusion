@@ -82,6 +82,8 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	}
 	CUDACachedFrame& tmpFrame = globalCache->m_cache[globalFrameIdx + 1];
 
+	std::cout << "USE ADAPTIVE FILTERING HERE" << std::endl;
+	getchar();
 	////!!!debugging
 	//DepthImage32 depthImage(m_width, m_height);
 	//ColorImageR32 intensity(m_width, m_height);

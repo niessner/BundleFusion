@@ -1373,6 +1373,9 @@ void TestMatching::printCacheFrames(const std::string& dir, const CUDACache* cac
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getPointer(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getPointer(), cachedFrames[i].d_intensityDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivImage.getPointer(), cachedFrames[i].d_intensityDerivsDownsampled, sizeof(float2)*width*height, cudaMemcpyDeviceToHost));
+		intensityImage.setInvalidValue(-std::numeric_limits<float>::infinity());
+		dx.setInvalidValue(-std::numeric_limits<float>::infinity());
+		dy.setInvalidValue(-std::numeric_limits<float>::infinity());
 
 		//debug check, save to point cloud
 		for (unsigned int k = 0; k < width*height; k++) {
@@ -1597,11 +1600,11 @@ void TestMatching::testGlobalDense()
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
 	//const std::string which = "fr2_xyz2";
 	//const std::string whichRef = "fr2_xyz_half";
-	const std::string which = "fr3_office_fuseW";
-	const std::string whichRef = "fr3_office";
-	//const std::string which = "fr3_nstn2";
-	//const std::string whichRef = "fr3_nstn";
-	bool loadCache = true;
+	//const std::string which = "fr3_office";
+	//const std::string whichRef = "fr3_office";
+	const std::string which = "fr3_nstn2";
+	const std::string whichRef = "fr3_nstn";
+	bool loadCache = false;
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
 		std::cout << "check if need to update ref trajectory! (press key to continue)" << std::endl;
@@ -1696,13 +1699,13 @@ void TestMatching::testGlobalDense()
 	const bool isLocal = false;
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
-	std::vector<float> weightsSparse(maxNumIters, 0.0f);
+	std::vector<float> weightsSparse(maxNumIters, 5.0f);
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.3f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.1f);  //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
 
@@ -2036,9 +2039,11 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_helperNormal, sizeof(float4) * m_widthDepth * m_heightDepth));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_filterHelperDown, sizeof(float) * width * height));
 
-	float intensityFilterSigma = GlobalBundlingState::get().s_colorDownSigma;
-	float depthFilterSigmaD = GlobalBundlingState::get().s_depthDownSigmaD;
-	float depthFilterSigmaR = GlobalBundlingState::get().s_depthDownSigmaR;
+	//const float adaptDepthFactor = 1.0f;
+	const float adaptIntensityFactor = 1.0f;
+	const float intensityFilterSigma = GlobalBundlingState::get().s_colorDownSigma;
+	const float depthFilterSigmaD = GlobalBundlingState::get().s_depthDownSigmaD;
+	const float depthFilterSigmaR = GlobalBundlingState::get().s_depthDownSigmaR;
 	//erode and smooth depth
 	bool erode = GlobalBundlingState::get().s_erodeSIFTdepth;
 	for (unsigned int i = 0; i < m_colorImages.size(); i++) {
@@ -2060,6 +2065,7 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 		CUDACachedFrame& frame = cachedFrames[i];
 		if (depthFilterSigmaD > 0.0f) {
 			CUDAImageUtil::gaussFilterDepthMap(d_depthErodeHelper, d_depth, depthFilterSigmaD, depthFilterSigmaR, m_widthDepth, m_heightDepth);
+			//CUDAImageUtil::adaptiveGaussFilterDepthMap(d_depthErodeHelper, d_depth, depthFilterSigmaD, adaptDepthFactor, depthFilterSigmaR, m_widthDepth, m_heightDepth);
 			std::swap(d_depthErodeHelper, d_depth);
 		}
 		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(d_helperCamPos, d_depth, MatrixConversion::toCUDA(m_depthCalibration.m_IntrinsicInverse), m_widthDepth, m_heightDepth);
@@ -2073,7 +2079,9 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 
 		CUDAImageUtil::resampleToIntensity(d_filterHelperDown, width, height, d_color, m_widthSift, m_heightSift);
-		if (intensityFilterSigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, intensityFilterSigma, width, height);
+		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, intensityFilterSigma, width, height);
+		if (intensityFilterSigma > 0.0f) CUDAImageUtil::jointBilateralFilterFloat(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, width, height);
+		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::adaptiveGaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, adaptIntensityFactor, width, height);
 		else std::swap(frame.d_intensityDownsampled, d_filterHelperDown);
 		CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, width, height);
 	}
