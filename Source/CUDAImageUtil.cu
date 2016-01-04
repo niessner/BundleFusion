@@ -544,6 +544,58 @@ void CUDAImageUtil::jointBilateralFilterFloat(float* d_output, float* d_input, f
 	cutilCheckMsg(__FUNCTION__);
 #endif
 }
+
+__global__ void adaptiveBilateralFilterIntensity_Kernel(float* d_output, const float* d_input, const float* d_depth, float sigmaD, float sigmaR, float adaptFactor, unsigned int width, unsigned int height)
+{
+	const int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x >= width || y >= height) return;
+
+	d_output[y*width + x] = MINF;
+
+	float sum = 0.0f;
+	float sumWeight = 0.0f;
+
+	const float depthCenter = d_depth[y*width + x];
+	if (depthCenter != MINF)
+	{
+		const float curSigma = sigmaD * adaptFactor / depthCenter;
+		const int kernelRadius = (int)ceil(2.0*curSigma);
+
+		for (int m = x - kernelRadius; m <= x + kernelRadius; m++)
+		{
+			for (int n = y - kernelRadius; n <= y + kernelRadius; n++)
+			{
+				if (m >= 0 && n >= 0 && m < width && n < height)
+				{
+					const float cur = d_input[n*width + m];
+					const float currentDepth = d_depth[n*width + m];
+
+					if (currentDepth != MINF && fabs(depthCenter - currentDepth) < sigmaR)
+					{ //const float weight = gaussD(curSigma, m - x, n - y)*gaussR(sigmaR, currentDepth - depthCenter);
+						const float weight = gaussD(curSigma, m - x, n - y);
+						sumWeight += weight;
+						sum += weight*cur;
+					}
+				}
+			}
+		}
+
+		if (sumWeight > 0.0f) d_output[y*width + x] = sum / sumWeight;
+	}
+}
+void CUDAImageUtil::adaptiveBilateralFilterIntensity(float* d_output, const float* d_input, const float* d_depth, float sigmaD, float sigmaR, float adaptFactor, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	adaptiveBilateralFilterIntensity_Kernel << <gridSize, blockSize >> >(d_output, d_input, d_depth, sigmaD, sigmaR, adaptFactor, width, height);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Erode Depth Map
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

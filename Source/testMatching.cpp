@@ -1598,12 +1598,12 @@ void TestMatching::testGlobalDense()
 	//const std::string which = "fr1_desk_f20";
 	//const std::string whichRef = "fr1_desk_from20";
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
-	//const std::string which = "fr2_xyz2";
-	//const std::string whichRef = "fr2_xyz_half";
+	const std::string which = "fr2_xyz2";
+	const std::string whichRef = "fr2_xyz_half";
 	//const std::string which = "fr3_office";
 	//const std::string whichRef = "fr3_office";
-	const std::string which = "fr3_nstn2";
-	const std::string whichRef = "fr3_nstn";
+	//const std::string which = "fr3_nstn2";
+	//const std::string whichRef = "fr3_nstn";
 	bool loadCache = false;
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
@@ -1692,22 +1692,23 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 4;
+	const unsigned int maxNumOutIts = 1;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
-	std::vector<float> weightsSparse(maxNumIters, 5.0f);
-	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	//std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr3_nstn
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.3f);
+
+	//std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr2_xyz
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.5f);
+	std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr2_xyz
 	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f); //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseDepth[i] = std::max(4.0f, 0.5f*(i + 1));  weightsDenseDepth[i + 1] = weightsDenseDepth[i]; }
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseDepth[i] = i + 1.0f;
-	std::vector<float> weightsDenseColor(maxNumIters, 0.3f);
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f); for (unsigned int i = 0; i < maxNumIters; i++) weightsDenseColor[i] = i + 1.0f;
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.1f);  //for (unsigned int i = 0; i < maxNumIters; i += 2) { weightsDenseColor[i] = std::max(2.0f, 0.5f*i);  weightsDenseColor[i + 1] = weightsDenseColor[i]; }
+	std::vector<float> weightsDenseColor(maxNumIters, 0.5f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
@@ -2080,8 +2081,9 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 
 		CUDAImageUtil::resampleToIntensity(d_filterHelperDown, width, height, d_color, m_widthSift, m_heightSift);
 		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, intensityFilterSigma, width, height);
-		if (intensityFilterSigma > 0.0f) CUDAImageUtil::jointBilateralFilterFloat(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, width, height);
-		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::adaptiveGaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, adaptIntensityFactor, width, height);
+		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::jointBilateralFilterFloat(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, width, height);
+		if (intensityFilterSigma > 0.0f) CUDAImageUtil::adaptiveBilateralFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled,
+			intensityFilterSigma, 0.01f, adaptIntensityFactor, width, height);
 		else std::swap(frame.d_intensityDownsampled, d_filterHelperDown);
 		CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, width, height);
 	}
