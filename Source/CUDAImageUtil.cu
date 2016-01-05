@@ -396,6 +396,56 @@ void CUDAImageUtil::computeNormals(float4* d_output, const float4* d_input, unsi
 #endif
 }
 
+__global__ void computeNormalsSobel_Kernel(float4* d_output, const float4* d_input, unsigned int width, unsigned int height)
+{
+	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if (x >= width || y >= height) return;
+
+	d_output[y*width + x] = make_float4(MINF, MINF, MINF, MINF);
+
+	if (x > 0 && x < width - 1 && y > 0 && y < height - 1)
+	{
+		float4 pos00 = d_input[(y - 1)*width + (x - 1)]; if (pos00.x == MINF) return;
+		float4 pos01 = d_input[(y - 0)*width + (x - 1)]; if (pos01.x == MINF) return;
+		float4 pos02 = d_input[(y + 1)*width + (x - 1)]; if (pos02.x == MINF) return;
+
+		float4 pos10 = d_input[(y - 1)*width + (x - 0)]; if (pos10.x == MINF) return;
+		//float4 pos11 = d_input[(y-0)*width + (x-0)]; if (pos11.x == MINF) return;
+		float4 pos12 = d_input[(y + 1)*width + (x - 0)]; if (pos12.x == MINF) return;
+
+		float4 pos20 = d_input[(y - 1)*width + (x + 1)]; if (pos20.x == MINF) return;
+		float4 pos21 = d_input[(y - 0)*width + (x + 1)]; if (pos21.x == MINF) return;
+		float4 pos22 = d_input[(y + 1)*width + (x + 1)]; if (pos22.x == MINF) return;
+
+		float4 resU = (-1.0f)*pos00 + (1.0f)*pos20 +
+			(-2.0f)*pos01 + (2.0f)*pos21 +
+			(-1.0f)*pos02 + (1.0f)*pos22;
+
+		float4 resV = (-1.0f)*pos00 + (-2.0f)*pos10 + (-1.0f)*pos20 +
+			(1.0f)*pos02 + (2.0f)*pos12 + (1.0f)*pos22;
+
+		const float3 n = cross(make_float3(resU.x, resU.y, resU.z), make_float3(resV.x, resV.y, resV.z));
+		const float  l = length(n);
+
+		if (l > 0.0f) d_output[y*width + x] = make_float4(n / l, 0.0f);
+	}
+}
+
+void CUDAImageUtil::computeNormalsSobel(float4* d_output, const float4* d_input, unsigned int width, unsigned int height)
+{
+	const dim3 gridSize((width + T_PER_BLOCK - 1) / T_PER_BLOCK, (height + T_PER_BLOCK - 1) / T_PER_BLOCK);
+	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
+
+	computeNormalsSobel_Kernel << <gridSize, blockSize >> >(d_output, d_input, width, height);
+
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
+
 __global__ void convertNormalsFloat4ToUCHAR4_Kernel(uchar4* d_output, const float4* d_input, unsigned int width, unsigned int height)
 {
 	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;

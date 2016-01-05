@@ -90,7 +90,18 @@ public:
 	bool isCurrentLocalValidChunk();
 	unsigned int getNumNextLocalFrames();
 	bool localMatchAndFilter(const float4x4& siftIntrinsicsInv) {
-		return matchAndFilter(true, m_currentLocal, m_currentLocalCache, siftIntrinsicsInv);
+		//!!!debugging
+		//if (m_global->getNumImages() == 56) {
+		//	setPrintMatchesDEBUG(true);
+		//}
+		//!!!debugging
+		bool ret = matchAndFilter(true, m_currentLocal, m_currentLocalCache, siftIntrinsicsInv);
+		//!!!debugging
+		//if (m_global->getNumImages() == 56) {
+		//	setPrintMatchesDEBUG(false);
+		//}
+		//!!!debugging
+		return ret;
 	}
 
 	void copyToGlobalCache();

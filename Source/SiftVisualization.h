@@ -26,6 +26,8 @@ public:
 
 	static void printMatch(const std::string& filename, const EntryJ& correspondence,
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics);
+	static void printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences,
+		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics);
 
 
 	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<CUDACachedFrame>& cachedFrames, unsigned int cacheWidth, unsigned int cacheHeight,

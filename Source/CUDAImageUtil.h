@@ -31,6 +31,7 @@ public:
 	static void computeIntensityDerivatives(float2* d_output, float* d_input, unsigned int width, unsigned int height);
 
 	static void convertNormalsFloat4ToUCHAR4(uchar4* d_output, const float4* d_input, unsigned int width, unsigned int height);
+	static void computeNormalsSobel(float4* d_output, const float4* d_input, unsigned int width, unsigned int height);
 
 	//adaptive filtering based on depth
 	static void adaptiveGaussFilterDepthMap(float* d_output, const float* d_input, float sigmaD, float sigmaR, float adaptFactor, unsigned int width, unsigned int height);

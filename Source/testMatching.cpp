@@ -1487,9 +1487,9 @@ void TestMatching::analyzeLocalOpts()
 	//const std::string test0File = "dump/recording.sensor"; //sparse+dense
 	//const std::string test1File = "dump/fr3_office.sensor"; //sparse
 	//const std::string refFile   = "../data/tum/fr3_office_depth.sensor"; //reference
-	const std::string test0File = "debug/test0.trajectory"; //sparse+dense
-	const std::string test1File = "debug/test1.trajectory"; //sparse
-	const std::string refFile = "debug/ref.trajectory"; //reference
+	const std::string test0File = "debug/opt_half_sdT.bin"; //sparse+dense
+	const std::string test1File = "debug/opt_half_s.bin"; //sparse
+	const std::string refFile = "debug/ref_fr2_xyz_half.bin"; //reference
 
 	std::cout << "loading trajectories... ";
 	std::vector<mat4f> test0Trajectory, test1Trajectory, referenceTrajectory;
@@ -1530,12 +1530,13 @@ void TestMatching::analyzeLocalOpts()
 		s >> referenceTrajectory;
 	}
 	std::cout << "done!" << std::endl;
+	size_t numTransforms = math::min(referenceTrajectory.size(), test0Trajectory.size());
 
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	std::vector<float> errors0, errors1;
 	std::vector<std::pair<unsigned int, float>> badIndices;
 	std::vector<std::pair<unsigned int, float>> goodIndices;
-	for (unsigned int i = 0; i < referenceTrajectory.size(); i += submapSize) {
+	for (unsigned int i = 0; i < numTransforms; i += submapSize) {
 		unsigned int numTransforms = std::min(submapSize, (int)referenceTrajectory.size() - i);
 		std::vector<mat4f> local0(numTransforms), local1(numTransforms), refLocalTrajectory(numTransforms);
 		mat4f offset0 = test0Trajectory[i].getInverse();
@@ -1566,7 +1567,7 @@ void TestMatching::analyzeLocalOpts()
 
 	//compare global keys
 	std::vector<mat4f> test0Keys, test1Keys, refKeys;
-	for (unsigned int i = 0; i < referenceTrajectory.size(); i += submapSize) {
+	for (unsigned int i = 0; i < numTransforms; i += submapSize) {
 		test0Keys.push_back(test0Trajectory[i]);
 		test1Keys.push_back(test1Trajectory[i]);
 		refKeys.push_back(referenceTrajectory[i]);
@@ -1590,6 +1591,9 @@ void TestMatching::analyzeLocalOpts()
 	}
 	float compErr = PoseHelper::evaluateAteRmse(composed, referenceTrajectory).first;
 	std::cout << "composed error = " << compErr << std::endl;
+
+	std::sort(errors0.begin(), errors0.end(), std::greater<float>()); //sparse+dense
+	std::sort(errors1.begin(), errors1.end(), std::greater<float>()); //sparse
 	int a = 5;
 }
 
@@ -1598,10 +1602,14 @@ void TestMatching::testGlobalDense()
 	//const std::string which = "fr1_desk_f20";
 	//const std::string whichRef = "fr1_desk_from20";
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
-	const std::string which = "fr2_xyz2";
-	const std::string whichRef = "fr2_xyz_half";
+	//const std::string which = "fr2_xyz";
+	//const std::string whichRef = "fr2_xyz";
+	//const std::string which = "half_sdT";
+	//const std::string whichRef = "fr2_xyz_half";
 	//const std::string which = "fr3_office";
 	//const std::string whichRef = "fr3_office";
+	const std::string which = "fr3_office2";
+	const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_nstn2";
 	//const std::string whichRef = "fr3_nstn";
 	bool loadCache = false;
@@ -1629,7 +1637,7 @@ void TestMatching::testGlobalDense()
 	const std::string trajFile = "debug/opt_" + which + ".bin";
 	const std::string refTrajFile = "debug/ref_" + whichRef + ".bin";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
-	bool savePointClouds = false; const float maxDepth = 2.0f;
+	bool savePointClouds = false; const float maxDepth = 1.0f;
 
 	std::vector<mat4f> trajectoryAll, refTrajectoryAll;
 	std::vector<mat4f> trajectoryKeys, refTrajectoryKeys;
@@ -1692,7 +1700,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 1;
+	const unsigned int maxNumOutIts = 4;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
@@ -1706,9 +1714,9 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr2_xyz
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.5f);
-	std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr2_xyz
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
-	std::vector<float> weightsDenseColor(maxNumIters, 0.5f);
+	std::vector<float> weightsSparse(maxNumIters, 0.0f); //fr2_xyz
+	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
@@ -1721,16 +1729,19 @@ void TestMatching::testGlobalDense()
 	//std::cout << "ate rmse = " << transErr.first << ", " << transErr.second << std::endl;
 	//	std::cout << "waiting..." << std::endl; getchar();
 	//}
-	//{//evaluate at ground truth
-	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, refTrajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
-	//	sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), true);
-	//	sba.align(m_siftManager, &cudaCache, d_transforms, 4, numPCGIts, useVerify, isLocal, false, true, false, false);
-	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-	//	const auto transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
-	//	std::cout << "ate rmse = " << transErr.first << ", " << transErr.second << std::endl;
-	//	std::cout << "saving ref opt to point cloud... "; SiftVisualization::saveToPointCloud("debug/optref.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse); std::cout << "done" << std::endl;
-	//	std::cout << "waiting..." << std::endl; getchar();
-	//}
+	if (false) {//evaluate at ground truth
+		std::cout << "saving ref to point cloud... "; SiftVisualization::saveToPointCloud("debug/ref.ply", m_depthImages, m_colorImages, refTrajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, refTrajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
+		sba.setGlobalWeights(std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), true);
+		for (unsigned int i = 0; i < 1; i++) {
+			sba.align(m_siftManager, &cudaCache, d_transforms, 4, numPCGIts, useVerify, isLocal, false, true, false, false);
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectoryKeys.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+			const auto transErr = PoseHelper::evaluateAteRmse(trajectoryKeys, refTrajectoryKeys);
+			std::cout << "ate rmse = " << transErr.first << ", " << transErr.second << std::endl;
+		}
+		std::cout << "saving ref opt to point cloud... "; SiftVisualization::saveToPointCloud("debug/optref.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
+		std::cout << "waiting..." << std::endl; getchar();
+	}
 	//{//evaluate sparse only
 	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectoryKeys.data(), sizeof(float4x4)*numImages, cudaMemcpyHostToDevice));
 	//	sba.setUseGlobalDenseOpt(false);
@@ -1836,9 +1847,9 @@ void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector
 
 void TestMatching::compareDEBUG()
 {
-	const std::string ref = "fr3_office";
-	const std::string test = "fr3_office_sT";
-	const std::string refTrajFile = "debug/ref_fr3_office.bin"; 
+	const std::string ref = "half_s";
+	const std::string test = "half_sdT";
+	const std::string refTrajFile = "debug/ref_fr2_xyz_half.bin"; 
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	//trajectories
 	std::vector<mat4f> optTrajectoryRef, optTrajectoryTest, referenceTrajectory;
@@ -1861,6 +1872,8 @@ void TestMatching::compareDEBUG()
 	m_siftManager->loadFromFile("debug/" + ref + ".sift");
 	siftManagerTest.loadFromFile("debug/" + test + ".sift");
 	std::cout << "done" << std::endl;
+	const std::vector<int>& validImagesRef = m_siftManager->getValidImages();
+	const std::vector<int>& validImagesTest = siftManagerTest.getValidImages();
 
 	const unsigned int numImages = m_siftManager->getNumImages();
 	std::cout << "[ #images = " << numImages << " ]" << std::endl;
@@ -1877,7 +1890,7 @@ void TestMatching::compareDEBUG()
 	std::vector< std::vector<bool> > markers(numImages); for (unsigned int i = 0; i < numImages; i++) markers[i].resize(numImages, false);
 	for (unsigned int i = 0; i < refCorr.size(); i++) {
 		const EntryJ& corr = refCorr[i];
-		if (corr.isValid()) {
+		if (corr.isValid() && validImagesRef[corr.imgIdx_i] && validImagesRef[corr.imgIdx_j]) {
 			if (!markers[corr.imgIdx_i][corr.imgIdx_j]) {
 				numImCorrPerImageRef[corr.imgIdx_i]++;
 				markers[corr.imgIdx_i][corr.imgIdx_j] = true;
@@ -1891,7 +1904,7 @@ void TestMatching::compareDEBUG()
 	markers.clear(); markers.resize(numImages); for (unsigned int i = 0; i < numImages; i++) markers[i].resize(numImages, false);
 	for (unsigned int i = 0; i < testCorr.size(); i++) {
 		const EntryJ& corr = testCorr[i];
-		if (corr.isValid()) {
+		if (corr.isValid() && validImagesTest[corr.imgIdx_i] && validImagesTest[corr.imgIdx_j]) {
 			if (!markers[corr.imgIdx_i][corr.imgIdx_j]) {
 				numImCorrPerImageTest[corr.imgIdx_i]++;
 				markers[corr.imgIdx_i][corr.imgIdx_j] = true;
@@ -1933,35 +1946,107 @@ void TestMatching::compareDEBUG()
 		numKeysTest[i] = siftManagerTest.getNumKeyPointsPerImage(i);
 	}
 
-	std::vector<float> errPerKeyRef(numImages, 0.0f), errPerKeyTest(numImages, 0.0f);
-	for (unsigned int i = 3; i < optKeysRef.size(); i++) {
-		errPerKeyRef[i] = PoseHelper::evaluateAteRmse(optKeysRef, refKeys, i).first;
-		errPerKeyTest[i] = PoseHelper::evaluateAteRmse(optKeysTest, refKeys, i).first;
+	//std::vector<float> errPerKeyRef(numImages, 0.0f), errPerKeyTest(numImages, 0.0f);
+	//for (unsigned int i = 3; i < optKeysRef.size(); i++) {
+	//	errPerKeyRef[i] = PoseHelper::evaluateAteRmse(optKeysRef, refKeys, i).first;
+	//	errPerKeyTest[i] = PoseHelper::evaluateAteRmse(optKeysTest, refKeys, i).first;
+	//}
+
+	if (false) {
+		std::vector<ColorImageR8G8B8A8> colorImages; mat4f colorIntrinsics;
+		//std::vector<DepthImage32> depthImages;
+		{
+			CalibratedSensorData cs;
+			BinaryDataStreamFile s("../data/tum/fr2_xyz_half.sensor", false);
+			s >> cs; s.closeStream();
+			for (unsigned int i = 0; i < cs.m_ColorNumFrames; i += submapSize) {
+				colorImages.push_back(ColorImageR8G8B8A8(cs.m_ColorImageWidth, cs.m_ColorImageHeight, cs.m_ColorImages[i]));
+				//depthImages.push_back(DepthImage32(cs.m_DepthImageWidth, cs.m_DepthImageHeight, cs.m_DepthImages[i]));
+			}
+			colorIntrinsics = cs.m_CalibrationColor.m_Intrinsic;
+		}
+		vec2ui debugMatchTest(56, 104);
+		SiftVisualization::printMatch("debug/matches/test_" + std::to_string(debugMatchTest.x) + "-" + std::to_string(debugMatchTest.y) + ".png",
+			debugMatchTest, testCorr, colorImages[debugMatchTest.x], colorImages[debugMatchTest.y], colorIntrinsics);
+		//SiftVisualization::printMatch("debug/matches/test_" + std::to_string(debugMatchTest.x) + "-" + std::to_string(debugMatchTest.y) + ".png",
+		//	debugMatchTest, testCorr, ColorImageR8G8B8A8(ColorImageR32G32B32(depthImages[debugMatchTest.x])), ColorImageR8G8B8A8(ColorImageR32G32B32(depthImages[debugMatchTest.y])), colorIntrinsics);
+
+		vec2ui debugMatchRef = debugMatchTest;
+		SiftVisualization::printMatch("debug/matches/ref_" + std::to_string(debugMatchRef.x) + "-" + std::to_string(debugMatchRef.y) + ".png",
+			debugMatchRef, refCorr, colorImages[debugMatchRef.x], colorImages[debugMatchRef.y], colorIntrinsics);
+		std::cout << "waiting..." << std::endl; getchar();
+		int a = 5;
+	}
+
+	std::vector<std::pair<vec2ui, float>> errPerImagePairCorrsRef, errPerImagePairCorrsTest;
+	{
+		std::unordered_map<vec2ui, vec2f> helper;
+		for (unsigned int i = 0; i < refCorr.size(); i++) {
+			const EntryJ& corr = refCorr[i];
+			if (corr.isValid() && validImagesRef[corr.imgIdx_i] && validImagesRef[corr.imgIdx_j]) {
+				vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
+				vec3f diff = referenceTrajectory[corr.imgIdx_i*submapSize] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) -
+					referenceTrajectory[corr.imgIdx_j*submapSize] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+				float err2 = diff.lengthSq();
+				auto it = helper.find(imageIndices);
+				if (it == helper.end()) helper[imageIndices] = vec2f(err2, 1.0f);
+				else it->second += vec2f(err2, 1.0f);
+			}
+		}
+		for (const auto a : helper) {
+			errPerImagePairCorrsRef.push_back(std::make_pair(a.first, a.second.x / a.second.y));
+		}
+		helper.clear();
+		for (unsigned int i = 0; i < testCorr.size(); i++) {
+			const EntryJ& corr = testCorr[i];
+			if (corr.isValid() && validImagesTest[corr.imgIdx_i] && validImagesTest[corr.imgIdx_j]) {
+				vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
+				vec3f diff = referenceTrajectory[corr.imgIdx_i*submapSize] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) -
+					referenceTrajectory[corr.imgIdx_j*submapSize] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+				float err2 = diff.lengthSq();
+				auto it = helper.find(imageIndices);
+				if (it == helper.end()) helper[imageIndices] = vec2f(err2, 1.0f);
+				else it->second += vec2f(err2, 1.0f);
+			}
+		}
+		for (const auto a : helper) {
+			errPerImagePairCorrsTest.push_back(std::make_pair(a.first, a.second.x / a.second.y));
+		}
+		std::sort(errPerImagePairCorrsRef.begin(), errPerImagePairCorrsRef.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) {
+			return fabs(left.second) > fabs(right.second);
+		});
+		std::sort(errPerImagePairCorrsTest.begin(), errPerImagePairCorrsTest.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) {
+			return fabs(left.second) > fabs(right.second);
+		});
 	}
 
 	float totalErrRef = PoseHelper::evaluateAteRmse(optTrajectoryRef, referenceTrajectory).first;
 	float totalErrTest = PoseHelper::evaluateAteRmse(optTrajectoryTest, referenceTrajectory).first;
 	float keysErrRef = PoseHelper::evaluateAteRmse(optKeysRef, refKeys).first;
 	float keysErrTest = PoseHelper::evaluateAteRmse(optKeysTest, refKeys).first;
-	std::cout << "total error sparse = " << totalErrRef << std::endl;
-	std::cout << "keys error sparse = " << keysErrRef << std::endl;
+	std::cout << "total error ref = " << totalErrRef << std::endl;
+	std::cout << "keys error ref = " << keysErrRef << std::endl;
 	std::cout << std::endl;
-	std::cout << "total error sparse/dense = " << totalErrTest << std::endl;
-	std::cout << "keys error sparse/dense = " << keysErrTest << std::endl;
+	std::cout << "total error test = " << totalErrTest << std::endl;
+	std::cout << "keys error test = " << keysErrTest << std::endl;
 	{
 		std::ofstream s("debug/statsRef.txt");
 		s << "ref" << std::endl;
-		s << "image\terror2\t#corr\t#keys\terr per key" << std::endl;
+		s << "image\terror2\t#corr\t#keys\timage pair\terr per image pair" << std::endl;
 		for (unsigned int i = 0; i < err2PerImageRef.size(); i++)
-			s << err2PerImageRef[i].first << "\t" << err2PerImageRef[i].second << "\t" << numImCorrPerImageRef[err2PerImageRef[i].first] << "\t" << numKeysRef[err2PerImageRef[i].first] << "\t" << errPerKeyRef[err2PerImageRef[i].first] << std::endl;
+			s << err2PerImageRef[i].first << "\t" << err2PerImageRef[i].second << "\t" << numImCorrPerImageRef[err2PerImageRef[i].first] << "\t" << numKeysRef[err2PerImageRef[i].first] << "\t" << errPerImagePairCorrsRef[i].first << "\t" << errPerImagePairCorrsRef[i].second << std::endl;
+		for (size_t i = err2PerImageRef.size(); i < errPerImagePairCorrsRef.size(); i++)
+			s << "\t\t\t\t" << errPerImagePairCorrsRef[i].first << "\t" << errPerImagePairCorrsRef[i].second << std::endl;
 		s.close();
 	}
 	{
 		std::ofstream s("debug/statsTest.txt");
 		s << "test" << std::endl;
-		s << "image\terror2\t#corr\t#keys\terr per key" << std::endl;
+		s << "image\terror2\t#corr\t#keys\timage pair\terr per image pair" << std::endl;
 		for (unsigned int i = 0; i < err2PerImageTest.size(); i++)
-			s << err2PerImageTest[i].first << "\t" << err2PerImageTest[i].second << "\t" << numImCorrPerImageTest[err2PerImageTest[i].first] << "\t" << numKeysTest[err2PerImageTest[i].first] << "\t" << errPerKeyTest[err2PerImageTest[i].first] << std::endl;
+			s << err2PerImageTest[i].first << "\t" << err2PerImageTest[i].second << "\t" << numImCorrPerImageTest[err2PerImageTest[i].first] << "\t" << numKeysTest[err2PerImageTest[i].first] << "\t" << errPerImagePairCorrsTest[i].first << "\t" << errPerImagePairCorrsTest[i].second << std::endl;
+		for (size_t i = err2PerImageTest.size(); i < errPerImagePairCorrsTest.size(); i++)
+			s << "\t\t\t\t" << errPerImagePairCorrsTest[i].first << "\t" << errPerImagePairCorrsTest[i].second << std::endl;
 		s.close();
 	}
 }
@@ -1992,6 +2077,8 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 	m_colorCalibration = cs.m_CalibrationColor;
 
 	std::cout << "done! (" << m_colorImages.size() << " of " << cs.m_ColorNumFrames << ")" << std::endl;
+	std::cout << "depth intrinsics:" << std::endl << m_depthCalibration.m_Intrinsic << std::endl;
+	std::cout << "color intrinsics:" << std::endl << m_colorCalibration.m_Intrinsic << std::endl;
 
 	initSiftParams(m_depthImages.front().getWidth(), m_depthImages.front().getHeight(),
 		m_colorImages.front().getWidth(), m_colorImages.front().getHeight());
@@ -2060,19 +2147,20 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 					CUDAImageUtil::erodeDepthMap(d_depth, d_depthErodeHelper, 3, m_widthDepth, m_heightDepth, 0.05f, 0.3f);
 				}
 			}
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_depthImages[i].getPointer(), d_depth, sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost)); //for vis only
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_depthImages[i].getPointer(), d_depth, sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost)); //for vis only
 		}
 
 		CUDACachedFrame& frame = cachedFrames[i];
 		if (depthFilterSigmaD > 0.0f) {
 			CUDAImageUtil::gaussFilterDepthMap(d_depthErodeHelper, d_depth, depthFilterSigmaD, depthFilterSigmaR, m_widthDepth, m_heightDepth);
-			//CUDAImageUtil::adaptiveGaussFilterDepthMap(d_depthErodeHelper, d_depth, depthFilterSigmaD, adaptDepthFactor, depthFilterSigmaR, m_widthDepth, m_heightDepth);
+			//CUDAImageUtil::adaptiveGaussFilterDepthMap(d_depthErodeHelper, d_depth, depthFilterSigmaD, 1.0f, depthFilterSigmaR, m_widthDepth, m_heightDepth);
 			std::swap(d_depthErodeHelper, d_depth);
 		}
 		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(d_helperCamPos, d_depth, MatrixConversion::toCUDA(m_depthCalibration.m_IntrinsicInverse), m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_cameraposDownsampled, width, height, d_helperCamPos, m_widthDepth, m_heightDepth);
 
 		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
+		//CUDAImageUtil::computeNormalsSobel(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
 
 		CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, width, height);
@@ -2081,9 +2169,8 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 
 		CUDAImageUtil::resampleToIntensity(d_filterHelperDown, width, height, d_color, m_widthSift, m_heightSift);
 		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, intensityFilterSigma, width, height);
-		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::jointBilateralFilterFloat(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, width, height);
-		if (intensityFilterSigma > 0.0f) CUDAImageUtil::adaptiveBilateralFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled,
-			intensityFilterSigma, 0.01f, adaptIntensityFactor, width, height);
+		if (intensityFilterSigma > 0.0f) CUDAImageUtil::jointBilateralFilterFloat(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, width, height);
+		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::adaptiveBilateralFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, adaptIntensityFactor, width, height);
 		else std::swap(frame.d_intensityDownsampled, d_filterHelperDown);
 		CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, width, height);
 	}

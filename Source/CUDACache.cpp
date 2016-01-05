@@ -62,7 +62,9 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 
 	//color
 	CUDAImageUtil::resampleToIntensity(d_intensityHelper, m_width, m_height, d_color, inputColorWidth, inputColorHeight);
-	if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, m_filterIntensitySigma, m_width, m_height);
+	//if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, m_filterIntensitySigma, m_width, m_height);
+	//if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::jointBilateralFilterFloat(frame.d_intensityDownsampled, d_intensityHelper, frame.d_depthDownsampled, m_intensityFilterSigma, 0.01f, m_width, m_height);
+	if (m_filterIntensitySigma > 0.0f) CUDAImageUtil::adaptiveBilateralFilterIntensity(frame.d_intensityDownsampled, d_intensityHelper, frame.d_depthDownsampled, m_filterIntensitySigma, 0.01f, 1.0f, m_width, m_height);
 	else std::swap(frame.d_intensityDownsampled, d_intensityHelper);
 	CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, m_width, m_height);
 
@@ -82,8 +84,6 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	}
 	CUDACachedFrame& tmpFrame = globalCache->m_cache[globalFrameIdx + 1];
 
-	std::cout << "USE ADAPTIVE FILTERING HERE" << std::endl;
-	getchar();
 	////!!!debugging
 	//DepthImage32 depthImage(m_width, m_height);
 	//ColorImageR32 intensity(m_width, m_height);

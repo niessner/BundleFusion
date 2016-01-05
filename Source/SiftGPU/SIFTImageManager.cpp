@@ -377,6 +377,7 @@ void findTrack(const std::vector< std::vector<std::pair<uint2, float3>> >& corrP
 	}
 }
 
+//#define MAX_TRACK_CORR_ERROR 0.03f
 void SIFTImageManager::computeTracks(const std::vector<EntryJ>& correspondences, const std::vector<uint2>& correspondenceKeyIndices,
 	std::vector< std::vector<std::pair<uint2, float3>> >& tracks) const {
 	tracks.clear();
@@ -384,7 +385,8 @@ void SIFTImageManager::computeTracks(const std::vector<EntryJ>& correspondences,
 	std::vector< std::vector<std::pair<uint2, float3>> > corrPerKey(m_numKeyPoints); //(image,keyIndex)
 	for (unsigned int i = 0; i < correspondences.size(); i++) {
 		const EntryJ& corr = correspondences[i];
-		if (corr.isValid() && corr.imgIdx_j) {
+		if (corr.isValid()) {
+			//float err = 
 			const uint2& keyIndices = correspondenceKeyIndices[i];
 			corrPerKey[keyIndices.x].push_back(std::make_pair(make_uint2(corr.imgIdx_j, keyIndices.y), corr.pos_j));
 			corrPerKey[keyIndices.y].push_back(std::make_pair(make_uint2(corr.imgIdx_i, keyIndices.x), corr.pos_i));

@@ -189,6 +189,11 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+		//bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
+		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
+		//	input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
+		//	input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
+		//	parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
 		if (useDepth) {
 			if (foundCorr) {
 				// point-to-plane residual
@@ -196,8 +201,10 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				depthRes = dot(diff, normalTgt);
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, 0.5f*((1.0f - length(diff) / parameters.denseDistThresh) + (1.0f - camPosTgt.z / parameters.denseDepthMax)));
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.0f)); //fr1_desk
-				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.5f)); //fr3_office
-				depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 3.0f)); //fr3_nstn, fr2_xyz_half
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.5f)); //fr3_office, fr2_xyz_half
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 3.0f)); //fr3_nstn
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 1.8f));
+				depthWeight = parameters.weightDenseDepth * imPairWeight * pow(max(0.0f, 1.0f - camPosTgt.z / 2.5f), 1.8f);
 #ifdef USE_LIE_SPACE
 				if (i > 0) computeJacobianBlockRow_i(depthJacBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
 				if (j > 0) computeJacobianBlockRow_j(depthJacBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
@@ -228,7 +235,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 					if (i > 0) computeJacobianBlockIntensityRow_i(colorJacBlockRow_i, focalLength, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					if (j > 0) computeJacobianBlockIntensityRow_j(colorJacBlockRow_j, focalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 #endif
-					colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, 1.0f - abs(colorRes) / parameters.denseColorThresh);
+					//colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, 1.0f - abs(colorRes) / parameters.denseColorThresh);
+					colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, 0.5f*(1.0f - abs(colorRes) / parameters.denseColorThresh) + 0.5f*(1.0f - camPosTgt.z / 1.0f));
 				}
 			}
 			addToLocalSystem(foundCorrColor, state.d_denseJtJ, state.d_denseJtr, input.numberOfImages * 6,

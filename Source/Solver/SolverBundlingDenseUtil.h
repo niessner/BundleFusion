@@ -87,6 +87,39 @@ __inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWid
 	} // valid src camera position
 	return false;
 }
+//__inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
+//	float distThresh, float normalThresh, const float4x4& transform, const float4& intrinsics,
+//	const float4* tgtCamPos, const float4* tgtNormals, const float4* srcCamPos, const float4* srcNormals,
+//	float depthMin, float depthMax, float3& camPosSrc, float3& camPosSrcToTgt, float2& tgtScreenPosf, float3& camPosTgt, float3& normalTgt)
+//{
+//	const float4 cposj = srcCamPos[idx]; 
+//	if (cposj.z > depthMin && cposj.z < depthMax) {
+//		camPosSrc = make_float3(cposj.x, cposj.y, cposj.z);
+//		float4 nrmj = srcNormals[idx];
+//		if (nrmj.x != MINF) {
+//			nrmj = transform * nrmj;
+//			camPosSrcToTgt = transform * camPosSrc;
+//			tgtScreenPosf = cameraToDepth(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, camPosSrcToTgt);
+//			int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
+//			if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
+//				float4 cposi = bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtCamPos, imageWidth, imageHeight);
+//				if (cposi.z > depthMin && cposi.z < depthMax) {
+//					camPosTgt = make_float3(cposi.x, cposi.y, cposi.z);
+//					float4 nrmi = bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtNormals, imageWidth, imageHeight);
+//					if (nrmi.x != MINF) {
+//						normalTgt = make_float3(nrmi.x, nrmi.y, nrmi.z);
+//						float dist = length(camPosSrcToTgt - camPosTgt);
+//						float dNormal = dot(nrmj, nrmi);
+//						if (dNormal >= normalThresh && dist <= distThresh) {
+//							return true;
+//						}
+//					}
+//				}
+//			} // valid projection
+//		} // valid src normal
+//	} // valid src camera position
+//	return false;
+//}
 
 ////////////////////////////////////////
 // build jtj/jtr

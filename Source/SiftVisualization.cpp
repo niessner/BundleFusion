@@ -138,6 +138,45 @@ void SiftVisualization::printMatch(const std::string& filename, const EntryJ& co
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
+void SiftVisualization::printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics)
+{
+	MLIB_ASSERT(imageIndices.x < imageIndices.y);
+
+	ColorImageR32G32B32 matchImage;
+	matchImage.allocate(image1.getWidth() * 2, image1.getHeight());
+	ColorImageR32G32B32 im1(image1);
+	ColorImageR32G32B32 im2(image2);
+	matchImage.copyIntoImage(im1, 0, 0);
+	matchImage.copyIntoImage(im2, image1.getWidth(), 0);
+
+	std::vector<vec2i> from, to;
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (corr.isValid() && corr.imgIdx_i == imageIndices.x && corr.imgIdx_j == imageIndices.y) {
+			vec3f proj0 = colorIntrinsics * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z);
+			vec3f proj1 = colorIntrinsics * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+			vec2i p0 = math::round(vec2f(proj0.x / proj0.z, proj0.y / proj0.z));
+			vec2i p1 = math::round(vec2f(proj1.x / proj1.z, proj1.y / proj1.z));
+			from.push_back(p0);			to.push_back(p1);
+		}
+	}
+	if (from.empty()) {
+		std::cout << "no matches to print for images " << imageIndices << std::endl;
+		return;
+	}
+	//draw
+	const int radius = 3;
+	for (unsigned int i = 0; i < from.size(); i++) {
+		const vec3f color = vec3f(RGBColor::randomColor());
+		vec2i p0 = from[i];
+		vec2i p1 = to[i] + vec2i(image1.getWidth(), 0);
+		ImageHelper::drawCircle(matchImage, p0, radius, color);
+		ImageHelper::drawCircle(matchImage, p1, radius, color);
+		ImageHelper::drawLine(matchImage, p0, p1, color);
+	}
+	FreeImageWrapper::saveImage(filename, matchImage);
+}
+
 void SiftVisualization::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache, bool filtered, int maxNumMatches /*= -1*/)
 {
 	const unsigned int numFrames = siftManager->getNumImages();

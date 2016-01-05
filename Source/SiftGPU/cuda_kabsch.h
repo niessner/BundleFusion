@@ -451,10 +451,10 @@ unsigned int filterKeyPointMatches(
 	while (!done) {
 		if (idx == numRawMatches || curNumMatches >= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) {
 			if (curNumMatches < minNumMatches || curMaxResidual >= maxResThresh || !validTransform) { // invalid
-				if (printDebug) printf("INVALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
+				//if (printDebug) printf("INVALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
 				curNumMatches = 0;
 			}
-			else if (printDebug) printf("VALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
+			//else if (printDebug) printf("VALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
 			done = true;
 			break;
 		}
