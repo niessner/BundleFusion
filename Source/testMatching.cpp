@@ -1599,7 +1599,7 @@ void TestMatching::analyzeLocalOpts()
 
 void TestMatching::testGlobalDense()
 {
-	const std::string which = "fr1_desk_f20_2";//"fr1_desk_f20";
+	const std::string which = "fr1_desk_f20_3";//"fr1_desk_f20";
 	const std::string whichRef = "fr1_desk_from20";
 	//const std::string which = "fr2_xyz";
 	//const std::string whichRef = "fr2_xyz";
@@ -1716,7 +1716,7 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 
-	std::vector<float> weightsSparse(maxNumIters, 0.1f); //fr1_desk 
+	std::vector<float> weightsSparse(maxNumIters, 0.2f); //fr1_desk 
 	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
