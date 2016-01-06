@@ -1609,7 +1609,7 @@ void TestMatching::testGlobalDense()
 	//const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_office_i3";//"fr3_office2";
 	//const std::string whichRef = "fr3_office";
-	const std::string which = "fr3_nstn";// "fr3_nstn2";
+	const std::string which = "fr3_nstn3";// "fr3_nstn2";
 	const std::string whichRef = "fr3_nstn";
 	bool loadCache = false;
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
@@ -1709,7 +1709,7 @@ void TestMatching::testGlobalDense()
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
 	std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr3_nstn
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.4f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.3f);
 	std::vector<float> weightsDenseColor(maxNumIters, 0.2f);
 
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz 
