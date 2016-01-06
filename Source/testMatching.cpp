@@ -1599,8 +1599,8 @@ void TestMatching::analyzeLocalOpts()
 
 void TestMatching::testGlobalDense()
 {
-	const std::string which = "fr1_desk_f20_3";//"fr1_desk_f20";
-	const std::string whichRef = "fr1_desk_from20";
+	//const std::string which = "fr1_desk_f20_3";//"fr1_desk_f20";
+	//const std::string whichRef = "fr1_desk_from20";
 	//const std::string which = "fr2_xyz";
 	//const std::string whichRef = "fr2_xyz";
 	//const std::string which = "half4";//"half3";//"half_i2";
@@ -1609,8 +1609,8 @@ void TestMatching::testGlobalDense()
 	//const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_office_i3";//"fr3_office2";
 	//const std::string whichRef = "fr3_office";
-	//const std::string which = "fr3_nstn2";
-	//const std::string whichRef = "fr3_nstn";
+	const std::string which = "fr3_nstn";// "fr3_nstn2";
+	const std::string whichRef = "fr3_nstn";
 	bool loadCache = false;
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
@@ -1701,24 +1701,24 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 1;
-	const unsigned int maxNumIters = 2;
+	const unsigned int maxNumOutIts = 2;
+	const unsigned int maxNumIters = 3;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
-	//std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr3_nstn
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.3f);
+	std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr3_nstn
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.4f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.2f);
 
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz 
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 
-	std::vector<float> weightsSparse(maxNumIters, 0.2f); //fr1_desk 
-	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	//std::vector<float> weightsSparse(maxNumIters, 0.2f); //fr1_desk 
+	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;

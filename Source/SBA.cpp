@@ -35,6 +35,7 @@ SBA::SBA()
 	//m_localWeightsDenseDepth.resize(maxNumIts, 1.0f);//for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
 	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
 	////for (unsigned int i = 0; i < 2; i++) m_localWeightsSparse[maxNumIts - i - 1] = 0.0f; // turn off sparse at end
+	for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
 
 	m_globalWeightsMutex.lock();
 	m_globalWeightsSparse.resize(maxNumIts, 1.0f);
