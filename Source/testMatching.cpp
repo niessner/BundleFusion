@@ -1599,13 +1599,12 @@ void TestMatching::analyzeLocalOpts()
 
 void TestMatching::testGlobalDense()
 {
-	//const std::string which = "fr1_desk_f20";
-	//const std::string whichRef = "fr1_desk_from20";
-	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
+	const std::string which = "fr1_desk_f20_2";//"fr1_desk_f20";
+	const std::string whichRef = "fr1_desk_from20";
 	//const std::string which = "fr2_xyz";
 	//const std::string whichRef = "fr2_xyz";
-	const std::string which = "half4";//"half3";//"half_i2";
-	const std::string whichRef = "fr2_xyz_half";
+	//const std::string which = "half4";//"half3";//"half_i2";
+	//const std::string whichRef = "fr2_xyz_half";
 	//const std::string which = "fr3_office";
 	//const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_office_i3";//"fr3_office2";
@@ -1713,15 +1712,13 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.3f);
 
-	//std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr2_xyz
-	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
-	//std::vector<float> weightsDenseColor(maxNumIters, 0.5f);
-	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz
+	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz 
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
-	std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz 
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
-	std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
+
+	std::vector<float> weightsSparse(maxNumIters, 0.1f); //fr1_desk 
+	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
