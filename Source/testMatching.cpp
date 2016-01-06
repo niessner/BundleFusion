@@ -1716,9 +1716,12 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr2_xyz
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.5f);
+	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 	std::vector<float> weightsSparse(maxNumIters, 0.0f); //fr2_xyz
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
-	std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
@@ -2190,8 +2193,9 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 
 		CUDAImageUtil::resampleToIntensity(d_filterHelperDown, width, height, d_color, m_widthSift, m_heightSift);
-		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, intensityFilterSigma, width, height);
-		if (intensityFilterSigma > 0.0f) CUDAImageUtil::jointBilateralFilterFloat(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, width, height);
+		if (intensityFilterSigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, intensityFilterSigma, width, height);
+		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::adaptiveGaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 1.0f, width, height);
+		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::jointBilateralFilterFloat(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, width, height);
 		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::adaptiveBilateralFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, adaptIntensityFactor, width, height);
 		else std::swap(frame.d_intensityDownsampled, d_filterHelperDown);
 		CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, width, height);
