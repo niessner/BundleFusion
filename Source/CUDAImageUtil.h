@@ -27,8 +27,9 @@ public:
 	static void gaussFilterIntensity(float* d_output, const float* d_input, float sigmaD, unsigned int width, unsigned int height);
 
 	static void convertUCHAR4ToIntensityFloat(float* d_output, const uchar4* d_input, unsigned int width, unsigned int height);
-	//no invalid checks!
-	static void computeIntensityDerivatives(float2* d_output, float* d_input, unsigned int width, unsigned int height);
+
+	static void computeIntensityDerivatives(float2* d_output, const float* d_input, unsigned int width, unsigned int height);
+	static void computeIntensityGradientMagnitude(float* d_output, const float* d_input, unsigned int width, unsigned int height);
 
 	static void convertNormalsFloat4ToUCHAR4(uchar4* d_output, const float4* d_input, unsigned int width, unsigned int height);
 	static void computeNormalsSobel(float4* d_output, const float4* d_input, unsigned int width, unsigned int height);

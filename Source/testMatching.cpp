@@ -1604,7 +1604,7 @@ void TestMatching::testGlobalDense()
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
 	//const std::string which = "fr2_xyz";
 	//const std::string whichRef = "fr2_xyz";
-	const std::string which = "half_i2";
+	const std::string which = "half4";//"half3";//"half_i2";
 	const std::string whichRef = "fr2_xyz_half";
 	//const std::string which = "fr3_office";
 	//const std::string whichRef = "fr3_office";
@@ -1703,7 +1703,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
 	const unsigned int maxNumOutIts = 1;
-	const unsigned int maxNumIters = 4;
+	const unsigned int maxNumIters = 2;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
@@ -1719,9 +1719,9 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
-	std::vector<float> weightsSparse(maxNumIters, 0.0f); //fr2_xyz
-	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz 
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
@@ -1860,7 +1860,7 @@ void TestMatching::compareDEBUG()
 {
 	const std::string ref = "half_s";
 	const std::string test = "half_sdT";
-	const std::string refTrajFile = "debug/ref_fr2_xyz_half.bin"; 
+	const std::string refTrajFile = "debug/ref_fr2_xyz_half.bin";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	//trajectories
 	std::vector<mat4f> optTrajectoryRef, optTrajectoryTest, referenceTrajectory;
@@ -2071,7 +2071,7 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 		BinaryDataStreamFile s(filename, false);
 		s >> cs;
 		s.closeStream();
-		
+
 		////default intrinsics
 		//cs.m_CalibrationDepth.m_Intrinsic = mat4f(
 		//	525.0f, 0.0f, 319.5f, 0.0f,
@@ -2199,6 +2199,13 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::adaptiveBilateralFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, frame.d_depthDownsampled, intensityFilterSigma, 0.01f, adaptIntensityFactor, width, height);
 		else std::swap(frame.d_intensityDownsampled, d_filterHelperDown);
 		CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, width, height);
+
+
+		//CUDAImageUtil::resampleToIntensity(frame.d_intensityDownsampled, width, height, d_color, m_widthSift, m_heightSift);
+		//CUDAImageUtil::computeIntensityGradientMagnitude(d_filterHelperDown, frame.d_intensityDownsampled, width, height);
+		//if (intensityFilterSigma > 0.0f) CUDAImageUtil::gaussFilterIntensity(frame.d_intensityDownsampled, d_filterHelperDown, intensityFilterSigma, width, height);
+		//else std::swap(frame.d_intensityDownsampled, d_filterHelperDown);
+		//CUDAImageUtil::computeIntensityDerivatives(frame.d_intensityDerivsDownsampled, frame.d_intensityDownsampled, width, height);
 	}
 	cache->setCurrentFrame((unsigned int)m_colorImages.size() - 1);
 

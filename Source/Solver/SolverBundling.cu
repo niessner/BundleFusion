@@ -307,7 +307,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 					if (i > 0) computeJacobianBlockIntensityRow_i(colorJacBlockRow_i, focalLength, state.d_xRot[i], state.d_xTrans[i], transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					if (j > 0) computeJacobianBlockIntensityRow_j(colorJacBlockRow_j, focalLength, state.d_xRot[j], state.d_xTrans[j], invTransform_i, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 #endif
-					colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, 1.0f - abs(colorRes) / parameters.denseColorThresh);
+					colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, 1.0f - abs(colorRes) / (1.15f*parameters.denseColorThresh));
+					//colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, 1.0f - abs(colorRes) / parameters.denseColorThresh) * max(0.0f, (1.0f - camPosTgt.z / 1.0f));
 					//colorWeight = parameters.weightDenseColor * imPairWeight * max(0.0f, 0.5f*(1.0f - abs(colorRes) / parameters.denseColorThresh) + 0.5f*max(0.0f, (1.0f - camPosTgt.z / 1.0f)));
 				}
 			}
