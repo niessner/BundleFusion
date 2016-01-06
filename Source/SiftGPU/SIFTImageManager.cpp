@@ -377,7 +377,7 @@ void findTrack(const std::vector< std::vector<std::pair<uint2, float3>> >& corrP
 	}
 }
 
-#define MAX_TRACK_CORR_ERROR 0.02f
+#define MAX_TRACK_CORR_ERROR 0.03f
 void SIFTImageManager::computeTracks(const std::vector<float4x4>& trajectory, const std::vector<EntryJ>& correspondences, const std::vector<uint2>& correspondenceKeyIndices,
 	std::vector< std::vector<std::pair<uint2, float3>> >& tracks) const {
 	tracks.clear();

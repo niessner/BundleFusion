@@ -1605,12 +1605,10 @@ void TestMatching::testGlobalDense()
 	//const std::string whichRef = "fr2_xyz";
 	//const std::string which = "half4";//"half3";//"half_i2";
 	//const std::string whichRef = "fr2_xyz_half";
-	//const std::string which = "fr3_office";
-	//const std::string whichRef = "fr3_office";
-	//const std::string which = "fr3_office_i3";//"fr3_office2";
-	//const std::string whichRef = "fr3_office";
-	const std::string which = "fr3_nstn3";// "fr3_nstn2";
-	const std::string whichRef = "fr3_nstn";
+	const std::string which = "fr3_office3";//"fr3_office_i3";//"fr3_office2";
+	const std::string whichRef = "fr3_office";
+	//const std::string which = "fr3_nstn3";// "fr3_nstn2";
+	//const std::string whichRef = "fr3_nstn";
 	bool loadCache = false;
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {

@@ -255,14 +255,14 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		}
 		//!!!DEBUGGING
 
-		if (_debugPrintMatches && !isLocal) {
-			std::vector<mat4f> filtRelativeTransforms(curFrame);
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(filtRelativeTransforms.data(), siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*curFrame, cudaMemcpyDeviceToHost));
-			for (unsigned int p = 0; p < curFrame; p++)
-				saveImPairToPointCloud("debug/", cudaCache, NULL, vec2ui(p, curFrame), filtRelativeTransforms[p]);
-			//SIFTMatchFilter::visualizeProjError(siftManager, vec2ui(42, 43), cudaCache->getCacheFrames(),
-			//	MatrixConversion::toCUDA(cudaCache->getIntrinsics()), MatrixConversion::toCUDA(filtRelativeTransforms[42].getInverse()), 0.1f, 3.0f);
-		}
+		//if (_debugPrintMatches && !isLocal) {
+		//	std::vector<mat4f> filtRelativeTransforms(curFrame);
+		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(filtRelativeTransforms.data(), siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*curFrame, cudaMemcpyDeviceToHost));
+		//	for (unsigned int p = 0; p < curFrame; p++)
+		//		saveImPairToPointCloud("debug/", cudaCache, NULL, vec2ui(p, curFrame), filtRelativeTransforms[p]);
+		//	//SIFTMatchFilter::visualizeProjError(siftManager, vec2ui(42, 43), cudaCache->getCacheFrames(),
+		//	//	MatrixConversion::toCUDA(cudaCache->getIntrinsics()), MatrixConversion::toCUDA(filtRelativeTransforms[42].getInverse()), 0.1f, 3.0f);
+		//}
 
 		// --- dense verify filter
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
@@ -457,17 +457,17 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (m_global->getNumImages() > 1) {
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() == 89) {
-			//	setPrintMatchesDEBUG(true);
-			//}
+			if (m_global->getNumImages() == 82) {
+				setPrintMatchesDEBUG(true);
+			}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() == 89) {
-			//	setPrintMatchesDEBUG(false);
-			//	std::cout << "waiting..." << std::endl;
-			//	getchar();
-			//}
+			if (m_global->getNumImages() == 82) {
+				setPrintMatchesDEBUG(false);
+				std::cout << "waiting..." << std::endl;
+				getchar();
+			}
 			//if (m_global->getNumImages() > 206) {
 			//	std::cout << "saving " << m_global->getNumImages() << " global to file... ";
 			//	m_global->saveToFile("debug/test" + std::to_string(m_global->getNumImages()) + ".sift");
@@ -491,7 +491,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
 				//!!!
 				std::cout << "WARNING: last image (" << m_global->getNumImages() << ") not valid! no new global images for solve" << std::endl;
-				//getchar();
+				getchar();
 				//!!!
 				ret = 2;
 			}
