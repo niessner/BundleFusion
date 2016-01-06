@@ -377,8 +377,8 @@ void findTrack(const std::vector< std::vector<std::pair<uint2, float3>> >& corrP
 	}
 }
 
-//#define MAX_TRACK_CORR_ERROR 0.03f
-void SIFTImageManager::computeTracks(const std::vector<EntryJ>& correspondences, const std::vector<uint2>& correspondenceKeyIndices,
+#define MAX_TRACK_CORR_ERROR 0.01f
+void SIFTImageManager::computeTracks(const std::vector<float4x4>& trajectory, const std::vector<EntryJ>& correspondences, const std::vector<uint2>& correspondenceKeyIndices,
 	std::vector< std::vector<std::pair<uint2, float3>> >& tracks) const {
 	tracks.clear();
 	const unsigned int numImages = getNumImages();
@@ -386,10 +386,12 @@ void SIFTImageManager::computeTracks(const std::vector<EntryJ>& correspondences,
 	for (unsigned int i = 0; i < correspondences.size(); i++) {
 		const EntryJ& corr = correspondences[i];
 		if (corr.isValid()) {
-			//float err = 
-			const uint2& keyIndices = correspondenceKeyIndices[i];
-			corrPerKey[keyIndices.x].push_back(std::make_pair(make_uint2(corr.imgIdx_j, keyIndices.y), corr.pos_j));
-			corrPerKey[keyIndices.y].push_back(std::make_pair(make_uint2(corr.imgIdx_i, keyIndices.x), corr.pos_i));
+			float err = length(trajectory[corr.imgIdx_i] * corr.pos_i - trajectory[corr.imgIdx_j] * corr.pos_j);
+			if (err < MAX_TRACK_CORR_ERROR) {
+				const uint2& keyIndices = correspondenceKeyIndices[i];
+				corrPerKey[keyIndices.x].push_back(std::make_pair(make_uint2(corr.imgIdx_j, keyIndices.y), corr.pos_j));
+				corrPerKey[keyIndices.y].push_back(std::make_pair(make_uint2(corr.imgIdx_i, keyIndices.x), corr.pos_i));
+			}
 		}
 	}
 
@@ -422,7 +424,7 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 	std::vector<SIFTKeyPoint> curKeys;	std::vector<SIFTKeyPointDesc> curDesc;
 
 	std::vector< std::vector<std::pair<uint2, float3>> > tracks;
-	computeTracks(correspondences, correspondenceKeyIndices, tracks);
+	computeTracks(transforms, correspondences, correspondenceKeyIndices, tracks);
 	for (unsigned int t = 0; t < tracks.size(); t++) {
 		const auto& repKey = tracks[t].front(); //arbitrarily pick a key for the descriptor
 		float3 pos = make_float3(0.0f); unsigned int num = 0;

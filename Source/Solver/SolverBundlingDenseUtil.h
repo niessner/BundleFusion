@@ -18,6 +18,29 @@
 // build jtj/jtr
 ////////////////////////////////////////
 
+//for pre-filter, no need for normal threshold
+__inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
+	float distThresh, const float4x4& transform, const float4& intrinsics,
+	const float* tgtDepth, const float* srcDepth, float depthMin, float depthMax)
+{
+	unsigned int x = idx % imageWidth;		unsigned int y = idx / imageWidth;
+	const float3 cposj = depthToCamera(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, make_int2(x, y), srcDepth[idx]);
+	if (cposj.z > depthMin && cposj.z < depthMax) {
+		float3 camPosSrcToTgt = transform * cposj;
+		float2 tgtScreenPosf = cameraToDepth(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, camPosSrcToTgt);
+		int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
+		if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
+			float3 camPosTgt = depthToCamera(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, tgtScreenPos, tgtDepth[tgtScreenPos.y * imageWidth + tgtScreenPos.x]);
+			if (camPosTgt.z > depthMin && camPosTgt.z < depthMax) {
+				if (length(camPosSrcToTgt - camPosTgt) <= distThresh) {
+					return true;
+				}
+			}
+		} // valid projection
+	} // valid src camera position
+	return false;
+}
+
 __inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, const float4x4& transform, const float4& intrinsics,
 	const float* tgtDepth, const uchar4* tgtNormals, const float* srcDepth, const uchar4* srcNormals,
@@ -29,7 +52,7 @@ __inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWid
 		uchar4 nrmjUCHAR4 = srcNormals[idx];
 		if (*(int*)(&nrmjUCHAR4) != 0) {
 			float3 nrmj = make_float3(nrmjUCHAR4.x, nrmjUCHAR4.y, nrmjUCHAR4.z) / 255.0f * 2.0f - 1.0f;
-			nrmj = transform * nrmj;
+			nrmj = transform.getFloat3x3() * nrmj;
 			float3 camPosSrcToTgt = transform * cposj;
 			float2 tgtScreenPosf = cameraToDepth(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, camPosSrcToTgt);
 			int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
@@ -52,6 +75,41 @@ __inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWid
 	return false;
 }
 
+__device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
+	float distThresh, float normalThresh, const float4x4& transform, const float4& intrinsics,
+	const float4* tgtCamPos, const float4* tgtNormals, const float4* srcCamPos, const float4* srcNormals,
+	float depthMin, float depthMax, float3& camPosSrc, float3& camPosSrcToTgt, float2& tgtScreenPosf, float3& camPosTgt, float3& normalTgt)
+{
+	const float4 cposj = srcCamPos[idx];
+	if (cposj.z > depthMin && cposj.z < depthMax) {
+		camPosSrc = make_float3(cposj.x, cposj.y, cposj.z);
+		float4 nrmj = srcNormals[idx];
+		if (nrmj.x != MINF) {
+			nrmj = transform * nrmj;
+			camPosSrcToTgt = transform * camPosSrc;
+			tgtScreenPosf = cameraToDepth(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, camPosSrcToTgt);
+			int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
+			if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
+				//camPosTgt = tgtCamPos[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
+				float4 cposi = bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtCamPos, imageWidth, imageHeight);
+				if (cposi.z > depthMin && cposi.z < depthMax) {
+					camPosTgt = make_float3(cposi.x, cposi.y, cposi.z);
+					//normalTgt = tgtNormals[tgtScreenPos.y * imageWidth + tgtScreenPos.x];
+					float4 nrmi = bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtNormals, imageWidth, imageHeight);
+					if (nrmi.x != MINF) {
+						normalTgt = make_float3(nrmi.x, nrmi.y, nrmi.z);
+						float dist = length(camPosSrcToTgt - camPosTgt);
+						float dNormal = dot(nrmj, nrmi);
+						if (dNormal >= normalThresh && dist <= distThresh) {
+							return true;
+						}
+					}
+				}
+			} // valid projection
+		} // valid src normal
+	} // valid src camera position
+	return false;
+}
 __inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, const float4x4& transform, const float4& intrinsics,
 	const float* tgtDepth, const float4* tgtNormals, const float* srcDepth, const float4* srcNormals,
@@ -87,39 +145,7 @@ __inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWid
 	} // valid src camera position
 	return false;
 }
-//__inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
-//	float distThresh, float normalThresh, const float4x4& transform, const float4& intrinsics,
-//	const float4* tgtCamPos, const float4* tgtNormals, const float4* srcCamPos, const float4* srcNormals,
-//	float depthMin, float depthMax, float3& camPosSrc, float3& camPosSrcToTgt, float2& tgtScreenPosf, float3& camPosTgt, float3& normalTgt)
-//{
-//	const float4 cposj = srcCamPos[idx]; 
-//	if (cposj.z > depthMin && cposj.z < depthMax) {
-//		camPosSrc = make_float3(cposj.x, cposj.y, cposj.z);
-//		float4 nrmj = srcNormals[idx];
-//		if (nrmj.x != MINF) {
-//			nrmj = transform * nrmj;
-//			camPosSrcToTgt = transform * camPosSrc;
-//			tgtScreenPosf = cameraToDepth(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, camPosSrcToTgt);
-//			int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
-//			if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
-//				float4 cposi = bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtCamPos, imageWidth, imageHeight);
-//				if (cposi.z > depthMin && cposi.z < depthMax) {
-//					camPosTgt = make_float3(cposi.x, cposi.y, cposi.z);
-//					float4 nrmi = bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtNormals, imageWidth, imageHeight);
-//					if (nrmi.x != MINF) {
-//						normalTgt = make_float3(nrmi.x, nrmi.y, nrmi.z);
-//						float dist = length(camPosSrcToTgt - camPosTgt);
-//						float dNormal = dot(nrmj, nrmi);
-//						if (dNormal >= normalThresh && dist <= distThresh) {
-//							return true;
-//						}
-//					}
-//				}
-//			} // valid projection
-//		} // valid src normal
-//	} // valid src camera position
-//	return false;
-//}
+
 
 ////////////////////////////////////////
 // build jtj/jtr

@@ -21,6 +21,61 @@
 
 #define THREADS_PER_BLOCK_DENSE_OVERLAP 512
 
+
+//!!!debugging
+__global__ void visualizeCorrespondences_Kernel(uint2 imageIndices, SolverInput input, SolverState state, SolverParameters parameters, float3* d_corrImage)
+{
+	const unsigned int i = imageIndices.x;	const unsigned int j = imageIndices.y;
+
+	const unsigned int tidx = threadIdx.x;
+	const unsigned int gidx = tidx * gridDim.x + blockIdx.x;
+
+	if (gidx < (input.denseDepthWidth * input.denseDepthHeight)) {
+		const unsigned int x = gidx % input.denseDepthWidth;
+		const unsigned int y = gidx / input.denseDepthWidth;
+		const bool printDebug = x == 81 && y == 97;
+#ifdef USE_LIE_SPACE
+		float4x4 transform = state.d_xTransformInverses[i] * state.d_xTransforms[j]; //invTransform_i * transform_j
+#else
+		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
+		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
+		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
+		float4x4 transform = invTransform_i * transform_j;
+#endif
+		// find correspondence
+		//if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
+		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
+		//	input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
+		//	input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
+		//	parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
+		float3 camPosSrc; float3 camPosSrcToTgt; float2 tgtScreenPosf; float3 camPosTgt; float3 normalTgt;
+		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
+			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
+			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPosf, camPosTgt, normalTgt)) { //i tgt, j src
+
+			int2 tgtScreenPos = make_int2((int)round(tgtScreenPosf.x), (int)round(tgtScreenPosf.y));
+			d_corrImage[tgtScreenPos.y * input.denseDepthWidth + tgtScreenPos.x] = camPosSrc;
+			if (printDebug) printf("(%d,%d) -> (%d,%d) valid corr\n", x, y, tgtScreenPos.x, tgtScreenPos.y);
+		} // found correspondence
+	} // valid image pixel
+}
+extern "C"
+void VisualizeCorrespondences(const uint2& imageIndices, const SolverInput& input, SolverState& state, SolverParameters& parameters, float3* d_corrImage)
+{
+	const int grid = (input.denseDepthWidth*input.denseDepthHeight + THREADS_PER_BLOCK_DENSE_DEPTH - 1) / THREADS_PER_BLOCK_DENSE_DEPTH;
+
+	visualizeCorrespondences_Kernel << < grid, THREADS_PER_BLOCK_DENSE_DEPTH >> >(imageIndices, input, state, parameters, d_corrImage);
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+}
+//!!!debugging
+
+
+
 /////////////////////////////////////////////////////////////////////////
 // Dense Depth Term
 /////////////////////////////////////////////////////////////////////////
@@ -53,21 +108,21 @@ __global__ void FindImageImageCorr_Kernel(SolverInput input, SolverState state, 
 		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
 		float4x4 transform = invTransform_i * transform_j;
 #endif
+		//if (!computeAngleDiff(transform, 0.8f)) return; //~45 degrees
 		if (!computeAngleDiff(transform, 0.52f)) return; //~30 degrees
 
 		// find correspondence
 		__shared__ int foundCorr[1]; foundCorr[0] = 0;
 		__syncthreads();
 		if (findDenseCorr(idx, input.denseDepthWidth, input.denseDepthHeight,
-			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
-			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
-			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
+			0.15f, transform, input.intrinsics,	
+			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[j].d_depthDownsampled, 
 			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
 			foundCorr[0] = 1;
 		} // found correspondence
 		__syncthreads();
 		if (tidx == 0) {
-			if (foundCorr[0] == 1) {
+			if (foundCorr[0] == 1) { 
 				int addr = atomicAdd(state.d_numDenseOverlappingImages, 1);
 				state.d_denseOverlappingImages[addr] = make_uint2(i, j);
 			}
@@ -110,13 +165,24 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		s_count[0] = 0;
 		int count = 0.0f;
 		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
-			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
+			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
 			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
 			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
 			//atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
 			count++;
 		} // found correspondence
+		//!!!debugging
+		//float3 camPosSrc; float3 camPosSrcToTgt; float2 tgtScreenPosf; float3 camPosTgt; float3 normalTgt;
+		//if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
+		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+		//	input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
+		//	input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
+		//	parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPosf, camPosTgt, normalTgt)) { //i tgt, j src
+		//	//atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
+		//	count++;
+		//} // found correspondence
+		//!!!debugging
 		count = warpReduce(count);
 		__syncthreads();
 		if (tidx % WARP_SIZE == 0) {
@@ -142,6 +208,7 @@ __global__ void WeightDenseCorrespondences_Kernel(unsigned int N, SolverState st
 		float x = state.d_denseCorrCounts[idx];
 		if (x > 0) {
 			if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			//if (x < 400) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
 			else {
 				state.d_denseCorrCounts[idx] = 1.0f / min(logf(x), 9.0f); // natural log //TODO PARAMS
 			}
@@ -184,16 +251,16 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 
 		// find correspondence
 		float3 camPosSrc; float3 camPosSrcToTgt; float3 camPosTgt; float3 normalTgt; float2 tgtScreenPos;
-		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
-			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
-			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
-			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
-			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
 		//bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
 		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
-		//	input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
-		//	input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
+		//	input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
+		//	input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 		//	parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
+			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
+			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
 		if (useDepth) {
 			if (foundCorr) {
 				// point-to-plane residual
@@ -204,7 +271,8 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 2.5f)); //fr3_office, fr2_xyz_half
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 3.0f)); //fr3_nstn
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 1.8f));
-				depthWeight = parameters.weightDenseDepth * imPairWeight * pow(max(0.0f, 1.0f - camPosTgt.z / 2.5f), 1.8f);
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.5f), 1.8f));
+				depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 1.5f));
 #ifdef USE_LIE_SPACE
 				if (i > 0) computeJacobianBlockRow_i(depthJacBlockRow_i, transform_i, invTransform_j, camPosSrc, normalTgt);
 				if (j > 0) computeJacobianBlockRow_j(depthJacBlockRow_j, invTransform_i, transform_j, camPosSrc, normalTgt);
@@ -227,7 +295,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				colorRes = intensityTgt - input.d_cacheFrames[j].d_intensityDownsampled[srcIdx];
 				foundCorrColor = (intensityDerivTgt.x != MINF && abs(colorRes) < parameters.denseColorThresh && length(intensityDerivTgt) > parameters.denseColorGradientMin);
 				if (foundCorrColor) {
-					const float2 focalLength = make_float2(input.depthIntrinsics.x, input.depthIntrinsics.y);
+					const float2 focalLength = make_float2(input.intrinsics.x, input.intrinsics.y);
 #ifdef USE_LIE_SPACE
 					if (i > 0) computeJacobianBlockIntensityRow_i(colorJacBlockRow_i, focalLength, transform_i, invTransform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
 					if (j > 0) computeJacobianBlockIntensityRow_j(colorJacBlockRow_j, focalLength, invTransform_i, transform_j, camPosSrc, camPosSrcToTgt, intensityDerivTgt);
@@ -394,7 +462,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	//!!!debugging
 
 	if (timer) timer->endEvent();
-	}
+}
 
 /////////////////////////////////////////////////////////////////////////
 // Eval Max Residual

@@ -1604,12 +1604,12 @@ void TestMatching::testGlobalDense()
 	//const std::string origFile = "../data/tum/fr1_desk_from20.sensor";
 	//const std::string which = "fr2_xyz";
 	//const std::string whichRef = "fr2_xyz";
-	//const std::string which = "half_sdT";
-	//const std::string whichRef = "fr2_xyz_half";
+	const std::string which = "half_i2";
+	const std::string whichRef = "fr2_xyz_half";
 	//const std::string which = "fr3_office";
 	//const std::string whichRef = "fr3_office";
-	const std::string which = "fr3_office2";
-	const std::string whichRef = "fr3_office";
+	//const std::string which = "fr3_office_i3";//"fr3_office2";
+	//const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_nstn2";
 	//const std::string whichRef = "fr3_nstn";
 	bool loadCache = false;
@@ -1678,6 +1678,8 @@ void TestMatching::testGlobalDense()
 	else {
 		loadCachedFramesFromSensor(&cudaCache, origFile, submapSize, (unsigned int)trajectoryKeys.size());
 		//std::cout << "saving cache to point cloud... "; SiftVisualization::saveToPointCloud("debug/cache.ply", &cudaCache, trajectoryKeys, maxDepth); std::cout << "done" << std::endl;
+		//vec2ui indices(63, 88);
+		//SiftVisualization::saveImPairToPointCloud("debug/test", cudaCache.getCacheFrames(), cudaCache.getWidth(), cudaCache.getHeight(), indices, trajectoryKeys[indices.y].getInverse() * trajectoryKeys[indices.x]);
 		//printCacheFrames("debug/cache/", &cudaCache, 10);
 		//cudaCache.saveToFile("debug/tmp.cache");
 		//cudaCache.loadFromFile("debug/tmp.cache");
@@ -1700,7 +1702,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 4;
+	const unsigned int maxNumOutIts = 1;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
@@ -1715,8 +1717,8 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.5f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.5f);
 	std::vector<float> weightsSparse(maxNumIters, 0.0f); //fr2_xyz
-	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
@@ -1821,6 +1823,12 @@ void TestMatching::testGlobalDense()
 
 	PoseHelper::saveToPoseFile("debug/gt.txt", refTrajectoryKeys);
 	PoseHelper::saveToPoseFile("debug/opt.txt", trajectoryKeys);
+	{
+		BinaryDataStreamFile s("debug/opt.bin", true);
+		s << trajectoryKeys;
+		s << trajectoryAll;
+		s.closeStream();
+	}
 
 	int a = 5;
 }
@@ -1832,7 +1840,7 @@ void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector
 		const mat4f& key = keys[i];
 		transforms.push_back(key);
 
-		const mat4f offset = all[i*submapSize].getInverse();
+		const mat4f& offset = all[i*submapSize].getInverse();
 		unsigned int num = std::min((int)submapSize, (int)all.size() - (int)(i * submapSize));
 		for (unsigned int s = 1; s < num; s++) {
 			transforms.push_back(key * offset * all[i*submapSize + s]);
@@ -2060,6 +2068,20 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 		BinaryDataStreamFile s(filename, false);
 		s >> cs;
 		s.closeStream();
+		
+		////default intrinsics
+		//cs.m_CalibrationDepth.m_Intrinsic = mat4f(
+		//	525.0f, 0.0f, 319.5f, 0.0f,
+		//	0.0f, 525.0f, 239.5f, 0.0f,
+		//	0.0f, 0.0f, 1.0f, 0.0f,
+		//	0.0f, 0.0f, 0.0f, 1.0f);
+		//cs.m_CalibrationDepth.m_IntrinsicInverse = cs.m_CalibrationDepth.m_Intrinsic.getInverse();
+		//cs.m_CalibrationColor.m_Intrinsic = mat4f(
+		//	525.0f, 0.0f, 319.5f, 0.0f,
+		//	0.0f, 525.0f, 239.5f, 0.0f,
+		//	0.0f, 0.0f, 1.0f, 0.0f,
+		//	0.0f, 0.0f, 0.0f, 1.0f);
+		//cs.m_CalibrationColor.m_IntrinsicInverse = cs.m_CalibrationColor.m_Intrinsic.getInverse();
 	}
 
 	m_colorImages.resize(numFrames);

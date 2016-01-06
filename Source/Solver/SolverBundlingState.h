@@ -23,7 +23,7 @@ struct SolverInput
 	const CUDACachedFrame* d_cacheFrames;
 	unsigned int denseDepthWidth;
 	unsigned int denseDepthHeight;
-	float4 depthIntrinsics;		//TODO constant buffer for this + siftimagemanger stuff?
+	float4 intrinsics;				//TODO constant buffer for this + siftimagemanger stuff?
 	unsigned int maxNumDenseImPairs;
 	float2 colorFocalLength; //color camera params (actually same as depthIntrinsics...)
 

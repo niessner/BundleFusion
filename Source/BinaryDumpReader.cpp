@@ -43,6 +43,19 @@ void BinaryDumpReader::createFirstConnected()
 	std::cout << "Loading finished" << std::endl;
 	std::cout << m_data << std::endl;
 
+	//default
+	//m_data.m_CalibrationDepth.m_Intrinsic = mat4f(
+	//	525.0f, 0.0f, 319.5f, 0.0f,
+	//	0.0f, 525.0f, 239.5f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f);
+	//m_data.m_CalibrationDepth.m_IntrinsicInverse = m_data.m_CalibrationDepth.m_Intrinsic.getInverse();
+	//m_data.m_CalibrationColor.m_Intrinsic = mat4f(
+	//	525.0f, 0.0f, 319.5f, 0.0f,
+	//	0.0f, 525.0f, 239.5f, 0.0f,
+	//	0.0f, 0.0f, 1.0f, 0.0f,
+	//	0.0f, 0.0f, 0.0f, 1.0f);
+	//m_data.m_CalibrationColor.m_IntrinsicInverse = m_data.m_CalibrationColor.m_Intrinsic.getInverse();
 	//fr1
 	//m_data.m_CalibrationDepth.m_Intrinsic = mat4f(
 	//	591.1f, 0.0f, 331.0f, 0.0f,

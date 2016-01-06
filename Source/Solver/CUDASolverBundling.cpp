@@ -14,6 +14,8 @@ extern "C" int countHighResiduals(SolverInput& input, SolverState& state, Solver
 extern "C" void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 extern "C" void convertLiePosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs);
 
+extern "C" void VisualizeCorrespondences(const uint2& imageIndices, const SolverInput& input, SolverState& state, SolverParameters& parameters, float3* d_corrImage);
+
 CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxNumResiduals)
 	: m_maxNumberOfImages(maxNumberOfImages)
 	, THREADS_PER_BLOCK(512) // keep consistent with the GPU
@@ -217,25 +219,68 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		solverInput.denseDepthWidth = cudaCache->getWidth(); //TODO constant buffer for this?
 		solverInput.denseDepthHeight = cudaCache->getHeight();
 		mat4f intrinsics = cudaCache->getIntrinsics();
-		solverInput.depthIntrinsics = make_float4(intrinsics(0, 0), intrinsics(1, 1), intrinsics(0, 2), intrinsics(1, 2));
+		solverInput.intrinsics = make_float4(intrinsics(0, 0), intrinsics(1, 1), intrinsics(0, 2), intrinsics(1, 2));
 		MLIB_ASSERT(solverInput.denseDepthWidth / parameters.denseOverlapCheckSubsampleFactor > 8); //need enough samples
 	}
 	else {
 		solverInput.d_cacheFrames = NULL;
 		solverInput.denseDepthWidth = 0;
 		solverInput.denseDepthHeight = 0;
-		solverInput.depthIntrinsics = make_float4(-std::numeric_limits<float>::infinity());
+		solverInput.intrinsics = make_float4(-std::numeric_limits<float>::infinity());
 	}
 	//!!!debugging
 	if (false && parameters.weightDenseDepth > 0) {
 		std::vector<int> validImages(solverInput.numberOfImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(validImages.data(), solverInput.d_validImages, sizeof(int)*solverInput.numberOfImages, cudaMemcpyDeviceToHost));
 		convertLiePosesToMatricesCU(m_solverState.d_xRot, m_solverState.d_xTrans, solverInput.numberOfImages, m_solverState.d_xTransforms, m_solverState.d_xTransformInverses);
+
+		//uint2 imageIndices = make_uint2(87, 88);
+		//float3* d_corrImage = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_corrImage, sizeof(float3)*solverInput.denseDepthWidth*solverInput.denseDepthHeight));
+		//ColorImageR32G32B32 projImage(solverInput.denseDepthWidth, solverInput.denseDepthHeight); projImage.setPixels(vec3f(-std::numeric_limits<float>::infinity()));
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_corrImage, projImage.getPointer(), sizeof(float3)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyHostToDevice));
+		//VisualizeCorrespondences(imageIndices, solverInput, m_solverState, parameters, d_corrImage);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(projImage.getPointer(), d_corrImage, sizeof(float3)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyDeviceToHost));
+		//MLIB_CUDA_SAFE_FREE(d_corrImage);
+		//FreeImageWrapper::saveImage("debug/imCorr.png", projImage);
+		//unsigned int counter = 0;
+		//for (unsigned int i = 0; i < projImage.getNumPixels(); i++) {
+		//	const vec3f& p = projImage.getPointer()[i];
+		//	if (p.x != -std::numeric_limits<float>::infinity()) counter++;
+		//}
+		//ColorImageR32G32B32A32 camPosImage(solverInput.denseDepthWidth, solverInput.denseDepthHeight);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), cudaCache->getCacheFrames()[imageIndices.x].d_cameraposDownsampled, sizeof(float4)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/imTgt.png", camPosImage);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), cudaCache->getCacheFrames()[imageIndices.y].d_cameraposDownsampled, sizeof(float4)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/imSrc.png", camPosImage);
+
+
 		BuildDenseSystem(solverInput, m_solverState, parameters, NULL);
-		std::vector<float> imPairWeights(numberOfImages * (numberOfImages - 1) / 2);
+		int numOverlappingImages;
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&numOverlappingImages, m_solverState.d_numDenseOverlappingImages, sizeof(int), cudaMemcpyDeviceToHost));
+		std::vector<float> imPairWeights(numOverlappingImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairWeights.data(), m_solverState.d_denseCorrCounts, sizeof(float)*imPairWeights.size(), cudaMemcpyDeviceToHost));
-		std::vector<vec2ui> imPairIndices(numberOfImages * (numberOfImages - 1) / 2);
+		std::vector<vec2ui> imPairIndices(numOverlappingImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairIndices.data(), m_solverState.d_denseOverlappingImages, sizeof(uint2)*imPairIndices.size(), cudaMemcpyDeviceToHost));
+
+		//!!!debugging
+		//std::vector<std::pair<vec2ui, unsigned int>> corrCounts;
+		std::vector<std::pair<unsigned int, unsigned int>> connections(numberOfImages); for (unsigned int i = 0; i < numberOfImages; i++) connections[i] = std::make_pair(i, 0);
+		for (unsigned int i = 0; i < imPairWeights.size(); i++) {
+			if (imPairWeights[i] > 0) {
+		//		corrCounts.push_back(std::make_pair(imPairIndices[i], (unsigned int)imPairWeights[i]));
+				connections[imPairIndices[i].x].second++;
+				connections[imPairIndices[i].y].second++;
+			}
+		}
+		//std::sort(corrCounts.begin(), corrCounts.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) {
+		//	return fabs(left.second) < fabs(right.second);
+		//});
+		std::sort(connections.begin(), connections.end(), [](const std::pair<unsigned int, unsigned int> &left, const std::pair<unsigned int, unsigned int> &right) {
+			return left.second < right.second;
+		});
+		int a = 5;
+		//!!!debugging
+
 		ColorImageR8G8B8 corrImage(numberOfImages, numberOfImages); unsigned int count = 0;
 		for (unsigned int i = 0; i < imPairWeights.size(); i++) {
 			if (imPairWeights[i] > 0) {
@@ -258,11 +303,13 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 					corrImage(k, i) = vec3uc(0, 255, 0); //green
 			}
 		}
-		//const unsigned int query = 32; std::vector<unsigned int> connections;
-		//for (unsigned int i = 0; i < numberOfImages; i++) {
-		//	if (imPairWeights[i*numberOfImages + query] > 0 || imPairWeights[query*numberOfImages + i] > 0)
-		//		connections.push_back(i);
-		//}
+		const unsigned int query = 88; std::vector<unsigned int> queryConnections;
+		for (unsigned int i = 0; i < imPairWeights.size(); i++) {
+			if (imPairWeights[i] > 0) {
+				if (imPairIndices[i].x == query) queryConnections.push_back(imPairIndices[i].y);
+				else if (imPairIndices[i].y == query) queryConnections.push_back(imPairIndices[i].x);
+			}
+		}
 		std::cout << "count = " << count << std::endl;
 		FreeImageWrapper::saveImage("debug/corr.png", corrImage);
 		std::cout << "waiting..." << std::endl; getchar();
