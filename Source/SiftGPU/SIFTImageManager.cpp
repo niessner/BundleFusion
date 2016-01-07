@@ -11,6 +11,7 @@ SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsigned int maxImag
 	m_submapSize = submapSize;
 
 	m_timer = NULL;
+	m_currentImage = 0;
 	alloc();
 }
 
@@ -68,16 +69,17 @@ void SIFTImageManager::finalizeSIFTImageGPU(unsigned int numKeyPoints)
 	m_numKeyPoints += numKeyPoints;
 	m_numKeyPointsPerImage.push_back(numKeyPoints);
 	m_bFinalizedGPUImage = true;
+	m_currentImage = (unsigned int)m_SIFTImagesGPU.size() - 1;
 
 	assert(getNumImages() == m_numKeyPointsPerImage.size());
 	assert(getNumImages() == m_numKeyPointsPerImagePrefixSum.size());
 }
 
-ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, uint2& keyPointOffset)
+ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, unsigned int curImageIdx, uint2& keyPointOffset)
 {
-	assert(prevImageIdx < m_maxNumImages);
-	assert(getNumImages() > 0);
-	keyPointOffset = make_uint2(m_numKeyPointsPerImagePrefixSum[prevImageIdx], m_numKeyPointsPerImagePrefixSum[getNumImages() - 1]);
+	assert(prevImageIdx < getNumImages());
+	assert(curImageIdx < getNumImages());
+	keyPointOffset = make_uint2(m_numKeyPointsPerImagePrefixSum[prevImageIdx], m_numKeyPointsPerImagePrefixSum[curImageIdx]);
 	return m_currImagePairMatches[prevImageIdx];
 }
 
@@ -526,26 +528,26 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 //	global->finalizeSIFTImageGPU(numKeys);
 //}
 
-void SIFTImageManager::filterFrames(unsigned int numCurrImagePairs)
+void SIFTImageManager::filterFrames(unsigned int curFrame, unsigned int numFrames)
 {
-	if (numCurrImagePairs == 0) return;
+	if (numFrames == 0) return;
 
 	int connected = 0;
 
-	std::vector<unsigned int> currNumFilteredMatchesPerImagePair(numCurrImagePairs);
-	cutilSafeCall(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int) * numCurrImagePairs, cudaMemcpyDeviceToHost));
+	std::vector<unsigned int> currNumFilteredMatchesPerImagePair(numFrames);
+	cutilSafeCall(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int) * numFrames, cudaMemcpyDeviceToHost));
 
-	for (unsigned int i = 0; i < numCurrImagePairs; i++) { // previous frames
-		if (m_validImages[i] != 0 && currNumFilteredMatchesPerImagePair[i] > 0) {
+	for (unsigned int i = 0; i < numFrames; i++) { // previous frames
+		if (m_validImages[i] != 0 && currNumFilteredMatchesPerImagePair[i] > 0 && i != curFrame) {
 			connected = 1;
 			break;
 		}
 	}
 
 	if (GlobalBundlingState::get().s_verbose && !connected)
-		std::cout << "frame " << numCurrImagePairs << " not connected to previous!" << std::endl;
+		std::cout << "frame " << curFrame << " not connected to previous!" << std::endl;
 
-	m_validImages[numCurrImagePairs] = connected;
+	m_validImages[curFrame] = connected;
 }
 
 //void SIFTImageManager::fuseLocalKeyDepths(std::vector<SIFTKeyPoint>& globalKeys, const std::vector<CUDACachedFrame>& cachedFrames,

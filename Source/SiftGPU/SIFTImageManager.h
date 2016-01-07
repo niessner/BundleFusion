@@ -86,7 +86,7 @@ public:
 	void finalizeSIFTImageGPU(unsigned int numKeyPoints);
 
 	// ------- image-image matching (API for the Sift matcher)
-	ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, uint2& keyPointOffset);
+	ImagePairMatch& SIFTImageManager::getImagePairMatch(unsigned int prevImageIdx, unsigned int curImageIdx, uint2& keyPointOffset);
 
 	ImagePairMatch& getImagePairMatchDEBUG(unsigned int prevImageIdx, unsigned int curImageIdx, uint2& keyPointOffset)
 	{
@@ -124,13 +124,13 @@ public:
 	}
 
 	//sorts the key point matches inside image pair matches
-	void SortKeyPointMatchesCU(unsigned int numCurrImagePairs);
+	void SortKeyPointMatchesCU(unsigned int curFrame, unsigned int numFrames);
 
-	void FilterKeyPointMatchesCU(unsigned int numCurrImagePairs, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxKabschRes2, bool printDebug);
+	void FilterKeyPointMatchesCU(unsigned int curFrame, unsigned int numFrames, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxKabschRes2);
 
-	void FilterMatchesBySurfaceAreaCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv, float areaThresh);
+	void FilterMatchesBySurfaceAreaCU(unsigned int curFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv, float areaThresh);
 
-	void FilterMatchesByDenseVerifyCU(unsigned int numCurrImagePairs, unsigned int imageWidth, unsigned int imageHeight,
+	void FilterMatchesByDenseVerifyCU(unsigned int curFrame, unsigned int numFrames, unsigned int imageWidth, unsigned int imageHeight,
 		const float4x4& intrinsics, const CUDACachedFrame* d_cachedFrames,
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax);
 
@@ -140,9 +140,7 @@ public:
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
 		float sensorDepthMin, float sensorDepthMax);
 
-	//void FilterFramesCU(unsigned int numCurrImagePairs);
-
-	void AddCurrToResidualsCU(unsigned int numCurrImagePairs, const float4x4& colorIntrinsicsInv);
+	void AddCurrToResidualsCU(unsigned int curFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv);
 
 	void InvalidateImageToImageCU(const uint2& imageToImageIdx);
 
@@ -151,7 +149,7 @@ public:
 
 	unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
 
-	void filterFrames(unsigned int numCurrImagePairs);
+	void filterFrames(unsigned int curFrame, unsigned int numFrames);
 
 	void computeSiftTransformCU(const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform, float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans);
 
@@ -215,7 +213,7 @@ public:
 		keyPointIndices.resize(numMatches);
 		cutilSafeCall(cudaMemcpy(keyPointIndices.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
 	}
-	EntryJ* getGlobalCorrespondencesDEBUG() { return d_globMatches; }
+	EntryJ* getGlobalCorrespondencesGPU() { return d_globMatches; }
 	unsigned int getNumGlobalCorrespondences() const { return m_globNumResiduals; }
 	const float4x4* getFiltTransformsDEBUG() const { return d_currFilteredTransforms; }
 
@@ -227,6 +225,19 @@ public:
 		const float4x4& colorIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const;
 	void computeTracks(const std::vector<float4x4>& trajectory, const std::vector<EntryJ>& correspondences, const std::vector<uint2>& correspondenceKeyIndices,
 		std::vector< std::vector<std::pair<uint2, float3>> >& tracks) const;
+
+	//try to match previously invalidated images
+	bool getTopRetryImage(unsigned int& idx) {
+		if (m_imagesToRetry.empty()) return false;
+		idx = m_imagesToRetry.front();
+		m_imagesToRetry.pop_front();
+		return true;
+	}
+	void addToRetryList(unsigned int idx) {
+		m_imagesToRetry.push_front(idx);
+	}
+	unsigned int getCurrentFrame() const { return m_currentImage; }
+	void setCurrentFrame(unsigned int idx) { m_currentImage = idx; }
 
 	static void TestSVDDebugCU(const float3x3& m);
 
@@ -302,6 +313,9 @@ private:
 	int* d_fuseGlobalKeyCount;
 	int* d_fuseGlobalKeyMarker; // which local keys are used for global key fuse
 	unsigned int m_submapSize;
+
+	std::list<unsigned int> m_imagesToRetry;
+	unsigned int			m_currentImage;
 
 	CUDATimer *m_timer;
 };

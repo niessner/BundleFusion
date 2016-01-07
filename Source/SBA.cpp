@@ -25,17 +25,17 @@ SBA::SBA()
 	m_bUseComprehensiveFrameInvalidation = false;
 
 	const unsigned int maxNumIts = std::max(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numLocalNonLinIterations);
-	m_localWeightsSparse.resize(maxNumIts, 1.0f);
-	m_localWeightsDenseDepth.resize(maxNumIts);
-	for (unsigned int i = 0; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = (i + 1.0f);
-	m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //no color
-	//for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;//fr3_nstn
-	//// for tum data
-	//std::cout << "using FR2_XYZ params" << std::endl;
 	//m_localWeightsSparse.resize(maxNumIts, 1.0f);
-	//m_localWeightsDenseDepth.resize(maxNumIts, 1.0f);//for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
-	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
-	////for (unsigned int i = 0; i < 2; i++) m_localWeightsSparse[maxNumIts - i - 1] = 0.0f; // turn off sparse at end
+	//m_localWeightsDenseDepth.resize(maxNumIts);
+	//for (unsigned int i = 0; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = (i + 1.0f);
+	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //no color
+	//for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;//fr3_nstn
+	// for tum data
+	std::cout << "using FR2_XYZ params" << std::endl;
+	m_localWeightsSparse.resize(maxNumIts, 1.0f);
+	m_localWeightsDenseDepth.resize(maxNumIts, 1.0f);//for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
+	m_localWeightsDenseColor.resize(maxNumIts, 0.0f); for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
+	//for (unsigned int i = 0; i < 2; i++) m_localWeightsSparse[maxNumIts - i - 1] = 0.0f; // turn off sparse at end
 
 	m_globalWeightsMutex.lock();
 	m_globalWeightsSparse.resize(maxNumIts, 1.0f);
@@ -73,10 +73,10 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (isLocal) {
 		weightsSparse = m_localWeightsSparse;
 		usePairwise = m_bUseLocalDensePairwise; 
-		cache = NULL; //to turn off
-		weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
-		//weightsDenseDepth = m_localWeightsDenseDepth; //turn on
-		//weightsDenseColor = m_localWeightsDenseColor;
+		//cache = NULL; //to turn off
+		//weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
+		weightsDenseDepth = m_localWeightsDenseDepth; //turn on
+		weightsDenseColor = m_localWeightsDenseColor;
 	}
 	else {
 		usePairwise = true; //always global dense pairwise
@@ -107,8 +107,12 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 		std::vector<vec3f> rot(numImages), trans(numImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
-		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z))) { printf("NaN input pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
-		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z))) { printf("NaN input pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
+		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z))) { 
+			printf("NaN input pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); 
+		} }
+		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z))) { 
+			printf("NaN input pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); 
+		} }
 	}
 	//!!!debugging
 
@@ -125,7 +129,7 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	} while (removed && curIt < maxIts);
 
 	if (useVerify) {
-		if (weightsSparse.front() > 0) m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesDEBUG(), siftManager->getNumGlobalCorrespondences());
+		if (weightsSparse.front() > 0) m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesGPU(), siftManager->getNumGlobalCorrespondences());
 		else m_bVerify = true; //!!!debugging //TODO this should not happen except for debugging
 	}
 
@@ -134,8 +138,12 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 		std::vector<vec3f> rot(numImages), trans(numImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
-		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z))) { printf("NaN out pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); } }
-		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z))) { printf("NaN out pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); } }
+		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z))) { 
+			printf("NaN out pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); 
+		} }
+		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z))) { 
+			printf("NaN out pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar();
+		} }
 	}
 	//!!!debugging
 
@@ -147,7 +155,7 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise, const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor,
 	unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd)
 {
-	EntryJ* d_correspondences = siftManager->getGlobalCorrespondencesDEBUG();
+	EntryJ* d_correspondences = siftManager->getGlobalCorrespondencesGPU();
 	m_numCorrespondences = siftManager->getNumGlobalCorrespondences();
 
 	// transforms
@@ -166,7 +174,7 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages)
 {
 	ml::vec2ui imageIndices;
-	bool remove = m_solver->getMaxResidual(siftManager->getGlobalCorrespondencesDEBUG(), imageIndices, m_maxResidual);
+	bool remove = m_solver->getMaxResidual(siftManager->getGlobalCorrespondencesGPU(), imageIndices, m_maxResidual);
 
 	if (remove) {
 		if (GlobalBundlingState::get().s_verbose) std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;

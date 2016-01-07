@@ -41,12 +41,17 @@ public:
 	}
 
 	void invalidateImages(unsigned int startFrame, unsigned int endFrame = -1) {
-		//std::cout << "invalidating images (" << startFrame << ", " << endFrame << ")" << std::endl;
-		//getchar();
 		if (endFrame == -1) m_invalidImagesList[startFrame] = 0;
 		else {
 			for (unsigned int i = startFrame; i < endFrame; i++)
 				m_invalidImagesList[i] = 0;
+		}
+	}
+	void validateImages(unsigned int startFrame, unsigned int endFrame = -1) {
+		if (endFrame == -1) m_invalidImagesList[startFrame] = 1;
+		else {
+			for (unsigned int i = startFrame; i < endFrame; i++)
+				m_invalidImagesList[i] = 1;
 		}
 	}
 
@@ -227,6 +232,7 @@ private:
 	float4x4* d_globalTrajectory;
 	float4x4* d_completeTrajectory;
 	float4x4* d_localTrajectories;
+	std::vector<std::vector<int>> m_localTrajectoriesValid;
 
 	float4x4*	 d_siftTrajectory; // frame-to-frame sift tracking for all frames in sequence
 	//************************************

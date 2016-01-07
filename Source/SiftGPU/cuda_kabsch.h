@@ -425,8 +425,7 @@ unsigned int filterKeyPointMatches(
 	volatile float* matchDistances, 
 	unsigned int numRawMatches, 
 	float4x4& transformEstimate, const float4x4& colorIntrinsicsInverse, unsigned int minNumMatches,
-	float maxKabschRes2,
-	bool printDebug)
+	float maxKabschRes2)
 {
 	const float maxResThresh = maxKabschRes2;//MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
 

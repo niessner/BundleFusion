@@ -834,21 +834,15 @@ void reintegrate()
 	const unsigned int maxPerFrameFixes = GlobalAppState::get().s_maxFrameFixes;
 	TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
 
-	//!!!TODO REMOVE
-	const bool outputDebug = false;//g_CudaImageManager->getCurrFrameNumber() >= 2078; //debug hack output to stderr
-	if (outputDebug) std::cerr << "frame " << g_CudaImageManager->getCurrFrameNumber() << std::endl;
-	//!!!TODO REMOVE
-
 	if (tm->getNumActiveOperations() < maxPerFrameFixes) {
 		//Timer t;
 		tm->generateUpdateLists(); 
-		if (GlobalBundlingState::get().s_verbose) {
-			if (tm->getNumActiveOperations() == 0) {
-				std::cout << __FUNCTION__ << " :  no more work (everything is reintegrated)" << std::endl;
-			}
-		}
+		//if (GlobalBundlingState::get().s_verbose) {
+		//	if (tm->getNumActiveOperations() == 0) {
+		//		std::cout << __FUNCTION__ << " :  no more work (everything is reintegrated)" << std::endl;
+		//	}
+		//}
 		//std::cout << "generateUpdateList " << t.getElapsedTimeMS() << " [ms] " << std::endl;
-		if (outputDebug) std::cerr << "\tgenerated update lists" << std::endl;
 	}
 
 	for (unsigned int fixes = 0; fixes < maxPerFrameFixes; fixes++) {
@@ -861,7 +855,6 @@ void reintegrate()
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 			MLIB_ASSERT(!isnan(oldTransform[0]));
-			if (outputDebug) std::cerr << "\tdeintegrate " << frameIdx << "\t" << PoseHelper::MatrixToPose(oldTransform) << std::endl;
 			deIntegrate(depthCameraData, oldTransform);
 			continue;
 		}
@@ -869,7 +862,6 @@ void reintegrate()
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 			MLIB_ASSERT(!isnan(newTransform[0]));
-			if (outputDebug) std::cerr << "\tintegrate " << frameIdx << "\t" << PoseHelper::MatrixToPose(newTransform) << std::endl;
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
 			continue;
@@ -878,10 +870,6 @@ void reintegrate()
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
 			MLIB_ASSERT(!isnan(oldTransform[0]) && !isnan(newTransform[0]));
-			if (outputDebug) {
-				std::cerr << "\treintegrate(de) " << frameIdx << "\t" << PoseHelper::MatrixToPose(oldTransform) << std::endl;
-				std::cerr << "\treintegrate(re) " << frameIdx << "\t" << PoseHelper::MatrixToPose(newTransform) << std::endl;
-			}
 			deIntegrate(depthCameraData, oldTransform);
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);

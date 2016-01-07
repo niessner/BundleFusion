@@ -189,7 +189,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	const unsigned int heightSIFT = GlobalBundlingState::get().s_heightSIFT;
 
 	// get images
-	unsigned int curFrame = numFrames - 1; //TODO get color cpu for these functions
+	unsigned int curFrame = siftManager->getCurrentFrame(); //TODO get color cpu for these functions
 	const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
 	ColorImageR32 curIntensity(cudaCache->getWidth(), cudaCache->getHeight());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curIntensity.getPointer(), cachedFrames[curFrame].d_intensityDownsampled,
@@ -219,7 +219,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	MLIB_ASSERT(util::directoryExists(dir));
 
 	// get images
-	unsigned int curFrame = numFrames - 1;
+	unsigned int curFrame = siftManager->getCurrentFrame();
 	const ColorImageR8G8B8A8& curImage = colorImages[curFrame];
 
 	//print out images

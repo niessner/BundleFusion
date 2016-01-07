@@ -69,7 +69,7 @@ public:
 private:
 	void evalResidualDEBUG(SIFTImageManager* siftManager, const float4x4* d_transforms) const {
 		std::vector<EntryJ> corrs(siftManager->getNumGlobalCorrespondences());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ)*corrs.size(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*corrs.size(), cudaMemcpyDeviceToHost));
 		std::vector<mat4f> transforms(siftManager->getNumImages());
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*transforms.size(), cudaMemcpyDeviceToHost));
 

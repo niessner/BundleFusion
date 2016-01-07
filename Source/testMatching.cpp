@@ -1450,23 +1450,23 @@ void TestMatching::constructSparseSystem(const std::vector<ColorImageR8G8B8A8> &
 					continue;
 				}
 				uint2 keyPointOffset = make_uint2(0, 0);
-				ImagePairMatch& imagePairMatch = siftManager->getImagePairMatch(prev, keyPointOffset);
+				ImagePairMatch& imagePairMatch = siftManager->getImagePairMatch(prev, curFrame, keyPointOffset);
 				siftMatcher->SetDescriptors(0, num1, (unsigned char*)prevImage.d_keyPointDescs);
 				siftMatcher->SetDescriptors(1, numKeypoints, (unsigned char*)cur.d_keyPointDescs);
 				siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset, matchThresh, ratioMax);
 
 				//filter
-				siftManager->SortKeyPointMatchesCU(curFrame);
-				siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches,
-					GlobalBundlingState::get().s_maxKabschResidual2, false);
-				siftManager->FilterMatchesBySurfaceAreaCU(curFrame, siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
-				siftManager->FilterMatchesByDenseVerifyCU(curFrame, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
+				siftManager->SortKeyPointMatchesCU(curFrame, numTotalFrames);
+				siftManager->FilterKeyPointMatchesCU(curFrame, numTotalFrames, siftIntrinsicsInv, minNumMatches,
+					GlobalBundlingState::get().s_maxKabschResidual2);
+				siftManager->FilterMatchesBySurfaceAreaCU(curFrame, numTotalFrames, siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
+				siftManager->FilterMatchesByDenseVerifyCU(curFrame, numTotalFrames, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
 					cudaCache->getCacheFramesGPU(), GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
 					GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh,
 					0.1f, 3.0f); //min/max
-				siftManager->filterFrames(curFrame);
+				siftManager->filterFrames(curFrame, numTotalFrames);
 				if (siftManager->getValidImages()[curFrame] != 0)
-					siftManager->AddCurrToResidualsCU(curFrame, siftIntrinsicsInv);
+					siftManager->AddCurrToResidualsCU(curFrame, numTotalFrames, siftIntrinsicsInv);
 			}  // prev frames
 		} //matching
 	} //all frames
@@ -1888,9 +1888,9 @@ void TestMatching::compareDEBUG()
 
 	//stats for correspondences
 	std::vector<EntryJ> refCorr(m_siftManager->getNumGlobalCorrespondences());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(refCorr.data(), m_siftManager->getGlobalCorrespondencesDEBUG(), sizeof(EntryJ) * refCorr.size(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(refCorr.data(), m_siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ) * refCorr.size(), cudaMemcpyDeviceToHost));
 	std::vector<EntryJ> testCorr(siftManagerTest.getNumGlobalCorrespondences());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(testCorr.data(), siftManagerTest.getGlobalCorrespondencesDEBUG(), sizeof(EntryJ) * testCorr.size(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(testCorr.data(), siftManagerTest.getGlobalCorrespondencesGPU(), sizeof(EntryJ) * testCorr.size(), cudaMemcpyDeviceToHost));
 
 	std::vector<unsigned int> numImCorrPerImageRef(numImages), numImCorrPerImageTest(numImages);
 	std::vector< std::vector<bool> > markers(numImages); for (unsigned int i = 0; i < numImages; i++) markers[i].resize(numImages, false);
