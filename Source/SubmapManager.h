@@ -126,14 +126,7 @@ public:
 	}
 
 	// update complete trajectory with new global trajectory info
-	void updateTrajectory(unsigned int curFrame) {
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
-
-		updateTrajectoryCU(d_globalTrajectory, m_global->getNumImages(),
-			d_completeTrajectory, curFrame,
-			d_localTrajectories, m_submapSize + 1, m_global->getNumImages(),
-			d_imageInvalidateList);
-	}
+	void updateTrajectory(unsigned int curFrame);
 
 	const float4x4* getCompleteTrajectory() const { return d_completeTrajectory; }
 

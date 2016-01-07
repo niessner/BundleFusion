@@ -402,7 +402,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 	return ret;
 }
 
-//#define USE_RETRY
+#define USE_RETRY
 
 int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const float4x4& siftIntrinsics, const float4x4& siftIntrinsicsInv)
 {
@@ -717,5 +717,15 @@ void SubmapManager::setEndSolveGlobalDenseWeights()
 	//std::vector<float> globalWeightsDenseColor(maxNumIts, 0.1f); //TODO turn on
 	//m_SparseBundler.setGlobalWeights(globalWeightsSparse, globalWeightsDenseDepth, globalWeightsDenseColor, true);
 	std::cout << "set end solve global dense weights" << std::endl;
+}
+
+void SubmapManager::updateTrajectory(unsigned int curFrame)
+{
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
+
+	updateTrajectoryCU(d_globalTrajectory, m_global->getNumImages(),
+		d_completeTrajectory, curFrame,
+		d_localTrajectories, m_submapSize + 1, m_global->getNumImages(),
+		d_imageInvalidateList);
 }
 

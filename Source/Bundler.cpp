@@ -93,8 +93,6 @@ void Bundler::processInput()
 		return; // nothing new to process
 	}
 
-	if (GlobalBundlingState::get().s_verbose) std::cout << "[ frame " << curFrame << " ]" << std::endl;
-
 	getCurrentFrame();
 
 	// run SIFT & process cuda cache
@@ -184,7 +182,6 @@ void Bundler::processGlobal()
 	if (m_currentState.m_bProcessGlobal == BundlerState::PROCESS) {
 		m_currentState.m_bOptimizeGlobal = (BundlerState::PROCESS_STATE)m_SubmapManager.computeAndMatchGlobalKeys(m_currentState.m_lastLocalSolved,
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
-		//printKey("debug/keysGlobal/key" + std::to_string(m_currentState.m_lastLocalSolved) + ".png", m_currentState.m_lastLocalSolved*m_submapSize, m_SubmapManager.getGlobalDEBUG(), m_currentState.m_lastLocalSolved);
 	}
 	else {
 		// cache
@@ -221,9 +218,10 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 			m_currentState.m_bOptimizeGlobal = BundlerState::DO_NOTHING;
 		}
 	}
-	else {
+	else { //invalidate
 		if (isStart) {
 			m_SubmapManager.invalidateLastGlobalFrame();
+			m_SubmapManager.invalidateImages(m_submapSize * m_currentState.m_lastLocalSolved, m_currentState.m_totalNumOptLocalFrames);
 			m_SubmapManager.updateTrajectory(numFrames);
 			m_trajectoryManager->updateOptimizedTransform(m_SubmapManager.getCompleteTrajectory(), numFrames);
 			m_currentState.m_numCompleteTransforms = numFrames;

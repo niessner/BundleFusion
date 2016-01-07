@@ -33,7 +33,6 @@ void TrajectoryManager::addFrame(TrajectoryFrame::TYPE what, const mat4f& transf
 
 void TrajectoryManager::updateOptimizedTransform(const float4x4* d_trajectory, unsigned int numFrames)
 {
-
 	m_mutexUpdateTransforms.lock();
 
 	m_numOptimizedFrames = numFrames;
@@ -57,8 +56,8 @@ void TrajectoryManager::generateUpdateLists()
 			invalidateFrame(i);	//adding it to the deIntragte list
 		}
 		else {
-			//has a valid transform now
-			if (f.type == TrajectoryFrame::NotIntegrated_NoTransform)	{
+			//has a valid transform now / re-validate
+			if (f.type == TrajectoryFrame::NotIntegrated_NoTransform || f.type == TrajectoryFrame::Invalid)	{
 				//adding it to the integrate list
 				f.type = TrajectoryFrame::NotIntegrated_WithTransform;
 				m_toIntegrateList.push_back(&f);
