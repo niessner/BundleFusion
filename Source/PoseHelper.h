@@ -20,25 +20,25 @@ namespace PoseHelper {
 			}
 			return std::make_pair(-std::numeric_limits<float>::infinity(), numTransforms);
 		}
-		std::vector<vec3f> pts, refPts; vec3f ptsMean(0.0f), refPtsMean(0.0f);
+		std::vector<vec3f> pts, refPts; //vec3f ptsMean(0.0f), refPtsMean(0.0f);
 		for (unsigned int i = 0; i < numTransforms; i++) {
 			if (trajectory[i][0] != -std::numeric_limits<float>::infinity() && referenceTrajectory[i][0] != -std::numeric_limits<float>::infinity()) {
 				pts.push_back(trajectory[i].getTranslation());
 				refPts.push_back(referenceTrajectory[i].getTranslation());
-				ptsMean += pts.back();
-				refPtsMean += refPts.back();
+				//ptsMean += pts.back();
+				//refPtsMean += refPts.back();
 			}
 		}
 		if (pts.size() == 0) {
 			std::cout << "ERROR no points to evaluate" << std::endl;
 			return std::make_pair(-std::numeric_limits<float>::infinity(), 0);
 		}
-		ptsMean /= (float)pts.size();
-		refPtsMean /= (float)refPts.size();
-		for (unsigned int i = 0; i < pts.size(); i++) {
-			pts[i] -= ptsMean;
-			refPts[i] -= refPtsMean;
-		}
+		//ptsMean /= (float)pts.size();
+		//refPtsMean /= (float)refPts.size();
+		//for (unsigned int i = 0; i < pts.size(); i++) {
+		//	pts[i] -= ptsMean;
+		//	refPts[i] -= refPtsMean;
+		//}
 		vec3f evs;
 		mat4f align = EigenWrapperf::kabsch(pts, refPts, evs);
 		float err = 0.0f;

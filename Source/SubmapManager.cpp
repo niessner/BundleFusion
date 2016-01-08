@@ -212,12 +212,12 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 
 		//!!!DEBUGGING
 		//_debugPrintMatches = true;
-		const bool printDebug = _debugPrintMatches;// && !isLocal;
+		const bool printDebug = _debugPrintMatches && !isLocal;
 		const std::string suffix = isLocal ? "Local/" : "Global/";
 		std::vector<unsigned int> _numRawMatches;
 		if (printDebug) {
 			siftManager->getNumRawMatchesDEBUG(_numRawMatches);
-			//SiftVisualization::printCurrentMatches("debug/rawMatches" + suffix, siftManager, cudaCache, false);
+			SiftVisualization::printCurrentMatches("debug/rawMatches" + suffix, siftManager, cudaCache, false);
 		}
 		//!!!DEBUGGING
 
@@ -445,13 +445,13 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (curGlobalFrame > 0) {
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() == 82) {
+			//if (curGlobalFrame == 47) {
 			//	setPrintMatchesDEBUG(true);
 			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (m_global->getNumImages() == 82) {
+			//if (curGlobalFrame == 47) {
 			//	setPrintMatchesDEBUG(false);
 			//	std::cout << "waiting..." << std::endl;
 			//	getchar();

@@ -1609,21 +1609,23 @@ void TestMatching::testGlobalDense()
 	//const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_nstn3";// "fr3_nstn2";
 	//const std::string whichRef = "fr3_nstn";
-	const std::string which = "test";
-	const std::string whichRef = "xyz_half";
+	//const std::string origFile = "../data/tum/" + whichRef + ".sensor";
+
+	//const std::string which = "liv3_sd";
+	//const std::string whichRef = "livingroom3";
+	//const std::string which = "liv2_sd";
+	//const std::string whichRef = "livingroom2";
+	const std::string which = "liv1_sd";
+	const std::string whichRef = "livingroom1";
+	const std::string origFile = "../data/iclnuim/" + whichRef + ".sensor";
 	bool loadCache = false;
-	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
 		std::cout << "check if need to update ref trajectory! (press key to continue)" << std::endl;
 		getchar();
 
 		CalibratedSensorData cs;
 		BinaryDataStreamFile s(origFile, false);
-		//BinaryDataStreamFile s("../data/iclnuim/livingroom1.sensor", false);
-		//BinaryDataStreamFile s("../data/iclnuim/livingroom2_nonoise.sensor", false);
-		//BinaryDataStreamFile s("../data/iclnuim/livingroom2.sensor", false);
-		s >> cs;
-		s.closeStream();
+		s >> cs; s.closeStream();
 		BinaryDataStreamFile o("debug/ref_" + whichRef + ".bin", true);
 		o << cs.m_trajectory;
 		o.closeStream();
@@ -1702,7 +1704,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
 	const unsigned int maxNumOutIts = 1;
-	const unsigned int maxNumIters = 3;
+	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
@@ -1724,9 +1726,12 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.2f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 
-	std::vector<float> weightsSparse(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
-	std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
+	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //livingroom3
+	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+	std::vector<float> weightsSparse(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;

@@ -241,7 +241,7 @@ int main(int argc, char** argv)
 			std::cout << "ERROR: " << GlobalAppState::get().s_binaryDumpSensorFile << "does not exist!" << std::endl;
 			getchar();
 		}
-		if (false) {
+		if (true) {
 			TestMatching test;
 			//test.loadFromSensor("../data/tum/fr3_office_250.sensor", "", 1);
 			//test.runOpt();
