@@ -1615,8 +1615,10 @@ void TestMatching::testGlobalDense()
 	//const std::string whichRef = "livingroom3";
 	//const std::string which = "liv2_sd";
 	//const std::string whichRef = "livingroom2";
-	const std::string which = "liv1_sd";
-	const std::string whichRef = "livingroom1";
+	//const std::string which = "liv1_sd";
+	//const std::string whichRef = "livingroom1";
+	const std::string which = "liv0_sd";
+	const std::string whichRef = "livingroom0";
 	const std::string origFile = "../data/iclnuim/" + whichRef + ".sensor";
 	bool loadCache = false;
 	if (false) {
@@ -1704,7 +1706,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
 	const unsigned int maxNumOutIts = 1;
-	const unsigned int maxNumIters = 4;
+	const unsigned int maxNumIters = 3;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
@@ -1729,7 +1731,7 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //livingroom3
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
-	std::vector<float> weightsSparse(maxNumIters, 0.0f);
+	std::vector<float> weightsSparse(maxNumIters, 2.0f);
 	std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
