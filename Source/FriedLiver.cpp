@@ -248,6 +248,7 @@ int main(int argc, char** argv)
 			//test.analyzeLocalOpts();
 			test.testGlobalDense();
 			//test.compareDEBUG();
+			//test.debug();
 
 			std::cout << "done!" << std::endl;
 			getchar();

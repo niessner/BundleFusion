@@ -425,7 +425,8 @@ unsigned int filterKeyPointMatches(
 	volatile float* matchDistances, 
 	unsigned int numRawMatches, 
 	float4x4& transformEstimate, const float4x4& colorIntrinsicsInverse, unsigned int minNumMatches,
-	float maxKabschRes2)
+	float maxKabschRes2
+	, bool printDebug)
 {
 	const float maxResThresh = maxKabschRes2;//MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
 
@@ -450,10 +451,10 @@ unsigned int filterKeyPointMatches(
 	while (!done) {
 		if (idx == numRawMatches || curNumMatches >= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) {
 			if (curNumMatches < minNumMatches || curMaxResidual >= maxResThresh || !validTransform) { // invalid
-				//if (printDebug) printf("INVALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
+				if (printDebug) printf("INVALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
 				curNumMatches = 0;
 			}
-			//else if (printDebug) printf("VALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
+			else if (printDebug) printf("VALID: cur#matches = %d, curMaxRes = %f, valid = %d\n", curNumMatches, curMaxResidual, validTransform);
 			done = true;
 			break;
 		}
@@ -496,6 +497,11 @@ unsigned int filterKeyPointMatches(
 
 		idx++;
 	} // while (!done)
+
+	//!!!debugging
+	if (curNumMatches > MAX_MATCHES_PER_IMAGE_PAIR_FILTERED) {
+		printf("ERROR: num filt matches = %d > max of %d\n", curNumMatches, MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+	}
 
 	return curNumMatches;
 }

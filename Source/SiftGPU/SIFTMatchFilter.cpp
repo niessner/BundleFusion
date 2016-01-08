@@ -44,13 +44,14 @@ void SIFTMatchFilter::filterKeyPointMatches(SIFTImageManager* siftManager, const
 	if (numImages <= 1) return;
 
 	// current data
-	const unsigned int curFrame = numImages - 1;
+	const unsigned int curFrame = siftManager->getCurrentFrame();
 	std::vector<SIFTKeyPoint> keyPoints;
 	siftManager->getSIFTKeyPointsDEBUG(keyPoints);
-	std::vector<float4x4> transforms(curFrame);
-	std::vector<float4x4> transformsInv(curFrame);
+	std::vector<float4x4> transforms(numImages);
+	std::vector<float4x4> transformsInv(numImages);
 
-	for (unsigned int i = 0; i < curFrame; i++) { // previous frames
+	for (unsigned int i = 0; i < numImages; i++) { // previous frames
+		if (i == curFrame) continue;
 
 		std::vector<uint2> keyPointIndices;
 		std::vector<float> matchDistances;

@@ -198,7 +198,9 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	curImage.reSample(widthSIFT, heightSIFT);
 
 	//print out images
-	for (unsigned int prev = 0; prev < curFrame; prev++) {
+	for (unsigned int prev = 0; prev < numFrames; prev++) {
+		if (prev == curFrame) continue;
+
 		ColorImageR32 prevIntensity(cudaCache->getWidth(), cudaCache->getHeight());
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevIntensity.getPointer(), cachedFrames[prev].d_intensityDownsampled,
 			sizeof(float) * prevIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
@@ -223,7 +225,8 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	const ColorImageR8G8B8A8& curImage = colorImages[curFrame];
 
 	//print out images
-	for (unsigned int prev = 0; prev < curFrame; prev++) {
+	for (unsigned int prev = 0; prev < numFrames; prev++) {
+		if (prev == curFrame) continue;
 		const ColorImageR8G8B8A8& prevImage = colorImages[prev];
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),

@@ -388,11 +388,15 @@ void SIFTImageManager::computeTracks(const std::vector<float4x4>& trajectory, co
 	for (unsigned int i = 0; i < correspondences.size(); i++) {
 		const EntryJ& corr = correspondences[i];
 		if (corr.isValid()) {
+			const uint2& keyIndices = correspondenceKeyIndices[i];
 			float err = length(trajectory[corr.imgIdx_i] * corr.pos_i - trajectory[corr.imgIdx_j] * corr.pos_j);
 			if (err < MAX_TRACK_CORR_ERROR) {
-				const uint2& keyIndices = correspondenceKeyIndices[i];
 				corrPerKey[keyIndices.x].push_back(std::make_pair(make_uint2(corr.imgIdx_j, keyIndices.y), corr.pos_j));
 				corrPerKey[keyIndices.y].push_back(std::make_pair(make_uint2(corr.imgIdx_i, keyIndices.x), corr.pos_i));
+			}
+			else {
+				corrPerKey[keyIndices.x].push_back(std::make_pair(make_uint2(corr.imgIdx_j, keyIndices.y), make_float3(-std::numeric_limits<float>::infinity())));
+				corrPerKey[keyIndices.y].push_back(std::make_pair(make_uint2(corr.imgIdx_i, keyIndices.x), make_float3(-std::numeric_limits<float>::infinity())));
 			}
 		}
 	}
@@ -431,20 +435,24 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 		const auto& repKey = tracks[t].front(); //arbitrarily pick a key for the descriptor
 		float3 pos = make_float3(0.0f); unsigned int num = 0;
 		for (unsigned int i = 0; i < tracks[t].size(); i++) {
-			pos += transforms[tracks[t][i].first.x] * tracks[t][i].second;
-			num++;
+			if (tracks[t][i].second.x != -std::numeric_limits<float>::infinity()) {
+				pos += transforms[tracks[t][i].first.x] * tracks[t][i].second;
+				num++;
+			}
 		}
-		pos /= (float)num; //average track locations
-		//project to first frame
-		pos = colorIntrinsics * pos;
-		float2 loc = make_float2(pos.x / pos.z, pos.y / pos.z);
-		SIFTKeyPoint key;
-		key.pos = loc;
-		key.scale = allKeys[repKey.first.y].scale;
-		key.depth = pos.z;
-		curKeys.push_back(key);
-		// desc
-		curDesc.push_back(allDesc[repKey.first.y]);
+		if (num > 0) {
+			pos /= (float)num; //average track locations
+			//project to first frame
+			pos = colorIntrinsics * pos;
+			float2 loc = make_float2(pos.x / pos.z, pos.y / pos.z);
+			SIFTKeyPoint key;
+			key.pos = loc;
+			key.scale = allKeys[repKey.first.y].scale;
+			key.depth = pos.z;
+			curKeys.push_back(key);
+			// desc
+			curDesc.push_back(allDesc[repKey.first.y]);
+		}
 	} // track
 
 	unsigned int numKeys = (unsigned int)curKeys.size();

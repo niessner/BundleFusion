@@ -96,13 +96,13 @@ public:
 	unsigned int getNumNextLocalFrames();
 	bool localMatchAndFilter(const float4x4& siftIntrinsicsInv) {
 		//!!!debugging
-		//if (m_global->getNumImages() == 56) {
+		//if (m_global->getNumImages() >= 63 && m_global->getNumImages() <= 66) {
 		//	setPrintMatchesDEBUG(true);
 		//}
 		//!!!debugging
 		bool ret = matchAndFilter(true, m_currentLocal, m_currentLocalCache, siftIntrinsicsInv);
 		//!!!debugging
-		//if (m_global->getNumImages() == 56) {
+		//if (m_currentLocal->getNumImages() == m_submapSize + 1 && m_global->getNumImages() == 66) {
 		//	setPrintMatchesDEBUG(false);
 		//}
 		//!!!debugging
@@ -115,6 +115,9 @@ public:
 	//! optimize local
 	bool optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations);
 	int computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const float4x4& siftIntrinsics, const float4x4& siftIntrinsicsInv);
+
+	void tryRevalidation(unsigned int curGlobalFrame, const float4x4& siftIntrinsicsInv);
+
 	void addInvalidGlobalKey();
 
 	//! optimize global

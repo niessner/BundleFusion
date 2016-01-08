@@ -188,6 +188,7 @@ public:
 	{
 		unsigned int numMatches;
 		cutilSafeCall(cudaMemcpy(&numMatches, d_currNumMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+		if (numMatches > MAX_MATCHES_PER_IMAGE_PAIR_RAW) numMatches = MAX_MATCHES_PER_IMAGE_PAIR_RAW;
 		keyPointIndices.resize(numMatches);
 		matchDistances.resize(numMatches);
 		if (numMatches > 0) {
@@ -199,6 +200,7 @@ public:
 	{
 		unsigned int numMatches;
 		cutilSafeCall(cudaMemcpy(&numMatches, d_currNumFilteredMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+		assert(numMatches <= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 		keyPointIndices.resize(numMatches);
 		matchDistances.resize(numMatches);
 		if (numMatches > 0) {

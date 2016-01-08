@@ -174,7 +174,10 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 void Bundler::processGlobal()
 {
 	if (m_currentState.m_bProcessGlobal == BundlerState::DO_NOTHING) {
-		if (!m_RGBDSensor->isReceivingFrames()) m_currentState.m_bOptimizeGlobal = BundlerState::PROCESS;
+		if (!m_RGBDSensor->isReceivingFrames()) {
+			m_SubmapManager.tryRevalidation(m_currentState.m_lastLocalSolved, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+			m_currentState.m_bOptimizeGlobal = BundlerState::PROCESS;
+		}
 		return;
 	}
 

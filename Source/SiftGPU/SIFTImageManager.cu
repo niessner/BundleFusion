@@ -68,7 +68,7 @@ void __global__ SortKeyPointMatchesCU_Kernel(
 
 	float* d_matchDistances = &d_matchDistancesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	uint2* d_matchKeyPointIndices = &d_matchKeyPointIndicesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
-	const unsigned int numMatches = d_numMatchesPerImagePair[imagePairIdx];
+	const unsigned int numMatches = min(MAX_MATCHES_PER_IMAGE_PAIR_RAW, d_numMatchesPerImagePair[imagePairIdx]);
 
 	if (numMatches == 0)	return;
 
@@ -203,7 +203,9 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 
 	const float* d_matchDistances = &d_matchDistancesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	const uint2* d_matchKeyPointIndices = &d_matchKeyPointIndicesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
-	unsigned int numMatches = d_numMatchesPerImagePair[imagePairIdx];
+	unsigned int numMatches = min(MAX_MATCHES_PER_IMAGE_PAIR_RAW, d_numMatchesPerImagePair[imagePairIdx]);
+	bool printDebug = imagePairIdx == 90 && curFrame == 89;
+	if (printDebug && tidx == 0) printf("filter for (%d,%d)\n", imagePairIdx, curFrame);
 
 	if (numMatches == 0) {
 		if (tidx == 0) {
@@ -211,7 +213,6 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 		}
 		return;
 	}
-	if (numMatches > MAX_MATCHES_PER_IMAGE_PAIR_RAW) numMatches = MAX_MATCHES_PER_IMAGE_PAIR_RAW;
 
 	__shared__ float matchDistances[MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	__shared__ uint2 matchKeyPointIndices[MAX_MATCHES_PER_IMAGE_PAIR_RAW];
@@ -235,7 +236,7 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	if (tidx == 0) 	{
 		float4x4 trans;
 		unsigned int curr = filterKeyPointMatches(d_keyPointsGlobal, matchKeyPointIndices, matchDistances, numMatches,
-			trans, siftIntrinsicsInv, minNumMatches, maxKabschRes2);
+			trans, siftIntrinsicsInv, minNumMatches, maxKabschRes2, printDebug);
 		numFilteredMatches = curr;
 		d_filteredTransforms[imagePairIdx] = trans;
 		d_filteredTransformsInv[imagePairIdx] = trans.getInverse();

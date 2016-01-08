@@ -67,6 +67,7 @@ public:
 	//void runLocalOpts();
 	//debug
 	void compareDEBUG();
+	void debug();
 
 	//// match within first numFrames of sensorFile
 	//void match(const std::string& loadFile, const std::string& outDir, const std::string& sensorFile, const vec2ui& frames = vec2ui((unsigned int)-1));
@@ -78,7 +79,7 @@ public:
 	//void debugMatchInfo();
 
 	//! debug hack
-	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames = vec2ui((unsigned int)-1));
+	void loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames = vec2ui((unsigned int)-1), bool createCache = true);
 
 	//void save(const std::string& filename) const;
 	//void load(const std::string& filename, const std::string siftFile);

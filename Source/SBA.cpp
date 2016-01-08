@@ -31,10 +31,10 @@ SBA::SBA()
 	m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //no color
 	//for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;//fr3_nstn
 	//// for tum data
-	//std::cout << "using FR2_XYZ params" << std::endl;
+	//std::cout << "using FR2 params" << std::endl;
 	//m_localWeightsSparse.resize(maxNumIts, 1.0f);
-	//m_localWeightsDenseDepth.resize(maxNumIts, 1.0f);//for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
-	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
+	//m_localWeightsDenseDepth.resize(maxNumIts, 1.0f); //for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
+	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
 	////for (unsigned int i = 0; i < 2; i++) m_localWeightsSparse[maxNumIts - i - 1] = 0.0f; // turn off sparse at end
 
 	m_globalWeightsMutex.lock();
@@ -73,10 +73,10 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (isLocal) {
 		weightsSparse = m_localWeightsSparse;
 		usePairwise = m_bUseLocalDensePairwise; 
-		cache = NULL; //to turn off
-		weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
-		//weightsDenseDepth = m_localWeightsDenseDepth; //turn on
-		//weightsDenseColor = m_localWeightsDenseColor;
+		//cache = NULL; //to turn off
+		//weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
+		weightsDenseDepth = m_localWeightsDenseDepth; //turn on
+		weightsDenseColor = m_localWeightsDenseColor;
 	}
 	else {
 		usePairwise = true; //always global dense pairwise

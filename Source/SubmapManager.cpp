@@ -217,7 +217,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		std::vector<unsigned int> _numRawMatches;
 		if (printDebug) {
 			siftManager->getNumRawMatchesDEBUG(_numRawMatches);
-			SiftVisualization::printCurrentMatches("debug/rawMatches" + suffix, siftManager, cudaCache, false);
+			//SiftVisualization::printCurrentMatches("debug/rawMatches" + suffix, siftManager, cudaCache, false);
 		}
 		//!!!DEBUGGING
 
@@ -281,6 +281,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		if (printDebug) {
 			siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
 			SiftVisualization::printCurrentMatches("debug/filtMatches" + suffix, siftManager, cudaCache, true);
+			int a = 5;
 		}
 		//!!!DEBUGGING
 
@@ -460,24 +461,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			if (m_global->getValidImages()[curGlobalFrame]) {
 				ret = 1; // ready to solve global
 #ifdef USE_RETRY
-				// see if have any invalid images which match
-				unsigned int idx;
-				if (m_global->getTopRetryImage(idx)) {
-					m_global->setCurrentFrame(idx);
-					matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
-					if (m_global->getValidImages()[idx] != 0) { //validate
-						//validate chunk images
-						const std::vector<int>& validLocal = m_localTrajectoriesValid[idx];
-						for (unsigned int i = 0; i < validLocal.size(); i++) {
-							if (validLocal[i] == 1)	validateImages(idx * m_submapSize + i);
-						}
-					}
-					else {
-						m_global->addToRetryList(idx);
-					}
-					//reset
-					m_global->setCurrentFrame(curGlobalFrame);
-				}
+				tryRevalidation(curGlobalFrame, siftIntrinsicsInv);
 #endif
 			}
 			else {
@@ -493,6 +477,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			ret = 0;
 		}
 	}
+
 	return ret;
 }
 
@@ -727,5 +712,42 @@ void SubmapManager::updateTrajectory(unsigned int curFrame)
 		d_completeTrajectory, curFrame,
 		d_localTrajectories, m_submapSize + 1, m_global->getNumImages(),
 		d_imageInvalidateList);
+}
+
+void SubmapManager::tryRevalidation(unsigned int curGlobalFrame, const float4x4& siftIntrinsicsInv)
+{
+	// see if have any invalid images which match
+	unsigned int idx;
+	if (m_global->getTopRetryImage(idx)) {
+		m_global->setCurrentFrame(idx);
+
+		//!!!debugging
+		//if (idx == 89) {
+		//	SiftVisualization::printKey("debug/keys/" + std::to_string(idx) + ".png", m_globalCache, m_global, idx);
+		//	setPrintMatchesDEBUG(true);
+		//}
+		//!!!debugging
+
+		matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
+
+		//!!!debugging
+		//if (idx == 89)
+		//	setPrintMatchesDEBUG(false);
+		//!!!debugging
+
+		if (m_global->getValidImages()[idx] != 0) { //validate
+			//validate chunk images
+			const std::vector<int>& validLocal = m_localTrajectoriesValid[idx];
+			for (unsigned int i = 0; i < validLocal.size(); i++) {
+				if (validLocal[i] == 1)	validateImages(idx * m_submapSize + i);
+			}
+			if (GlobalBundlingState::get().s_verbose) std::cout << "re-validating " << idx << std::endl;
+		}
+		else {
+			m_global->addToRetryList(idx);
+		}
+		//reset
+		m_global->setCurrentFrame(curGlobalFrame);
+	}
 }
 

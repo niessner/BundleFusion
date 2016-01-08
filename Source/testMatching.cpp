@@ -488,7 +488,7 @@ void TestMatching::printMatches(const std::string& outDir, const std::vector<vec
 	}
 }
 
-void TestMatching::loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames /*= vec2ui((unsigned int)-1)*/)
+void TestMatching::loadFromSensor(const std::string& sensorFile, const std::string& trajectoryFile, unsigned int skip, const vec2ui& frames /*= vec2ui((unsigned int)-1)*/, bool createCache /*= true*/)
 {
 	if (skip > 1) {
 		std::cout << "WARNING: need to load keys for skip " << skip << std::endl;
@@ -520,7 +520,7 @@ void TestMatching::loadFromSensor(const std::string& sensorFile, const std::stri
 	m_colorImages.resize(numFrames);
 	m_depthImages.resize(numFrames);
 	m_referenceTrajectory.resize(numFrames);
-	MLIB_ASSERT((cs.m_ColorNumFrames - 1) / skip == numFrames - 1);
+	MLIB_ASSERT((startEnd.y - startEnd.x - 1) / skip == numFrames - 1);
 	for (unsigned int i = startEnd.x; i < startEnd.y; i += skip) {
 		const unsigned int newIndex = (i - startEnd.x) / skip;
 		MLIB_ASSERT(newIndex < m_colorImages.size());
@@ -571,7 +571,7 @@ void TestMatching::loadFromSensor(const std::string& sensorFile, const std::stri
 		std::cout << "done!" << std::endl;
 	}
 
-	createCachedFrames();
+	if (createCache) createCachedFrames();
 }
 
 //void TestMatching::saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices /*= std::vector<unsigned int>()*/) const
@@ -1487,9 +1487,9 @@ void TestMatching::analyzeLocalOpts()
 	//const std::string test0File = "dump/recording.sensor"; //sparse+dense
 	//const std::string test1File = "dump/fr3_office.sensor"; //sparse
 	//const std::string refFile   = "../data/tum/fr3_office_depth.sensor"; //reference
-	const std::string test0File = "debug/opt_half_sdT.bin"; //sparse+dense
-	const std::string test1File = "debug/opt_half_s.bin"; //sparse
-	const std::string refFile = "debug/ref_fr2_xyz_half.bin"; //reference
+	const std::string test0File = "debug/opt_fr2_desk_sd.bin"; //sparse+dense
+	const std::string test1File = "debug/opt_fr2_desk_s2.bin"; //sparse
+	const std::string refFile = "debug/ref_fr2_desk.bin"; //reference
 
 	std::cout << "loading trajectories... ";
 	std::vector<mat4f> test0Trajectory, test1Trajectory, referenceTrajectory;
@@ -1605,10 +1605,12 @@ void TestMatching::testGlobalDense()
 	//const std::string whichRef = "fr2_xyz";
 	//const std::string which = "half4";//"half3";//"half_i2";
 	//const std::string whichRef = "fr2_xyz_half";
-	const std::string which = "fr3_office3";//"fr3_office_i3";//"fr3_office2";
-	const std::string whichRef = "fr3_office";
+	//const std::string which = "fr3_office3";//"fr3_office_i3";//"fr3_office2";
+	//const std::string whichRef = "fr3_office";
 	//const std::string which = "fr3_nstn3";// "fr3_nstn2";
 	//const std::string whichRef = "fr3_nstn";
+	const std::string which = "test";
+	const std::string whichRef = "xyz_half";
 	bool loadCache = false;
 	const std::string origFile = "../data/tum/" + whichRef + ".sensor";
 	if (false) {
@@ -1699,16 +1701,16 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 2;
+	const unsigned int maxNumOutIts = 1;
 	const unsigned int maxNumIters = 3;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
 	const bool isLocal = false;
 	unsigned int numPerRemove = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 	//params
-	std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr3_nstn
-	std::vector<float> weightsDenseDepth(maxNumIters, 0.3f);
-	std::vector<float> weightsDenseColor(maxNumIters, 0.2f);
+	//std::vector<float> weightsSparse(maxNumIters, 5.0f); //fr3_nstn
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.3f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 0.2f);
 
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //fr2_xyz 
 	//std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
@@ -1717,6 +1719,14 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsSparse(maxNumIters, 0.2f); //fr1_desk 
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
+
+	//std::vector<float> weightsSparse(maxNumIters, 20.0f); //fr2_desk
+	//std::vector<float> weightsDenseDepth(maxNumIters, 0.2f);
+	//std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
+
+	std::vector<float> weightsSparse(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 0.0f);
+	std::vector<float> weightsDenseColor(maxNumIters, 1.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
@@ -1853,9 +1863,9 @@ void TestMatching::evaluateTrajectory(unsigned int submapSize, const std::vector
 
 void TestMatching::compareDEBUG()
 {
-	const std::string ref = "half_s";
-	const std::string test = "half_sdT";
-	const std::string refTrajFile = "debug/ref_fr2_xyz_half.bin";
+	const std::string ref = "fr2_desk_s2";
+	const std::string test = "fr2_desk_sd";
+	const std::string refTrajFile = "debug/ref_fr2_desk.bin";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 	//trajectories
 	std::vector<mat4f> optTrajectoryRef, optTrajectoryTest, referenceTrajectory;
@@ -2211,6 +2221,83 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 	MLIB_CUDA_SAFE_FREE(d_helperNormal);
 	MLIB_CUDA_SAFE_FREE(d_filterHelperDown);
 	std::cout << "done!" << std::endl;
+}
+
+void TestMatching::debug()
+{
+	const std::string siftFile = "debug/test.sift";
+	const std::string trajFile = "debug/opt_test.bin";
+	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
+
+	m_siftManager->loadFromFile(siftFile);
+	const unsigned int numImages = m_siftManager->getNumImages();
+	std::vector<mat4f> trajectory, trajectoryKeys;
+	{
+		BinaryDataStreamFile s(trajFile, false);
+		s >> trajectory; s.closeStream();
+	}
+	for (unsigned int i = 0; i < trajectory.size(); i+=submapSize)
+		trajectoryKeys.push_back(trajectory[i]);
+	const std::vector<int>& validImages = m_siftManager->getValidImages();
+
+	//save point clouds
+	{
+		const float maxDepth = 1.5f;
+		loadFromSensor("../data/tum/fr2_desk.sensor", "", submapSize, vec2ui((unsigned int)-1), false);
+		std::cout << "saving ref to point cloud... "; SiftVisualization::saveToPointCloud("debug/ref.ply", m_depthImages, m_colorImages, m_referenceTrajectory, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
+		std::cout << "saving opt to point cloud... "; SiftVisualization::saveToPointCloud("debug/opt.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
+		std::cout << "waiting..." << std::endl; getchar();
+	}
+
+	//image-image correspondences
+	std::vector<EntryJ> correspondences(m_siftManager->getNumGlobalCorrespondences());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), m_siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
+	std::unordered_map<vec2ui, vec2f> imageImageErrs; //vec2f(sum err, count)
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (corr.isValid() && validImages[corr.imgIdx_i] && validImages[corr.imgIdx_j] &&
+			m_referenceTrajectory[corr.imgIdx_i][0] != -std::numeric_limits<float>::infinity() &&
+			m_referenceTrajectory[corr.imgIdx_j][0] != -std::numeric_limits<float>::infinity()) {
+			vec2ui imageIndices = vec2ui(corr.imgIdx_i, corr.imgIdx_j);
+			vec3f err = m_referenceTrajectory[corr.imgIdx_i] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) - trajectory[corr.imgIdx_j] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+			auto it = imageImageErrs.find(imageIndices);
+			if (it == imageImageErrs.end()) {
+				imageImageErrs[imageIndices] = vec2f(err.length(), 1.0f);
+			}
+			else {
+				it->second += vec2f(err.length(), 1.0f);
+			}
+		}
+	}
+	std::vector<std::pair<vec2ui, float>> errors;
+	for (const auto a : imageImageErrs) {
+		errors.push_back(std::make_pair(a.first, a.second.x / a.second.y));
+	}
+	std::sort(errors.begin(), errors.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) {
+		return fabs(left.second) > fabs(right.second);
+	});
+	// print highest error pair
+	const vec2ui& imWorst = errors.front().first;
+	std::cout << "highest error image image corr: " << imWorst << " -> " << errors.front().second << std::endl;
+	SiftVisualization::printMatch("debug/matches/" + std::to_string(imWorst.x) + "-" + std::to_string(imWorst.y) + ".png", imWorst, correspondences,
+		m_colorImages[imWorst.x], m_colorImages[imWorst.y], m_colorCalibration.m_Intrinsic);
+
+	//correspondence matrix
+	ColorImageR8G8B8 corrImage(numImages, numImages); corrImage.setPixels(vec3uc((unsigned char)0));
+	for (const auto a : imageImageErrs) {
+		const vec2ui& imageIndices = a.first;
+		corrImage(imageIndices.x, imageIndices.y) = vec3uc((unsigned char)0, (unsigned char)0, (unsigned char)225); //blue
+		corrImage(imageIndices.y, imageIndices.x) = vec3uc((unsigned char)0, (unsigned char)0, (unsigned char)225); //blue
+	}
+	for (unsigned int i = 0; i < numImages; i++) {
+		if (validImages[i] == 0) {
+			for (unsigned int j = 0; j < numImages; j++) {
+				corrImage(i, j) = vec3uc((unsigned char)0, (unsigned char)225, (unsigned char)0); //green
+				corrImage(j, i) = vec3uc((unsigned char)0, (unsigned char)225, (unsigned char)0); //green
+			}
+		}
+	}
+	FreeImageWrapper::saveImage("debug/corr.png", corrImage);
 }
 
 
