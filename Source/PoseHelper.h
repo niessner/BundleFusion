@@ -7,6 +7,22 @@ typedef ml::vec6f Pose;
 
 namespace PoseHelper {
 
+	static void composeTrajectory(unsigned int submapSize, const std::vector<mat4f>& keys, std::vector<mat4f>& all)
+	{
+		std::vector<mat4f> transforms;
+		for (unsigned int i = 0; i < keys.size(); i++) {
+			const mat4f& key = keys[i];
+			transforms.push_back(key);
+
+			const mat4f& offset = all[i*submapSize].getInverse();
+			unsigned int num = std::min((int)submapSize, (int)all.size() - (int)(i * submapSize));
+			for (unsigned int s = 1; s < num; s++) {
+				transforms.push_back(key * offset * all[i*submapSize + s]);
+			}
+		}
+		all = transforms;
+	}
+
 	static std::pair<float, unsigned int> evaluateAteRmse(const std::vector<mat4f>& trajectory, const std::vector<mat4f>& referenceTrajectory, unsigned int numTransforms = (unsigned int)-1) {
 		if (numTransforms == (unsigned int)-1) numTransforms = (unsigned int)math::min(trajectory.size(), referenceTrajectory.size());
 		if (numTransforms < 3) {

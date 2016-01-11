@@ -23,7 +23,7 @@ public:
 		float*					d_intensitySIFT;
 		mat4f					m_SIFTIntrinsics;
 		mat4f					m_SIFTIntrinsicsInv;
-		float*					d_depthErodeHelper;
+		float*					d_intensityFilterHelper;
 
 		bool m_bFilterDepthValues;
 		float m_fBilateralFilterSigmaD, m_fBilateralFilterSigmaR;
@@ -35,7 +35,7 @@ public:
 			d_inputDepthFilt = NULL;d_inputDepthRaw = NULL;
 			d_inputColor = NULL;
 			d_intensitySIFT = NULL;
-			d_depthErodeHelper = NULL;
+			d_intensityFilterHelper = NULL;
 		}
 		void alloc(const RGBDSensor* sensor) {
 			m_inputDepthWidth = sensor->getDepthWidth();
@@ -46,7 +46,7 @@ public:
 			m_heightSIFT = GlobalBundlingState::get().s_heightSIFT;
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepthFilt, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepthRaw, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthErodeHelper, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityFilterHelper, sizeof(float)*m_widthSIFT*m_heightSIFT));
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputColor, sizeof(uchar4)*m_inputColorWidth*m_inputColorHeight));
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
 
@@ -67,7 +67,7 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepthRaw));
 			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputColor));
 			MLIB_CUDA_SAFE_CALL(cudaFree(d_intensitySIFT));
-			MLIB_CUDA_SAFE_CALL(cudaFree(d_depthErodeHelper));
+			MLIB_CUDA_SAFE_CALL(cudaFree(d_intensityFilterHelper));
 		}
 	};
 	struct BundlerState {

@@ -208,8 +208,8 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			//fileNameDescGlobalApp = "zParametersDefault.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			fileNameDescGlobalApp = "zParametersDefault.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 
 			//fileNameDescGlobalApp = "zParametersMedium.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
@@ -217,11 +217,11 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersHigh.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
 
-			fileNameDescGlobalApp = "zParametersTUM.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
+			//fileNameDescGlobalApp = "zParametersTUM.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
 
-			//fileNameDescGlobalApp = "zParametersKinect.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingKinect.txt";
+			//fileNameDescGlobalApp = "zParametersAug.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -241,6 +241,34 @@ int main(int argc, char** argv)
 			std::cout << "ERROR: " << GlobalAppState::get().s_binaryDumpSensorFile << "does not exist!" << std::endl;
 			getchar();
 		}
+		//if (false) {
+		//	//process all opt 
+		//	const std::string sensorFile = "../data/iclnuim/livingroom2.sensor";
+		//	const std::string filename = "../data/iclnuim/tmp2.sensor";
+		//	std::cout << "loading... ";
+		//	std::vector<mat4f> optTrajectory;
+		//	CalibratedSensorData cs;
+		//	{
+		//		BinaryDataStreamFile s(sensorFile, false);
+		//		s >> cs; s.closeStream();
+		//	}
+		//	{
+		//		CalibratedSensorData cs2;
+		//		BinaryDataStreamFile s(filename, false);
+		//		s >> cs2; s.closeStream();
+		//		optTrajectory = cs2.m_trajectory;
+		//	}
+		//	std::cout << "done!" << std::endl;
+		//	std::vector<mat4f> referenceTrajectory = cs.m_trajectory;
+		//	
+		//	//sanity check
+		//	auto err = PoseHelper::evaluateAteRmse(optTrajectory, referenceTrajectory);
+		//	std::cout << "ate rmse = " << err.first << " [#frames = " << err.second << "]" << std::endl;
+		//	ColorImageR8G8B8A8 image(cs.m_ColorImageWidth, cs.m_ColorImageHeight, cs.m_ColorImages.front());
+		//	FreeImageWrapper::saveImage("first.png", image);
+		//	std::cout << "first transform: " << referenceTrajectory.front() << std::endl;
+		//	getchar();
+		//}
 		if (true) {
 			TestMatching test;
 			//test.loadFromSensor("../data/tum/fr3_office_250.sensor", "", 1);

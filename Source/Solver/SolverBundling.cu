@@ -109,7 +109,7 @@ __global__ void FindImageImageCorr_Kernel(SolverInput input, SolverState state, 
 		float4x4 transform = invTransform_i * transform_j;
 #endif
 		//if (!computeAngleDiff(transform, 0.8f)) return; //~45 degrees
-		if (!computeAngleDiff(transform, 0.52f)) return; //~30 degrees
+		//if (!computeAngleDiff(transform, 0.52f)) return; //~30 degrees
 
 		// find correspondence
 		__shared__ int foundCorr[1]; foundCorr[0] = 0;

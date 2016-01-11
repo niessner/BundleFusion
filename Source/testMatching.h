@@ -93,8 +93,12 @@ public:
 
 	void loadCachedFramesFromSensor(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames);
 
+	void createCUDACache(CUDACache* cache);
+
+	void loadCachedFramesFromSensorData(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames);
+
 private:
-	void evaluateTrajectory(unsigned int submapSize, const std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll);
+	void evaluateTrajectory(unsigned int submapSize, std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll);
 	void loadTrajectory(const std::string& filename, std::vector<mat4f>& trajectory)
 	{
 		std::string line;

@@ -260,9 +260,23 @@ void Bundler::getCurrentFrame()
 	CUDAImageUtil::resampleToIntensity(m_bundlerInputData.d_intensitySIFT, m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT,
 		m_bundlerInputData.d_inputColor, m_bundlerInputData.m_inputColorWidth, m_bundlerInputData.m_inputColorHeight);
 
+	if (GlobalAppState::get().s_colorFilter) {
+		CUDAImageUtil::gaussFilterIntensity(m_bundlerInputData.d_intensityFilterHelper, m_bundlerInputData.d_intensitySIFT, GlobalAppState::get().s_colorSigmaD, m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
+		std::swap(m_bundlerInputData.d_intensityFilterHelper, m_bundlerInputData.d_intensitySIFT);
+
+		////!!!debugging
+		//ColorImageR32 image(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getPointer(), m_bundlerInputData.d_intensityFilterHelper, sizeof(float) * image.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/_intensityOrig.png", image);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getPointer(), m_bundlerInputData.d_intensitySIFT, sizeof(float) * image.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/_intensityFilt.png", image);
+
+		//std::cout << "waiting (check intensity filter)..." << std::endl;
+		//getchar();
+		////!!!debugging
+	}
 	//if (GlobalBundlingState::get().s_erodeSIFTdepth) {
 	//	unsigned int numIter = 2;
-
 	//	numIter = 2 * ((numIter + 1) / 2);
 	//	for (unsigned int i = 0; i < numIter; i++) {
 	//		if (i % 2 == 0) {
