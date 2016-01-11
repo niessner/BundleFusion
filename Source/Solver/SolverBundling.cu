@@ -108,6 +108,7 @@ __global__ void FindImageImageCorr_Kernel(SolverInput input, SolverState state, 
 		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
 		float4x4 transform = invTransform_i * transform_j;
 #endif
+		if (!computeAngleDiff(transform, 1.0f)) return; //~60 degrees
 		//if (!computeAngleDiff(transform, 0.8f)) return; //~45 degrees
 		//if (!computeAngleDiff(transform, 0.52f)) return; //~30 degrees
 
@@ -272,9 +273,9 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 3.0f)); //fr3_nstn
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 1.8f));
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.5f), 1.8f));
-				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.0f), 1.8f)); //fr3_office, fr1_desk_f20
+				depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.0f), 1.8f)); //fr3_office, fr1_desk_f20
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.0f), 2.5f)); //fr2_xyz_half
-				depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 3.5f), 1.8f)); //fr3_nstn
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 3.5f), 1.8f)); //fr3_nstn
 
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / parameters.denseDepthMax));
 

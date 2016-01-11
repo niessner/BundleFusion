@@ -1600,6 +1600,19 @@ void TestMatching::analyzeLocalOpts()
 
 void TestMatching::testGlobalDense()
 {
+	//{
+	//	std::vector<mat4f> traj;
+	//	BinaryDataStreamFile st("debug/opt_copy_s.bin", false);
+	//	st >> traj; st.closeStream();
+	//	SensorData data; data.readFromFile("../data/copyroom200/copyroom200.sens");
+	//	if (data.m_frames.size() > traj.size()) data.m_frames.resize(traj.size());
+	//	for (unsigned int i = 0; i < data.m_frames.size(); i++) {
+	//		data.m_frames[i].m_frameToWorld = traj[i];
+	//	}
+	//	data.writeToFile("dump/recording.sens");
+	//	std::cout << "done" << std::endl; getchar();
+	//}
+
 	//const std::string which = "fr1_desk_f20_3";//"fr1_desk_f20";
 	//const std::string whichRef = "fr1_desk_from20";
 	//const std::string which = "fr2_xyz";
@@ -1625,8 +1638,8 @@ void TestMatching::testGlobalDense()
 	const bool useReference = false;
 	const bool writeSensorFile = true;
 
-	const std::string which = "office375_sd";
-	const std::string whichRef = "office375";
+	const std::string which = "copy_sd";
+	const std::string whichRef = "copyroom200";
 	const std::string origFile = "dump/" + whichRef + ".sens";
 
 	bool loadCache = false;
@@ -1711,7 +1724,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 2;
+	const unsigned int maxNumOutIts = 1;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
@@ -1737,8 +1750,8 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f); //livingroom3
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
-	std::vector<float> weightsSparse(maxNumIters, 0.5f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 5.0f);
+	std::vector<float> weightsSparse(maxNumIters, 1.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 10.0f);
 	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
 	//if (savePointClouds) {
