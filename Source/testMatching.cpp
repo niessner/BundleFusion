@@ -1638,8 +1638,8 @@ void TestMatching::testGlobalDense()
 	const bool useReference = false;
 	const bool writeSensorFile = true;
 
-	const std::string which = "gates381_sd";
-	const std::string whichRef = "gates381";
+	const std::string which = "michael_sd";
+	const std::string whichRef = "michael";
 	const std::string origFile = "dump/" + whichRef + ".sens";
 
 	bool loadCache = false;
