@@ -1638,8 +1638,8 @@ void TestMatching::testGlobalDense()
 	const bool useReference = false;
 	const bool writeSensorFile = true;
 
-	const std::string which = "gates371_sd";
-	const std::string whichRef = "gates371";
+	const std::string which = "gates381_sd";
+	const std::string whichRef = "gates381";
 	const std::string origFile = "dump/" + whichRef + ".sens";
 
 	bool loadCache = false;
@@ -1752,7 +1752,7 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
 	std::vector<float> weightsDenseDepth(maxNumIters, 5.0f);
-	std::vector<float> weightsDenseColor(maxNumIters, 0.5f);
+	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
 	//if (savePointClouds) {
 	//	std::cout << "saving init to point cloud... "; SiftVisualization::saveToPointCloud("debug/init.ply", m_depthImages, m_colorImages, trajectoryKeys, m_depthCalibration.m_IntrinsicInverse, maxDepth); std::cout << "done" << std::endl;
