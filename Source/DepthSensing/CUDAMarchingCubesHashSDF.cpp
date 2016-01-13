@@ -31,18 +31,17 @@ void CUDAMarchingCubesHashSDF::copyTrianglesToCPU() {
 
 	//std::cout << "Marching Cubes: #triangles = " << nTriangles << std::endl;
 
-	if (nTriangles == 0) return;
+	if (nTriangles != 0) {
+		unsigned int baseIdx = (unsigned int)m_meshData.m_Vertices.size();
+		m_meshData.m_Vertices.resize(baseIdx + 3 * nTriangles);
+		m_meshData.m_Colors.resize(baseIdx + 3 * nTriangles);
 
-	unsigned int baseIdx = (unsigned int)m_meshData.m_Vertices.size();
-	m_meshData.m_Vertices.resize(baseIdx + 3*nTriangles);
-	m_meshData.m_Colors.resize(baseIdx + 3*nTriangles);
-
-	vec3f* vc = (vec3f*)cpuData.d_triangles;
-	for (unsigned int i = 0; i < 3*nTriangles; i++) {
-		m_meshData.m_Vertices[baseIdx + i] = vc[2*i+0];
-		m_meshData.m_Colors[baseIdx + i] = vec4f(vc[2*i+1]);
+		vec3f* vc = (vec3f*)cpuData.d_triangles;
+		for (unsigned int i = 0; i < 3 * nTriangles; i++) {
+			m_meshData.m_Vertices[baseIdx + i] = vc[2 * i + 0];
+			m_meshData.m_Colors[baseIdx + i] = vec4f(vc[2 * i + 1]);
+		}
 	}
-
 	cpuData.free();
 }
 
