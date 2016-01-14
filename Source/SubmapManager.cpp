@@ -223,13 +223,8 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 
 		// --- filter matches
 		const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
-		//!!!DEBUGGING
 		//SIFTMatchFilter::ransacKeyPointMatches(siftManager, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
 		//SIFTMatchFilter::filterKeyPointMatches(siftManager, siftIntrinsicsInv, minNumMatches);
-		//SIFTMatchFilter::filterKeyPointMatchesDEBUG(siftManager->getNumImages() - 1, siftManager, siftIntrinsicsInv, minNumMatches,
-		//	GlobalBundlingState::get().s_maxKabschResidual2, false);
-		//siftManager->FilterKeyPointMatchesCU(curFrame, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
-		//!!!DEBUGGING
 		siftManager->FilterKeyPointMatchesCU(curFrame, numFrames, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = timer.getElapsedTimeMS(); }
 
@@ -288,14 +283,11 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		// --- filter frames
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		siftManager->filterFrames(curFrame, numFrames);
-		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeFilterFrames = timer.getElapsedTimeMS(); }
-
 		// --- add to global correspondences
-		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		if (siftManager->getValidImages()[curFrame] != 0)
 			siftManager->AddCurrToResidualsCU(curFrame, numFrames, siftIntrinsicsInv);
 		else lastValid = false;
-		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeAddCurrResiduals = timer.getElapsedTimeMS(); }
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMisc = timer.getElapsedTimeMS(); }
 	}
 
 	return lastValid;

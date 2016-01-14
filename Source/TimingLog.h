@@ -12,8 +12,7 @@ public:
 		double timeMatchFilterKeyPoint;
 		double timeMatchFilterSurfaceArea;
 		double timeMatchFilterDenseVerify;
-		double timeFilterFrames;
-		double timeAddCurrResiduals;
+		double timeMisc;
 		double timeSolve;
 		unsigned int numItersSolve;
 
@@ -28,8 +27,7 @@ public:
 			timeMatchFilterKeyPoint = 0;
 			timeMatchFilterSurfaceArea = 0;
 			timeMatchFilterDenseVerify = 0;
-			timeFilterFrames = 0;
-			timeAddCurrResiduals = 0;
+			timeMisc = 0;
 			timeSolve = 0;
 			numItersSolve = 0;
 
@@ -45,8 +43,7 @@ public:
 			*out << "\tTime Match Filter Key Point: " << std::to_string(timeMatchFilterKeyPoint) << "ms" << std::endl;
 			*out << "\tTime Match Filter Surface Area: " << std::to_string(timeMatchFilterSurfaceArea) << "ms" << std::endl;
 			*out << "\tTime Match Filter Dense Verify: " << std::to_string(timeMatchFilterDenseVerify) << "ms" << std::endl;
-			*out << "\tTime Filter Frames: " << std::to_string(timeFilterFrames) << "ms" << std::endl;
-			*out << "\tTime Add Curr Residuals: " << std::to_string(timeAddCurrResiduals) << "ms" << std::endl;
+			*out << "\tTime Misc: " << std::to_string(timeMisc) << "ms" << std::endl;
 			*out << "\tTime Solve: " << std::to_string(timeSolve) << "ms" << std::endl;
 			*out << "\t#iters solve: " << std::to_string(numItersSolve) << std::endl;
 			if (printDepthSensing) {
@@ -137,11 +134,8 @@ public:
 		*out << "Match Filter Dense Verify";
 		for (unsigned int i = 0; i < frameTimings.size(); i++) *out << separator << frameTimings[i].timeMatchFilterDenseVerify;
 		*out << std::endl;
-		*out << "Filter Frames";
-		for (unsigned int i = 0; i < frameTimings.size(); i++) *out << separator << frameTimings[i].timeFilterFrames;
-		*out << std::endl;
-		*out << "Add Curr Residuals";
-		for (unsigned int i = 0; i < frameTimings.size(); i++) *out << separator << frameTimings[i].timeAddCurrResiduals;
+		*out << "Misc";
+		for (unsigned int i = 0; i < frameTimings.size(); i++) *out << separator << frameTimings[i].timeMisc;
 		*out << std::endl;
 		*out << "Solve";
 		for (unsigned int i = 0; i < frameTimings.size(); i++) *out << separator << frameTimings[i].timeSolve;

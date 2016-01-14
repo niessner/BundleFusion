@@ -1231,7 +1231,6 @@ void TestMatching::runOpt()
 	//params
 	const bool savePointClouds = false;
 	const unsigned int maxNumIters = 4;
-	GlobalBundlingState::get().s_localDenseUseAllPairwise = false;
 
 	//weights...
 	//std::vector<float> weightsSparse(maxNumIters, 1.0f);
@@ -1281,7 +1280,6 @@ void TestMatching::runOpt()
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
 	sba.setGlobalWeights(weightsSparse, weightsDenseDepth, weightsDenseColor, useGlobalDense);
-	sba.setLocalDensePairwise(GlobalBundlingState::get().s_localDenseUseAllPairwise);
 	// params
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;

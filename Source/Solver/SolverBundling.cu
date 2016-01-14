@@ -1,8 +1,8 @@
 #include <iostream>
 
 //!!!DEBUGGING
-#define PRINT_RESIDUALS_SPARSE
-#define PRINT_RESIDUALS_DENSE
+//#define PRINT_RESIDUALS_SPARSE
+//#define PRINT_RESIDUALS_DENSE
 //!!!DEBUGGING
 
 #include "GlobalDefines.h"

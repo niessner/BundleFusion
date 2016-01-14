@@ -29,7 +29,7 @@ public:
 		m_bVerify = false;
 
 		m_bUseComprehensiveFrameInvalidation = GlobalBundlingState::get().s_useComprehensiveFrameInvalidation;
-		m_bUseLocalDensePairwise = GlobalBundlingState::get().s_localDenseUseAllPairwise;
+		m_bUseLocalDense = GlobalBundlingState::get().s_useLocalDense;
 	}
 	~SBA() {
 		SAFE_DELETE(m_solver);
@@ -62,9 +62,6 @@ public:
 		m_bUseGlobalDenseOpt = useGlobalDenseOpt;
 		m_globalWeightsMutex.unlock();
 	}
-	void setLocalDensePairwise(bool b) {
-		m_bUseLocalDensePairwise = b;
-	}
 
 private:
 	void evalResidualDEBUG(SIFTImageManager* siftManager, const float4x4* d_transforms) const {
@@ -95,7 +92,7 @@ private:
 	unsigned int	m_numCorrespondences;
 
 	//dense opt params
-	bool m_bUseLocalDensePairwise;
+	bool m_bUseLocalDense;
 	bool m_bUseGlobalDenseOpt;
 	std::vector<float> m_localWeightsSparse;
 	std::vector<float> m_localWeightsDenseDepth;

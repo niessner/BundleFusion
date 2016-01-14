@@ -243,8 +243,14 @@ int main(int argc, char** argv)
 		}
 		//if (false) {
 		//	//process all opt 
-		//	const std::string sensorFile = "../data/iclnuim/livingroom2.sensor";
-		//	const std::string filename = "../data/iclnuim/tmp2.sensor";
+		//	const unsigned int num = 1;
+		//	const std::string outputFile = "dump/liv" + std::to_string(num) + "_s.sensor";
+		//	const std::string sensorFile = "../data/iclnuim/livingroom" + std::to_string(num) + ".sensor";
+		//	const std::string filename = "debug/iclnuim/opt_liv" + std::to_string(num) + "_s.bin";
+		//	if (!util::fileExists(sensorFile) || !util::fileExists(filename)) {
+		//		std::cerr << "ERROR inputs do not exist: " << std::endl << "\t" << sensorFile << std::endl << "\t" << filename << std::endl;
+		//		getchar();
+		//	}
 		//	std::cout << "loading... ";
 		//	std::vector<mat4f> optTrajectory;
 		//	CalibratedSensorData cs;
@@ -253,14 +259,21 @@ int main(int argc, char** argv)
 		//		s >> cs; s.closeStream();
 		//	}
 		//	{
-		//		CalibratedSensorData cs2;
 		//		BinaryDataStreamFile s(filename, false);
-		//		s >> cs2; s.closeStream();
-		//		optTrajectory = cs2.m_trajectory;
+		//		s >> optTrajectory; s.closeStream();
 		//	}
 		//	std::cout << "done!" << std::endl;
 		//	std::vector<mat4f> referenceTrajectory = cs.m_trajectory;
-		//	
+		//	if (cs.m_trajectory.size() > optTrajectory.size()) {
+		//		std::cout << "#frames from " << cs.m_trajectory.size() << " to " << optTrajectory.size() << std::endl;
+		//		cs.m_DepthNumFrames = (unsigned int)optTrajectory.size();
+		//		cs.m_ColorNumFrames = (unsigned int)optTrajectory.size();
+		//		cs.m_DepthImages.resize(optTrajectory.size());
+		//		cs.m_ColorImages.resize(optTrajectory.size());
+		//	}
+		//	cs.m_trajectory = optTrajectory;
+		//	BinaryDataStreamFile s(outputFile, true);
+		//	s << cs; s.closeStream();
 		//	//sanity check
 		//	auto err = PoseHelper::evaluateAteRmse(optTrajectory, referenceTrajectory);
 		//	std::cout << "ate rmse = " << err.first << " [#frames = " << err.second << "]" << std::endl;
@@ -269,10 +282,8 @@ int main(int argc, char** argv)
 		//	std::cout << "first transform: " << referenceTrajectory.front() << std::endl;
 		//	getchar();
 		//}
-		if (true) {
+		if (false) {
 			TestMatching test;
-			//test.loadFromSensor("../data/tum/fr3_office_250.sensor", "", 1);
-			//test.runOpt();
 			//test.analyzeLocalOpts();
 			test.testGlobalDense();
 			//test.compareDEBUG();

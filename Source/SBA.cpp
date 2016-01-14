@@ -55,7 +55,7 @@ SBA::SBA()
 #endif
 	m_globalWeightsMutex.unlock();
 
-	m_bUseLocalDensePairwise = true;
+	m_bUseLocalDense = true;
 }
 
 
@@ -72,11 +72,15 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	std::vector<float> weightsDenseDepth, weightsDenseColor, weightsSparse;
 	if (isLocal) {
 		weightsSparse = m_localWeightsSparse;
-		usePairwise = m_bUseLocalDensePairwise;
-		cache = NULL; //to turn off
-		weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
-		//weightsDenseDepth = m_localWeightsDenseDepth; //turn on
-		//weightsDenseColor = m_localWeightsDenseColor;
+		usePairwise = true; //always use pairwise
+		if (m_bUseLocalDense) {
+			weightsDenseDepth = m_localWeightsDenseDepth; //turn on
+			weightsDenseColor = m_localWeightsDenseColor;
+		}
+		else {
+			cache = NULL; //to turn off
+			weightsDenseDepth = std::vector<float>(m_localWeightsDenseDepth.size(), 0.0f); weightsDenseColor = weightsDenseDepth;
+		}
 	}
 	else {
 		usePairwise = true; //always global dense pairwise
@@ -102,20 +106,6 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	const int* d_validImages = siftManager->getValidImagesGPU();
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans, d_validImages);
 
-	//!!!debugging
-	{
-		std::vector<vec3f> rot(numImages), trans(numImages);
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
-		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z))) { 
-			printf("NaN input pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); 
-		} }
-		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z))) { 
-			printf("NaN input pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar(); 
-		} }
-	}
-	//!!!debugging
-
 	bool removed = false;
 	const unsigned int maxIts = 1;//GlobalBundlingState::get().s_maxNumResidualsRemoved;
 	unsigned int curIt = 0;
@@ -130,22 +120,8 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 
 	if (useVerify) {
 		if (weightsSparse.front() > 0) m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesGPU(), siftManager->getNumGlobalCorrespondences());
-		else m_bVerify = true; //!!!debugging //TODO this should not happen except for debugging
+		else m_bVerify = true; //TODO this should not happen except for debugging
 	}
-
-	//!!!debugging
-	{
-		std::vector<vec3f> rot(numImages), trans(numImages);
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(rot.data(), d_xRot, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(trans.data(), d_xTrans, sizeof(float3)*numImages, cudaMemcpyDeviceToHost));
-		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(rot[i].x) || isnan(rot[i].y) || isnan(rot[i].z))) { 
-			printf("NaN out pose rot %d (%f %f %f)\n", i, rot[i].x, rot[i].y, rot[i].z); getchar(); 
-		} }
-		for (unsigned int i = 0; i < numImages; i++) { if (siftManager->getValidImages()[i] != 0 && (isnan(trans[i].x) || isnan(trans[i].y) || isnan(trans[i].z))) { 
-			printf("NaN out pose trans %d (%f %f %f)\n", i, trans[i].x, trans[i].y, trans[i].z); getchar();
-		} }
-	}
-	//!!!debugging
 
 	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, d_validImages);
 
