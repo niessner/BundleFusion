@@ -219,12 +219,8 @@ public:
 	unsigned int getNumGlobalCorrespondences() const { return m_globNumResiduals; }
 	const float4x4* getFiltTransformsDEBUG() const { return d_currFilteredTransforms; }
 
-
-	//void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
-	//	const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& colorIntrinsicsInv, const float4x4& downSampIntrinsics, const float4x4& downSampIntrinsicsInv) const;
 	void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
-		const std::vector<float*>& depthFrames, unsigned int depthWidth, unsigned int depthHeight,
-		const float4x4& colorIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const;
+		const float4x4& colorIntrinsicsInv) const;
 	void computeTracks(const std::vector<float4x4>& trajectory, const std::vector<EntryJ>& correspondences, const std::vector<uint2>& correspondenceKeyIndices,
 		std::vector< std::vector<std::pair<uint2, float3>> >& tracks) const;
 

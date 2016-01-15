@@ -412,8 +412,7 @@ void SIFTImageManager::computeTracks(const std::vector<float4x4>& trajectory, co
 }
 
 void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
-	const std::vector<float*>& depthFrames, unsigned int depthWidth, unsigned int depthHeight,
-	const float4x4& colorIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const
+	const float4x4& colorIntrinsicsInv) const
 {
 	std::vector<EntryJ> correspondences(m_globNumResiduals);
 	cutilSafeCall(cudaMemcpy(correspondences.data(), d_globMatches, sizeof(EntryJ) * m_globNumResiduals, cudaMemcpyDeviceToHost));
@@ -462,8 +461,7 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 	global->finalizeSIFTImageGPU(numKeys);
 }
 //void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
-//	const std::vector<float*>& depthFrames, unsigned int depthWidth, unsigned int depthHeight,
-//	const float4x4& colorIntrinsicsInv, const float4x4& depthIntrinsics, const float4x4& depthIntrinsicsInv) const
+//	const float4x4& colorIntrinsicsInv) const
 //{
 //	//const unsigned int overlapImageIndex = getNumImages() - 1; // overlap frame
 //

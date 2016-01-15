@@ -1,6 +1,6 @@
 #pragma once
 #ifndef SUBMAP_MANAGER_H
-#define SUBMAP_MAnAGER_H
+#define SUBMAP_MANAGER_H
 
 #include "SiftGPU/SIFTImageManager.h"
 #include "CUDAImageManager.h"
@@ -10,6 +10,9 @@
 #include "SiftGPU/CUDATimer.h"
 #include "GlobalBundlingState.h"
 #include "mLibCuda.h"
+
+#define DEBUG_PRINT_MATCHING
+
 
 class SiftGPU;
 class SiftMatchGPU;
@@ -141,7 +144,6 @@ public:
 		m_SparseBundler.printConvergence(filename);
 	}
 
-	void saveVerifyDEBUG(const std::string& prefix) const;
 	//! only debug 
 	const SIFTImageManager* getCurrentLocalDEBUG() const { return m_currentLocal; }
 	const SIFTImageManager* getGlobalDEBUG() const { return m_global; }
@@ -243,18 +245,9 @@ private:
 	unsigned int m_submapSize;
 	unsigned int m_numOptPerResidualRemoval;
 
-	//!!!DEBUGGING
-	std::vector<float*> m_fuseDepthImages; // vector of depth images (device) from local to use for global key fuse
-	mat4f m_fuseDepthIntrinsics;
-	mat4f m_fuseDepthIntrinsicsInv;
-	unsigned int m_fuseDepthWidth, m_fuseDepthHeight;
-
-	std::vector<unsigned int> _idxsLocalOptimized;
-	std::vector<unsigned int> _idxsLocalInvalidVerify;
-	std::vector<unsigned int> _idxsGlobalOptimized;
-
+#ifdef DEBUG_PRINT_MATCHING
 	bool _debugPrintMatches;
-	//!!!DEBUGGING
+#endif
 };
 
 #endif

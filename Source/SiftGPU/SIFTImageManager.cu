@@ -204,8 +204,6 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	const float* d_matchDistances = &d_matchDistancesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	const uint2* d_matchKeyPointIndices = &d_matchKeyPointIndicesGlobal[imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_RAW];
 	unsigned int numMatches = min(MAX_MATCHES_PER_IMAGE_PAIR_RAW, d_numMatchesPerImagePair[imagePairIdx]);
-	bool printDebug = imagePairIdx == 90 && curFrame == 89;
-	if (printDebug && tidx == 0) printf("filter for (%d,%d)\n", imagePairIdx, curFrame);
 
 	if (numMatches == 0) {
 		if (tidx == 0) {
@@ -236,7 +234,7 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	if (tidx == 0) 	{
 		float4x4 trans;
 		unsigned int curr = filterKeyPointMatches(d_keyPointsGlobal, matchKeyPointIndices, matchDistances, numMatches,
-			trans, siftIntrinsicsInv, minNumMatches, maxKabschRes2, printDebug);
+			trans, siftIntrinsicsInv, minNumMatches, maxKabschRes2);
 		numFilteredMatches = curr;
 		d_filteredTransforms[imagePairIdx] = trans;
 		d_filteredTransformsInv[imagePairIdx] = trans.getInverse();
@@ -1081,7 +1079,7 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, int* d_validIm
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
 
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
-			printf("VERIFY LOCAL SUBMAP[%d-%d]: %f %f\n", img0, img1, err, corr);
+			//printf("VERIFY LOCAL SUBMAP[%d-%d]: %f %f\n", img0, img1, err, corr);
 			d_validOpt[0] = 0;
 		}
 	}

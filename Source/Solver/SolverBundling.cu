@@ -208,8 +208,8 @@ __global__ void WeightDenseCorrespondences_Kernel(unsigned int N, SolverState st
 		// apply ln to weights
 		float x = state.d_denseCorrCounts[idx];
 		if (x > 0) {
-			if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
-			//if (x < 400) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			//if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			if (x < 200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS //for 80x60
 			else {
 				state.d_denseCorrCounts[idx] = 1.0f / min(logf(x), 9.0f); // natural log //TODO PARAMS
 			}

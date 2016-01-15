@@ -147,9 +147,6 @@ public:
 		m_SubmapManager.printConvergence(filename);
 	}
 
-	//! debug vis functions
-	void saveDEBUG();
-
 	//! debug functions only call at end
 	void saveCompleteTrajectory(const std::string& filename) const;
 	void saveSiftTrajectory(const std::string& filename) const;

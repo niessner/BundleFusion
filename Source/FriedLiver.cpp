@@ -208,8 +208,8 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			fileNameDescGlobalApp = "zParametersDefault.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			//fileNameDescGlobalApp = "zParametersDefault.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 
 			//fileNameDescGlobalApp = "zParametersMedium.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
@@ -220,8 +220,8 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersTUM.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
 
-			//fileNameDescGlobalApp = "zParametersAug.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
+			fileNameDescGlobalApp = "video_params\\zParametersTimingLow_Individual_Student300.txt";
+			fileNameDescGlobalBundling = "video_params\\zParametersBundlingIndividualTimings.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;

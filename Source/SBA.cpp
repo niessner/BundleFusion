@@ -39,14 +39,12 @@ SBA::SBA()
 
 	m_globalWeightsMutex.lock();
 	m_globalWeightsSparse.resize(maxNumIts, 1.0f);
-	//m_globalWeightsDenseDepth.resize(maxNumIts, 1.0f);
-	m_globalWeightsDenseDepth.resize(maxNumIts, 0.5f);
-	for (unsigned int i = 0; i < 3; i++) m_globalWeightsDenseDepth[i] = 0.0f;
-	m_globalWeightsDenseColor.resize(maxNumIts, 0.0f); //TODO turn on
+	m_globalWeightsDenseDepth.resize(maxNumIts, 1.0f);
+	m_globalWeightsDenseColor.resize(maxNumIts, 0.0f); //off
 	//// for tum data
 	//m_globalWeightsSparse.resize(maxNumIts, 1.0f);
 	//m_globalWeightsDenseDepth.resize(maxNumIts, 0.0f);
-	//m_globalWeightsDenseColor.resize(maxNumIts, 0.1f); //TODO turn on
+	//m_globalWeightsDenseColor.resize(maxNumIts, 0.1f); //off
 
 #ifdef USE_GLOBAL_DENSE_EVERY_FRAME
 	m_bUseGlobalDenseOpt = true;
@@ -106,17 +104,11 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	const int* d_validImages = siftManager->getValidImagesGPU();
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans, d_validImages);
 
-	bool removed = false;
-	const unsigned int maxIts = 1;//GlobalBundlingState::get().s_maxNumResidualsRemoved;
-	unsigned int curIt = 0;
-	do {
-		removed = alignCUDA(siftManager, cache, usePairwise, weightsSparse, weightsDenseDepth, weightsDenseColor, maxNumIters, numPCGits, isStart, isEnd);
-		if (recordConvergence) {
-			const std::vector<float>& conv = m_solver->getConvergenceAnalysis();
-			m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
-		}
-		curIt++;
-	} while (removed && curIt < maxIts);
+	bool removed = alignCUDA(siftManager, cache, usePairwise, weightsSparse, weightsDenseDepth, weightsDenseColor, maxNumIters, numPCGits, isStart, isEnd);
+	if (recordConvergence) {
+		const std::vector<float>& conv = m_solver->getConvergenceAnalysis();
+		m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
+	}
 
 	if (useVerify) {
 		if (weightsSparse.front() > 0) m_bVerify = m_solver->useVerification(siftManager->getGlobalCorrespondencesGPU(), siftManager->getNumGlobalCorrespondences());

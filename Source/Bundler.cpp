@@ -297,11 +297,6 @@ void Bundler::getCurrentFrame()
 	//}
 }
 
-void Bundler::saveDEBUG()
-{
-	m_SubmapManager.saveVerifyDEBUG("debug/");
-}
-
 void Bundler::prepareLocalSolve(unsigned int curFrame, bool isLastFrame /*= false*/)
 {
 	unsigned int curLocalIdx = m_SubmapManager.getCurrLocal(curFrame);

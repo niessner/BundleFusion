@@ -160,6 +160,36 @@ public:
 		}
 	}
 
+	static void printAverages(std::ofstream* out, const std::string& separator, std::vector<FrameTiming>& frameTimings, bool printDepthSensing)
+	{
+		double sum = 0.0f; unsigned int count = 0;
+		*out << "Average times:" << std::endl;
+		for (unsigned int i = 0; i < frameTimings.size(); i++) { sum += frameTimings[i].timeSiftDetection; count++; }
+		*out << "SIFT Detection" << separator << (sum / count) << separator << count << std::endl;
+		sum = 0.0f; count = 0;
+		for (unsigned int i = 0; i < frameTimings.size(); i++) { sum += frameTimings[i].timeSiftMatching; count++; }
+		*out << "SIFT Matching" << separator << (sum / count) << separator << count << std::endl;
+		sum = 0.0f; count = 0;
+		for (unsigned int i = 0; i < frameTimings.size(); i++) { sum += (frameTimings[i].timeMatchFilterKeyPoint + frameTimings[i].timeMatchFilterSurfaceArea + frameTimings[i].timeMatchFilterDenseVerify); count++; }
+		*out << "Corr Filter" << separator << (sum / count) << separator << count << std::endl;
+		sum = 0.0f; count = 0;
+		for (unsigned int i = 0; i < frameTimings.size(); i++) { sum += frameTimings[i].timeMisc; count++; }
+		*out << "Misc" << separator << (sum / count) << separator << count << std::endl;
+		sum = 0.0f; count = 0;
+		for (unsigned int i = 0; i < frameTimings.size(); i++) { sum += frameTimings[i].timeSolve; count++; }
+		*out << "Solve" << separator << (sum / count) << separator << count << std::endl;
+
+		if (printDepthSensing) {
+			sum = 0.0f; count = 0;
+			for (unsigned int i = 0; i < frameTimings.size(); i++) { sum += frameTimings[i].timeReIntegrate; count++; }
+			*out << "Re-Integrate" << separator << (sum / count) << separator << count << std::endl;
+			sum = 0.0f; count = 0;
+			for (unsigned int i = 0; i < frameTimings.size(); i++) { sum += (frameTimings[i].timeSensorProcess + frameTimings[i].timeReconstruct + frameTimings[i].timeVisualize); count++; }
+			*out << "Misc" << separator << (sum / count) << separator << count << std::endl;
+		}
+		*out << std::endl << std::endl;
+	}
+
 	static void printExcelTimings(const std::string& prefix)
 	{
 		const std::string separator = ",";
@@ -167,12 +197,14 @@ public:
 		if (!m_globalFrameTimings.empty()) {
 			const std::string globalFile = prefix + "_global.txt";
 			std::ofstream out(globalFile);
+			printAverages(&out, separator, m_globalFrameTimings, false);
 			printExcelTimings(&out, separator, m_globalFrameTimings, false);
 			out.close();
 		}
 		if (!m_localFrameTimings.empty()) {
 			const std::string localFile = prefix + "_local.txt";
 			std::ofstream out(localFile);
+			printAverages(&out, separator, m_localFrameTimings, true);
 			printExcelTimings(&out, separator, m_localFrameTimings, true);
 			out.close();
 		}
