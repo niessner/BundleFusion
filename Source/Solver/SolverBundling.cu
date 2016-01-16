@@ -116,14 +116,14 @@ __global__ void FindImageImageCorr_Kernel(SolverInput input, SolverState state, 
 		__shared__ int foundCorr[1]; foundCorr[0] = 0;
 		__syncthreads();
 		if (findDenseCorr(idx, input.denseDepthWidth, input.denseDepthHeight,
-			0.15f, transform, input.intrinsics,	
+			parameters.denseDistThresh, transform, input.intrinsics,	
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[j].d_depthDownsampled, 
-			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
-			foundCorr[0] = 1;
+			parameters.denseDepthMin, 2.0f)) { //i tgt, j src		//TODO PARAMS
+			atomicAdd(foundCorr, 1);
 		} // found correspondence
 		__syncthreads();
 		if (tidx == 0) {
-			if (foundCorr[0] == 1) { 
+			if (foundCorr[0] > 10) { //TODO PARAMS
 				int addr = atomicAdd(state.d_numDenseOverlappingImages, 1);
 				state.d_denseOverlappingImages[addr] = make_uint2(i, j);
 			}
@@ -173,17 +173,6 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 			//atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
 			count++;
 		} // found correspondence
-		//!!!debugging
-		//float3 camPosSrc; float3 camPosSrcToTgt; float2 tgtScreenPosf; float3 camPosTgt; float3 normalTgt;
-		//if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
-		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
-		//	input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
-		//	input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
-		//	parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPosf, camPosTgt, normalTgt)) { //i tgt, j src
-		//	//atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
-		//	count++;
-		//} // found correspondence
-		//!!!debugging
 		count = warpReduce(count);
 		__syncthreads();
 		if (tidx % WARP_SIZE == 0) {
@@ -208,8 +197,8 @@ __global__ void WeightDenseCorrespondences_Kernel(unsigned int N, SolverState st
 		// apply ln to weights
 		float x = state.d_denseCorrCounts[idx];
 		if (x > 0) {
-			//if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
-			if (x < 200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS //for 80x60
+			//if (x < 3200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
 			else {
 				state.d_denseCorrCounts[idx] = 1.0f / min(logf(x), 9.0f); // natural log //TODO PARAMS
 			}
@@ -253,7 +242,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 		// find correspondence
 		float3 camPosSrc; float3 camPosSrcToTgt; float3 camPosTgt; float3 normalTgt; float2 tgtScreenPos;
 		//bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
-		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
+		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
 		//	input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 		//	input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 		//	parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
@@ -369,6 +358,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	cutilSafeCall(cudaMemcpy(&numOverlapImagePairs, state.d_numDenseOverlappingImages, sizeof(int), cudaMemcpyDeviceToHost));
 	const int reductionGlobal = (input.denseDepthWidth*input.denseDepthHeight + THREADS_PER_BLOCK_DENSE_DEPTH - 1) / THREADS_PER_BLOCK_DENSE_DEPTH;
 	dim3 grid(numOverlapImagePairs, reductionGlobal);
+	//printf("num overlap image pairs = %d\n", numOverlapImagePairs);
 
 	if (timer) timer->startEvent("BuildDenseDepthSystem - compute im-im weights");
 
@@ -410,28 +400,27 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 #endif
 
 	//!!!debugging
-	bool debugPrint = false;
-	float* h_JtJ = NULL;
-	float* h_Jtr = NULL;
-	if (debugPrint) {
-		h_JtJ = new float[sizeJtJ];
-		h_Jtr = new float[sizeJtr];
-		cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-		cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-		printf("JtJ:\n");
-		//for (unsigned int i = 0; i < 6 * N; i++) {
-		//	for (unsigned int j = 0; j < 6 * N; j++)
-		for (unsigned int i = 6 * 1; i < 6 * 2; i++) {
-			for (unsigned int j = 6 * 1; j < 6 * 2; j++)
-				printf(" %f,", h_JtJ[j * 6 * N + i]);
-			printf("\n");
-		}
-		printf("Jtr:\n");
-		for (unsigned int i = 0; i < 6 * N; i++) {
-			printf(" %f,", h_Jtr[i]);
-		}
-		printf("\n");
-	}
+	//bool debugPrint = false;
+	//if (debugPrint) {
+	//	float* h_JtJ = new float[sizeJtJ];
+	//	float* h_Jtr = new float[sizeJtr];
+	//	cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
+	//	cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
+	//	printf("JtJ:\n");
+	//	//for (unsigned int i = 0; i < 6 * N; i++) {
+	//	//	for (unsigned int j = 0; j < 6 * N; j++)
+	//	for (unsigned int i = 6 * 1; i < 6 * 2; i++) {
+	//		for (unsigned int j = 6 * 1; j < 6 * 2; j++)
+	//			printf(" %f,", h_JtJ[j * 6 * N + i]);
+	//		printf("\n");
+	//	}
+	//	printf("Jtr:\n");
+	//	for (unsigned int i = 0; i < 6 * N; i++) {
+	//		printf(" %f,", h_Jtr[i]);
+	//	}
+	//	printf("\n");
+	//}
+	//!!!debugging
 #ifdef PRINT_RESIDUALS_DENSE
 	if (parameters.weightDenseDepth > 0) {
 		float sumResidual; int corrCount;
@@ -452,24 +441,6 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif	
-	//if (debugPrint) {
-	//	cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-	//	cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-	//	printf("JtJ:\n");
-	//	for (unsigned int i = 0; i < 6 * N; i++) {
-	//		for (unsigned int j = 0; j < 6 * N; j++)
-	//			printf(" %f,", h_JtJ[j * 6 * N + i]);
-	//		printf("\n");
-	//	}
-	//	printf("Jtr:\n");
-	//	for (unsigned int i = 0; i < 6 * N; i++) {
-	//		printf(" %f,", h_Jtr[i]);
-	//	}
-	//	printf("\n\n");
-	//	if (h_JtJ) delete[] h_JtJ;
-	//	if (h_Jtr) delete[] h_Jtr;
-	//}
-	//!!!debugging
 
 	if (timer) timer->endEvent();
 }

@@ -4,12 +4,6 @@
 
 #include "FriedLiver.h"
 
-//!!!debugging
-extern "C" void convertMatricesToPosesCU(const float4x4* d_transforms, unsigned int numTransforms,
-	float3* d_rot, float3* d_trans);
-
-extern "C" void convertPosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numImages, float4x4* d_transforms);
-//!!!debugging
 
 RGBDSensor* getRGBDSensor()
 {
@@ -208,8 +202,8 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			//fileNameDescGlobalApp = "zParametersDefault.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			fileNameDescGlobalApp = "zParametersDefault.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 
 			//fileNameDescGlobalApp = "zParametersMedium.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
@@ -219,9 +213,6 @@ int main(int argc, char** argv)
 
 			//fileNameDescGlobalApp = "zParametersTUM.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
-
-			fileNameDescGlobalApp = "video_params\\zParametersTimingLow_Individual_Student300.txt";
-			fileNameDescGlobalBundling = "video_params\\zParametersBundlingIndividualTimings.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;

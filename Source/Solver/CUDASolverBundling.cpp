@@ -194,10 +194,11 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.denseColorThresh = 0.1f;
 	parameters.denseColorGradientMin = 0.005f;
 	parameters.denseDepthMin = 0.5f;
-	parameters.denseDepthMax = 3.5f;//4.5f;//TODO 
+	parameters.denseDepthMax = 2.5f;//3.5f;//4.5f;//TODO 
 	parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
 	parameters.useDenseDepthAllPairwise = usePairwiseDense;
-	parameters.denseOverlapCheckSubsampleFactor = 8; // for 160x120 -> 20x15 image
+	//parameters.denseOverlapCheckSubsampleFactor = 8; // for 160x120 -> 20x15 image
+	parameters.denseOverlapCheckSubsampleFactor = 4; // for 80x60 -> 20x15 image //TODO PARAMS
 
 	SolverInput solverInput;
 	solverInput.d_correspondences = d_correspondences;
@@ -233,27 +234,6 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		std::vector<int> validImages(solverInput.numberOfImages);
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(validImages.data(), solverInput.d_validImages, sizeof(int)*solverInput.numberOfImages, cudaMemcpyDeviceToHost));
 		convertLiePosesToMatricesCU(m_solverState.d_xRot, m_solverState.d_xTrans, solverInput.numberOfImages, m_solverState.d_xTransforms, m_solverState.d_xTransformInverses);
-
-		//uint2 imageIndices = make_uint2(87, 88);
-		//float3* d_corrImage = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_corrImage, sizeof(float3)*solverInput.denseDepthWidth*solverInput.denseDepthHeight));
-		//ColorImageR32G32B32 projImage(solverInput.denseDepthWidth, solverInput.denseDepthHeight); projImage.setPixels(vec3f(-std::numeric_limits<float>::infinity()));
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_corrImage, projImage.getPointer(), sizeof(float3)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyHostToDevice));
-		//VisualizeCorrespondences(imageIndices, solverInput, m_solverState, parameters, d_corrImage);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(projImage.getPointer(), d_corrImage, sizeof(float3)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyDeviceToHost));
-		//MLIB_CUDA_SAFE_FREE(d_corrImage);
-		//FreeImageWrapper::saveImage("debug/imCorr.png", projImage);
-		//unsigned int counter = 0;
-		//for (unsigned int i = 0; i < projImage.getNumPixels(); i++) {
-		//	const vec3f& p = projImage.getPointer()[i];
-		//	if (p.x != -std::numeric_limits<float>::infinity()) counter++;
-		//}
-		//ColorImageR32G32B32A32 camPosImage(solverInput.denseDepthWidth, solverInput.denseDepthHeight);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), cudaCache->getCacheFrames()[imageIndices.x].d_cameraposDownsampled, sizeof(float4)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("debug/imTgt.png", camPosImage);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), cudaCache->getCacheFrames()[imageIndices.y].d_cameraposDownsampled, sizeof(float4)*solverInput.denseDepthWidth*solverInput.denseDepthHeight, cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("debug/imSrc.png", camPosImage);
-
-
 		BuildDenseSystem(solverInput, m_solverState, parameters, NULL);
 		int numOverlappingImages;
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&numOverlappingImages, m_solverState.d_numDenseOverlappingImages, sizeof(int), cudaMemcpyDeviceToHost));
@@ -263,20 +243,19 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(imPairIndices.data(), m_solverState.d_denseOverlappingImages, sizeof(uint2)*imPairIndices.size(), cudaMemcpyDeviceToHost));
 
 		//!!!debugging
-		//std::vector<std::pair<vec2ui, unsigned int>> corrCounts;
+		std::vector< std::vector<unsigned int> > imageImageCorrs(numberOfImages);
 		std::vector<std::pair<unsigned int, unsigned int>> connections(numberOfImages); for (unsigned int i = 0; i < numberOfImages; i++) connections[i] = std::make_pair(i, 0);
 		for (unsigned int i = 0; i < imPairWeights.size(); i++) {
 			if (imPairWeights[i] > 0) {
-		//		corrCounts.push_back(std::make_pair(imPairIndices[i], (unsigned int)imPairWeights[i]));
 				connections[imPairIndices[i].x].second++;
 				connections[imPairIndices[i].y].second++;
+
+				imageImageCorrs[imPairIndices[i].x].push_back(imPairIndices[i].y);
+				imageImageCorrs[imPairIndices[i].y].push_back(imPairIndices[i].x);
 			}
 		}
-		//std::sort(corrCounts.begin(), corrCounts.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) {
-		//	return fabs(left.second) < fabs(right.second);
-		//});
 		std::sort(connections.begin(), connections.end(), [](const std::pair<unsigned int, unsigned int> &left, const std::pair<unsigned int, unsigned int> &right) {
-			return left.second < right.second;
+			return left.second > right.second;
 		});
 		int a = 5;
 		//!!!debugging
