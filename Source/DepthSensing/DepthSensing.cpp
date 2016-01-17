@@ -68,7 +68,8 @@ void CALLBACK		OnD3D11DestroyDevice(void* pUserContext);
 void CALLBACK		OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext);
 
 void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRigidTransform, bool trackingLost);
-void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, bool trackingLost);
+void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRigidTransform, bool trackingLost);
+void renderFrustum(const mat4f& transform, const mat4f& cameraMatrix, const vec4f& color);
 
 void RenderText();
 void RenderHelp();
@@ -102,10 +103,15 @@ CUDAImageManager*			g_CudaImageManager = NULL;
 RGBDSensor*					g_depthSensingRGBDSensor = NULL;
 Bundler*					g_depthSensingBundler = NULL;
 
-mat4f transformWorld = mat4f(	//student3500 video
-	0.995244, 0.051565, 0.082647, 0.414195,
-	0.051565, 0.440933, -0.896057, 1.631109,
-	-0.082647, 0.896057, 0.436177, -1.496328,
+//mat4f transformWorld = mat4f(	//student3500 video
+//	0.995244, 0.051565, 0.082647, 0.414195,
+//	0.051565, 0.440933, -0.896057, 1.631109,
+//	-0.082647, 0.896057, 0.436177, -1.496328,
+//	0.000000, 0.000000, 0.000000, 1.000000);
+mat4f transformWorld = mat4f(	//office375
+	0.999490, -0.015504, -0.027929, -0.051648,
+	-0.015504, 0.529007, -0.848476, 1.175524,
+	0.027929, 0.848476, 0.528496, -1.437696,
 	0.000000, 0.000000, 0.000000, 1.000000);
 //mat4f transformWorld = mat4f::identity();
 
@@ -1030,7 +1036,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 
 	if (GlobalAppState::get().s_generateVideo) { // still renders the frames during the end optimize
 		//renderToFile(pd3dImmediateContext, g_lastRigidTransform, trackingLost);
-		renderTopDown(pd3dImmediateContext, trackingLost);
+		renderTopDown(pd3dImmediateContext, g_lastRigidTransform, trackingLost);
 	}
 	if (!g_depthSensingRGBDSensor->isReceivingFrames() && !GlobalAppState::get().s_printTimingsDirectory.empty()) {
 		const std::string outDir = GlobalAppState::get().s_printTimingsDirectory;
@@ -1050,7 +1056,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 
 
 	DXUT_EndPerfEvent();
-	}
+}
 
 void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRigidTransform, bool trackingLost)
 {
@@ -1167,7 +1173,7 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	}
 }
 
-void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, bool trackingLost)
+void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRigidTransform, bool trackingLost)
 {
 	static unsigned int frameNumber = 0;
 	std::string baseFolder = GlobalAppState::get().s_generateVideoDir;
@@ -1183,7 +1189,8 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, bool trackingLost)
 
 	mat4f view = mat4f::identity();
 
-	mat4f transform = mat4f::translation(-2.0f, 2.5f, -9.0f) * mat4f::rotationZ(-15); //for student3500
+	//mat4f transform = mat4f::translation(-2.0f, 2.5f, -9.0f) * mat4f::rotationZ(-15); //for student3500
+	mat4f transform = mat4f::translation(0.0f, 1.5f, -8.0f) * mat4f::rotationZ(-15); //for office375
 
 	const mat4f renderIntrinsics = g_rayCast->getIntrinsics();
 	g_sceneRep->setLastRigidTransformAndCompactify(transform);
@@ -1192,18 +1199,41 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, bool trackingLost)
 		std::cout << "ERROR nothing in the scene!" << std::endl;
 		getchar();
 	}
+	g_rayCast->updateRayCastMinMax(6.0f, 20.0f);
 	g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), transform);
+	//g_rayCast->updateRayCastMinMax(GlobalAppState::get().s_renderDepthMin, GlobalAppState::get().s_renderDepthMax); // not technically necessary
 
+	ColorImageR8G8B8A8 imageFrustum(g_RenderToFileTarget.getWidth(), g_RenderToFileTarget.getHeight());
+	{	//frustum
+		g_RenderToFileTarget.Clear(pd3dImmediateContext);
+		g_RenderToFileTarget.Bind(pd3dImmediateContext);
+		RGBColor c(74, 196, 237);
+		if (trackingLost) c = RGBColor(127, 127, 127);
+		renderFrustum(transformWorld * lastRigidTransform, transform.getInverse(), c.toVec4f());
+		g_RenderToFileTarget.Unbind(pd3dImmediateContext);
+
+		BYTE* data; unsigned int bytesPerElement;
+		g_RenderToFileTarget.copyToHost(data, bytesPerElement);
+		vec4uc* cdata = (vec4uc*)data;
+		for (unsigned int y = 0; y < imageFrustum.getHeight(); y++) {
+			for (unsigned int x = 0; x < imageFrustum.getWidth(); x++) {
+				const vec4uc& v = cdata[y * imageFrustum.getWidth() + x];
+				if (v.x > 0 || v.y > 0 || v.z > 0)
+					imageFrustum(x, imageFrustum.getHeight() - y - 1) = vec4uc(v.x, v.y, v.z, 255);
+			}
+		}
+		SAFE_DELETE_ARRAY(data);
+	}
 	{	// reconstruction
-		g_CustomRenderTarget.Clear(pd3dImmediateContext);
-		g_CustomRenderTarget.Bind(pd3dImmediateContext);
+		g_RenderToFileTarget.Clear(pd3dImmediateContext);
+		g_RenderToFileTarget.Bind(pd3dImmediateContext);
 		g_RGBDRenderer.RenderDepthMap(pd3dImmediateContext, g_rayCast->getRayCastData().d_depth, g_rayCast->getRayCastData().d_colors,
 			g_rayCast->getRayCastParams().m_width, g_rayCast->getRayCastParams().m_height,
 			g_rayCast->getIntrinsicsInv(),
 			view, renderIntrinsics, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(),
 			0.02f, 0.01f);
 		//GlobalAppState::get().s_renderingDepthDiscontinuityThresOffset, GlobalAppState::get().s_renderingDepthDiscontinuityThresLin);
-		g_CustomRenderTarget.Unbind(pd3dImmediateContext);
+		g_RenderToFileTarget.Unbind(pd3dImmediateContext);
 
 		bool colored = false;
 
@@ -1224,6 +1254,8 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, bool trackingLost)
 		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
 			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
 				image.getPointer()[i].w = 255;
+			if (imageFrustum.getPointer()[i].x != 0 || imageFrustum.getPointer()[i].y != 0 || imageFrustum.getPointer()[i].z != 0)
+				image.getPointer()[i] = imageFrustum.getPointer()[i];
 		}
 		LodePNG::save(image, reconstructionDir + ssFrameNumber.str() + ".png");
 		SAFE_DELETE_ARRAY(data);
@@ -1254,6 +1286,8 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, bool trackingLost)
 		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
 			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
 				image.getPointer()[i].w = 255;
+			if (imageFrustum.getPointer()[i].x != 0 || imageFrustum.getPointer()[i].y != 0 || imageFrustum.getPointer()[i].z != 0)
+				image.getPointer()[i] = imageFrustum.getPointer()[i];
 		}
 		//FreeImageWrapper::saveImage(reconstructColorDir + ssFrameNumber.str() + ".png", image);
 		LodePNG::save(image, reconstructColorDir + ssFrameNumber.str() + ".png");
@@ -1278,6 +1312,7 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, bool trackingLost)
 		}
 		LodePNG::save(imageU, inputDepthDir + ssFrameNumber.str() + ".png");
 	}
+	//std::cout << "waiting..." << std::endl; getchar();
 
 	frameNumber++;
 	if (!g_depthSensingRGBDSensor->isReceivingFrames()) {
@@ -1287,5 +1322,56 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, bool trackingLost)
 			exit(1);
 		}
 		pastEndCounter++;
+	}
+}
+
+void renderFrustum(const mat4f& transform, const mat4f& cameraMatrix, const vec4f& color) {
+	std::vector<LineSegment3f> frustum;
+
+	//float maxDepth = GlobalAppState::get().s_SDFMaxIntegrationDistance;
+	float maxDepth = 0.30f;	//in m
+
+	vec3f eye = vec3f(0, 0, 0);
+	vec3f farPlane[4];
+	const mat4f& intrinsicsInv = g_CudaImageManager->getIntrinsicsInv();
+	farPlane[0] = intrinsicsInv * (maxDepth * vec3f(0, 0, 1.0f));
+	farPlane[1] = intrinsicsInv * (maxDepth * vec3f(g_CudaImageManager->getIntegrationWidth() - 1.0f, 0, 1.0f));
+	farPlane[2] = intrinsicsInv * (maxDepth * vec3f(g_CudaImageManager->getIntegrationWidth() - 1.0f, g_CudaImageManager->getIntegrationHeight() - 1.0f, 1.0f));
+	farPlane[3] = intrinsicsInv * (maxDepth * vec3f(0, g_CudaImageManager->getIntegrationHeight() - 1.0f, 1.0f));
+
+	for (unsigned int i = 0; i < 4; i++) {
+		frustum.push_back(LineSegment3f(farPlane[i], farPlane[(i + 1) % 4]));
+		frustum.push_back(LineSegment3f(farPlane[i], eye));
+	}
+
+	//transform to world space
+	for (auto& line : frustum) {
+		line = LineSegment3f(transform * line.p0(), transform * line.p1());
+	}
+
+	float fx = g_rayCast->getIntrinsics()(0, 0);
+	float fy = g_rayCast->getIntrinsics()(1, 1);
+	mat4f proj = Cameraf::visionToGraphicsProj(g_RenderToFileTarget.getWidth(), g_RenderToFileTarget.getHeight(), fx, fy, 1.0f, 20.0f);
+
+	ml::D3D11GraphicsDevice g;	g.init(DXUTGetD3D11Device(), DXUTGetD3D11DeviceContext(), DXUTGetDXGISwapChain(), DXUTGetD3D11RenderTargetView(), DXUTGetD3D11DepthStencilView());
+
+	struct ConstantBuffer	{ ml::mat4f worldViewProj; };
+	ml::D3D11ConstantBuffer<ConstantBuffer> m_constants;
+	m_constants.init(g);
+	ConstantBuffer cBuffer;	cBuffer.worldViewProj = proj * cameraMatrix;
+	m_constants.updateAndBind(cBuffer, 0);
+
+	MeshDataf debugMesh;
+
+	float radius = 0.01f;
+	for (auto& line : frustum) {
+		auto triMesh = ml::Shapesf::cylinder(line.p0(), line.p1(), radius, 10, 10, color);
+		debugMesh.merge(triMesh.getMeshData());
+
+		ml::D3D11TriMesh renderLine;
+		renderLine.load(g, triMesh);
+
+		g.getShaderManager().bindShaders("defaultBasic");
+		renderLine.render();
 	}
 }

@@ -62,6 +62,12 @@ public:
 	mat4f getIntrinsicsInv() const { return m_rayCastIntrinsicsInverse; }
 	mat4f getIntrinsics() const { return m_rayCastIntrinsics; }
 
+	//! the actual raycast calls the gpu update
+	void updateRayCastMinMax(float depthMin, float depthMax) {
+		m_params.m_minDepth = depthMin;
+		m_params.m_maxDepth = depthMax;
+	}
+
 	// debugging
 	void convertToCameraSpace();
 
