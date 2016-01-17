@@ -334,6 +334,8 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 
 	// verify
 	if (m_SparseBundler.useVerification()) {
+		Timer timer;
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
 		int valid = siftManager->VerifyTrajectoryCU(siftManager->getNumImages(), getLocalTrajectoryGPU(curLocalIdx),
 			cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
@@ -341,6 +343,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifyOptErrThresh, GlobalBundlingState::get().s_verifyOptCorrThresh,
 			//GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax); //TODO PARAMS
 			0.1f, 3.0f);
+		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(true).timeSolve += timer.getElapsedTimeMS(); }
 
 		if (valid == 0) {
 			////!!!DEBUGGING
@@ -376,7 +379,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 	return ret;
 }
 
-#define USE_RETRY
+//#define USE_RETRY
 
 int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const float4x4& siftIntrinsics, const float4x4& siftIntrinsicsInv)
 {
@@ -392,7 +395,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		//unsigned int numGlobalKeys = local->FuseToGlobalKeyCU(curGlobalImage, getLocalTrajectoryGPU(lastLocalSolved),
 		//	siftIntrinsics, siftIntrinsicsInv);
 		//m_global->finalizeSIFTImageGPU(numGlobalKeys);
-		local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved), siftIntrinsicsInv); //TODO need GPU version of this
+		local->fuseToGlobal(m_global, siftIntrinsics, getLocalTrajectoryGPU(lastLocalSolved), siftIntrinsicsInv); //TODO GPU version of this
 
 		//fuse local depth frames for global cache
 		//m_nextLocalCache->fuseDepthFrames(m_globalCache, local->getValidImagesGPU(), getLocalTrajectoryGPU(lastLocalSolved)); //valid images have been updated in the solve
@@ -438,6 +441,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			}
 			else {
 				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << curGlobalFrame << ") not valid! no new global images for solve" << std::endl;
+				std::cout << "WARNING: last image (" << curGlobalFrame << ") not valid! no new global images for solve" << std::endl;
 				//getchar();
 #ifdef USE_RETRY
 				m_global->addToRetryList(curGlobalFrame);

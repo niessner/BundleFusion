@@ -33,7 +33,6 @@
 	X(bool, s_erodeSIFTdepth) \
 	X(float, s_verifyOptErrThresh) \
 	X(float, s_verifyOptCorrThresh) \
-	X(unsigned int, s_maxNumResidualsRemoved) \
 	X(bool, s_verbose) \
 	X(bool, s_sendUplinkFeedbackImage) \
 	X(float, s_depthSigmaD) \

@@ -11,7 +11,7 @@
 #include "GlobalBundlingState.h"
 #include "mLibCuda.h"
 
-#define DEBUG_PRINT_MATCHING
+//#define DEBUG_PRINT_MATCHING
 
 
 class SiftGPU;
@@ -147,8 +147,9 @@ public:
 	//! only debug 
 	const SIFTImageManager* getCurrentLocalDEBUG() const { return m_currentLocal; }
 	const SIFTImageManager* getGlobalDEBUG() const { return m_global; }
+#ifdef DEBUG_PRINT_MATCHING
 	void setPrintMatchesDEBUG(bool b) { _debugPrintMatches = b; }
-
+#endif
 	// to fake opt finish when no opt
 	void resetDEBUG(bool initNextGlobal, int numLocalSolved, unsigned int curFrame) { //numLocalSolved == numGlobalFrames
 		mutex_nextLocal.lock();
