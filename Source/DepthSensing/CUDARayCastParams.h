@@ -8,8 +8,7 @@ __align__(16)	//has to be aligned to 16 bytes
 struct RayCastParams {
 	float4x4 m_viewMatrix;
 	float4x4 m_viewMatrixInverse;
-	float4x4 m_intrinsics;
-	float4x4 m_intrinsicsInverse;
+	float mx, my, fx, fy; //raycast intrinsics
 
 	unsigned int m_width;
 	unsigned int m_height;

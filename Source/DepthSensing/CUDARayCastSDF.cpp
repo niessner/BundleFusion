@@ -22,6 +22,13 @@ void CUDARayCastSDF::create(const RayCastParams& params)
 	m_params = params;
 	m_data.allocate(m_params);
 	m_rayIntervalSplatting.OnD3D11CreateDevice(DXUTGetD3D11Device(), params.m_width, params.m_height);
+
+	m_rayCastIntrinsics = mat4f(
+		params.fx, 0.0f, params.mx, 0.0f,
+		0.0f, params.fy, params.my, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f);
+	m_rayCastIntrinsicsInverse = m_rayCastIntrinsics.getInverse();
 }
 
 void CUDARayCastSDF::destroy(void)
@@ -66,7 +73,7 @@ void CUDARayCastSDF::render(const HashData& hashData, const HashParams& hashPara
 
 void CUDARayCastSDF::convertToCameraSpace()
 {
-	convertDepthFloatToCameraSpaceFloat4(m_data.d_depth4, m_data.d_depth, m_params.m_intrinsicsInverse, m_params.m_width, m_params.m_height);
+	convertDepthFloatToCameraSpaceFloat4(m_data.d_depth4, m_data.d_depth, MatrixConversion::toCUDA(m_rayCastIntrinsicsInverse), m_params.m_width, m_params.m_height);
 	
 	if(!m_params.m_useGradients) {
 		computeNormals(m_data.d_normals, m_data.d_depth4, m_params.m_width, m_params.m_height);

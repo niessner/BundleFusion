@@ -22,11 +22,22 @@ public:
 	}
 
 	static RayCastParams parametersFromGlobalAppState(const GlobalAppState& gas, const mat4f& intrinsics, const mat4f& intrinsicsInv) {
+		mat4f rayCastIntrinsics = intrinsics;
+		if (gas.s_rayCastWidth != gas.s_integrationWidth || gas.s_rayCastHeight != gas.s_integrationHeight) {
+			const float scaleWidthDepth = (float)gas.s_rayCastWidth / (float)gas.s_integrationWidth;
+			const float scaleHeightDepth = (float)gas.s_rayCastHeight / (float)gas.s_integrationHeight;
+			// adapt intrinsics
+			rayCastIntrinsics._m00 *= scaleWidthDepth;  rayCastIntrinsics._m02 *= scaleWidthDepth;
+			rayCastIntrinsics._m11 *= scaleHeightDepth; rayCastIntrinsics._m12 *= scaleHeightDepth;
+		}
+
 		RayCastParams params;
-		params.m_width = gas.s_integrationWidth;			//TODO check the ray tracing resolution!
-		params.m_height = gas.s_integrationHeight;			//TODO check the ray tracing resolution
-		params.m_intrinsics = MatrixConversion::toCUDA(intrinsics);
-		params.m_intrinsicsInverse = MatrixConversion::toCUDA(intrinsicsInv);
+		params.m_width = gas.s_rayCastWidth;			
+		params.m_height = gas.s_rayCastHeight;			
+		params.fx = rayCastIntrinsics(0, 0);
+		params.fy = rayCastIntrinsics(1, 1);
+		params.mx = rayCastIntrinsics(0, 2);
+		params.my = rayCastIntrinsics(1, 2);
 		params.m_minDepth = gas.s_renderDepthMin;
 		params.m_maxDepth = gas.s_renderDepthMax;
 		params.m_rayIncrement = gas.s_SDFRayIncrementFactor * gas.s_SDFTruncation;
@@ -48,6 +59,8 @@ public:
 		return m_params;
 	}
 
+	mat4f getIntrinsicsInv() const { return m_rayCastIntrinsicsInverse; }
+	mat4f getIntrinsics() const { return m_rayCastIntrinsics; }
 
 	// debugging
 	void convertToCameraSpace();
@@ -61,6 +74,8 @@ private:
 
 	RayCastParams m_params;
 	RayCastData m_data;
+	mat4f m_rayCastIntrinsics;
+	mat4f m_rayCastIntrinsicsInverse;
 
 	DX11RayIntervalSplatting m_rayIntervalSplatting;
 

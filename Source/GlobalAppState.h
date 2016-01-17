@@ -28,6 +28,8 @@
 	X(unsigned int, s_windowHeight) \
 	X(unsigned int, s_integrationWidth) \
 	X(unsigned int, s_integrationHeight) \
+	X(unsigned int, s_rayCastWidth) \
+	X(unsigned int, s_rayCastHeight) \
 	X(unsigned int, s_maxFrameFixes) \
 	X(unsigned int, s_topNActive) \
 	X(float, s_minPoseDistSqrt) \

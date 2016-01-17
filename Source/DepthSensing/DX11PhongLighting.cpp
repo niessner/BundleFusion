@@ -131,8 +131,8 @@ HRESULT DX11PhongLighting::OnD3D11CreateDevice(ID3D11Device* pd3dDevice, unsigne
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	descTex.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 	descTex.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	descTex.Width  = GlobalAppState::get().s_integrationWidth;
-	descTex.Height = GlobalAppState::get().s_integrationHeight;
+	descTex.Width  = GlobalAppState::get().s_rayCastWidth;
+	descTex.Height = GlobalAppState::get().s_rayCastHeight;
 
 	// Positions
 	V_RETURN(pd3dDevice->CreateTexture2D(&descTex, NULL, &s_pTmpTexturePositions));
@@ -148,8 +148,8 @@ HRESULT DX11PhongLighting::OnD3D11CreateDevice(ID3D11Device* pd3dDevice, unsigne
 	cutilSafeCall(cudaGraphicsD3D11RegisterResource(&s_dCudaNormals, s_pTmpTextureNormals, cudaGraphicsRegisterFlagsNone));
 	cutilSafeCall(cudaGraphicsResourceSetMapFlags(s_dCudaNormals, cudaGraphicsMapFlagsWriteDiscard));
 
-	descTex.Width  = GlobalAppState::get().s_integrationWidth;
-	descTex.Height = GlobalAppState::get().s_integrationHeight;
+	descTex.Width  = GlobalAppState::get().s_rayCastWidth;
+	descTex.Height = GlobalAppState::get().s_rayCastHeight;
 
 	// Colors
 	V_RETURN(pd3dDevice->CreateTexture2D(&descTex, NULL, &s_pTmpTextureColors));

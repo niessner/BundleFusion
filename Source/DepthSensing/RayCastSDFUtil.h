@@ -5,7 +5,7 @@
 #include <device_functions.h>
 
 #include "cuda_SimpleMatrixUtil.h"
-#include "DepthCameraUtil.h"
+//#include "DepthCameraUtil.h"
 #include "VoxelUtilHashSDF.h"
 
 #include "CUDARayCastParams.h"
@@ -194,6 +194,33 @@ struct RayCastData {
 		return -grad/l;
 	}
 
+	static __inline__ __device__
+	float depthProjToCameraZ(float z)	{
+		return z * (c_rayCastParams.m_maxDepth - c_rayCastParams.m_minDepth) + c_rayCastParams.m_minDepth;
+	}
+	static __inline__ __device__
+	float3 depthToCamera(unsigned int ux, unsigned int uy, float depth) 
+	{
+		const float x = ((float)ux-c_rayCastParams.mx) / c_rayCastParams.fx;
+		const float y = ((float)uy-c_rayCastParams.my) / c_rayCastParams.fy;
+		return make_float3(depth*x, depth*y, depth);
+	}
+	static __inline__ __device__
+	float3 cameraToDepthProj(const float3& pos)	{
+		float2 proj = make_float2(
+			pos.x*c_rayCastParams.fx/pos.z + c_rayCastParams.mx,			
+			pos.y*c_rayCastParams.fy/pos.z + c_rayCastParams.my);
+
+		float3 pImage = make_float3(proj.x, proj.y, pos.z);
+
+		pImage.x = (2.0f*pImage.x - (c_rayCastParams.m_width- 1.0f))/(c_rayCastParams.m_width- 1.0f);
+		//pImage.y = (2.0f*pImage.y - (c_rayCastParams.m_height-1.0f))/(c_rayCastParams.m_height-1.0f);
+		pImage.y = ((c_rayCastParams.m_height-1.0f) - 2.0f*pImage.y)/(c_rayCastParams.m_height-1.0f);
+		pImage.z = (pImage.z - c_rayCastParams.m_minDepth)/(c_rayCastParams.m_maxDepth - c_rayCastParams.m_minDepth);
+
+		return pImage;
+	}
+
 	__device__
 	void traverseCoarseGridSimpleSampleAll(const HashData& hash, const float3& worldCamPos, const float3& worldDir, const float3& camDir, const int3& dTid, float minInterval, float maxInterval) const
 	{
@@ -231,7 +258,7 @@ struct RayCastData {
 							float depth = alpha / depthToRayLength; // Convert ray length to depth depthToRayLength
 
 							d_depth[dTid.y*rayCastParams.m_width+dTid.x] = depth;
-							d_depth4[dTid.y*rayCastParams.m_width+dTid.x] = make_float4(DepthCameraData::kinectDepthToSkeleton(dTid.x, dTid.y, depth), 1.0f);
+							d_depth4[dTid.y*rayCastParams.m_width+dTid.x] = make_float4(depthToCamera(dTid.x, dTid.y, depth), 1.0f);
 							d_colors[dTid.y*rayCastParams.m_width+dTid.x] = make_float4(color2.x/255.f, color2.y/255.f, color2.z/255.f, 1.0f);
 
 							if(rayCastParams.m_useGradients)

@@ -1,7 +1,7 @@
 #define MINF asfloat(0xff800000)
 
 #define DEPTH_WORLD_MIN 0.1f
-#define DEPTH_WORLD_MAX 8.0f
+#define DEPTH_WORLD_MAX 20.0f
 
 float cameraToKinectProjZ(float z)
 {

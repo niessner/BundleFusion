@@ -5,7 +5,6 @@
 
 #include "cuda_SimpleMatrixUtil.h"
 
-#include "DepthCameraUtil.h"
 #include "VoxelUtilHashSDF.h"
 #include "RayCastSDFUtil.h"
 
@@ -28,7 +27,7 @@ __global__ void renderKernel(HashData hashData, RayCastData rayCastData)
 		rayCastData.d_normals[y*rayCastParams.m_width+x] = make_float4(MINF,MINF,MINF,MINF);
 		rayCastData.d_colors[y*rayCastParams.m_width+x] = make_float4(MINF,MINF,MINF,MINF);
 
-		float3 camDir = normalize(DepthCameraData::kinectProjToCamera(x, y, 1.0f));
+		float3 camDir = normalize(RayCastData::depthToCamera(x, y, 1.0f));
 		float3 worldCamPos = rayCastParams.m_viewMatrixInverse * make_float3(0.0f, 0.0f, 0.0f);
 		float4 w = rayCastParams.m_viewMatrixInverse * make_float4(camDir, 0.0f);
 		float3 worldDir = normalize(make_float3(w.x, w.y, w.z));
@@ -115,14 +114,22 @@ __global__ void rayIntervalSplatKernel(HashData hashData, RayCastData rayCastDat
 
 		float3 maxv = MINV+SDF_BLOCK_SIZE*c_hashParams.m_virtualVoxelSize;
 
-		float3 proj000 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, MINV.y, MINV.z));
-		float3 proj100 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, MINV.y, MINV.z));
-		float3 proj010 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, maxv.y, MINV.z));
-		float3 proj001 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, MINV.y, maxv.z));
-		float3 proj110 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, maxv.y, MINV.z));
-		float3 proj011 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, maxv.y, maxv.z));
-		float3 proj101 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, MINV.y, maxv.z));
-		float3 proj111 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, maxv.y, maxv.z));
+		//float3 proj000 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, MINV.y, MINV.z));
+		//float3 proj100 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, MINV.y, MINV.z));
+		//float3 proj010 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, maxv.y, MINV.z));
+		//float3 proj001 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, MINV.y, maxv.z));
+		//float3 proj110 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, maxv.y, MINV.z));
+		//float3 proj011 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(MINV.x, maxv.y, maxv.z));
+		//float3 proj101 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, MINV.y, maxv.z));
+		//float3 proj111 = DepthCameraData::cameraToKinectProj(viewMatrix * make_float3(maxv.x, maxv.y, maxv.z));
+		float3 proj000 = RayCastData::cameraToDepthProj(viewMatrix * make_float3(MINV.x, MINV.y, MINV.z));
+		float3 proj100 = RayCastData::cameraToDepthProj(viewMatrix * make_float3(maxv.x, MINV.y, MINV.z));
+		float3 proj010 = RayCastData::cameraToDepthProj(viewMatrix * make_float3(MINV.x, maxv.y, MINV.z));
+		float3 proj001 = RayCastData::cameraToDepthProj(viewMatrix * make_float3(MINV.x, MINV.y, maxv.z));
+		float3 proj110 = RayCastData::cameraToDepthProj(viewMatrix * make_float3(maxv.x, maxv.y, MINV.z));
+		float3 proj011 = RayCastData::cameraToDepthProj(viewMatrix * make_float3(MINV.x, maxv.y, maxv.z));
+		float3 proj101 = RayCastData::cameraToDepthProj(viewMatrix * make_float3(maxv.x, MINV.y, maxv.z));
+		float3 proj111 = RayCastData::cameraToDepthProj(viewMatrix * make_float3(maxv.x, maxv.y, maxv.z));
 
 		// Tree Reduction Min
 		float3 min00 = fminf(proj000, proj100);
@@ -150,7 +157,8 @@ __global__ void rayIntervalSplatKernel(HashData hashData, RayCastData rayCastDat
 		if(params.m_splatMinimum == 1) {
 			depth = minFinal.z;
 		}
-		float depthWorld = DepthCameraData::kinectProjToCameraZ(depth);
+		//float depthWorld = DepthCameraData::kinectProjToCameraZ(depth);
+		float depthWorld = RayCastData::depthProjToCameraZ(depth);
 
 		//uint addr = idx*4;
 		//rayCastData.d_vertexBuffer[addr] = make_float4(maxFinal.x, minFinal.y, depth, depthWorld);

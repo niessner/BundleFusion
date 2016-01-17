@@ -1636,8 +1636,9 @@ void TestMatching::testGlobalDense()
 	const bool useReference = false;
 	const bool writeSensorFile = true;
 
-	const std::string which = "michael_sd";
-	const std::string whichRef = "michael";
+	//const std::string which = "gates371_sd";
+	const std::string which = "g0";
+	const std::string whichRef = "gates371";
 	const std::string origFile = "dump/" + whichRef + ".sens";
 
 	bool loadCache = false;
@@ -1722,7 +1723,7 @@ void TestMatching::testGlobalDense()
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
 	const unsigned int maxNumResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (maxNumImages*(maxNumImages - 1)) / 2;
 	sba.init(numImages, maxNumResiduals);
-	const unsigned int maxNumOutIts = 1;
+	const unsigned int maxNumOutIts = 2;
 	const unsigned int maxNumIters = 4;
 	const unsigned int numPCGIts = 50;
 	const bool useVerify = true;
@@ -1749,7 +1750,7 @@ void TestMatching::testGlobalDense()
 	//std::vector<float> weightsDenseDepth(maxNumIters, 1.0f);
 	//std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 	std::vector<float> weightsSparse(maxNumIters, 1.0f);
-	std::vector<float> weightsDenseDepth(maxNumIters, 20.0f);
+	std::vector<float> weightsDenseDepth(maxNumIters, 50.0f);
 	std::vector<float> weightsDenseColor(maxNumIters, 0.0f);
 
 	//if (savePointClouds) {
@@ -2170,7 +2171,7 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 
 void TestMatching::debug()
 {
-	const std::string filename = "../data/michael/michael.sens";
+	const std::string filename = "../data/gates371/gates371.sens";
 	std::cout << "loading sensor file.... ";
 	SensorData sensorData;
 	sensorData.readFromFile(filename);
