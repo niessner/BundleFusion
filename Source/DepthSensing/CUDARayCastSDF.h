@@ -67,6 +67,17 @@ public:
 		m_params.m_minDepth = depthMin;
 		m_params.m_maxDepth = depthMax;
 	}
+	//! the actual raycast calls the gpu update
+	void setRayCastIntrinsics(unsigned int width, unsigned int height, const mat4f& intrinsics, const mat4f& intrinsicsInverse) {
+		m_params.m_width = width;
+		m_params.m_height = height;
+		m_params.fx = intrinsics(0, 0);
+		m_params.fy = intrinsics(1, 1);
+		m_params.mx = intrinsics(0, 2);
+		m_params.my = intrinsics(1, 2);
+		m_rayCastIntrinsics = intrinsics;
+		m_rayCastIntrinsicsInverse = intrinsicsInverse;
+	}
 
 	// debugging
 	void convertToCameraSpace();
