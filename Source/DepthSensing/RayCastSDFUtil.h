@@ -243,7 +243,8 @@ struct RayCastData {
 
 			if(trilinearInterpolationSimpleFastFast(hash, currentPosWorld, dist, color))
 			{
-				if(lastSample.weight > 0 && lastSample.sdf > 0.0f && dist < 0.0f) // current sample is always valid here 
+				if(lastSample.weight > 0 && lastSample.sdf > 0.0f && dist < 0.0f)// current sample is always valid here 
+				//if(lastSample.weight > 0 && ((lastSample.sdf > 0.0f && dist < 0.0f) || (lastSample.sdf < 0.0f && dist > 0.0f))) //hack for top down video
 				{
 
 					float alpha; // = findIntersectionLinear(lastSample.alpha, rayCurrent, lastSample.sdf, dist);

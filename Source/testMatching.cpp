@@ -1637,9 +1637,13 @@ void TestMatching::testGlobalDense()
 	const bool writeSensorFile = true;
 
 	//const std::string which = "gates371_sd";
-	const std::string which = "g0";
-	const std::string whichRef = "gates371";
-	const std::string origFile = "dump/" + whichRef + ".sens";
+	//const std::string which = "g0";
+	//const std::string whichRef = "gates371";
+	//const std::string origFile = "dump/" + whichRef + ".sens";
+
+	const std::string which = "maryland_hotel1";
+	const std::string whichRef = "maryland_hotel1";
+	const std::string origFile = "../data/sun3d/" + whichRef + ".sens";
 
 	bool loadCache = false;
 	if (false && useReference) {

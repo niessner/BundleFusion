@@ -454,7 +454,7 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 		}
 	} // track
 
-	unsigned int numKeys = (unsigned int)curKeys.size();
+	unsigned int numKeys = std::min((unsigned int)curKeys.size(), m_maxKeyPointsPerImage);
 	SIFTImageGPU& cur = global->createSIFTImageGPU();
 	cutilSafeCall(cudaMemcpy(cur.d_keyPoints, curKeys.data(), sizeof(SIFTKeyPoint) * numKeys, cudaMemcpyHostToDevice));
 	cutilSafeCall(cudaMemcpy(cur.d_keyPointDescs, curDesc.data(), sizeof(SIFTKeyPointDesc) * numKeys, cudaMemcpyHostToDevice));

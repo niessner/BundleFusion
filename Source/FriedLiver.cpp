@@ -202,8 +202,9 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			//fileNameDescGlobalApp = "zParametersDefault.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			fileNameDescGlobalApp = "zParametersDefault.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			//fileNameDescGlobalBundling = "zParametersBundling20K.txt";
 
 			//fileNameDescGlobalApp = "zParametersMedium.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
@@ -213,9 +214,6 @@ int main(int argc, char** argv)
 
 			//fileNameDescGlobalApp = "zParametersTUM.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
-
-			fileNameDescGlobalApp = "zParametersVideo.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -231,6 +229,7 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
+		if (GlobalAppState::get().s_generateVideo) { std::cout << "remember to change raycast for top-down rendering!" << std::endl; getchar(); }
 		if (!util::fileExists(GlobalAppState::get().s_binaryDumpSensorFile)) {
 			std::cout << "ERROR: " << GlobalAppState::get().s_binaryDumpSensorFile << "does not exist!" << std::endl;
 			getchar();
