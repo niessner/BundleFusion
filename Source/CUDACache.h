@@ -67,13 +67,13 @@ public:
 		ColorImageR32 intensityOrig(m_width, m_height);
 		for (unsigned int i = 0; i < m_currentFrame; i++) {
 			const CUDACachedFrame& f = m_cache[i];
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(depth.getPointer(), f.d_depthDownsampled, sizeof(float)*depth.getNumPixels(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPos.getPointer(), f.d_cameraposDownsampled, sizeof(float4)*camPos.getNumPixels(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getPointer(), f.d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
-			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getPointer(), f.d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), f.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivative.getPointer(), f.d_intensityDerivsDownsampled, sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityOrig.getPointer(), f.d_normalsDownsampledUCHAR4, sizeof(float)*intensityOrig.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(depth.getData(), f.d_depthDownsampled, sizeof(float)*depth.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPos.getData(), f.d_cameraposDownsampled, sizeof(float4)*camPos.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getData(), f.d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(color.getData(), f.d_colorDownsampled, sizeof(uchar4)*color.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), f.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivative.getData(), f.d_intensityDerivsDownsampled, sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityOrig.getData(), f.d_normalsDownsampledUCHAR4, sizeof(float)*intensityOrig.getNumPixels(), cudaMemcpyDeviceToHost));
 			s << depth;
 			s << camPos;
 			s << normals;
@@ -119,13 +119,13 @@ public:
 			s >> intensity;
 			s >> intensityDerivative;
 			s >> intensityOrig;
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_depthDownsampled, depth.getPointer(), sizeof(float)*depth.getNumPixels(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_cameraposDownsampled, camPos.getPointer(), sizeof(float4)*camPos.getNumPixels(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_normalsDownsampled, normals.getPointer(), sizeof(float4)*normals.getNumPixels(), cudaMemcpyHostToDevice));
-			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_colorDownsampled, color.getPointer(), sizeof(uchar4)*color.getNumPixels(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_intensityDownsampled, intensity.getPointer(), sizeof(float)*intensity.getNumPixels(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_intensityDerivsDownsampled, intensityDerivative.getPointer(), sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyHostToDevice));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_normalsDownsampledUCHAR4, intensityOrig.getPointer(), sizeof(float)*intensityOrig.getNumPixels(), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_depthDownsampled, depth.getData(), sizeof(float)*depth.getNumPixels(), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_cameraposDownsampled, camPos.getData(), sizeof(float4)*camPos.getNumPixels(), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_normalsDownsampled, normals.getData(), sizeof(float4)*normals.getNumPixels(), cudaMemcpyHostToDevice));
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_colorDownsampled, color.getData(), sizeof(uchar4)*color.getNumPixels(), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_intensityDownsampled, intensity.getData(), sizeof(float)*intensity.getNumPixels(), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_intensityDerivsDownsampled, intensityDerivative.getData(), sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyHostToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_normalsDownsampledUCHAR4, intensityOrig.getData(), sizeof(float)*intensityOrig.getNumPixels(), cudaMemcpyHostToDevice));
 		}
 		s.closeStream();
 	}

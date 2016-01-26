@@ -87,8 +87,8 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	////!!!debugging
 	//DepthImage32 depthImage(m_width, m_height);
 	//ColorImageR32 intensity(m_width, m_height);
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), globalFrame.d_depthDownsampled, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), globalFrame.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getData(), globalFrame.d_depthDownsampled, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), globalFrame.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 	//FreeImageWrapper::saveImage("debug/_orig.png", depthImage);
 	//FreeImageWrapper::saveImage("debug/_origIntensity.png", intensity);
 	////!!!debugging
@@ -104,13 +104,13 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	////!!!debugging
 	//PointCloudf pcOrig;
 	//ColorImageR32G32B32A32 cpos(m_width, m_height);
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(cpos.getPointer(), m_cache.front().d_cameraposDownsampled, sizeof(float4)*cpos.getNumPixels(), cudaMemcpyDeviceToHost));
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), m_cache.front().d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(cpos.getData(), m_cache.front().d_cameraposDownsampled, sizeof(float4)*cpos.getNumPixels(), cudaMemcpyDeviceToHost));
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), m_cache.front().d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 	//for (unsigned int i = 0; i < cpos.getNumPixels(); i++) {
-	//	const vec4f& p = cpos.getPointer()[i];
+	//	const vec4f& p = cpos.getData()[i];
 	//	if (p.x != -std::numeric_limits<float>::infinity()) {
 	//		pcOrig.m_points.push_back(p.getVec3());
-	//		float c = intensity.getPointer()[i];
+	//		float c = intensity.getData()[i];
 	//		pcOrig.m_colors.push_back(vec4f(c, c, c, 1.0f));
 	//	}
 	//}
@@ -118,7 +118,7 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	//
 	////fused
 	//DepthImage32 depthFused(m_width, m_height);
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthFused.getPointer(), globalFrame.d_depthDownsampled, sizeof(float)*depthFused.getNumPixels(), cudaMemcpyDeviceToHost));
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthFused.getData(), globalFrame.d_depthDownsampled, sizeof(float)*depthFused.getNumPixels(), cudaMemcpyDeviceToHost));
 	//unsigned int newCount = 0; unsigned int diffCount = 0; unsigned int numOrigValid = 0;
 	//for (unsigned int y = 0; y < m_height; y++) {
 	//	for (unsigned int x = 0; x < m_width; x++) {
@@ -134,13 +134,13 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	//}
 	//FreeImageWrapper::saveImage("debug/_fuse.png", depthFused);
 	//PointCloudf pcFuse;
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(cpos.getPointer(), globalFrame.d_cameraposDownsampled, sizeof(float4)*cpos.getNumPixels(), cudaMemcpyDeviceToHost));
-	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), globalFrame.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(cpos.getData(), globalFrame.d_cameraposDownsampled, sizeof(float4)*cpos.getNumPixels(), cudaMemcpyDeviceToHost));
+	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), globalFrame.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 	//for (unsigned int i = 0; i < cpos.getNumPixels(); i++) {
-	//	const vec4f& p = cpos.getPointer()[i];
+	//	const vec4f& p = cpos.getData()[i];
 	//	if (p.x != -std::numeric_limits<float>::infinity()) {
 	//		pcFuse.m_points.push_back(p.getVec3());
-	//		float c = intensity.getPointer()[i];
+	//		float c = intensity.getData()[i];
 	//		pcFuse.m_colors.push_back(vec4f(c, c, c, 1.0f));
 	//	}
 	//}

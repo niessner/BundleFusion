@@ -735,8 +735,8 @@ void TestMatching::detectKeys(const std::vector<ColorImageR8G8B8A8> &colorImages
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depth, sizeof(float)*m_widthDepth*m_heightDepth));
 	for (unsigned int f = 0; f < numFrames; f++) {
 		ColorImageR32 intensity = colorImages[f].convertToGrayscale();
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_intensity, intensity.getPointer(), sizeof(float)*m_widthSift*m_heightSift, cudaMemcpyHostToDevice));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, depthImages[f].getPointer(), sizeof(float)*m_widthDepth*m_heightDepth, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_intensity, intensity.getData(), sizeof(float)*m_widthSift*m_heightSift, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, depthImages[f].getData(), sizeof(float)*m_widthDepth*m_heightDepth, cudaMemcpyHostToDevice));
 		// run sift
 		SIFTImageGPU& cur = siftManager->createSIFTImageGPU();
 		int success = sift->RunSIFT(d_intensity, d_depth);
@@ -787,8 +787,8 @@ void TestMatching::createCachedFrames()
 	bool erode = GlobalBundlingState::get().s_erodeSIFTdepth;
 	//bool smooth = GlobalBundlingState::get().s_depthFilter;
 	for (unsigned int i = 0; i < m_colorImages.size(); i++) {
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, m_depthImages[i].getPointer(), sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyHostToDevice));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, m_colorImages[i].getPointer(), sizeof(uchar4) * m_colorImages[i].getNumPixels(), cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, m_depthImages[i].getData(), sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, m_colorImages[i].getData(), sizeof(uchar4) * m_colorImages[i].getNumPixels(), cudaMemcpyHostToDevice));
 		if (erode) {
 			unsigned int numIter = 2; numIter = 2 * ((numIter + 1) / 2);
 			for (unsigned int k = 0; k < numIter; k++) {
@@ -804,7 +804,7 @@ void TestMatching::createCachedFrames()
 		//	CUDAImageUtil::gaussFilterDepthMap(d_depthErodeHelper, d_depth, GlobalBundlingState::get().s_depthSigmaD, GlobalBundlingState::get().s_depthSigmaR, m_widthDepth, m_heightDepth);
 		//	std::swap(d_depth, d_depthErodeHelper);
 		//}
-		if (erode) MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_depthImages[i].getPointer(), d_depth, sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost)); //for vis only
+		if (erode) MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_depthImages[i].getData(), d_depth, sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost)); //for vis only
 
 		CUDACachedFrame& frame = m_cachedFrames[i];
 		if (depthFilterSigmaD > 0.0f) {
@@ -1367,19 +1367,19 @@ void TestMatching::printCacheFrames(const std::string& dir, const CUDACache* cac
 	ColorImageR32G32B32A32 camPosImage(width, height), normalImage(width, height);
 	ColorImageR32 dx(width, height), dy(width, height);
 	for (unsigned int i = 0; i < numPrint; i++) {
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getPointer(), cachedFrames[i].d_depthDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getPointer(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getPointer(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getPointer(), cachedFrames[i].d_intensityDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivImage.getPointer(), cachedFrames[i].d_intensityDerivsDownsampled, sizeof(float2)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getData(), cachedFrames[i].d_depthDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getData(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getData(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getData(), cachedFrames[i].d_intensityDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivImage.getData(), cachedFrames[i].d_intensityDerivsDownsampled, sizeof(float2)*width*height, cudaMemcpyDeviceToHost));
 		intensityImage.setInvalidValue(-std::numeric_limits<float>::infinity());
 		dx.setInvalidValue(-std::numeric_limits<float>::infinity());
 		dy.setInvalidValue(-std::numeric_limits<float>::infinity());
 
 		//debug check, save to point cloud
 		for (unsigned int k = 0; k < width*height; k++) {
-			normalImage.getPointer()[k] = (normalImage.getPointer()[k] + 1.0f) / 2.0f;
-			normalImage.getPointer()[k].w = 1.0f; // make visible
+			normalImage.getData()[k] = (normalImage.getData()[k] + 1.0f) / 2.0f;
+			normalImage.getData()[k].w = 1.0f; // make visible
 		}
 
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_depth.png", ColorImageR32G32B32(depthImage));
@@ -1388,8 +1388,8 @@ void TestMatching::printCacheFrames(const std::string& dir, const CUDACache* cac
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_intensity.png", intensityImage);
 
 		for (unsigned int p = 0; p < intensityDerivImage.getNumPixels(); p++) {
-			const vec2f& d = intensityDerivImage.getPointer()[p];
-			dx.getPointer()[p] = d.x; dy.getPointer()[p] = d.y;
+			const vec2f& d = intensityDerivImage.getData()[p];
+			dx.getData()[p] = d.x; dy.getData()[p] = d.y;
 		}
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_intensityDerivX.png", dx);
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_intensityDerivY.png", dy);
@@ -1424,8 +1424,8 @@ void TestMatching::constructSparseSystem(const std::vector<ColorImageR8G8B8A8> &
 	//TODO incorporate invalid
 	for (unsigned int curFrame = 0; curFrame < numTotalFrames; curFrame++) {
 		ColorImageR32 intensity = colorImages[curFrame].convertToGrayscale();
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_intensity, intensity.getPointer(), sizeof(float)*m_widthSift*m_heightSift, cudaMemcpyHostToDevice));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, depthImages[curFrame].getPointer(), sizeof(float)*m_widthDepth*m_heightDepth, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_intensity, intensity.getData(), sizeof(float)*m_widthSift*m_heightSift, cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, depthImages[curFrame].getData(), sizeof(float)*m_widthDepth*m_heightDepth, cudaMemcpyHostToDevice));
 		// detect keys
 		SIFTImageGPU& cur = siftManager->createSIFTImageGPU();
 		int success = sift->RunSIFT(d_intensity, d_depth);
@@ -2264,8 +2264,8 @@ void TestMatching::createCUDACache(CUDACache* cache)
 	//erode and smooth depth
 	bool erode = GlobalBundlingState::get().s_erodeSIFTdepth;
 	for (unsigned int i = 0; i < m_colorImages.size(); i++) {
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, m_depthImages[i].getPointer(), sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyHostToDevice));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, m_colorImages[i].getPointer(), sizeof(uchar4) * m_colorImages[i].getNumPixels(), cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depth, m_depthImages[i].getData(), sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_color, m_colorImages[i].getData(), sizeof(uchar4) * m_colorImages[i].getNumPixels(), cudaMemcpyHostToDevice));
 		if (erode) {
 			unsigned int numIter = 2; numIter = 2 * ((numIter + 1) / 2);
 			for (unsigned int k = 0; k < numIter; k++) {
@@ -2276,7 +2276,7 @@ void TestMatching::createCUDACache(CUDACache* cache)
 					CUDAImageUtil::erodeDepthMap(d_depth, d_depthErodeHelper, 3, m_widthDepth, m_heightDepth, 0.05f, 0.3f);
 				}
 			}
-			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_depthImages[i].getPointer(), d_depth, sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost)); //for vis only
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_depthImages[i].getData(), d_depth, sizeof(float) * m_depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost)); //for vis only
 		}
 
 		CUDACachedFrame& frame = cachedFrames[i];

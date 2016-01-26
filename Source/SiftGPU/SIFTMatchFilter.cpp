@@ -108,19 +108,19 @@ void SIFTMatchFilter::filterBySurfaceArea(SIFTImageManager* siftManager, const s
 	std::vector<SIFTKeyPoint> keyPoints;
 	siftManager->getSIFTKeyPointsDEBUG(keyPoints);
 	ml::DepthImage32 curDepth(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curDepth.getPointer(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curDepth.getData(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 
 	for (unsigned int i = 0; i < curFrame; i++) { // previous frames
 		// get data
 		ml::DepthImage32 prvDepth(downSampWidth, downSampHeight);
-		cutilSafeCall(cudaMemcpy(prvDepth.getPointer(), cachedFrames[i].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(prvDepth.getData(), cachedFrames[i].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 
 		std::vector<uint2> keyPointIndices;
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
 		//std::cout << "(" << i << ", " << curFrame << "): ";
 		bool valid =
-			filterImagePairBySurfaceArea(keyPoints, prvDepth.getPointer(), curDepth.getPointer(), keyPointIndices, siftIntrinsicsInv, minNumMatches);
+			filterImagePairBySurfaceArea(keyPoints, prvDepth.getData(), curDepth.getData(), keyPointIndices, siftIntrinsicsInv, minNumMatches);
 
 		if (!valid) {
 			// invalidate
@@ -195,13 +195,13 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 	// current data
 	const unsigned int curFrame = numImages - 1;
 	ml::DepthImage32 curDepth(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curDepth.getPointer(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curDepth.getData(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR8G8B8A8 curIntensity(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curIntensity.getPointer(), cachedFrames[curFrame].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curIntensity.getData(), cachedFrames[curFrame].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 curCamPos(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curCamPos.getPointer(), cachedFrames[curFrame].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curCamPos.getData(), cachedFrames[curFrame].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 curNormals(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curNormals.getPointer(), cachedFrames[curFrame].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curNormals.getData(), cachedFrames[curFrame].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 
 	// transforms
 	std::vector<float4x4> transforms(curFrame);
@@ -210,21 +210,21 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 	for (unsigned int i = 0; i < curFrame; i++) { // previous frames
 		// get data
 		ml::DepthImage32 prvDepth(downSampWidth, downSampHeight);
-		cutilSafeCall(cudaMemcpy(prvDepth.getPointer(), cachedFrames[i].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(prvDepth.getData(), cachedFrames[i].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 		ml::ColorImageR8G8B8A8 prvIntensity(downSampWidth, downSampHeight);
-		cutilSafeCall(cudaMemcpy(prvIntensity.getPointer(), cachedFrames[i].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(prvIntensity.getData(), cachedFrames[i].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 		ml::ColorImageR32G32B32A32 prvCamPos(downSampWidth, downSampHeight);
-		cutilSafeCall(cudaMemcpy(prvCamPos.getPointer(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(prvCamPos.getData(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 		ml::ColorImageR32G32B32A32 prvNormals(downSampWidth, downSampHeight);
-		cutilSafeCall(cudaMemcpy(prvNormals.getPointer(), cachedFrames[i].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(prvNormals.getData(), cachedFrames[i].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 
 		std::vector<uint2> keyPointIndices;
 		siftManager->getFiltKeyPointIndicesDEBUG(i, keyPointIndices);
 
 		//std::cout << "(" << i << ", " << curFrame << "): ";
 		bool valid =
-			filterImagePairByDenseVerify(prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (float*)prvIntensity.getPointer(),
-			curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (float*)curIntensity.getPointer(),
+			filterImagePairByDenseVerify(prvDepth.getData(), (float4*)prvCamPos.getData(), (float4*)prvNormals.getData(), (float*)prvIntensity.getData(),
+			curDepth.getData(), (float4*)curCamPos.getData(), (float4*)curNormals.getData(), (float*)curIntensity.getData(),
 			transforms[i], downSampWidth, downSampHeight, depthIntrinsics, depthMin, depthMax);
 		//if (valid) std::cout << "VALID" << std::endl;
 		//else std::cout << "INVALID" << std::endl;
@@ -721,23 +721,23 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 
 	// current data
 	ml::DepthImage32 curDepth(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curDepth.getPointer(), cachedFrames[imageIndices.y].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curDepth.getData(), cachedFrames[imageIndices.y].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR8G8B8A8 curIntensity(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curIntensity.getPointer(), cachedFrames[imageIndices.y].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curIntensity.getData(), cachedFrames[imageIndices.y].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 curCamPos(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curCamPos.getPointer(), cachedFrames[imageIndices.y].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curCamPos.getData(), cachedFrames[imageIndices.y].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 curNormals(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(curNormals.getPointer(), cachedFrames[imageIndices.y].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(curNormals.getData(), cachedFrames[imageIndices.y].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 
 	// prev data
 	ml::DepthImage32 prvDepth(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(prvDepth.getPointer(), cachedFrames[imageIndices.x].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(prvDepth.getData(), cachedFrames[imageIndices.x].d_depthDownsampled, sizeof(float) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR8G8B8A8 prvIntensity(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(prvIntensity.getPointer(), cachedFrames[imageIndices.x].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(prvIntensity.getData(), cachedFrames[imageIndices.x].d_intensityDownsampled, sizeof(uchar4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 prvCamPos(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(prvCamPos.getPointer(), cachedFrames[imageIndices.x].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(prvCamPos.getData(), cachedFrames[imageIndices.x].d_cameraposDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 	ml::ColorImageR32G32B32A32 prvNormals(downSampWidth, downSampHeight);
-	cutilSafeCall(cudaMemcpy(prvNormals.getPointer(), cachedFrames[imageIndices.x].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(prvNormals.getData(), cachedFrames[imageIndices.x].d_normalsDownsampled, sizeof(float4) * downSampWidth * downSampHeight, cudaMemcpyDeviceToHost));
 
 	std::vector<uint2> keyPointIndices;
 	siftManager->getFiltKeyPointIndicesDEBUG(imageIndices.x, keyPointIndices);
@@ -755,8 +755,8 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	// input -> model
 	float4x4 transformEstimate = transformCurToPrv;
 	float sumResidual0, sumWeight0; unsigned int numCorr0;
-	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (float*)curIntensity.getPointer(),
-		prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (float*)prvIntensity.getPointer(),
+	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, curDepth.getData(), (float4*)curCamPos.getData(), (float4*)curNormals.getData(), (float*)curIntensity.getData(),
+		prvDepth.getData(), (float4*)prvCamPos.getData(), (float4*)prvNormals.getData(), (float*)prvIntensity.getData(),
 		transformEstimate, distThres, normalThres, colorThresh,
 		depthIntrinsics, depthMin, depthMax, sumResidual0, sumWeight0, numCorr0);
 	
@@ -765,8 +765,8 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	// model -> input
 	transformEstimate = transformCurToPrv.getInverse();
 	float sumResidual1, sumWeight1; unsigned int numCorr1;
-	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, prvDepth.getPointer(), (float4*)prvCamPos.getPointer(), (float4*)prvNormals.getPointer(), (float*)prvIntensity.getPointer(),
-		curDepth.getPointer(), (float4*)curCamPos.getPointer(), (float4*)curNormals.getPointer(), (float*)curIntensity.getPointer(),
+	computeCorrespondencesDEBUG(downSampWidth, downSampHeight, prvDepth.getData(), (float4*)prvCamPos.getData(), (float4*)prvNormals.getData(), (float*)prvIntensity.getData(),
+		curDepth.getData(), (float4*)curCamPos.getData(), (float4*)curNormals.getData(), (float*)curIntensity.getData(),
 		transformEstimate, distThres, normalThres, colorThresh,
 		depthIntrinsics, depthMin, depthMax, sumResidual1, sumWeight1, numCorr1);
 

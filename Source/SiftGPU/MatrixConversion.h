@@ -24,10 +24,10 @@ namespace MatrixConversion
 		return ml::vec3i(v.x, v.y, v.z);
 	}
 	static float4x4 toCUDA(const ml::mat4f& m) {
-		return float4x4(m.getPointer());
+		return float4x4(m.getData());
 	}
 	static float3x3 toCUDA(const ml::mat3f& m) {
-		return float3x3(m.getRawData());
+		return float3x3(m.getData());
 	}
 
 	// dx/cuda conversion
@@ -69,7 +69,7 @@ namespace MatrixConversion
 
 	//static Eigen::Matrix4f MatToEig(const ml::mat4f& mat)
 	//{
-	//	return Eigen::Matrix4f(mat.getPointer()).transpose();
+	//	return Eigen::Matrix4f(mat.getData()).transpose();
 	//}
 
 	//static Eigen::Vector4f VecH(const Eigen::Vector3f& v)
@@ -104,6 +104,6 @@ namespace MatrixConversion
 
 	//static Eigen::Matrix3f MatToEig(const matNxM<3, 3>& mat)
 	//{
-	//	return Eigen::Matrix3f(mat.getPointer()).transpose();
+	//	return Eigen::Matrix3f(mat.getData()).transpose();
 	//}
 }

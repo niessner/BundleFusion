@@ -1075,7 +1075,7 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	ssFrameNumber << frameNumber;
 
 	DepthImage32 test(640, 480);
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(test.getPointer(), g_rayCast->getRayCastData().d_depth, sizeof(float)*test.getNumPixels(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(test.getData(), g_rayCast->getRayCastData().d_depth, sizeof(float)*test.getNumPixels(), cudaMemcpyDeviceToHost));
 	FreeImageWrapper::saveImage("debug/test.png", ColorImageR32G32B32(test));
 
 	mat4f view = mat4f::identity();
@@ -1108,8 +1108,8 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 		g_RenderToFileTarget.copyToHost(data, bytesPerElement);
 		ColorImageR8G8B8A8 image(g_RenderToFileTarget.getWidth(), g_RenderToFileTarget.getHeight(), (vec4uc*)data);
 		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-				image.getPointer()[i].w = 255;
+			if (image.getData()[i].x > 0 || image.getData()[i].y > 0 || image.getData()[i].z > 0)
+				image.getData()[i].w = 255;
 		}
 		LodePNG::save(image, reconstructionDir + ssFrameNumber.str() + ".png");
 		SAFE_DELETE_ARRAY(data);
@@ -1139,8 +1139,8 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 		g_RenderToFileTarget.copyToHost(data, bytesPerElement);
 		ColorImageR8G8B8A8 image(g_RenderToFileTarget.getWidth(), g_RenderToFileTarget.getHeight(), (vec4uc*)data);
 		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-				image.getPointer()[i].w = 255;
+			if (image.getData()[i].x > 0 || image.getData()[i].y > 0 || image.getData()[i].z > 0)
+				image.getData()[i].w = 255;
 		}
 		LodePNG::save(image, reconstructColorDir + ssFrameNumber.str() + ".png");
 		SAFE_DELETE_ARRAY(data);
@@ -1150,8 +1150,8 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	//{	// input color
 	//	ColorImageR8G8B8A8 image(g_depthSensingRGBDSensor->getColorWidth(), g_depthSensingRGBDSensor->getColorHeight(), (vec4uc*)g_depthSensingRGBDSensor->getColorRGBX());
 	//	for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-	//		if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-	//			image.getPointer()[i].w = 255;
+	//		if (image.getData()[i].x > 0 || image.getData()[i].y > 0 || image.getData()[i].z > 0)
+	//			image.getData()[i].w = 255;
 	//	}
 	//	//FreeImageWrapper::saveImage(inputColorDir + ssFrameNumber.str() + ".png", image);
 	//	LodePNG::save(image, inputColorDir + ssFrameNumber.str() + ".png");
@@ -1160,13 +1160,13 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	//	DepthImage32 depthImage(g_depthSensingRGBDSensor->getDepthWidth(), g_depthSensingRGBDSensor->getDepthHeight(), g_depthSensingRGBDSensor->getDepthFloat());
 	//	ColorImageR32G32B32A32 image(depthImage);
 	//	//for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-	//	//	if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-	//	//		image.getPointer()[i].w = 1.0f;
+	//	//	if (image.getData()[i].x > 0 || image.getData()[i].y > 0 || image.getData()[i].z > 0)
+	//	//		image.getData()[i].w = 1.0f;
 	//	//}
 	//	//FreeImageWrapper::saveImage(inputDepthDir + ssFrameNumber.str() + ".png", image);
 	//	ColorImageR8G8B8A8 imageU(image.getWidth(), image.getHeight());
 	//	for (unsigned int i = 0; i < image.getNumPixels(); i++) {
-	//		imageU.getPointer()[i] = vec4uc(image.getPointer()[i] * 255.0f);
+	//		imageU.getData()[i] = vec4uc(image.getData()[i] * 255.0f);
 	//	}
 	//	LodePNG::save(imageU, inputDepthDir + ssFrameNumber.str() + ".png");
 	//}
@@ -1266,10 +1266,10 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastR
 		g_RenderToFileTarget.copyToHost(data, bytesPerElement);
 		ColorImageR8G8B8A8 image(g_RenderToFileTarget.getWidth(), g_RenderToFileTarget.getHeight(), (vec4uc*)data);
 		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-				image.getPointer()[i].w = 255;
-			if (imageFrustum.getPointer()[i].x != 0 || imageFrustum.getPointer()[i].y != 0 || imageFrustum.getPointer()[i].z != 0)
-				image.getPointer()[i] = imageFrustum.getPointer()[i];
+			if (image.getData()[i].x > 0 || image.getData()[i].y > 0 || image.getData()[i].z > 0)
+				image.getData()[i].w = 255;
+			if (imageFrustum.getData()[i].x != 0 || imageFrustum.getData()[i].y != 0 || imageFrustum.getData()[i].z != 0)
+				image.getData()[i] = imageFrustum.getData()[i];
 		}
 		LodePNG::save(image, reconstructionDir + ssFrameNumber.str() + ".png");
 		SAFE_DELETE_ARRAY(data);
@@ -1298,10 +1298,10 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastR
 		g_RenderToFileTarget.copyToHost(data, bytesPerElement);
 		ColorImageR8G8B8A8 image(g_RenderToFileTarget.getWidth(), g_RenderToFileTarget.getHeight(), (vec4uc*)data);
 		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-				image.getPointer()[i].w = 255;
-			if (imageFrustum.getPointer()[i].x != 0 || imageFrustum.getPointer()[i].y != 0 || imageFrustum.getPointer()[i].z != 0)
-				image.getPointer()[i] = imageFrustum.getPointer()[i];
+			if (image.getData()[i].x > 0 || image.getData()[i].y > 0 || image.getData()[i].z > 0)
+				image.getData()[i].w = 255;
+			if (imageFrustum.getData()[i].x != 0 || imageFrustum.getData()[i].y != 0 || imageFrustum.getData()[i].z != 0)
+				image.getData()[i] = imageFrustum.getData()[i];
 		}
 		//FreeImageWrapper::saveImage(reconstructColorDir + ssFrameNumber.str() + ".png", image);
 		LodePNG::save(image, reconstructColorDir + ssFrameNumber.str() + ".png");
@@ -1312,8 +1312,8 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastR
 	{	// input color
 		ColorImageR8G8B8A8 image(g_depthSensingRGBDSensor->getColorWidth(), g_depthSensingRGBDSensor->getColorHeight(), (vec4uc*)g_depthSensingRGBDSensor->getColorRGBX());
 		for (unsigned int i = 0; i < image.getWidth()*image.getHeight(); i++) {
-			if (image.getPointer()[i].x > 0 || image.getPointer()[i].y > 0 || image.getPointer()[i].z > 0)
-				image.getPointer()[i].w = 255;
+			if (image.getData()[i].x > 0 || image.getData()[i].y > 0 || image.getData()[i].z > 0)
+				image.getData()[i].w = 255;
 		}
 		LodePNG::save(image, inputColorDir + ssFrameNumber.str() + ".png");
 	}
@@ -1322,7 +1322,7 @@ void renderTopDown(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastR
 		ColorImageR32G32B32A32 image(depthImage);
 		ColorImageR8G8B8A8 imageU(image.getWidth(), image.getHeight());
 		for (unsigned int i = 0; i < image.getNumPixels(); i++) {
-			imageU.getPointer()[i] = vec4uc(image.getPointer()[i] * 255.0f);
+			imageU.getData()[i] = vec4uc(image.getData()[i] * 255.0f);
 		}
 		LodePNG::save(imageU, inputDepthDir + ssFrameNumber.str() + ".png");
 	}

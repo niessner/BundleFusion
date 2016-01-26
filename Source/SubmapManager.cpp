@@ -542,16 +542,16 @@ void SubmapManager::saveOptToPointCloud(const std::string& filename, const CUDAC
 	for (unsigned int f = 0; f < numFrames; f++) {
 		if (valid[f] == 0) continue;
 
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getPointer(), cacheFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), cacheFrames[f].d_intensityDownsampled, sizeof(uchar4)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getData(), cacheFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), cacheFrames[f].d_intensityDownsampled, sizeof(uchar4)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 
 		PointCloudf framePc;
 
 		for (unsigned int i = 0; i < camPosition.getNumPixels(); i++) {
-			const vec4f& p = camPosition.getPointer()[i];
+			const vec4f& p = camPosition.getData()[i];
 			if (p.x != -std::numeric_limits<float>::infinity()) {
 				pc.m_points.push_back(transforms[f] * p.getVec3());
-				const float c = intensity.getPointer()[i];
+				const float c = intensity.getData()[i];
 				pc.m_colors.push_back(vec4f(c));
 
 				if (saveFrameByFrame) {
@@ -605,16 +605,16 @@ void SubmapManager::saveImPairToPointCloud(const std::string& prefix, const CUDA
 	for (unsigned int i = 0; i < 2; i++) {
 		mat4f transform = transforms[i];
 		unsigned int f = imageIndices[i];
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getPointer(), cacheFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getPointer(), cacheFrames[f].d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosition.getData(), cacheFrames[f].d_cameraposDownsampled, sizeof(float4)*camPosition.getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), cacheFrames[f].d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 
 		PointCloudf framePc;
 
 		for (unsigned int i = 0; i < camPosition.getNumPixels(); i++) {
-			const vec4f& p = camPosition.getPointer()[i];
+			const vec4f& p = camPosition.getData()[i];
 			if (p.x != -std::numeric_limits<float>::infinity()) {
 				pc.m_points.push_back(transform * p.getVec3());
-				const float c = intensity.getPointer()[i];
+				const float c = intensity.getData()[i];
 				pc.m_colors.push_back(vec4f(c));
 
 				if (saveFrameByFrame) {

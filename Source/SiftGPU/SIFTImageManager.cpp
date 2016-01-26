@@ -568,8 +568,8 @@ void SIFTImageManager::fuseLocalKeyDepths(std::vector<SIFTKeyPoint>& globalKeys,
 	std::vector<DepthImage32> depthImages(getNumImages());
 	for (unsigned int i = 0; i < depthImages.size(); i++) {
 		depthImages[i].allocate(depthWidth, depthHeight);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImages[i].getPointer(), cachedFrames[i].d_depthDownsampled, sizeof(float) * depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImages[i].getPointer(), depthFrames[i], sizeof(float) * depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost));
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImages[i].getData(), cachedFrames[i].d_depthDownsampled, sizeof(float) * depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImages[i].getData(), depthFrames[i], sizeof(float) * depthImages[i].getNumPixels(), cudaMemcpyDeviceToHost));
 	}
 
 	for (unsigned int i = 0; i < globalKeys.size(); i++) {

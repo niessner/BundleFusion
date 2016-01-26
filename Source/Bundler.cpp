@@ -266,9 +266,9 @@ void Bundler::getCurrentFrame()
 
 		////!!!debugging
 		//ColorImageR32 image(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getPointer(), m_bundlerInputData.d_intensityFilterHelper, sizeof(float) * image.getNumPixels(), cudaMemcpyDeviceToHost));
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getData(), m_bundlerInputData.d_intensityFilterHelper, sizeof(float) * image.getNumPixels(), cudaMemcpyDeviceToHost));
 		//FreeImageWrapper::saveImage("debug/_intensityOrig.png", image);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getPointer(), m_bundlerInputData.d_intensitySIFT, sizeof(float) * image.getNumPixels(), cudaMemcpyDeviceToHost));
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getData(), m_bundlerInputData.d_intensitySIFT, sizeof(float) * image.getNumPixels(), cudaMemcpyDeviceToHost));
 		//FreeImageWrapper::saveImage("debug/_intensityFilt.png", image);
 
 		//std::cout << "waiting (check intensity filter)..." << std::endl;

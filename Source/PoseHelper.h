@@ -410,7 +410,7 @@ namespace PoseHelper {
 
 		//if (pseudo_exponential) out_pose.m_coords = mu_xyz;
 		mat4f result = mat4f::identity();
-		result.setRotation(rotation);
+		result.setRotationMatrix(rotation);
 		result.setTranslationVector(translation);
 		return result;
 	}

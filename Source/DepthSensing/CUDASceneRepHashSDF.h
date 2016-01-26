@@ -101,7 +101,7 @@ public:
 		//garbageCollect();
 
 		//DepthImage32 test(depthCameraParams.m_imageWidth, depthCameraParams.m_imageHeight);
-		//cudaMemcpyFromArray(test.getPointer(), depthCameraData.d_depthArray, 0, 0, sizeof(float)*depthCameraParams.m_imageWidth *depthCameraParams.m_imageHeight, cudaMemcpyDeviceToHost);
+		//cudaMemcpyFromArray(test.getData(), depthCameraData.d_depthArray, 0, 0, sizeof(float)*depthCameraParams.m_imageWidth *depthCameraParams.m_imageHeight, cudaMemcpyDeviceToHost);
 		//FreeImageWrapper::saveImage("test_deint_depth" + std::to_string(m_numIntegratedFrames) + " .png", ColorImageR32G32B32(test), true);
 
 		m_numIntegratedFrames--;

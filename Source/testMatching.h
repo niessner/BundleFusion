@@ -118,7 +118,7 @@ private:
 
 				mat4f transform = mat4f::identity();
 				transform.setTranslationVector(translation);
-				transform.setRotation(rotation.matrix3x3());
+				transform.setRotationMatrix(rotation.matrix3x3());
 				trajectory.push_back(transform);
 			}
 			s.close();
