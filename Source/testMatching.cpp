@@ -1455,17 +1455,17 @@ void TestMatching::constructSparseSystem(const std::vector<ColorImageR8G8B8A8> &
 				siftMatcher->GetSiftMatch(num1, imagePairMatch, keyPointOffset, matchThresh, ratioMax);
 
 				//filter
-				siftManager->SortKeyPointMatchesCU(curFrame, numTotalFrames);
-				siftManager->FilterKeyPointMatchesCU(curFrame, numTotalFrames, siftIntrinsicsInv, minNumMatches,
+				siftManager->SortKeyPointMatchesCU(curFrame, 0, numTotalFrames);
+				siftManager->FilterKeyPointMatchesCU(curFrame, 0, numTotalFrames, siftIntrinsicsInv, minNumMatches,
 					GlobalBundlingState::get().s_maxKabschResidual2);
-				siftManager->FilterMatchesBySurfaceAreaCU(curFrame, numTotalFrames, siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
-				siftManager->FilterMatchesByDenseVerifyCU(curFrame, numTotalFrames, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
+				siftManager->FilterMatchesBySurfaceAreaCU(curFrame, 0, numTotalFrames, siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
+				siftManager->FilterMatchesByDenseVerifyCU(curFrame, 0, numTotalFrames, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
 					cudaCache->getCacheFramesGPU(), GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
 					GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh,
 					0.1f, 3.0f); //min/max
-				siftManager->filterFrames(curFrame, numTotalFrames);
+				siftManager->filterFrames(curFrame, 0, numTotalFrames);
 				if (siftManager->getValidImages()[curFrame] != 0)
-					siftManager->AddCurrToResidualsCU(curFrame, numTotalFrames, siftIntrinsicsInv);
+					siftManager->AddCurrToResidualsCU(curFrame, 0, numTotalFrames, siftIntrinsicsInv);
 			}  // prev frames
 		} //matching
 	} //all frames

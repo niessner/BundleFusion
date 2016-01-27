@@ -124,13 +124,13 @@ public:
 	}
 
 	//sorts the key point matches inside image pair matches
-	void SortKeyPointMatchesCU(unsigned int curFrame, unsigned int numFrames);
+	void SortKeyPointMatchesCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames);
 
-	void FilterKeyPointMatchesCU(unsigned int curFrame, unsigned int numFrames, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxKabschRes2);
+	void FilterKeyPointMatchesCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxKabschRes2);
 
-	void FilterMatchesBySurfaceAreaCU(unsigned int curFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv, float areaThresh);
+	void FilterMatchesBySurfaceAreaCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv, float areaThresh);
 
-	void FilterMatchesByDenseVerifyCU(unsigned int curFrame, unsigned int numFrames, unsigned int imageWidth, unsigned int imageHeight,
+	void FilterMatchesByDenseVerifyCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, unsigned int imageWidth, unsigned int imageHeight,
 		const float4x4& intrinsics, const CUDACachedFrame* d_cachedFrames,
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax);
 
@@ -140,7 +140,7 @@ public:
 		float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh,
 		float sensorDepthMin, float sensorDepthMax);
 
-	void AddCurrToResidualsCU(unsigned int curFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv);
+	void AddCurrToResidualsCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv);
 
 	void InvalidateImageToImageCU(const uint2& imageToImageIdx);
 
@@ -149,7 +149,7 @@ public:
 
 	unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
 
-	void filterFrames(unsigned int curFrame, unsigned int numFrames);
+	void filterFrames(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames);
 
 	void computeSiftTransformCU(const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform, float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans);
 

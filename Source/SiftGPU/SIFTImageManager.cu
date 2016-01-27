@@ -58,11 +58,12 @@ __device__ bool cmpAndSawp(
 //we launch 1 thread for two array entries
 void __global__ SortKeyPointMatchesCU_Kernel(
 	unsigned int curFrame, 
+	unsigned int startFrameOffset,
 	const int* d_numMatchesPerImagePair,
 	float* d_matchDistancesGlobal,
 	uint2* d_matchKeyPointIndicesGlobal)
 {
-	unsigned int imagePairIdx = blockIdx.x;
+	unsigned int imagePairIdx = blockIdx.x + startFrameOffset;
 	if (imagePairIdx == curFrame) return;
 	unsigned int tidx = threadIdx.x;
 
@@ -142,16 +143,17 @@ void __global__ SortKeyPointMatchesCU_Kernel(
 }
 
 
-void SIFTImageManager::SortKeyPointMatchesCU(unsigned int curFrame, unsigned int numFrames) {
+void SIFTImageManager::SortKeyPointMatchesCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames) {
 
 	if (numFrames == 0) return;
 
-	dim3 grid(numFrames);
+	dim3 grid(numFrames - startFrame);
 	dim3 block(SORT_NUM_BLOCK_THREADS_X);
 
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
-	SortKeyPointMatchesCU_Kernel << <grid, block >> >(curFrame, d_currNumMatchesPerImagePair, d_currMatchDistances, d_currMatchKeyPointIndices);
+	SortKeyPointMatchesCU_Kernel << <grid, block >> >(curFrame, startFrame, 
+		d_currNumMatchesPerImagePair, d_currMatchDistances, d_currMatchKeyPointIndices);
 
 	if (m_timer) m_timer->endEvent();
 
@@ -183,6 +185,7 @@ void SIFTImageManager::SortKeyPointMatchesCU(unsigned int curFrame, unsigned int
 //we launch 1 thread for two array entries
 void __global__ FilterKeyPointMatchesCU_Kernel(
 	unsigned int curFrame, 
+	unsigned int startFrame,
 	const SIFTKeyPoint* d_keyPointsGlobal,
 	const int* d_numMatchesPerImagePair,
 	const float* d_matchDistancesGlobal,
@@ -196,7 +199,7 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	unsigned int minNumMatches,
 	float maxKabschRes2)
 {
-	const unsigned int imagePairIdx = blockIdx.x;
+	const unsigned int imagePairIdx = blockIdx.x + startFrame;
 	if (imagePairIdx == curFrame) return;
 
 	const unsigned int tidx = threadIdx.x;
@@ -259,17 +262,18 @@ void __global__ FilterKeyPointMatchesCU_Kernel(
 	}
 }
 
-void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int curFrame, unsigned int numFrames, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxKabschRes2) {
+void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, const float4x4& siftIntrinsicsInv, unsigned int minNumMatches, float maxKabschRes2) {
 
 	if (numFrames == 0) return;
 
-	dim3 grid(numFrames);
+	dim3 grid(numFrames - startFrame);
 	dim3 block(FILTER_NUM_BLOCK_THREADS_X);
 
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	FilterKeyPointMatchesCU_Kernel << <grid, block >> >(
 		curFrame,
+		startFrame,
 		d_keyPoints,
 		d_currNumMatchesPerImagePair,
 		d_currMatchDistances,
@@ -313,13 +317,14 @@ void SIFTImageManager::FilterKeyPointMatchesCU(unsigned int curFrame, unsigned i
 //we launch 1 thread for two array entries
 void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	unsigned int curFrame,
+	unsigned int startFrame,
 	const SIFTKeyPoint* d_keyPointsGlobal,
 	int* d_numFilteredMatchesPerImagePair,
 	const uint2* d_filteredMatchKeyPointIndicesGlobal,
 	const float4x4 colorIntrinsicsInv,
 	float areaThresh)
 {
-	const unsigned int imagePairIdx = blockIdx.x;
+	const unsigned int imagePairIdx = blockIdx.x + startFrame;
 	if (imagePairIdx == curFrame) return;
 
 	const unsigned int numMatches = d_numFilteredMatchesPerImagePair[imagePairIdx];
@@ -383,10 +388,10 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 	}
 }
 
-void SIFTImageManager::FilterMatchesBySurfaceAreaCU(unsigned int curFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv, float areaThresh) {
+void SIFTImageManager::FilterMatchesBySurfaceAreaCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv, float areaThresh) {
 	if (numFrames == 0) return;
 
-	dim3 grid(numFrames);
+	dim3 grid(numFrames - startFrame);
 	const unsigned int threadsPerBlock = ((MAX_MATCHES_PER_IMAGE_PAIR_FILTERED + 31) / 32) * 32;
 	dim3 block(threadsPerBlock);
 
@@ -394,6 +399,7 @@ void SIFTImageManager::FilterMatchesBySurfaceAreaCU(unsigned int curFrame, unsig
 
 	FilterMatchesBySurfaceAreaCU_Kernel << <grid, block >> >(
 		curFrame,
+		startFrame,
 		d_keyPoints,
 		d_currNumFilteredMatchesPerImagePair,
 		d_currFilteredMatchKeyPointIndices,
@@ -463,11 +469,11 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 
 
 //we launch 1 thread for two array entries
-void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int curImageIdx, unsigned int imageWidth, unsigned int imageHeight, const float4x4 intrinsics,
+void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int curImageIdx, unsigned int startFrame, unsigned int imageWidth, unsigned int imageHeight, const float4x4 intrinsics,
 	int* d_currNumFilteredMatchesPerImagePair, const float4x4* d_currFilteredTransforms, const float4x4* d_currFilteredTransformsInv, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax)
 {
-	const unsigned int imagePairIdx = blockIdx.x; // prev image idx
+	const unsigned int imagePairIdx = blockIdx.x + startFrame; // prev image idx
 	if (imagePairIdx == curImageIdx) return;
 	const unsigned int numMatches = d_currNumFilteredMatchesPerImagePair[imagePairIdx];
 	if (numMatches == 0) {
@@ -559,19 +565,19 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int curImageIdx, un
 	}
 }
 
-void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int curFrame, unsigned int numFrames, unsigned int imageWidth, unsigned int imageHeight,
+void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, unsigned int imageWidth, unsigned int imageHeight,
 	const float4x4& intrinsics, const CUDACachedFrame* d_cachedFrames,
 	float distThresh, float normalThresh, float colorThresh, float errThresh, float corrThresh, float sensorDepthMin, float sensorDepthMax)
 {
 	if (numFrames == 0) return;
 
-	dim3 grid(numFrames);
+	dim3 grid(numFrames - startFrame);
 	dim3 block(imageWidth, (imageHeight + FILTER_DENSE_VERIFY_THREAD_SPLIT - 1) / FILTER_DENSE_VERIFY_THREAD_SPLIT);
 
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
 
 	FilterMatchesByDenseVerifyCU_Kernel << <grid, block >> >(
-		curFrame, imageWidth, imageHeight, intrinsics,
+		curFrame, startFrame, imageWidth, imageHeight, intrinsics,
 		d_currNumFilteredMatchesPerImagePair, d_currFilteredTransforms, d_currFilteredTransformsInv, d_cachedFrames,
 		distThresh, normalThresh, colorThresh, errThresh, corrThresh,
 		sensorDepthMin, sensorDepthMax);
@@ -584,6 +590,7 @@ void SIFTImageManager::FilterMatchesByDenseVerifyCU(unsigned int curFrame, unsig
 
 void __global__ AddCurrToResidualsCU_Kernel(
 	unsigned int curFrame,
+	unsigned int startFrame,
 	EntryJ* d_globMatches,
 	uint2* d_globMatchesKeyPointIndices,
 	int* d_globNumImagePairs,
@@ -594,9 +601,10 @@ void __global__ AddCurrToResidualsCU_Kernel(
 	const float4x4 colorIntrinsicsInv
 	)
 {
-	if (blockIdx.x == curFrame) return;
+	const unsigned int imagePairIdx = blockIdx.x + startFrame;
+	if (imagePairIdx == curFrame) return;
 	const unsigned int tidx = threadIdx.x;
-	const unsigned int numMatches = d_currNumFilteredMatchesPerImagePair[blockIdx.x];
+	const unsigned int numMatches = d_currNumFilteredMatchesPerImagePair[imagePairIdx];
 	__shared__ unsigned int basePtr;
 	if (tidx == 0) {
 		basePtr = atomicAdd(&d_globNumImagePairs[0], numMatches);
@@ -604,21 +612,21 @@ void __global__ AddCurrToResidualsCU_Kernel(
 	__syncthreads();
 
 	//if (tidx == 0) {
-	//	printf("[%d] baseAddr=%d\n", blockIdx.x, basePtr);
+	//	printf("[%d] baseAddr=%d\n", imagePairIdx, basePtr);
 	//}
 
 	if (tidx < numMatches) {
-		const unsigned int srcAddr = blockIdx.x*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED + tidx;
+		const unsigned int srcAddr = imagePairIdx*MAX_MATCHES_PER_IMAGE_PAIR_FILTERED + tidx;
 
 		uint2 currFilteredMachtKeyPointIndices = d_currFilteredMatchKeyPointIndices[srcAddr];
 
-		//printf("[%d] = [%d %d]\n", blockIdx.x, currFilteredMachtKeyPointIndices.x, currFilteredMachtKeyPointIndices.y);
+		//printf("[%d] = [%d %d]\n", imagePairIdx, currFilteredMachtKeyPointIndices.x, currFilteredMachtKeyPointIndices.y);
 
 		const SIFTKeyPoint& k_i = d_keyPoints[currFilteredMachtKeyPointIndices.x];
 		const SIFTKeyPoint& k_j = d_keyPoints[currFilteredMachtKeyPointIndices.y];
 
 		EntryJ e;
-		const unsigned int imageIdx0 = blockIdx.x;
+		const unsigned int imageIdx0 = imagePairIdx;
 		const unsigned int imageIdx1 = curFrame;
 		e.imgIdx_i = imageIdx0;
 		e.imgIdx_j = imageIdx1;
@@ -630,7 +638,7 @@ void __global__ AddCurrToResidualsCU_Kernel(
 	}
 }
 
-void SIFTImageManager::AddCurrToResidualsCU(unsigned int curFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv) {
+void SIFTImageManager::AddCurrToResidualsCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv) {
 	if (numFrames == 0) return;
 
 	dim3 grid(numFrames);
@@ -641,6 +649,7 @@ void SIFTImageManager::AddCurrToResidualsCU(unsigned int curFrame, unsigned int 
 
 	AddCurrToResidualsCU_Kernel << <grid, block >> >(
 		curFrame,
+		startFrame,
 		d_globMatches,
 		d_globMatchesKeyPointIndices,
 		d_globNumResiduals,

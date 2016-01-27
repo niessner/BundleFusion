@@ -118,7 +118,7 @@ __global__ void FindImageImageCorr_Kernel(SolverInput input, SolverState state, 
 		if (findDenseCorr(idx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, transform, input.intrinsics,
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[j].d_depthDownsampled,
-			parameters.denseDepthMin, 2.0f)) { //i tgt, j src		//TODO PARAMS
+			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src		//TODO PARAMS
 			atomicAdd(foundCorr, 1);
 		} // found correspondence
 		__syncthreads();
@@ -357,6 +357,10 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 
 	int numOverlapImagePairs;
 	cutilSafeCall(cudaMemcpy(&numOverlapImagePairs, state.d_numDenseOverlappingImages, sizeof(int), cudaMemcpyDeviceToHost));
+	if (numOverlapImagePairs == 0) {
+		printf("warning: no overlapping images for dense solve\n");
+		return;
+	}
 	const int reductionGlobal = (input.denseDepthWidth*input.denseDepthHeight + THREADS_PER_BLOCK_DENSE_DEPTH - 1) / THREADS_PER_BLOCK_DENSE_DEPTH;
 	dim3 grid(numOverlapImagePairs, reductionGlobal);
 	//printf("num overlap image pairs = %d\n", numOverlapImagePairs);

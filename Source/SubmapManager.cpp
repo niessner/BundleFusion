@@ -161,9 +161,10 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 	// match with every other
 	const unsigned int numFrames = siftManager->getNumImages();
 	const unsigned int curFrame = siftManager->getCurrentFrame();
+	const unsigned int startFrame = numFrames == curFrame + 1 ? 0 : curFrame + 1; //TODO HERE
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 	if (isLocal) m_mutexMatcher.lock();
-	for (unsigned int prev = 0; prev < numFrames; prev++) {
+	for (unsigned int prev = startFrame; prev < numFrames; prev++) {
 		if (prev == curFrame) continue;
 		uint2 keyPointOffset = make_uint2(0, 0);
 		ImagePairMatch& imagePairMatch = siftManager->getImagePairMatch(prev, curFrame, keyPointOffset);
@@ -194,7 +195,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 
 		// --- sort the current key point matches
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
-		siftManager->SortKeyPointMatchesCU(curFrame, numFrames);
+		siftManager->SortKeyPointMatchesCU(curFrame, startFrame, numFrames);
 
 #ifdef DEBUG_PRINT_MATCHING
 		//_debugPrintMatches = true;
@@ -211,7 +212,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
 		//SIFTMatchFilter::ransacKeyPointMatches(siftManager, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2, false);
 		//SIFTMatchFilter::filterKeyPointMatches(siftManager, siftIntrinsicsInv, minNumMatches);
-		siftManager->FilterKeyPointMatchesCU(curFrame, numFrames, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2);
+		siftManager->FilterKeyPointMatchesCU(curFrame, startFrame, numFrames, siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterKeyPoint = timer.getElapsedTimeMS(); }
 
 #ifdef DEBUG_PRINT_MATCHING
@@ -226,7 +227,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		//const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
 		//SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
-		siftManager->FilterMatchesBySurfaceAreaCU(curFrame, numFrames, siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
+		siftManager->FilterMatchesBySurfaceAreaCU(curFrame, startFrame, numFrames, siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterSurfaceArea = timer.getElapsedTimeMS(); }
 
 #ifdef DEBUG_PRINT_MATCHING
@@ -248,7 +249,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 		//SIFTMatchFilter::filterByDenseVerify(siftManager, cachedFrames);
 		const CUDACachedFrame* cachedFramesCUDA = cudaCache->getCacheFramesGPU();
-		siftManager->FilterMatchesByDenseVerifyCU(curFrame, numFrames, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
+		siftManager->FilterMatchesByDenseVerifyCU(curFrame, startFrame, numFrames, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
 			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
 			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh,
 			//GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax); //TODO PARAMS
@@ -266,10 +267,10 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 
 		// --- filter frames
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
-		siftManager->filterFrames(curFrame, numFrames);
+		siftManager->filterFrames(curFrame, startFrame, numFrames);
 		// --- add to global correspondences
 		if (siftManager->getValidImages()[curFrame] != 0)
-			siftManager->AddCurrToResidualsCU(curFrame, numFrames, siftIntrinsicsInv);
+			siftManager->AddCurrToResidualsCU(curFrame, startFrame, numFrames, siftIntrinsicsInv);
 		else lastValid = false;
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMisc = timer.getElapsedTimeMS(); }
 	}

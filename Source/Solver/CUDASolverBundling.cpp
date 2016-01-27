@@ -194,7 +194,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.denseColorThresh = 0.1f;
 	parameters.denseColorGradientMin = 0.005f;
 	parameters.denseDepthMin = 0.5f;
-	parameters.denseDepthMax = 2.5f;//3.5f;//4.5f;//TODO 
+	parameters.denseDepthMax = 3.5f;//2.5f;//3.5f;//4.5f;//TODO 
 	parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
 	parameters.useDenseDepthAllPairwise = usePairwiseDense;
 	//parameters.denseOverlapCheckSubsampleFactor = 8; // for 160x120 -> 20x15 image
@@ -293,6 +293,11 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		FreeImageWrapper::saveImage("debug/corr.png", corrImage);
 		std::cout << "waiting..." << std::endl; getchar();
 	}
+	//{
+	//	std::vector<EntryJ> corr(numberOfCorrespondences);
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(corr.data(), d_correspondences, sizeof(EntryJ)*numberOfCorrespondences, cudaMemcpyDeviceToHost));
+	//	int a = 5;
+	//}
 	//!!!debugging
 
 

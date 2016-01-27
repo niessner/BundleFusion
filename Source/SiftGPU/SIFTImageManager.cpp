@@ -534,17 +534,17 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 //	global->finalizeSIFTImageGPU(numKeys);
 //}
 
-void SIFTImageManager::filterFrames(unsigned int curFrame, unsigned int numFrames)
+void SIFTImageManager::filterFrames(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames)
 {
 	if (numFrames == 0) return;
 
 	int connected = 0;
 
-	std::vector<unsigned int> currNumFilteredMatchesPerImagePair(numFrames);
-	cutilSafeCall(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int) * numFrames, cudaMemcpyDeviceToHost));
+	std::vector<unsigned int> currNumFilteredMatchesPerImagePair(numFrames - startFrame);
+	cutilSafeCall(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair + startFrame, sizeof(unsigned int) * currNumFilteredMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
 
-	for (unsigned int i = 0; i < numFrames; i++) { // previous frames
-		if (m_validImages[i] != 0 && currNumFilteredMatchesPerImagePair[i] > 0 && i != curFrame) {
+	for (unsigned int i = startFrame; i < numFrames; i++) { // previous frames
+		if (m_validImages[i] != 0 && currNumFilteredMatchesPerImagePair[i-startFrame] > 0 && i != curFrame) {
 			connected = 1;
 			break;
 		}

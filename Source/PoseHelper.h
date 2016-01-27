@@ -195,7 +195,7 @@ namespace PoseHelper {
 		ml::vec3f degrees;
 		for (unsigned int i = 0; i < 3; i++)
 			degrees[i] = ml::math::radiansToDegrees(ksi[i]);
-		res.setRotation(ml::mat3f::rotationZ(degrees[2])*ml::mat3f::rotationY(degrees[1])*ml::mat3f::rotationX(degrees[0]));
+		res.setRotationMatrix(ml::mat3f::rotationZ(degrees[2])*ml::mat3f::rotationY(degrees[1])*ml::mat3f::rotationX(degrees[0]));
 		res.setTranslationVector(ml::vec3f(ksi[3], ksi[4], ksi[5]));
 		return res;
 	}
@@ -463,7 +463,7 @@ namespace PoseHelper {
 	//		trans = V * t;
 	//	}
 	//	mat4f res = mat4f::identity();
-	//	res.setRotation(rot);
+	//	res.setRotationMatrix(rot);
 	//	res.setTranslationVector(trans);
 	//	return res;
 	//}
