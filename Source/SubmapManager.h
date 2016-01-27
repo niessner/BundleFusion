@@ -119,7 +119,7 @@ public:
 	bool optimizeLocal(unsigned int curLocalIdx, unsigned int numNonLinIterations, unsigned int numLinIterations);
 	int computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const float4x4& siftIntrinsics, const float4x4& siftIntrinsicsInv);
 
-	void tryRevalidation(unsigned int curGlobalFrame, const float4x4& siftIntrinsicsInv);
+	void tryRevalidation(unsigned int curGlobalFrame, const float4x4& siftIntrinsicsInv, bool isScanningDone = false);
 
 	void addInvalidGlobalKey();
 
@@ -246,6 +246,7 @@ private:
 	unsigned int m_submapSize;
 	unsigned int m_numOptPerResidualRemoval;
 
+	int m_continueRetry;
 #ifdef DEBUG_PRINT_MATCHING
 	bool _debugPrintMatches;
 #endif

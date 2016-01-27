@@ -35,6 +35,7 @@ SubmapManager::SubmapManager()
 
 	d_siftTrajectory = NULL;
 
+	m_continueRetry = 0;
 #ifdef DEBUG_PRINT_MATCHING
 	_debugPrintMatches = false;
 #endif
@@ -666,11 +667,21 @@ void SubmapManager::updateTrajectory(unsigned int curFrame)
 		d_imageInvalidateList);
 }
 
-void SubmapManager::tryRevalidation(unsigned int curGlobalFrame, const float4x4& siftIntrinsicsInv)
+void SubmapManager::tryRevalidation(unsigned int curGlobalFrame, const float4x4& siftIntrinsicsInv, bool isScanningDone /*= false*/)
 {
+	if (m_continueRetry < 0) return; // nothing to do
 	// see if have any invalid images which match
 	unsigned int idx;
 	if (m_global->getTopRetryImage(idx)) {
+		if (isScanningDone) {
+			if (m_continueRetry == 0) {
+				m_continueRetry = idx;
+			}
+			else if (m_continueRetry == idx) {
+				m_continueRetry = -1;
+				return; // nothing more to do (looped around again)
+			}
+		}
 		m_global->setCurrentFrame(idx);
 
 		matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);

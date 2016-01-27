@@ -175,7 +175,7 @@ void Bundler::processGlobal()
 {
 	if (m_currentState.m_bProcessGlobal == BundlerState::DO_NOTHING) {
 		if (!m_RGBDSensor->isReceivingFrames()) {
-			m_SubmapManager.tryRevalidation(m_currentState.m_lastLocalSolved, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+			m_SubmapManager.tryRevalidation(m_currentState.m_lastLocalSolved, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv), true);
 			m_currentState.m_bOptimizeGlobal = BundlerState::PROCESS;
 		}
 		return;
