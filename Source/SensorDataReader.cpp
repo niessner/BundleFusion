@@ -43,7 +43,7 @@ void SensorDataReader::createFirstConnected()
 
 	std::cout << "Start loading binary dump... ";
 	m_sensorData = new SensorData;
-	m_sensorData->readFromFile(filename);
+	m_sensorData->loadFromFile(filename);
 	std::cout << "DONE!" << std::endl;
 	std::cout << *m_sensorData << std::endl;
 
@@ -87,10 +87,11 @@ bool SensorDataReader::processDepth()
 		float* depth = getDepthFloat();
 		//memcpy(depth, m_data.m_DepthImages[m_currFrame], sizeof(float)*getDepthWidth()*getDepthHeight());
 
+		//TODO check why the frame cache is not used?
 		//ml::RGBDFrameCacheRead::FrameState frameState = m_sensorDataCache->getNext();
 		ml::RGBDFrameCacheRead::FrameState frameState;
-		frameState.m_colorFrame = m_sensorData->m_frames[m_currFrame].decompressColorAlloc();
-		frameState.m_depthFrame = m_sensorData->m_frames[m_currFrame].decompressDepthAlloc();
+		frameState.m_colorFrame = m_sensorData->decompressColorAlloc(m_currFrame);
+		frameState.m_depthFrame = m_sensorData->decompressDepthAlloc(m_currFrame);
 
 
 		for (unsigned int i = 0; i < getDepthWidth()*getDepthHeight(); i++) {
@@ -129,7 +130,7 @@ ml::mat4f SensorDataReader::getRigidTransform(int offset) const
 {
 	unsigned int idx = m_currFrame - 1 + offset;
 	if (idx >= m_sensorData->m_frames.size()) throw MLIB_EXCEPTION("invalid trajectory index " + std::to_string(idx));
-	const mat4f& transform = m_sensorData->m_frames[idx].m_frameToWorld;
+	const mat4f& transform = m_sensorData->m_frames[idx].getCameraToWorld();
 	return transform;
 	//return m_data.m_trajectory[idx];
 }

@@ -15,13 +15,13 @@
 ///////////////////////////////////////////////////////////////////////////////////
 
 namespace stb {
-//#define STB_IMAGE_IMPLEMENTATION
+	//#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-//#undef STB_IMAGE_IMPLEMENTATION
+	//#undef STB_IMAGE_IMPLEMENTATION
 
-//#define STB_IMAGE_WRITE_IMPLEMENTATION
+	//#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-//#undef STB_IMAGE_WRITE_IMPLEMENTATION
+	//#undef STB_IMAGE_WRITE_IMPLEMENTATION
 }
 
 #ifdef _USE_UPLINK_COMPRESSION
@@ -121,6 +121,10 @@ namespace ml {
 			matrix[8] = 0.0f;	matrix[9] = 0.0f;	matrix[10] = 1.0; matrix[11] = 0.0f;
 			matrix[12] = 0.0f;	matrix[13] = 0.0f;	matrix[14] = 0.0f; matrix[15] = 1.0;
 		}
+		static mat4f identity() {
+			mat4f res;	res.setIdentity();
+			return res;
+		}
 		union {
 			//! access matrix using a single array
 			float matrix[16];
@@ -147,17 +151,22 @@ namespace ml {
 				setIdentity();
 			}
 
+			CalibrationData(const mat4f& intrinsic, const mat4f& extrinsic) {
+				m_intrinsic = intrinsic;
+				m_extrinsic = extrinsic;
+			}
+
 			void setIdentity() {
 				m_intrinsic.setIdentity();
 				m_extrinsic.setIdentity();
 			}
 
-			void writeToFile(std::ofstream& out) const {
+			void saveToFile(std::ofstream& out) const {
 				out.write((const char*)&m_intrinsic, sizeof(mat4f));
 				out.write((const char*)&m_extrinsic, sizeof(mat4f));
 			}
 
-			void readFromFile(std::ifstream& in) {
+			void loadFromFile(std::ifstream& in) {
 				in.read((char*)&m_intrinsic, sizeof(mat4f));
 				in.read((char*)&m_extrinsic, sizeof(mat4f));
 			}
@@ -181,39 +190,78 @@ namespace ml {
 			mat4f m_extrinsic;
 		};
 
+		enum COMPRESSION_TYPE_COLOR {
+			TYPE_RAW = 0,
+			TYPE_PNG = 1,
+			TYPE_JPEG = 2
+		};
+		enum COMPRESSION_TYPE_DEPTH {
+			TYPE_RAW_USHORT = 0,
+			TYPE_ZLIB_USHORT = 1,
+			TYPE_OCCI_USHORT = 2
+		};
 
 
 		class RGBDFrame {
-		public:
-			enum COMPRESSION_TYPE_COLOR {
-				TYPE_RAW = 0,
-				TYPE_PNG = 1,
-				TYPE_JPEG = 2
-			};
-			enum COMPRESSION_TYPE_DEPTH {
-				TYPE_RAW_USHORT = 0,
-				TYPE_ZLIB_USHORT = 1,
-				TYPE_OCCI_USHORT = 2
-			};
-
+		public:			
 			RGBDFrame() {
 				m_colorCompressed = NULL;
 				m_depthCompressed = NULL;
 				m_colorSizeBytes = 0;
 				m_depthSizeBytes = 0;
-				m_frameToWorld.setIdentity();
+				m_cameraToWorld.setIdentity();
+				m_timeStampColor = 0;
+				m_timeStampDepth = 0;
 			}
+
+
+			unsigned char* getColorCompressed() const {
+				return m_colorCompressed;
+			}
+			unsigned char* getDepthCompressed() const {
+				return m_depthCompressed;
+			}
+			size_t getColorSizeBytes() const {
+				return m_colorSizeBytes;
+			}
+			size_t getDepthSizeBytes() const {
+				return m_depthSizeBytes;
+			}
+
+			const mat4f& getCameraToWorld() const {
+				return m_cameraToWorld;
+			}
+
+			void setCameraToWorld(const mat4f& cameraToWorld) {
+				m_cameraToWorld = cameraToWorld;
+			}
+
+			void free() {
+				freeColor();
+				freeDepth();
+				m_cameraToWorld.setIdentity();
+			}
+
+
+		private:
+			friend class SensorData;
+
 			RGBDFrame(
 				const vec3uc* color, unsigned int colorWidth, unsigned int colorHeight,
 				const unsigned short*  depth, unsigned int depthWidth, unsigned int depthHeight,
+				const mat4f& cameraToWorld = mat4f::identity(),
 				COMPRESSION_TYPE_COLOR colorType = TYPE_JPEG,
-				COMPRESSION_TYPE_DEPTH depthType = TYPE_ZLIB_USHORT)
+				COMPRESSION_TYPE_DEPTH depthType = TYPE_ZLIB_USHORT,	
+				UINT64 timeStampColor = 0,
+				UINT64 timeStampDepth = 0)
 			{
 				m_colorCompressed = NULL;
 				m_depthCompressed = NULL;
 				m_colorSizeBytes = 0;
 				m_depthSizeBytes = 0;
-				m_frameToWorld.setIdentity();
+				m_cameraToWorld = cameraToWorld;
+				m_timeStampColor = timeStampColor;
+				m_timeStampDepth = timeStampDepth;
 
 				if (color) {
 					//Timer t;
@@ -227,46 +275,25 @@ namespace ml {
 				}
 			}
 
-			void free() {
-				freeColor();
-				freeDepth();
-				m_frameToWorld.setIdentity();
-			}
-
 
 			void freeColor() {
 				if (m_colorCompressed) std::free(m_colorCompressed);
 				m_colorCompressed = NULL;
 				m_colorSizeBytes = 0;
-				m_colorWidth = m_colorHeight = 0;
+				m_timeStampColor = 0;
 			}
 			void freeDepth() {
 				if (m_depthCompressed) std::free(m_depthCompressed);
 				m_depthCompressed = NULL;
 				m_depthSizeBytes = 0;
-				m_depthWidth = m_depthHeight = 0;
+				m_timeStampDepth = 0;
 			}
 
 
-			void compressColor(const vec3uc* color, unsigned int width, unsigned int height, COMPRESSION_TYPE_COLOR type = TYPE_JPEG) {
-				//if (m_colorCompressed)	stbi_image_free(m_colorCompressed);
-				//int channels = 3;
-				//int stride_bytes = width * channels;
-				//int len = 0;
-				//m_colorCompressed = stbi_write_png_to_mem((unsigned char*)color, stride_bytes, width, height, channels, &len);
-				//m_colorSizeBytes = len;
-				//if (m_colorCompressed == NULL || m_colorSizeBytes == 0) throw MLIB_EXCEPTION("compression error");
-
-				//if (m_colorCompressed) std::free(m_colorCompressed);
-				//LodePNGColorType colorType = LodePNGColorType::LCT_RGB;
-				//unsigned int bitDepth = 8;
-				//unsigned error = lodepng_encode_memory(&m_colorCompressed, &m_colorSizeBytes, (const unsigned char*)color, width, height, colorType, bitDepth);
-				//if (error != 0 || m_colorCompressed == NULL || m_colorSizeBytes == 0) throw MLIB_EXCEPTION("compression error");
-
-				m_colorCompressionType = type;
+			void compressColor(const vec3uc* color, unsigned int width, unsigned int height, COMPRESSION_TYPE_COLOR type) {
 
 				if (type == TYPE_RAW) {
-					if (m_colorSizeBytes != width*height) {_USE_UPLINK_COMPRESSION
+					if (m_colorSizeBytes != width*height) {
 						freeColor();
 						m_colorSizeBytes = width*height*sizeof(vec3uc);
 						m_colorCompressed = (unsigned char*)std::malloc(m_colorSizeBytes);
@@ -291,46 +318,23 @@ namespace ml {
 #else
 					throw MLIB_EXCEPTION("need UPLINK_COMPRESSION");
 #endif
-
-					//jpge::params p = jpge::params();
-					//p.m_quality = 95;
-					//int channels = 3;
-					//int buffSize = std::max(1024u, width*height*channels);
-					//void* buff = std::malloc(buffSize);
-					//bool r = jpge::compress_image_to_jpeg_file_in_memory(buff, buffSize, width, height, channels, (const jpge::uint8*)color, p);
-					//if (r == false)	 std::cout << "error - len: " << buffSize << std::endl;
-					//m_colorSizeBytes = buffSize;
-					//m_colorCompressed = (unsigned char*)std::malloc(buffSize);
-					//std::memcpy(m_colorCompressed, buff, buffSize);
-					//std::free(buff);
 				}
 				else {
 					throw MLIB_EXCEPTION("unknown compression type");
 				}
-
-				m_colorWidth = width;
-				m_colorHeight = height;
 			}
 
-			vec3uc* decompressColorAlloc() const {
-				if (m_colorCompressionType == TYPE_RAW)	return decompressColorAlloc_raw();
+			vec3uc* decompressColorAlloc(COMPRESSION_TYPE_COLOR type) const {
+				if (type == TYPE_RAW)	return decompressColorAlloc_raw(type);
 #ifdef _USE_UPLINK_COMPRESSION
-				else return decompressColorAlloc_occ();	//this handles all image formats;
+				else return decompressColorAlloc_occ(type);	//this handles all image formats;
 #else
-				else return decompressColorAlloc_stb();	// this handles all image formats
+				else return decompressColorAlloc_stb(type);	// this handles all image formats
 #endif
-				//if (m_colorCompressed == NULL || m_colorSizeBytes == 0) throw MLIB_EXCEPTION("decompression error");
-				//LodePNGColorType colorType = LodePNGColorType::LCT_RGB;
-				//unsigned int bitDepth = 8;
-				//vec3uc* res = NULL;
-				//unsigned int width, height;
-				//unsigned error = lodepng_decode_memory((unsigned char**)&res, &width, &height, m_colorCompressed, m_colorSizeBytes, colorType, bitDepth);
-				//if (error != 0 || res == NULL) throw MLIB_EXCEPTION("decompression error");
-				//return res;
 			}
 
-			vec3uc* decompressColorAlloc_stb() const {	//can handle PNG, JPEG etc.
-				if (m_colorCompressionType != TYPE_JPEG && m_colorCompressionType != TYPE_PNG) throw MLIB_EXCEPTION("invliad type");
+			vec3uc* decompressColorAlloc_stb(COMPRESSION_TYPE_COLOR type) const {	//can handle PNG, JPEG etc.
+				if (type != TYPE_JPEG && type != TYPE_PNG) throw MLIB_EXCEPTION("invliad type");
 				if (m_colorCompressed == NULL || m_colorSizeBytes == 0) throw MLIB_EXCEPTION("decompression error");
 				int channels = 3;
 				int width, height;
@@ -338,13 +342,13 @@ namespace ml {
 				return (vec3uc*)raw;
 			}
 
-			vec3uc* decompressColorAlloc_occ() const {
+			vec3uc* decompressColorAlloc_occ(COMPRESSION_TYPE_COLOR type) const {
 #ifdef _USE_UPLINK_COMPRESSION
-				if (m_colorCompressionType != TYPE_JPEG && m_colorCompressionType != TYPE_PNG) throw MLIB_EXCEPTION("invliad type");
+				if (type != TYPE_JPEG && type != TYPE_PNG) throw MLIB_EXCEPTION("invliad type");
 				if (m_colorCompressed == NULL || m_colorSizeBytes == 0) throw MLIB_EXCEPTION("decompression error");
 				uplinksimple::graphics_PixelFormat format = uplinksimple::graphics_PixelFormat_RGB;
 				uplinksimple::graphics_ImageCodec codec = uplinksimple::graphics_ImageCodec_JPEG;
-				if (m_colorCompressionType == TYPE_PNG) codec = uplinksimple::graphics_ImageCodec_PNG;
+				if (type == TYPE_PNG) codec = uplinksimple::graphics_ImageCodec_PNG;
 
 				uplinksimple::MemoryBlock block;
 				float quality = uplinksimple::defaultQuality;
@@ -360,18 +364,16 @@ namespace ml {
 #endif
 			}
 
-			vec3uc* decompressColorAlloc_raw() const {
-				if (m_colorCompressionType != TYPE_RAW) throw MLIB_EXCEPTION("invliad type");
+			vec3uc* decompressColorAlloc_raw(COMPRESSION_TYPE_COLOR type) const {
+				if (type != TYPE_RAW) throw MLIB_EXCEPTION("invliad type");
 				if (m_colorCompressed == NULL || m_colorSizeBytes == 0) throw MLIB_EXCEPTION("invalid data");
 				vec3uc* res = (vec3uc*)std::malloc(m_colorSizeBytes);
 				memcpy(res, m_colorCompressed, m_colorSizeBytes);
 				return res;
 			}
 
-			void compressDepth(const unsigned short* depth, unsigned int width, unsigned int height, COMPRESSION_TYPE_DEPTH type = TYPE_ZLIB_USHORT) {
+			void compressDepth(const unsigned short* depth, unsigned int width, unsigned int height, COMPRESSION_TYPE_DEPTH type) {
 				freeDepth();
-
-				m_depthCompressionType = type;
 
 				if (type == TYPE_RAW_USHORT) {
 					if (m_depthSizeBytes != width*height) {
@@ -412,34 +414,31 @@ namespace ml {
 				else {
 					throw MLIB_EXCEPTION("unknown compression type");
 				}
-
-				m_depthWidth = width;
-				m_depthHeight = height;
 			}
 
-			unsigned short* decompressDepthAlloc() const {
-				if (m_depthCompressionType == TYPE_RAW_USHORT)	return decompressDepthAlloc_raw();
-				else if (m_depthCompressionType == TYPE_ZLIB_USHORT) return decompressDepthAlloc_stb();
-				else if (m_depthCompressionType == TYPE_OCCI_USHORT) return decompressDepthAlloc_occ();
+			unsigned short* decompressDepthAlloc(unsigned int width, unsigned int height, COMPRESSION_TYPE_DEPTH type) const {
+				if (type == TYPE_RAW_USHORT)	return decompressDepthAlloc_raw(type);
+				else if (type == TYPE_ZLIB_USHORT) return decompressDepthAlloc_stb(type);
+				else if (type == TYPE_OCCI_USHORT) return decompressDepthAlloc_occ(width, height, type);
 				else {
 					throw MLIB_EXCEPTION("invalid type");
 					return NULL;
 				}
 			}
 
-			unsigned short* decompressDepthAlloc_stb() const {
-				if (m_depthCompressionType != TYPE_ZLIB_USHORT) throw MLIB_EXCEPTION("invliad type");
+			unsigned short* decompressDepthAlloc_stb(COMPRESSION_TYPE_DEPTH type) const {
+				if (type != TYPE_ZLIB_USHORT) throw MLIB_EXCEPTION("invliad type");
 				unsigned short* res;
 				int len;
 				res = (unsigned short*)stb::stbi_zlib_decode_malloc((const char*)m_depthCompressed, (int)m_depthSizeBytes, &len);
 				return res;
 			}
 
-			unsigned int short* decompressDepthAlloc_occ() const {
+			unsigned int short* decompressDepthAlloc_occ(unsigned int width, unsigned int height, COMPRESSION_TYPE_DEPTH type) const {
 #ifdef _USE_UPLINK_COMPRESSION
-				if (m_depthCompressionType != TYPE_OCCI_USHORT) throw MLIB_EXCEPTION("invliad type");
-				unsigned short* res = (unsigned short*)std::malloc(m_depthWidth*m_depthHeight * 2);
-				uplinksimple::decode(m_depthCompressed, (unsigned int)m_depthSizeBytes, m_depthWidth*m_depthHeight, res);
+				if (type != TYPE_OCCI_USHORT) throw MLIB_EXCEPTION("invliad type");
+				unsigned short* res = (unsigned short*)std::malloc(width*height * 2);
+				uplinksimple::decode(m_depthCompressed, (unsigned int)m_depthSizeBytes, width*height, res);
 				//uplinksimple::shift2depth(res, m_depthWidth*m_depthHeight); //this is a stupid idea i think
 				return res;
 #else
@@ -448,49 +447,30 @@ namespace ml {
 #endif
 			}
 
-			unsigned short* decompressDepthAlloc_raw() const {
+			unsigned short* decompressDepthAlloc_raw(COMPRESSION_TYPE_DEPTH type) const {
+				if (type != TYPE_RAW_USHORT) throw MLIB_EXCEPTION("invliad type");
 				if (m_depthCompressed == NULL || m_depthSizeBytes == 0) throw MLIB_EXCEPTION("invalid data");
 				unsigned short* res = (unsigned short*)std::malloc(m_depthSizeBytes);
 				memcpy(res, m_depthCompressed, m_depthSizeBytes);
 				return res;
 			}
 
-			unsigned char* getColorCompressed() const {
-				return m_colorCompressed;
-			}
-			unsigned char* getDepthCompressed() const {
-				return m_depthCompressed;
-			}
-			size_t getColorSizeBytes() const {
-				return m_colorSizeBytes;
-			}
-			size_t getDepthSizeBytes() const {
-				return m_depthSizeBytes;
-			}
 
-			void writeToFile(std::ofstream& out) const {
-				out.write((const char*)&m_colorCompressionType, sizeof(COMPRESSION_TYPE_COLOR));
-				out.write((const char*)&m_depthCompressionType, sizeof(COMPRESSION_TYPE_DEPTH));
-				out.write((const char*)&m_frameToWorld, sizeof(mat4f));
-				out.write((const char*)&m_colorWidth, sizeof(unsigned int));
-				out.write((const char*)&m_colorHeight, sizeof(unsigned int));
-				out.write((const char*)&m_depthWidth, sizeof(unsigned int));
-				out.write((const char*)&m_depthHeight, sizeof(unsigned int));
+			void saveToFile(std::ofstream& out) const {
+				out.write((const char*)&m_cameraToWorld, sizeof(mat4f));
+				out.write((const char*)&m_timeStampColor, sizeof(UINT64));
+				out.write((const char*)&m_timeStampDepth, sizeof(UINT64));
 				out.write((const char*)&m_colorSizeBytes, sizeof(UINT64));
 				out.write((const char*)&m_depthSizeBytes, sizeof(UINT64));
 				out.write((const char*)m_colorCompressed, m_colorSizeBytes);
 				out.write((const char*)m_depthCompressed, m_depthSizeBytes);
 			}
 
-			void readFromFile(std::ifstream& in) {
+			void loadFromFile(std::ifstream& in) {
 				free();
-				in.read((char*)&m_colorCompressionType, sizeof(COMPRESSION_TYPE_COLOR));
-				in.read((char*)&m_depthCompressionType, sizeof(COMPRESSION_TYPE_DEPTH));
-				in.read((char*)&m_frameToWorld, sizeof(mat4f));
-				in.read((char*)&m_colorWidth, sizeof(unsigned int));
-				in.read((char*)&m_colorHeight, sizeof(unsigned int));
-				in.read((char*)&m_depthWidth, sizeof(unsigned int));
-				in.read((char*)&m_depthHeight, sizeof(unsigned int));
+				in.read((char*)&m_cameraToWorld, sizeof(mat4f));
+				in.read((char*)&m_timeStampColor, sizeof(UINT64));
+				in.read((char*)&m_timeStampDepth, sizeof(UINT64));
 				in.read((char*)&m_colorSizeBytes, sizeof(UINT64));
 				in.read((char*)&m_depthSizeBytes, sizeof(UINT64));
 				m_colorCompressed = (unsigned char*)std::malloc(m_colorSizeBytes);
@@ -500,16 +480,12 @@ namespace ml {
 			}
 
 			bool operator==(const RGBDFrame& other) const {
-				if (m_colorCompressionType != other.m_colorCompressionType)	return false;
-				if (m_depthCompressionType != other.m_depthCompressionType) return false;
 				if (m_colorSizeBytes != other.m_colorSizeBytes) return false;
 				if (m_depthSizeBytes != other.m_depthSizeBytes) return false;
-				if (m_colorWidth != other.m_colorWidth) return false;
-				if (m_colorHeight != other.m_colorHeight) return false;
-				if (m_depthWidth != other.m_depthWidth) return false;
-				if (m_depthHeight != other.m_depthHeight) return false;
+				if (m_timeStampColor != other.m_timeStampColor) return false;
+				if (m_timeStampDepth != other.m_timeStampDepth) return false;
 				for (unsigned int i = 0; i < 16; i++) {
-					if (m_frameToWorld[i] != other.m_frameToWorld[i]) return false;
+					if (m_cameraToWorld[i] != other.m_cameraToWorld[i]) return false;
 				}
 				for (UINT64 i = 0; i < m_colorSizeBytes; i++) {
 					if (m_colorCompressed[i] != other.m_colorCompressed[i]) return false;
@@ -524,17 +500,13 @@ namespace ml {
 				return !((*this) == other);
 			}
 
-			COMPRESSION_TYPE_COLOR m_colorCompressionType;
-			COMPRESSION_TYPE_DEPTH m_depthCompressionType;
-			UINT64 m_colorSizeBytes;	//compressed byte size
-			UINT64 m_depthSizeBytes;	//compressed byte size
-			unsigned char* m_colorCompressed;
-			unsigned char* m_depthCompressed;
-			unsigned int m_colorWidth, m_colorHeight;
-			unsigned int m_depthWidth, m_depthHeight;
-
-			//! camera trajectory (from base to current frame)
-			mat4f m_frameToWorld;
+			UINT64 m_colorSizeBytes;					//compressed byte size
+			UINT64 m_depthSizeBytes;					//compressed byte size
+			unsigned char* m_colorCompressed;			//compressed color data
+			unsigned char* m_depthCompressed;			//compressed depth data
+			UINT64 m_timeStampColor;					//time stamp color
+			UINT64 m_timeStampDepth;					//time stamp depth
+			mat4f m_cameraToWorld;						//camera trajectory: from current frame to base frame
 		};
 
 
@@ -542,25 +514,31 @@ namespace ml {
 		// SensorData Class starts here //
 		//////////////////////////////////
 
-		SensorData() {
-			//the first 3 versions [0,1,2] are reserved for the old .sensor files
 #define M_SENSOR_DATA_VERSION 3
-			m_versionNumber = M_CALIBRATED_SENSOR_DATA_VERSION;
+///the first 3 versions [0,1,2] are reserved for the old .sensor files
+
+		SensorData() {
+			m_versionNumber = M_SENSOR_DATA_VERSION;
 			m_sensorName = "Unknown";
+			m_colorWidth = 0;
+			m_colorHeight = 0;
+			m_depthWidth = 0;
+			m_depthHeight = 0;
+			m_colorCompressionType = SensorData::TYPE_JPEG;
+			m_depthCompressionType = SensorData::TYPE_ZLIB_USHORT;
 		}
 
 		SensorData(const std::string& filename) {
-			//the first 3 versions [0,1,2] are reserved for the old .sensor files
-#define M_SENSOR_DATA_VERSION 3
-			m_versionNumber = M_CALIBRATED_SENSOR_DATA_VERSION;
+			m_versionNumber = M_SENSOR_DATA_VERSION;
 			m_sensorName = "Unknown";
-			readFromFile(filename);
+			loadFromFile(filename);
 		}
 
 		~SensorData() {
 			free();
 		}
 
+		//! frees all allocated memory (all data will be lost)
 		void free() {
 			for (size_t i = 0; i < m_frames.size(); i++) {
 				m_frames[i].free();
@@ -574,11 +552,65 @@ namespace ml {
 			m_depthHeight = 0;
 		}
 
+		//! checks the version number
 		void assertVersionNumber() const {
-			if (m_versionNumber != M_CALIBRATED_SENSOR_DATA_VERSION)	throw MLIB_EXCEPTION("Invalid file version");
+			if (m_versionNumber != M_SENSOR_DATA_VERSION)	
+				throw MLIB_EXCEPTION("Invalid file version -- found " + std::to_string(m_versionNumber) + " but expectd " + std::to_string(M_SENSOR_DATA_VERSION));
 		}
 
-		void writeToFile(const std::string& filename) const {
+		//! this function must be called if not read from a file
+		void initDefault(
+			unsigned int colorWidth,
+			unsigned int colorHeight,
+			unsigned int depthWidth,
+			unsigned int depthHeight,
+			const CalibrationData& calibrationColor,
+			const CalibrationData& calibrationDepth,
+			COMPRESSION_TYPE_COLOR colorType = TYPE_JPEG,
+			COMPRESSION_TYPE_DEPTH depthType = TYPE_ZLIB_USHORT,
+			float depthShift = 1000.0f,
+			const std::string sensorName = "Unknown") 
+		{
+			m_sensorName = sensorName;
+			m_colorCompressionType = colorType;
+			m_depthCompressionType = depthType;
+			m_colorWidth = colorWidth;
+			m_colorHeight = colorHeight;
+			m_depthWidth = depthWidth;
+			m_depthHeight = depthHeight;
+			m_depthShift = depthShift;
+			m_calibrationColor = calibrationColor;
+			m_calibrationDepth = calibrationDepth;
+		}
+
+		RGBDFrame& addFrame(const vec3uc* color, const unsigned short* depth, const mat4f& cameraToWorld = mat4f::identity(), UINT64 timeStamp = 0) {
+			m_frames.push_back(RGBDFrame(color, m_colorWidth, m_colorHeight, depth, m_depthWidth, m_depthHeight, cameraToWorld, m_colorCompressionType, m_depthCompressionType, timeStamp, timeStamp));
+			return m_frames.back();
+		}
+		
+		//! decompresses the frame and allocates the memory -- needs std::free afterwards!
+		vec3uc* decompressColorAlloc(const RGBDFrame& f) const {
+			return f.decompressColorAlloc(m_colorCompressionType);
+		}
+		//! decompresses the frame and allocates the memory -- needs std::free afterwards!
+		vec3uc* decompressColorAlloc(size_t frameIdx) const {
+			if (frameIdx > m_frames.size()) throw MLIB_EXCEPTION("out of bounds");
+			return decompressColorAlloc(m_frames[frameIdx]);
+		}
+
+		//! decompresses the frame and allocates the memory -- needs std::free afterwards!
+		unsigned short* decompressDepthAlloc(const RGBDFrame& f) const {
+			return f.decompressDepthAlloc(m_depthWidth, m_depthHeight, m_depthCompressionType);
+		}
+		//! decompresses the frame and allocates the memory -- needs std::free afterwards!
+		unsigned short* decompressDepthAlloc(size_t frameIdx) const {
+			if (frameIdx > m_frames.size()) throw MLIB_EXCEPTION("out of bounds");
+			return decompressDepthAlloc(m_frames[frameIdx]);
+		}
+
+
+		//! saves a .sens file
+		void saveToFile(const std::string& filename) const {
 			std::ofstream out(filename, std::ios::binary);
 
 			out.write((const char*)&m_versionNumber, sizeof(unsigned int));
@@ -586,9 +618,11 @@ namespace ml {
 			out.write((const char*)&strLen, sizeof(UINT64));
 			out.write((const char*)&m_sensorName[0], strLen*sizeof(char));
 
-			m_calibrationColor.writeToFile(out);
-			m_calibrationDepth.writeToFile(out);
+			m_calibrationColor.saveToFile(out);
+			m_calibrationDepth.saveToFile(out);
 
+			out.write((const char*)&m_colorCompressionType, sizeof(COMPRESSION_TYPE_COLOR));
+			out.write((const char*)&m_depthCompressionType, sizeof(COMPRESSION_TYPE_DEPTH));
 			out.write((const char*)&m_colorWidth, sizeof(unsigned int));
 			out.write((const char*)&m_colorHeight, sizeof(unsigned int));
 			out.write((const char*)&m_depthWidth, sizeof(unsigned int));
@@ -598,12 +632,12 @@ namespace ml {
 			UINT64 numFrames = m_frames.size();
 			out.write((const char*)&numFrames, sizeof(UINT64));
 			for (size_t i = 0; i < m_frames.size(); i++) {
-				m_frames[i].writeToFile(out);
+				m_frames[i].saveToFile(out);
 			}
 		}
 
-
-		void readFromFile(const std::string& filename) {
+		//! loads a .sens file
+		void loadFromFile(const std::string& filename) {
 			std::ifstream in(filename, std::ios::binary);
 
 			if (!in.is_open()) {
@@ -617,9 +651,11 @@ namespace ml {
 			m_sensorName.resize(strLen);
 			in.read((char*)&m_sensorName[0], strLen*sizeof(char));
 
-			m_calibrationColor.readFromFile(in);
-			m_calibrationDepth.readFromFile(in);
+			m_calibrationColor.loadFromFile(in);
+			m_calibrationDepth.loadFromFile(in);
 
+			in.read((char*)&m_colorCompressionType, sizeof(COMPRESSION_TYPE_COLOR));
+			in.read((char*)&m_depthCompressionType, sizeof(COMPRESSION_TYPE_DEPTH));
 			in.read((char*)&m_colorWidth, sizeof(unsigned int));
 			in.read((char*)&m_colorHeight, sizeof(unsigned int));
 			in.read((char*)&m_depthWidth, sizeof(unsigned int));
@@ -630,25 +666,23 @@ namespace ml {
 			in.read((char*)&numFrames, sizeof(UINT64));
 			m_frames.resize(numFrames);
 			for (size_t i = 0; i < m_frames.size(); i++) {
-				m_frames[i].readFromFile(in);
+				m_frames[i].loadFromFile(in);
 			}
 		}
-
-
 
 		class StringCounter {
 		public:
 			StringCounter(const std::string& base, const std::string fileEnding, unsigned int numCountDigits = 0, unsigned int initValue = 0) {
-				m_Base = base;
+				m_base = base;
 				if (fileEnding[0] != '.') {
-					m_FileEnding = ".";
-					m_FileEnding.append(fileEnding);
+					m_fileEnding = ".";
+					m_fileEnding.append(fileEnding);
 				}
 				else {
-					m_FileEnding = fileEnding;
+					m_fileEnding = fileEnding;
 				}
-				m_NumCountDigits = numCountDigits;
-				m_InitValue = initValue;
+				m_numCountDigits = numCountDigits;
+				m_initValue = initValue;
 				resetCounter();
 			}
 
@@ -657,219 +691,234 @@ namespace ml {
 
 			std::string getNext() {
 				std::string curr = getCurrent();
-				m_Current++;
+				m_current++;
 				return curr;
 			}
 
 			std::string getCurrent() {
 				std::stringstream ss;
-				ss << m_Base;
-				for (unsigned int i = std::max(1u, (unsigned int)std::ceilf(std::log10f((float)m_Current + 1))); i < m_NumCountDigits; i++) ss << "0";
-				ss << m_Current;
-				ss << m_FileEnding;
+				ss << m_base;
+				for (unsigned int i = std::max(1u, (unsigned int)std::ceilf(std::log10f((float)m_current + 1))); i < m_numCountDigits; i++) ss << "0";
+				ss << m_current;
+				ss << m_fileEnding;
 				return ss.str();
 			}
 
 			void resetCounter() {
-				m_Current = m_InitValue;
+				m_current = m_initValue;
 			}
 		private:
-			std::string		m_Base;
-			std::string		m_FileEnding;
-			unsigned int	m_NumCountDigits;
-			unsigned int	m_Current;
-			unsigned int	m_InitValue;
+			std::string		m_base;
+			std::string		m_fileEnding;
+			unsigned int	m_numCountDigits;
+			unsigned int	m_current;
+			unsigned int	m_initValue;
 		};
 
+		
+#ifdef 	_HAS_MLIB	//needs free image to write out data
+		//! 7-scenes format
+		void saveToImages(const std::string& outputFolder, const std::string& basename = "frame-") const {
+			if (!ml::util::directoryExists(outputFolder)) ml::util::makeDirectory(outputFolder);
 
-//#ifdef 	_HAS_MLIB	//needs free image to write out data
-//		//! 7-scenes format
-//		void writeToImages(const std::string& outputFolder, const std::string& basename = "frame-") const {
-//			if (!ml::util::directoryExists(outputFolder)) ml::util::makeDirectory(outputFolder);
-//
-//			{
-//				//write meta information
-//				const std::string& metaData = "info.txt";
-//				std::ofstream outMeta(outputFolder + "/" + metaData);
-//
-//				outMeta << "m_versionNumber" << " = " << m_versionNumber << '\n';
-//				outMeta << "m_sensorName" << " = " << m_sensorName << '\n';
-//				outMeta << "m_colorWidth" << " = " << m_colorWidth << '\n';
-//				outMeta << "m_colorHeight" << " = " << m_colorHeight << '\n';
-//				outMeta << "m_depthWidth" << " = " << m_depthWidth << '\n';
-//				outMeta << "m_depthHeight" << " = " << m_depthHeight << '\n';
-//				outMeta << "m_depthShift" << " = " << m_depthShift << '\n';
-//				outMeta << "m_calibrationColorIntrinsic" << " = ";
-//				for (unsigned int i = 0; i < 16; i++) outMeta << m_calibrationColor.m_intrinsic[i] << " ";	outMeta << "\n";
-//				outMeta << "m_calibrationColorExtrinsic" << " = ";
-//				for (unsigned int i = 0; i < 16; i++) outMeta << m_calibrationColor.m_extrinsic[i] << " ";	outMeta << "\n";
-//				outMeta << "m_calibrationDepthIntrinsic" << " = ";
-//				for (unsigned int i = 0; i < 16; i++) outMeta << m_calibrationDepth.m_intrinsic[i] << " ";	outMeta << "\n";
-//				outMeta << "m_calibrationDepthExtrinsic" << " = ";
-//				for (unsigned int i = 0; i < 16; i++) outMeta << m_calibrationDepth.m_extrinsic[i] << " ";	outMeta << "\n";
-//				UINT64 numFrames = m_frames.size();
-//				outMeta << "m_frames.size" << " = " << numFrames << "\n";
-//			}
-//
-//			if (m_frames.size() == 0) return;	//nothing to do
-//			const RGBDFrame& baseFrame = m_frames[0];	//assumes all frames have the same format
-//			std::string colorFormatEnding = "png";	//default is png			
-//			if (baseFrame.m_colorCompressionType == RGBDFrame::TYPE_PNG) colorFormatEnding = "png";
-//			else if (baseFrame.m_colorCompressionType == RGBDFrame::TYPE_JPEG) colorFormatEnding = "jpg";
-//
-//
-//			StringCounter scColor(outputFolder + "/" + basename, "color." + colorFormatEnding, 6);
-//			StringCounter scDepth(outputFolder + "/" + basename, "depth.png", 6);
-//			StringCounter scPose(outputFolder + "/" + basename, ".pose.txt", 6);
-//
-//			for (size_t i = 0; i < m_frames.size(); i++) {
-//				std::string colorFile = scColor.getNext();
-//				std::string depthFile = scDepth.getNext();
-//				std::string poseFile = scPose.getNext();
-//
-//				std::cout << "current Frame: " << i << std::endl;
-//
-//				const RGBDFrame& f = m_frames[i];
-//
-//				//color data
-//				if (baseFrame.m_colorCompressionType == RGBDFrame::TYPE_RAW)
-//				{
-//					RGBDFrame frameCompressed((vec3uc*)f.getColorCompressed(), m_colorWidth, m_colorHeight, NULL, 0, 0, RGBDFrame::TYPE_PNG);
-//					FILE* file = fopen(colorFile.c_str(), "wb");
-//					if (!file) throw MLIB_EXCEPTION("cannot open file " + colorFile);
-//					fwrite(frameCompressed.getColorCompressed(), 1, frameCompressed.getColorSizeBytes(), file);
-//					fclose(file);
-//					frameCompressed.free();
-//				}
-//				else if (baseFrame.m_colorCompressionType == RGBDFrame::TYPE_PNG || baseFrame.m_colorCompressionType == RGBDFrame::TYPE_JPEG)
-//				{
-//					FILE* file = fopen(colorFile.c_str(), "wb");
-//					if (!file) throw MLIB_EXCEPTION("cannot open file " + colorFile);
-//					fwrite(f.getColorCompressed(), 1, f.getColorSizeBytes(), file);
-//					fclose(file);
-//				}
-//				else {
-//					throw MLIB_EXCEPTION("unknown format");
-//				}
-//
-//				//depth data
-//				const bool writeDepthData = true;
-//				if (writeDepthData)
-//				{
-//					unsigned short* depth = f.decompressDepthAlloc();
-//					DepthImage16 image(m_depthWidth, m_depthHeight, depth);
-//					FreeImageWrapper::saveImage(depthFile, image);					
-//					std::free(depth);
-//				}
-//
-//				savePoseFile(poseFile, f.m_frameToWorld);
-//			}
-//		}
-//
-//		//! 7-scenes format
-//		void readFromImages(const std::string& sourceFolder, const std::string& basename = "frame-", const std::string& colorEnding = "png") 
-//		{
-//			if (colorEnding != "png" && colorEnding != "jpg") throw MLIB_EXCEPTION("invalid color format " + colorEnding);
-//			
-//
-//			{
-//				//write meta information
-//				const std::string& metaData = "info.txt";
-//				std::ifstream inMeta(sourceFolder + "/" + metaData);
-//
-//				std::string varName; std::string seperator;
-//				inMeta >> varName; inMeta >> seperator; inMeta >> m_versionNumber;
-//				inMeta >> varName; inMeta >> seperator; inMeta >> m_sensorName;
-//				inMeta >> varName; inMeta >> seperator; inMeta >> m_colorWidth;
-//				inMeta >> varName; inMeta >> seperator; inMeta >> m_colorHeight;
-//				inMeta >> varName; inMeta >> seperator; inMeta >> m_depthWidth;
-//				inMeta >> varName; inMeta >> seperator; inMeta >> m_depthHeight;
-//				inMeta >> varName; inMeta >> seperator; inMeta >> m_depthShift;
-//
-//				inMeta >> varName; inMeta >> seperator;
-//				for (unsigned int i = 0; i < 16; i++) inMeta >> m_calibrationColor.m_intrinsic[i];
-//				inMeta >> varName; inMeta >> seperator;
-//				for (unsigned int i = 0; i < 16; i++) inMeta >> m_calibrationColor.m_extrinsic[i];
-//				inMeta >> varName; inMeta >> seperator;
-//				for (unsigned int i = 0; i < 16; i++) inMeta >> m_calibrationDepth.m_intrinsic[i];
-//				inMeta >> varName; inMeta >> seperator;
-//				for (unsigned int i = 0; i < 16; i++) inMeta >> m_calibrationDepth.m_extrinsic[i];
-//				UINT64 numFrames;
-//				inMeta >> varName; inMeta >> numFrames;
-//			}
-//
-//
-//			StringCounter scColor(sourceFolder + "/" + basename, "color." + colorEnding, 6);
-//			StringCounter scDepth(sourceFolder + "/" + basename, "depth.png", 6);
-//			StringCounter scPose(sourceFolder + "/" + basename, ".pose.txt", 6);
-//
-//			for (unsigned int i = 0;; i++) {
-//				std::string colorFile = scColor.getNext();
-//				std::string depthFile = scDepth.getNext();
-//				std::string poseFile = scPose.getNext();
-//
-//				if (!ml::util::fileExists(colorFile) || !ml::util::fileExists(depthFile) || !ml::util::fileExists(poseFile)) {
-//					std::cout << "DONE" << std::endl;
-//					break;
-//				}
-//
-//				std::cout << "current Frame: " << i << std::endl;
-//
-//				//ColorImageR8G8B8 colorImage;	ml::FreeImageWrapper::loadImage(colorFile, colorImage, false);
-//				//vec3uc* colorData = new vec3uc[m_colorWidth*m_colorHeight];
-//				//memcpy(colorData, colorImage.getPointer(), sizeof(vec3uc)*m_colorWidth*m_colorHeight);
-//				std::ifstream colorStream(colorFile, std::ios::binary | std::ios::ate);
-//				size_t colorSizeBytes = colorStream.tellg();
-//				colorStream.seekg(0, std::ios::beg);
-//				unsigned char* colorData = (unsigned char*)std::malloc(colorSizeBytes);
-//				colorStream.read((char*)colorData, colorSizeBytes);
-//				colorStream.close();
-//
-//
-//				DepthImage16 depthImage;			ml::FreeImageWrapper::loadImage(depthFile, depthImage, false);
-//				unsigned short*	depthData = new unsigned short[m_depthWidth*m_depthHeight];
-//				memcpy(depthData, depthImage.getPointer(), sizeof(unsigned short)*m_depthWidth*m_depthHeight);
-//				
-//
-//				ml::SensorData::RGBDFrame::COMPRESSION_TYPE_COLOR compressionColor = ml::SensorData::RGBDFrame::COMPRESSION_TYPE_COLOR::TYPE_PNG;
-//				if (colorEnding == "png")		compressionColor = ml::SensorData::RGBDFrame::COMPRESSION_TYPE_COLOR::TYPE_PNG;
-//				else if (colorEnding == "jpg")	compressionColor = ml::SensorData::RGBDFrame::COMPRESSION_TYPE_COLOR::TYPE_JPEG;
-//				else throw MLIB_EXCEPTION("invalid color format " + compressionColor);
-//
-//				//by default use TYPE_OCCI_USHORT (it's just the best)
-//				ml::SensorData::RGBDFrame::COMPRESSION_TYPE_DEPTH compressionDepth = ml::SensorData::RGBDFrame::COMPRESSION_TYPE_DEPTH::TYPE_OCCI_USHORT;
-//
-//				//m_frames.push_back(RGBDFrame(colorData, m_colorWidth, m_colorHeight, depthData, m_depthWidth, m_depthHeight, compressionColor, compressionDepth));
-//				m_frames.push_back(RGBDFrame(NULL, 0, 0, depthData, m_depthWidth, m_depthHeight, compressionColor, compressionDepth));
-//				m_frames.back().m_colorCompressionType = compressionColor;
-//				m_frames.back().m_colorWidth = m_colorWidth;
-//				m_frames.back().m_colorHeight = m_colorHeight;
-//				m_frames.back().m_colorSizeBytes = colorSizeBytes;
-//				m_frames.back().m_colorCompressed = colorData;
-//
-//				//! camera trajectory (from base to current frame)
-//				mat4f m_frameToWorld;
-//
-//				mat4f pose = loadPoseFile(poseFile);
-//				m_frames.back().m_frameToWorld = pose;
-//
-//				////debug
-//				//{
-//				//	unsigned short* depth = m_frames.back().decompressDepth();
-//				//	ml::DepthImage16 depth16(m_depthWidth, m_depthHeight, depth);
-//				//	ml::FreeImageWrapper::saveImage(sourceFolder + "/" + "depth" + std::to_string(i) + ".png", ml::ColorImageR32G32B32A32(depth16));
-//				//}
-//
-//				SAFE_DELETE_ARRAY(depthData);
-//			}
-//		}
-//#endif //_HAS_MLIB
+			{
+				//write meta information
+				const std::string& metaData = "info.txt";
+				std::ofstream outMeta(outputFolder + "/" + metaData);
 
+				outMeta << "m_versionNumber" << " = " << m_versionNumber << '\n';
+				outMeta << "m_sensorName" << " = " << m_sensorName << '\n';
+				outMeta << "m_colorWidth" << " = " << m_colorWidth << '\n';
+				outMeta << "m_colorHeight" << " = " << m_colorHeight << '\n';
+				outMeta << "m_depthWidth" << " = " << m_depthWidth << '\n';
+				outMeta << "m_depthHeight" << " = " << m_depthHeight << '\n';
+				outMeta << "m_depthShift" << " = " << m_depthShift << '\n';
+				outMeta << "m_calibrationColorIntrinsic" << " = ";
+				for (unsigned int i = 0; i < 16; i++) outMeta << m_calibrationColor.m_intrinsic[i] << " ";	outMeta << "\n";
+				outMeta << "m_calibrationColorExtrinsic" << " = ";
+				for (unsigned int i = 0; i < 16; i++) outMeta << m_calibrationColor.m_extrinsic[i] << " ";	outMeta << "\n";
+				outMeta << "m_calibrationDepthIntrinsic" << " = ";
+				for (unsigned int i = 0; i < 16; i++) outMeta << m_calibrationDepth.m_intrinsic[i] << " ";	outMeta << "\n";
+				outMeta << "m_calibrationDepthExtrinsic" << " = ";
+				for (unsigned int i = 0; i < 16; i++) outMeta << m_calibrationDepth.m_extrinsic[i] << " ";	outMeta << "\n";
+				UINT64 numFrames = m_frames.size();
+				outMeta << "m_frames.size" << " = " << numFrames << "\n";
+			}
+
+			if (m_frames.size() == 0) return;	//nothing to do
+			std::string colorFormatEnding = "png";	//default is png			
+			if (m_colorCompressionType == TYPE_PNG) colorFormatEnding = "png";
+			else if (m_colorCompressionType == TYPE_JPEG) colorFormatEnding = "jpg";
+
+
+			StringCounter scColor(outputFolder + "/" + basename, "color." + colorFormatEnding, 6);
+			StringCounter scDepth(outputFolder + "/" + basename, "depth.png", 6);
+			StringCounter scPose(outputFolder + "/" + basename, ".pose.txt", 6);
+
+			for (size_t i = 0; i < m_frames.size(); i++) {
+				std::string colorFile = scColor.getNext();
+				std::string depthFile = scDepth.getNext();
+				std::string poseFile = scPose.getNext();
+
+				const RGBDFrame& f = m_frames[i];
+
+				//color data
+				if (m_colorCompressionType == TYPE_RAW)
+				{
+					RGBDFrame frameCompressed((vec3uc*)f.getColorCompressed(), m_colorWidth, m_colorHeight, NULL, 0, 0, mat4f::identity(), TYPE_PNG);
+					FILE* file = fopen(colorFile.c_str(), "wb");
+					if (!file) throw MLIB_EXCEPTION("cannot open file " + colorFile);
+					fwrite(frameCompressed.getColorCompressed(), 1, frameCompressed.getColorSizeBytes(), file);
+					fclose(file);
+					frameCompressed.free();
+				}
+				else if (m_colorCompressionType == TYPE_PNG || m_colorCompressionType == TYPE_JPEG)
+				{
+					FILE* file = fopen(colorFile.c_str(), "wb");
+					if (!file) throw MLIB_EXCEPTION("cannot open file " + colorFile);
+					fwrite(f.getColorCompressed(), 1, f.getColorSizeBytes(), file);
+					fclose(file);
+				}
+				else {
+					throw MLIB_EXCEPTION("unknown format");
+				}
+
+				//depth data
+				const bool writeDepthData = true;
+				if (writeDepthData)
+				{
+					unsigned short* depth = decompressDepthAlloc(f);
+					DepthImage16 image(m_depthWidth, m_depthHeight, depth);
+					FreeImageWrapper::saveImage(depthFile, image);					
+					std::free(depth);
+				}
+
+				savePoseFile(poseFile, f.m_cameraToWorld);
+			}
+		}
+
+		//! 7-scenes format
+		void loadFromImages(const std::string& sourceFolder, const std::string& basename = "frame-", const std::string& colorEnding = "png") 
+		{
+			if (colorEnding != "png" && colorEnding != "jpg") throw MLIB_EXCEPTION("invalid color format " + colorEnding);
+			
+
+			{
+				//write meta information
+				const std::string& metaData = "info.txt";
+				std::ifstream inMeta(sourceFolder + "/" + metaData);
+
+				std::string varName; std::string seperator;
+				inMeta >> varName; inMeta >> seperator; inMeta >> m_versionNumber;
+				inMeta >> varName; inMeta >> seperator; inMeta >> m_sensorName;
+				inMeta >> varName; inMeta >> seperator; inMeta >> m_colorWidth;
+				inMeta >> varName; inMeta >> seperator; inMeta >> m_colorHeight;
+				inMeta >> varName; inMeta >> seperator; inMeta >> m_depthWidth;
+				inMeta >> varName; inMeta >> seperator; inMeta >> m_depthHeight;
+				inMeta >> varName; inMeta >> seperator; inMeta >> m_depthShift;
+
+				inMeta >> varName; inMeta >> seperator;
+				for (unsigned int i = 0; i < 16; i++) inMeta >> m_calibrationColor.m_intrinsic[i];
+				inMeta >> varName; inMeta >> seperator;
+				for (unsigned int i = 0; i < 16; i++) inMeta >> m_calibrationColor.m_extrinsic[i];
+				inMeta >> varName; inMeta >> seperator;
+				for (unsigned int i = 0; i < 16; i++) inMeta >> m_calibrationDepth.m_intrinsic[i];
+				inMeta >> varName; inMeta >> seperator;
+				for (unsigned int i = 0; i < 16; i++) inMeta >> m_calibrationDepth.m_extrinsic[i];
+				UINT64 numFrames;
+				inMeta >> varName; inMeta >> numFrames;
+			}
+
+
+			StringCounter scColor(sourceFolder + "/" + basename, "color." + colorEnding, 6);
+			StringCounter scDepth(sourceFolder + "/" + basename, "depth.png", 6);
+			StringCounter scPose(sourceFolder + "/" + basename, ".pose.txt", 6);
+
+			for (unsigned int i = 0;; i++) {
+				std::string colorFile = scColor.getNext();
+				std::string depthFile = scDepth.getNext();
+				std::string poseFile = scPose.getNext();
+
+				if (!ml::util::fileExists(colorFile) || !ml::util::fileExists(depthFile) || !ml::util::fileExists(poseFile)) {
+					std::cout << "DONE" << std::endl;
+					break;
+				}
+
+
+				//ColorImageR8G8B8 colorImage;	ml::FreeImageWrapper::loadImage(colorFile, colorImage, false);
+				//vec3uc* colorData = new vec3uc[m_colorWidth*m_colorHeight];
+				//memcpy(colorData, colorImage.getPointer(), sizeof(vec3uc)*m_colorWidth*m_colorHeight);
+				std::ifstream colorStream(colorFile, std::ios::binary | std::ios::ate);
+				size_t colorSizeBytes = colorStream.tellg();
+				colorStream.seekg(0, std::ios::beg);
+				unsigned char* colorData = (unsigned char*)std::malloc(colorSizeBytes);
+				colorStream.read((char*)colorData, colorSizeBytes);
+				colorStream.close();
+
+
+				DepthImage16 depthImage;			ml::FreeImageWrapper::loadImage(depthFile, depthImage, false);
+				unsigned short*	depthData = new unsigned short[m_depthWidth*m_depthHeight];
+				memcpy(depthData, depthImage.getData(), sizeof(unsigned short)*m_depthWidth*m_depthHeight);
+				
+
+				ml::SensorData::COMPRESSION_TYPE_COLOR compressionColor = ml::SensorData::COMPRESSION_TYPE_COLOR::TYPE_PNG;
+				if (colorEnding == "png")		compressionColor = ml::SensorData::COMPRESSION_TYPE_COLOR::TYPE_PNG;
+				else if (colorEnding == "jpg")	compressionColor = ml::SensorData::COMPRESSION_TYPE_COLOR::TYPE_JPEG;
+				else throw MLIB_EXCEPTION("invalid color format " + compressionColor);
+
+				//by default use TYPE_OCCI_USHORT (it's just the best)
+				ml::SensorData::COMPRESSION_TYPE_DEPTH compressionDepth = ml::SensorData::COMPRESSION_TYPE_DEPTH::TYPE_OCCI_USHORT;
+
+				RGBDFrame& f = addFrame(NULL, depthData);
+				f.m_colorSizeBytes = colorSizeBytes;
+				f.m_colorCompressed = colorData;
+
+				//! camera trajectory (from base to current frame)
+				mat4f m_frameToWorld;
+
+				mat4f pose = loadPoseFile(poseFile);
+				f.m_cameraToWorld = pose;
+
+				////debug
+				//{
+				//	unsigned short* depth = m_frames.back().decompressDepth();
+				//	ml::DepthImage16 depth16(m_depthWidth, m_depthHeight, depth);
+				//	ml::FreeImageWrapper::saveImage(sourceFolder + "/" + "depth" + std::to_string(i) + ".png", ml::ColorImageR32G32B32A32(depth16));
+				//}
+
+				SAFE_DELETE_ARRAY(depthData);
+			}
+		}
+#endif //_HAS_MLIB
+
+		//! appends another SensorData object
+		void append(const SensorData& second) {
+			if (m_colorWidth != second.m_colorWidth &&
+				m_colorHeight != second.m_colorHeight &&
+				m_depthWidth != second.m_depthWidth &&
+				m_depthHeight != second.m_depthHeight &&
+				m_colorCompressionType != second.m_colorCompressionType &&
+				m_depthCompressionType != second.m_depthCompressionType) {
+				throw MLIB_EXCEPTION("sensor data incompatible");
+			}
+
+			for (size_t i = 0; i < second.m_frames.size(); i++) {
+				m_frames.push_back(second.m_frames[i]);	//this is a bit of hack (relying on the fact that no copy-operator is implemented)
+				RGBDFrame& f = m_frames.back();
+				f.m_colorCompressed = (unsigned char*)std::malloc(f.m_colorSizeBytes);
+				f.m_depthCompressed = (unsigned char*)std::malloc(f.m_depthSizeBytes);
+				std::memcpy(f.m_colorCompressed, second.m_frames[i].m_colorCompressed, f.m_colorSizeBytes);
+				std::memcpy(f.m_depthCompressed, second.m_frames[i].m_depthCompressed, f.m_depthSizeBytes);
+			}
+		}
+		
 		bool operator==(const SensorData& other) const {
 			if (m_versionNumber != other.m_versionNumber) return false;
 			if (m_sensorName != other.m_sensorName) return false;
 			if (m_calibrationColor != other.m_calibrationColor) return false;
 			if (m_calibrationDepth != other.m_calibrationDepth) return false;
+			if (m_colorCompressionType != other.m_colorCompressionType) return false;
+			if (m_depthCompressionType != other.m_depthCompressionType) return false;
 			if (m_colorWidth != other.m_colorWidth) return false;
 			if (m_colorHeight != other.m_colorHeight) return false;
 			if (m_depthWidth != other.m_depthWidth) return false;
@@ -896,11 +945,14 @@ namespace ml {
 		CalibrationData m_calibrationColor;
 		CalibrationData m_calibrationDepth;
 
+		COMPRESSION_TYPE_COLOR m_colorCompressionType;
+		COMPRESSION_TYPE_DEPTH m_depthCompressionType;
+
 		unsigned int m_colorWidth;
 		unsigned int m_colorHeight;
 		unsigned int m_depthWidth;
 		unsigned int m_depthHeight;
-		float m_depthShift;	//conversion from float[m] to ushort
+		float m_depthShift;	//conversion from float[m] to ushort (typically 1000.0f)
 
 		std::vector<RGBDFrame> m_frames;
 
@@ -911,6 +963,8 @@ namespace ml {
 
 		static mat4f loadPoseFile(const std::string& filename) {
 			std::ifstream file(filename);
+			if (!file.is_open()) throw MLIB_EXCEPTION("file not found " + filename);
+
 			mat4f m;
 			file >>
 				m._m00 >> m._m01 >> m._m02 >> m._m03 >>
@@ -932,11 +986,11 @@ namespace ml {
 		}
 
 
+
 	};
 
-
 	class RGBDFrameCacheRead {
-public:
+	public:
 		struct FrameState {
 			FrameState() {
 				m_bIsReady = false;
@@ -1010,19 +1064,17 @@ public:
 					cache->m_data.push_back(FrameState());
 					cache->m_mutexList.unlock();
 
-					SensorData::RGBDFrame& frame = cache->m_sensorData->m_frames[cache->m_nextFromSensorData];
+					SensorData* sensorData = cache->m_sensorData;
+					SensorData::RGBDFrame& frame = sensorData->m_frames[cache->m_nextFromSensorData];
 					FrameState& fs = cache->m_data.back();
 
 					//std::cout << "decompressing frame " << cache->m_nextFromSensorData << std::endl;
-					fs.m_colorFrame = frame.decompressColorAlloc();
-					fs.m_depthFrame = frame.decompressDepthAlloc();
+					fs.m_colorFrame = sensorData->decompressColorAlloc(frame);
+					fs.m_depthFrame = sensorData->decompressDepthAlloc(frame);
 					fs.m_bIsReady = true;
 					cache->m_nextFromSensorData++;
 				}
 			}
-
-			std::cout << "done decomp" << std::endl;
-			int a = 5;
 		}
 
 		SensorData* m_sensorData;
@@ -1035,7 +1087,7 @@ public:
 
 		unsigned int m_nextFromSensorData;
 		unsigned int m_nextFromSensorCache;
-	};
+		};
 
 	class RGBDFrameCacheWrite {
 	private:
@@ -1063,7 +1115,7 @@ public:
 			m_bTerminateThread = false;
 			startCompBackgroundThread();
 		}
- 
+
 		~RGBDFrameCacheWrite() {
 			m_bTerminateThread = true;
 			if (m_compThread.joinable()) {
@@ -1102,13 +1154,14 @@ public:
 					cache->m_data.pop_front();
 					cache->m_mutexList.unlock();
 
-					cache->m_sensorData->m_frames.push_back(SensorData::RGBDFrame(
-						fs.m_colorFrame,
-						cache->m_sensorData->m_colorWidth,
-						cache->m_sensorData->m_colorHeight,
-						fs.m_depthFrame,
-						cache->m_sensorData->m_depthWidth,
-						cache->m_sensorData->m_depthHeight));
+					//cache->m_sensorData->m_frames.push_back(SensorData::RGBDFrame(
+					//	fs.m_colorFrame,
+					//	cache->m_sensorData->m_colorWidth,
+					//	cache->m_sensorData->m_colorHeight,
+					//	fs.m_depthFrame,
+					//	cache->m_sensorData->m_depthWidth,
+					//	cache->m_sensorData->m_depthHeight));
+					cache->m_sensorData->addFrame(fs.m_colorFrame, fs.m_depthFrame);
 					fs.free();
 
 				}

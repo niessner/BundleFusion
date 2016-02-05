@@ -345,7 +345,7 @@ void RGBDSensor::saveRecordedFramesToFile(const std::string& filename, const std
 
 		//setting the trajectory first
 		for (size_t i = 0; i < numFrames; i++) {
-			m_recordedData->m_frames[i].m_frameToWorld = trajectory[i];
+			m_recordedData->m_frames[i].setCameraToWorld(trajectory[i]);
 		}
 		//free frames without a trajectory
 		if (numFrames < m_recordedData->m_frames.size()) {
@@ -372,7 +372,7 @@ void RGBDSensor::saveRecordedFramesToFile(const std::string& filename, const std
 			actualFilename = path + base + std::to_string(num + 1) + "." + ext;
 		}
 
-		m_recordedData->writeToFile(actualFilename);
+		m_recordedData->saveToFile(actualFilename);
 		std::cout << "DONE!" << std::endl;
 
 

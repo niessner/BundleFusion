@@ -1866,14 +1866,14 @@ void TestMatching::testGlobalDense()
 		const std::string outFile = "dump/" + which + "_glob.sens";
 		std::cout << "writing sensor file to " << outFile << "... ";
 		SensorData sensorData;
-		sensorData.readFromFile(origFile);
+		sensorData.loadFromFile(origFile);
 		if (sensorData.m_frames.size() != trajectoryAll.size()) {
 			std::cout << "warning: sensor data has " << sensorData.m_frames.size() << " frames vs " << trajectoryAll.size() << " transforms" << std::endl;
 			if (sensorData.m_frames.size() > trajectoryAll.size()) sensorData.m_frames.resize(trajectoryAll.size());
 		}
 		for (unsigned int i = 0; i < sensorData.m_frames.size(); i++) 
-			sensorData.m_frames[i].m_frameToWorld = trajectoryAll[i];
-		sensorData.writeToFile(outFile);
+			sensorData.m_frames[i].setCameraToWorld(trajectoryAll[i]);
+		sensorData.saveToFile(outFile);
 		std::cout << "done!" << std::endl;
 	}
 
@@ -2178,7 +2178,7 @@ void TestMatching::debug()
 	const std::string filename = "../data/gates371/gates371.sens";
 	std::cout << "loading sensor file.... ";
 	SensorData sensorData;
-	sensorData.readFromFile(filename);
+	sensorData.loadFromFile(filename);
 	std::cout << "done!" << std::endl;
 
 	std::cout << "writing color images... ";
@@ -2187,8 +2187,8 @@ void TestMatching::debug()
 
 	for (unsigned int i = 0; i < sensorData.m_frames.size(); i+=10) {
 		ml::RGBDFrameCacheRead::FrameState frameState;
-		frameState.m_colorFrame = sensorData.m_frames[i].decompressColorAlloc();
-		//frameState.m_depthFrame = sensorData.m_frames[i].decompressDepthAlloc();
+		frameState.m_colorFrame = sensorData.decompressColorAlloc(i);
+		//frameState.m_depthFrame = sensorData.decompressDepthAlloc(i);
 		FreeImageWrapper::saveImage(outDir + std::to_string(i) + ".png", ColorImageR8G8B8(sensorData.m_colorWidth, sensorData.m_colorHeight, frameState.m_colorFrame));
 		frameState.free();
 	}
@@ -2201,7 +2201,7 @@ void TestMatching::loadCachedFramesFromSensorData(CUDACache* cache, const std::s
 
 	std::cout << "loading cached frames from sensor... ";
 	SensorData sensorData;
-	sensorData.readFromFile(filename);
+	sensorData.loadFromFile(filename);
 	RGBDFrameCacheRead sensorDataCache(&sensorData, 10);
 	const unsigned int numOrigFrames = (unsigned int)sensorData.m_frames.size();
 
@@ -2212,9 +2212,9 @@ void TestMatching::loadCachedFramesFromSensorData(CUDACache* cache, const std::s
 		const unsigned int oldIndex = i * skip;
 		MLIB_ASSERT(oldIndex < numOrigFrames);
 		const auto& frame = sensorData.m_frames[oldIndex];
-		m_colorImages[i] = ColorImageR8G8B8A8(ColorImageR8G8B8(sensorData.m_colorWidth, sensorData.m_colorHeight, frame.decompressColorAlloc()));
-		m_depthImages[i] = DepthImage32(DepthImage16(sensorData.m_depthWidth, sensorData.m_depthHeight, frame.decompressDepthAlloc()));
-		m_referenceTrajectory[i] = frame.m_frameToWorld;
+		//m_colorImages[i] = ColorImageR8G8B8A8(ColorImageR8G8B8(sensorData.m_colorWidth, sensorData.m_colorHeight, sensorData.decompressColorAlloc(frame)));
+		m_depthImages[i] = DepthImage32(DepthImage16(sensorData.m_depthWidth, sensorData.m_depthHeight, sensorData.decompressDepthAlloc(frame)));
+		m_referenceTrajectory[i] = frame.getCameraToWorld();
 	}
 
 	m_depthCalibration.setMatrices(sensorData.m_calibrationDepth.m_intrinsic, sensorData.m_calibrationDepth.m_extrinsic);
