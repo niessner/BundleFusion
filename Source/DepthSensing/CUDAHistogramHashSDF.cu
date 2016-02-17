@@ -13,7 +13,7 @@
 
 
 
-__global__ void computeHistrogramKernel(unsigned int* d_data, HashData hashData)
+__global__ void computeHistrogramKernel(unsigned int* d_data, HashDataStruct hashData)
 {
 	const HashParams& hashParams = c_hashParams;
 	const unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -28,7 +28,7 @@ __global__ void computeHistrogramKernel(unsigned int* d_data, HashData hashData)
 }
 
 
-extern "C" void computeHistogramCUDA(unsigned int* d_data, const HashData& hashData, const HashParams& hashParams) 
+extern "C" void computeHistogramCUDA(unsigned int* d_data, const HashDataStruct& hashData, const HashParams& hashParams) 
 {
 	const dim3 gridSize((hashParams.m_hashNumBuckets + (T_PER_BLOCK*T_PER_BLOCK) - 1)/(T_PER_BLOCK*T_PER_BLOCK), 1);
 	const dim3 blockSize((T_PER_BLOCK*T_PER_BLOCK), 1);

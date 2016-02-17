@@ -24,7 +24,7 @@ extern "C" void bindInputDepthColorTextures(const DepthCameraData& depthCameraDa
 	colorTextureRef.filterMode = cudaFilterModePoint;
 }
 
-__global__ void resetHeapKernel(HashData hashData) 
+__global__ void resetHeapKernel(HashDataStruct hashData) 
 {
 	const HashParams& hashParams = c_hashParams;
 	unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -44,7 +44,7 @@ __global__ void resetHeapKernel(HashData hashData)
 	}
 }
 
-__global__ void resetHashKernel(HashData hashData) 
+__global__ void resetHashKernel(HashDataStruct hashData) 
 {
 	const HashParams& hashParams = c_hashParams;
 	const unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -55,7 +55,7 @@ __global__ void resetHashKernel(HashData hashData)
 }
 
 
-__global__ void resetHashBucketMutexKernel(HashData hashData) 
+__global__ void resetHashBucketMutexKernel(HashDataStruct hashData) 
 {
 	const HashParams& hashParams = c_hashParams;
 	const unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -64,7 +64,7 @@ __global__ void resetHashBucketMutexKernel(HashData hashData)
 	}
 }
 
-extern "C" void resetCUDA(HashData& hashData, const HashParams& hashParams)
+extern "C" void resetCUDA(HashDataStruct& hashData, const HashParams& hashParams)
 {
 	{
 		//resetting the heap and SDF blocks
@@ -110,7 +110,7 @@ extern "C" void resetCUDA(HashData& hashData, const HashParams& hashParams)
 
 }
 
-extern "C" void resetHashBucketMutexCUDA(HashData& hashData, const HashParams& hashParams)
+extern "C" void resetHashBucketMutexCUDA(HashDataStruct& hashData, const HashParams& hashParams)
 {
 	const dim3 gridSize((hashParams.m_hashNumBuckets + (T_PER_BLOCK*T_PER_BLOCK) - 1)/(T_PER_BLOCK*T_PER_BLOCK), 1);
 	const dim3 blockSize((T_PER_BLOCK*T_PER_BLOCK), 1);
@@ -150,7 +150,7 @@ int3 worldToChunks(const float3& posWorld)
 }
 
 __device__
-bool isSDFBlockStreamedOut(const int3& sdfBlock, const HashData& hashData, const unsigned int* d_bitMask)	//TODO MATTHIAS (-> move to HashData)
+bool isSDFBlockStreamedOut(const int3& sdfBlock, const HashDataStruct& hashData, const unsigned int* d_bitMask)	//TODO MATTHIAS (-> move to HashData)
 {
 	if (!d_bitMask) return false;	//TODO can statically disable streaming??
 
@@ -162,7 +162,7 @@ bool isSDFBlockStreamedOut(const int3& sdfBlock, const HashData& hashData, const
 	return ((d_bitMask[index/nBitsInT] & (0x1 << (index%nBitsInT))) != 0x0);
 }
 
-__global__ void allocKernel(HashData hashData, DepthCameraData cameraData, const unsigned int* d_bitMask) 
+__global__ void allocKernel(HashDataStruct hashData, DepthCameraData cameraData, const unsigned int* d_bitMask) 
 {
 	const HashParams& hashParams = c_hashParams;
 	const DepthCameraParams& cameraParams = c_depthCameraParams;
@@ -250,7 +250,7 @@ __global__ void allocKernel(HashData hashData, DepthCameraData cameraData, const
 	}
 }
 
-extern "C" void allocCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams, const unsigned int* d_bitMask) 
+extern "C" void allocCUDA(HashDataStruct& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams, const unsigned int* d_bitMask) 
 {
 	const dim3 gridSize((depthCameraParams.m_imageWidth + T_PER_BLOCK - 1)/T_PER_BLOCK, (depthCameraParams.m_imageHeight + T_PER_BLOCK - 1)/T_PER_BLOCK);
 	const dim3 blockSize(T_PER_BLOCK, T_PER_BLOCK);
@@ -265,7 +265,7 @@ extern "C" void allocCUDA(HashData& hashData, const HashParams& hashParams, cons
 
 
 
-__global__ void fillDecisionArrayKernel(HashData hashData) 
+__global__ void fillDecisionArrayKernel(HashDataStruct hashData) 
 {
 	const HashParams& hashParams = c_hashParams;
 	const unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -281,7 +281,7 @@ __global__ void fillDecisionArrayKernel(HashData hashData)
 	}
 }
 
-extern "C" void fillDecisionArrayCUDA(HashData& hashData, const HashParams& hashParams)
+extern "C" void fillDecisionArrayCUDA(HashDataStruct& hashData, const HashParams& hashParams)
 {
 	const dim3 gridSize((HASH_BUCKET_SIZE * hashParams.m_hashNumBuckets + (T_PER_BLOCK*T_PER_BLOCK) - 1)/(T_PER_BLOCK*T_PER_BLOCK), 1);
 	const dim3 blockSize((T_PER_BLOCK*T_PER_BLOCK), 1);
@@ -295,7 +295,7 @@ extern "C" void fillDecisionArrayCUDA(HashData& hashData, const HashParams& hash
 
 }
 
-__global__ void compactifyHashKernel(HashData hashData) 
+__global__ void compactifyHashKernel(HashDataStruct hashData) 
 {
 	const HashParams& hashParams = c_hashParams;
 	const unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -306,7 +306,7 @@ __global__ void compactifyHashKernel(HashData hashData)
 	}
 }
 
-extern "C" void compactifyHashCUDA(HashData& hashData, const HashParams& hashParams) 
+extern "C" void compactifyHashCUDA(HashDataStruct& hashData, const HashParams& hashParams) 
 {
 	const dim3 gridSize((HASH_BUCKET_SIZE * hashParams.m_hashNumBuckets + (T_PER_BLOCK*T_PER_BLOCK) - 1)/(T_PER_BLOCK*T_PER_BLOCK), 1);
 	const dim3 blockSize((T_PER_BLOCK*T_PER_BLOCK), 1);
@@ -321,7 +321,7 @@ extern "C" void compactifyHashCUDA(HashData& hashData, const HashParams& hashPar
 
 #define COMPACTIFY_HASH_THREADS_PER_BLOCK 256
 //#define COMPACTIFY_HASH_SIMPLE
-__global__ void compactifyHashAllInOneKernel(HashData hashData)
+__global__ void compactifyHashAllInOneKernel(HashDataStruct hashData)
 {
 	const HashParams& hashParams = c_hashParams;
 	const unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -365,7 +365,7 @@ __global__ void compactifyHashAllInOneKernel(HashData hashData)
 #endif
 }
 
-extern "C" unsigned int compactifyHashAllInOneCUDA(HashData& hashData, const HashParams& hashParams)
+extern "C" unsigned int compactifyHashAllInOneCUDA(HashDataStruct& hashData, const HashParams& hashParams)
 {
 	const unsigned int threadsPerBlock = COMPACTIFY_HASH_THREADS_PER_BLOCK;
 	const dim3 gridSize((HASH_BUCKET_SIZE * hashParams.m_hashNumBuckets + threadsPerBlock - 1) / threadsPerBlock, 1);
@@ -418,7 +418,7 @@ inline __device__ float4 bilinearFilterColor(const float2& screenPos) {
 }
 
 template<bool deIntegrate = false>
-__global__ void integrateDepthMapKernel(HashData hashData, DepthCameraData cameraData) {
+__global__ void integrateDepthMapKernel(HashDataStruct hashData, DepthCameraData cameraData) {
 	const HashParams& hashParams = c_hashParams;
 	const DepthCameraParams& cameraParams = c_depthCameraParams;
 
@@ -521,7 +521,7 @@ __global__ void integrateDepthMapKernel(HashData hashData, DepthCameraData camer
 }
 
 
-extern "C" void integrateDepthMapCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams)
+extern "C" void integrateDepthMapCUDA(HashDataStruct& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams)
 {
 	const unsigned int threadsPerBlock = SDF_BLOCK_SIZE*SDF_BLOCK_SIZE*SDF_BLOCK_SIZE;
 	const dim3 gridSize(hashParams.m_numOccupiedBlocks, 1);
@@ -535,7 +535,7 @@ extern "C" void integrateDepthMapCUDA(HashData& hashData, const HashParams& hash
 #endif
 }
 
-extern "C" void deIntegrateDepthMapCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams)
+extern "C" void deIntegrateDepthMapCUDA(HashDataStruct& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams)
 {
 	const unsigned int threadsPerBlock = SDF_BLOCK_SIZE*SDF_BLOCK_SIZE*SDF_BLOCK_SIZE;
 	const dim3 gridSize(hashParams.m_numOccupiedBlocks, 1);
@@ -551,7 +551,7 @@ extern "C" void deIntegrateDepthMapCUDA(HashData& hashData, const HashParams& ha
 
 
 
-__global__ void starveVoxelsKernel(HashData hashData) {
+__global__ void starveVoxelsKernel(HashDataStruct hashData) {
 
 	const uint idx = blockIdx.x;
 	const HashEntry& entry = hashData.d_hashCompactified[idx];
@@ -562,7 +562,7 @@ __global__ void starveVoxelsKernel(HashData hashData) {
 	hashData.d_SDFBlocks[entry.ptr + threadIdx.x].weight = weight;
 }
 
-extern "C" void starveVoxelsKernelCUDA(HashData& hashData, const HashParams& hashParams)
+extern "C" void starveVoxelsKernelCUDA(HashDataStruct& hashData, const HashParams& hashParams)
 {
 	const unsigned int threadsPerBlock = SDF_BLOCK_SIZE*SDF_BLOCK_SIZE*SDF_BLOCK_SIZE;
 	const dim3 gridSize(hashParams.m_numOccupiedBlocks, 1);
@@ -581,7 +581,7 @@ extern "C" void starveVoxelsKernelCUDA(HashData& hashData, const HashParams& has
 __shared__ uint		shared_MaxWeight[SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE / 2];
 
 
-__global__ void garbageCollectIdentifyKernel(HashData hashData) {
+__global__ void garbageCollectIdentifyKernel(HashDataStruct hashData) {
 
 	const unsigned int hashIdx = blockIdx.x;
 	const HashEntry& entry = hashData.d_hashCompactified[hashIdx];
@@ -630,7 +630,7 @@ __global__ void garbageCollectIdentifyKernel(HashData hashData) {
 	}
 }
  
-extern "C" void garbageCollectIdentifyCUDA(HashData& hashData, const HashParams& hashParams) {
+extern "C" void garbageCollectIdentifyCUDA(HashDataStruct& hashData, const HashParams& hashParams) {
 	
 	const unsigned int threadsPerBlock = SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE / 2;
 	const dim3 gridSize(hashParams.m_numOccupiedBlocks, 1);
@@ -645,7 +645,7 @@ extern "C" void garbageCollectIdentifyCUDA(HashData& hashData, const HashParams&
 }
 
 
-__global__ void garbageCollectFreeKernel(HashData hashData) {
+__global__ void garbageCollectFreeKernel(HashDataStruct hashData) {
 
 	//const uint hashIdx = blockIdx.x;
 	const uint hashIdx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -668,7 +668,7 @@ __global__ void garbageCollectFreeKernel(HashData hashData) {
 }
 
 
-extern "C" void garbageCollectFreeCUDA(HashData& hashData, const HashParams& hashParams) {
+extern "C" void garbageCollectFreeCUDA(HashDataStruct& hashData, const HashParams& hashParams) {
 	
 	const unsigned int threadsPerBlock = T_PER_BLOCK*T_PER_BLOCK;
 	const dim3 gridSize((hashParams.m_numOccupiedBlocks + threadsPerBlock - 1) / threadsPerBlock, 1);

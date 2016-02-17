@@ -3,15 +3,12 @@
 #include <cutil_inline.h>
 #include <cutil_math.h>
 
-#include "MatrixConversion.h"
 #include "VoxelUtilHashSDF.h"
 #include "DepthCameraUtil.h"
 #include "CUDAScan.h"
 
-#include "GlobalAppState.h"
-#include "TimingLogDepthSensing.h"
 
-extern "C" void computeHistogramCUDA(unsigned int* d_data, const HashData& hashData, const HashParams& hashParams);
+extern "C" void computeHistogramCUDA(unsigned int* d_data, const HashDataStruct& hashData, const HashParams& hashParams);
 extern "C" void resetHistrogramCUDA(unsigned int* d_data, unsigned int numValues);
 
 class CUDAHistrogramHashSDF {
@@ -23,7 +20,7 @@ public:
 		destroy();
 	}
 
-	void computeHistrogram(const HashData& hashData, const HashParams& hashParams) {
+	void computeHistrogram(const HashDataStruct& hashData, const HashParams& hashParams) {
 		resetHistrogramCUDA(d_historgram, hashParams.m_hashBucketSize + 1 + hashParams.m_hashMaxCollisionLinkedListSize + 1);
 		computeHistogramCUDA(d_historgram, hashData, hashParams);
 		printHistogram(hashParams);

@@ -24,7 +24,7 @@ struct SDFBlockDesc {
 // Pass 1: Find all SDFBlocks that have to be transfered
 //-------------------------------------------------------
 
-__global__ void integrateFromGlobalHashPass1Kernel(HashData hashData, uint start, float radius, float3 cameraPosition, uint* d_outputCounter, SDFBlockDesc* d_output) 
+__global__ void integrateFromGlobalHashPass1Kernel(HashDataStruct hashData, uint start, float radius, float3 cameraPosition, uint* d_outputCounter, SDFBlockDesc* d_output) 
 {
 	const HashParams& hashParams = c_hashParams;
 	const unsigned int bucketID = blockIdx.x*blockDim.x + threadIdx.x + start;
@@ -73,7 +73,7 @@ __global__ void integrateFromGlobalHashPass1Kernel(HashData hashData, uint start
 	}
 }
 
-extern "C" void integrateFromGlobalHashPass1CUDA(const HashParams& hashParams, const HashData& hashData, uint threadsPerPart, uint start, float radius, const float3& cameraPosition, uint* d_outputCounter, SDFBlockDesc* d_output)
+extern "C" void integrateFromGlobalHashPass1CUDA(const HashParams& hashParams, const HashDataStruct& hashData, uint threadsPerPart, uint start, float radius, const float3& cameraPosition, uint* d_outputCounter, SDFBlockDesc* d_output)
 {
 	const dim3 gridSize((threadsPerPart + (T_PER_BLOCK*T_PER_BLOCK) - 1)/(T_PER_BLOCK*T_PER_BLOCK), 1);
 	const dim3 blockSize((T_PER_BLOCK*T_PER_BLOCK), 1);
@@ -94,7 +94,7 @@ extern "C" void integrateFromGlobalHashPass1CUDA(const HashParams& hashParams, c
 //-------------------------------------------------------
 
 
-__global__ void integrateFromGlobalHashPass2Kernel(HashData hashData, const SDFBlockDesc* d_SDFBlockDescs, Voxel* d_output, unsigned int nSDFBlocks)
+__global__ void integrateFromGlobalHashPass2Kernel(HashDataStruct hashData, const SDFBlockDesc* d_SDFBlockDescs, Voxel* d_output, unsigned int nSDFBlocks)
 {
 	const uint idxBlock = blockIdx.x;
 
@@ -112,7 +112,7 @@ __global__ void integrateFromGlobalHashPass2Kernel(HashData hashData, const SDFB
 	}
 }
 
-extern "C" void integrateFromGlobalHashPass2CUDA(const HashParams& hashParams, const HashData& hashData, uint threadsPerPart, const SDFBlockDesc* d_SDFBlockDescs, Voxel* d_output, unsigned int nSDFBlocks)
+extern "C" void integrateFromGlobalHashPass2CUDA(const HashParams& hashParams, const HashDataStruct& hashData, uint threadsPerPart, const SDFBlockDesc* d_SDFBlockDescs, Voxel* d_output, unsigned int nSDFBlocks)
 {
 	const uint threadsPerBlock = SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 	const dim3 gridSize(threadsPerPart, 1);
@@ -140,7 +140,7 @@ extern "C" void integrateFromGlobalHashPass2CUDA(const HashParams& hashParams, c
 // Pass 1: Allocate memory
 //-------------------------------------------------------
 
-__global__ void  chunkToGlobalHashPass1Kernel(HashData hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks)
+__global__ void  chunkToGlobalHashPass1Kernel(HashDataStruct hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks)
 {
 	const unsigned int bucketID = blockIdx.x*blockDim.x + threadIdx.x;
 	const uint linBlockSize = SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
@@ -159,7 +159,7 @@ __global__ void  chunkToGlobalHashPass1Kernel(HashData hashData, uint numSDFBloc
 	}
 }
 
-extern "C" void chunkToGlobalHashPass1CUDA(const HashParams& hashParams, const HashData& hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks)
+extern "C" void chunkToGlobalHashPass1CUDA(const HashParams& hashParams, const HashDataStruct& hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks)
 {
 	const dim3 gridSize((numSDFBlockDescs + (T_PER_BLOCK*T_PER_BLOCK) - 1)/(T_PER_BLOCK*T_PER_BLOCK), 1);
 	const dim3 blockSize((T_PER_BLOCK*T_PER_BLOCK), 1);
@@ -178,7 +178,7 @@ extern "C" void chunkToGlobalHashPass1CUDA(const HashParams& hashParams, const H
 // Pass 2: Copy input to SDFBlocks
 //-------------------------------------------------------
 
-__global__ void chunkToGlobalHashPass2Kernel(HashData hashData, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks)
+__global__ void chunkToGlobalHashPass2Kernel(HashDataStruct hashData, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks)
 {
 	const uint blockID = blockIdx.x;
 	const uint linBlockSize = SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
@@ -189,7 +189,7 @@ __global__ void chunkToGlobalHashPass2Kernel(HashData hashData, uint heapCountPr
 }
 
 
-extern "C" void chunkToGlobalHashPass2CUDA(const HashParams& hashParams, const HashData& hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks)
+extern "C" void chunkToGlobalHashPass2CUDA(const HashParams& hashParams, const HashDataStruct& hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks)
 {
 	const uint threadsPerBlock = SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 	const dim3 gridSize(numSDFBlockDescs, 1);

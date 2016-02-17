@@ -7,8 +7,6 @@
 
 #ifdef SENSOR_DATA_READER
 
-#include "sensorData/sensorData.h"
-
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -89,7 +87,7 @@ bool SensorDataReader::processDepth()
 
 		//TODO check why the frame cache is not used?
 		//ml::RGBDFrameCacheRead::FrameState frameState = m_sensorDataCache->getNext();
-		ml::RGBDFrameCacheRead::FrameState frameState;
+		ml::SensorData::RGBDFrameCacheRead::FrameState frameState;
 		frameState.m_colorFrame = m_sensorData->decompressColorAlloc(m_currFrame);
 		frameState.m_depthFrame = m_sensorData->decompressDepthAlloc(m_currFrame);
 

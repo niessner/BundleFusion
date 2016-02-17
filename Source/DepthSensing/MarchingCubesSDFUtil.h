@@ -116,7 +116,7 @@ struct MarchingCubesData {
 //#else
 //	__host__
 //#endif
-	void extractIsoSurfaceAtPosition(const float3& worldPos, const HashData& hashData, const RayCastData& rayCastData)
+	void extractIsoSurfaceAtPosition(const float3& worldPos, const HashDataStruct& hashData, const RayCastData& rayCastData)
 	{
 		const HashParams& hashParams = c_hashParams;
 		const MarchingCubesParams& params = *d_params;

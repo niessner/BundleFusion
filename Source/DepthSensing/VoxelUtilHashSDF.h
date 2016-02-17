@@ -100,14 +100,14 @@ struct Voxel {
 extern  __constant__ HashParams c_hashParams;
 extern "C" void updateConstantHashParams(const HashParams& hashParams);
  
-struct HashData {
+struct HashDataStruct {
 
 	///////////////
 	// Host part //
 	///////////////
 
 	__device__ __host__
-	HashData() {
+	HashDataStruct() {
 		d_heap = NULL;
 		d_heapCounter = NULL;
 		d_hash = NULL;
@@ -191,10 +191,10 @@ struct HashData {
 	}
 
 	__host__
-	HashData copyToCPU() const {
+	HashDataStruct copyToCPU() const {
 		HashParams params;
 		
-		HashData hashData;
+		HashDataStruct hashData;
 		hashData.allocate(params, false);	//allocate the data on the CPU
 		cutilSafeCall(cudaMemcpy(hashData.d_heap, d_heap, sizeof(unsigned int) * params.m_numSDFBlocks, cudaMemcpyDeviceToHost));
 		cutilSafeCall(cudaMemcpy(hashData.d_heapCounter, d_heapCounter, sizeof(unsigned int), cudaMemcpyDeviceToHost));

@@ -140,11 +140,11 @@ private:
 	bool m_bUseModernSensFilesForRecording;
 
 	std::list<float*> m_recordedDepthData;
-	std::list<vec4uc*>	m_recordedColorData;
+	std::list<vec4uc*> m_recordedColorData;
 
 	std::vector<PointCloudf> m_recordedPoints;
 
 	//new recording version
 	ml::SensorData* m_recordedData;
-	ml::RGBDFrameCacheWrite* m_recordedDataCache;
+	ml::SensorData::RGBDFrameCacheWrite* m_recordedDataCache;
 };

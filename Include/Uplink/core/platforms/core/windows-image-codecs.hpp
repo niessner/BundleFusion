@@ -44,15 +44,15 @@ namespace Gdiplus
 
 //------------------------------------------------------------------------------
 
-inline bool
-operator < (const GUID& lhs, const GUID& rhs)
-{
-    if (lhs.Data1 < rhs.Data1) return true; else if (rhs.Data1 < lhs.Data1) return false;
-    if (lhs.Data2 < rhs.Data2) return true; else if (rhs.Data2 < lhs.Data2) return false;
-    if (lhs.Data3 < rhs.Data3) return true; else if (rhs.Data3 < lhs.Data3) return false;
-
-	return std::memcmp(lhs.Data4, rhs.Data4, 8) < 0;
-}
+//inline bool
+//operator < (const GUID& lhs, const GUID& rhs)
+//{
+//    if (lhs.Data1 < rhs.Data1) return true; else if (rhs.Data1 < lhs.Data1) return false;
+//    if (lhs.Data2 < rhs.Data2) return true; else if (rhs.Data2 < lhs.Data2) return false;
+//    if (lhs.Data3 < rhs.Data3) return true; else if (rhs.Data3 < lhs.Data3) return false;
+//
+//	return std::memcmp(lhs.Data4, rhs.Data4, 8) < 0;
+//}
 
 //------------------------------------------------------------------------------
 

@@ -5,7 +5,7 @@
 #include "CUDAMarchingCubesHashSDF.h"
 
 extern "C" void resetMarchingCubesCUDA(MarchingCubesData& data);
-extern "C" void extractIsoSurfaceCUDA(const HashData& hashData,
+extern "C" void extractIsoSurfaceCUDA(const HashDataStruct& hashData,
 										 const RayCastData& rayCastData,
 										 const MarchingCubesParams& params,
 										 MarchingCubesData& data);
@@ -99,7 +99,7 @@ void CUDAMarchingCubesHashSDF::saveMesh(const std::string& filename, const mat4f
 	
 }
 
-void CUDAMarchingCubesHashSDF::extractIsoSurface(const HashData& hashData, const HashParams& hashParams, const RayCastData& rayCastData,  const vec3f& minCorner, const vec3f& maxCorner, bool boxEnabled)
+void CUDAMarchingCubesHashSDF::extractIsoSurface(const HashDataStruct& hashData, const HashParams& hashParams, const RayCastData& rayCastData,  const vec3f& minCorner, const vec3f& maxCorner, bool boxEnabled)
 {
 	resetMarchingCubesCUDA(m_data);
 

@@ -12,7 +12,7 @@ __global__ void resetMarchingCubesKernel(MarchingCubesData data)
 	*data.d_numTriangles = 0;
 }
 
-__global__ void extractIsoSurfaceKernel(HashData hashData, RayCastData rayCastData, MarchingCubesData data) 
+__global__ void extractIsoSurfaceKernel(HashDataStruct hashData, RayCastData rayCastData, MarchingCubesData data) 
 {
 	uint idx = blockIdx.x;
 
@@ -39,7 +39,7 @@ extern "C" void resetMarchingCubesCUDA(MarchingCubesData& data)
 #endif
 }
 
-extern "C" void extractIsoSurfaceCUDA(const HashData& hashData, const RayCastData& rayCastData, const MarchingCubesParams& params, MarchingCubesData& data)
+extern "C" void extractIsoSurfaceCUDA(const HashDataStruct& hashData, const RayCastData& rayCastData, const MarchingCubesParams& params, MarchingCubesData& data)
 {
 	const dim3 gridSize(params.m_hashNumBuckets*params.m_hashBucketSize, 1, 1);
 	const dim3 blockSize(params.m_sdfBlockSize, params.m_sdfBlockSize, params.m_sdfBlockSize);

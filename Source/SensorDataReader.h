@@ -11,10 +11,10 @@
 
 #ifdef SENSOR_DATA_READER
 
-namespace ml {
-	class SensorData;
-	class RGBDFrameCacheRead;
-}
+//namespace ml {
+//	class SensorData;
+//	class RGBDFrameCacheRead;
+//}
 
 class SensorDataReader : public RGBDSensor
 {
@@ -49,7 +49,7 @@ private:
 	void releaseData();
 
 	ml::SensorData* m_sensorData;
-	ml::RGBDFrameCacheRead* m_sensorDataCache;
+	ml::SensorData::RGBDFrameCacheRead* m_sensorDataCache;
 
 	unsigned int	m_numFrames;
 	unsigned int	m_currFrame;

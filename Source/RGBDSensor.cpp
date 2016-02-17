@@ -4,17 +4,16 @@
 #include "RGBDSensor.h"
 
 #include "GlobalAppState.h"
-#include "sensorData/sensorData.h"
 
-namespace stb {
-#define STB_IMAGE_IMPLEMENTATION
-#include "SensorData/stb_image.h"
-#undef STB_IMAGE_IMPLEMENTATION
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "SensorData/stb_image_write.h"
-#undef STB_IMAGE_WRITE_IMPLEMENTATION
-}
+//namespace stb {
+//#define STB_IMAGE_IMPLEMENTATION
+//#include "SensorData/stb_image.h"
+//#undef STB_IMAGE_IMPLEMENTATION
+//
+//#define STB_IMAGE_WRITE_IMPLEMENTATION
+//#include "SensorData/stb_image_write.h"
+//#undef STB_IMAGE_WRITE_IMPLEMENTATION
+//}
 
 #include <limits>
 
@@ -270,7 +269,7 @@ void RGBDSensor::recordFrame()
 		}
 		if (!m_recordedDataCache) {
 			const unsigned int cacheSize = 1000;
-			m_recordedDataCache = new ml::RGBDFrameCacheWrite(m_recordedData, cacheSize);
+			m_recordedDataCache = new ml::SensorData::RGBDFrameCacheWrite(m_recordedData, cacheSize);
 		}
 
 		vec3uc* color = (vec3uc*)std::malloc(sizeof(vec3uc)*getColorWidth()*getColorHeight());

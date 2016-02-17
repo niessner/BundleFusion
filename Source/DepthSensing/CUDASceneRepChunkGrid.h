@@ -139,11 +139,11 @@ inline BinaryDataStream<BinaryDataBuffer, BinaryDataCompressor>& operator>>(Bina
 	return s;
 }
 
-extern "C" void integrateFromGlobalHashPass1CUDA(const HashParams& hashParams, const HashData& hashData, uint threadsPerPart, uint start, float radius, const float3& cameraPosition, uint* d_outputCounter, SDFBlockDesc* d_output);
-extern "C" void integrateFromGlobalHashPass2CUDA(const HashParams& hashParams, const HashData& hashData, uint threadsPerPart, const SDFBlockDesc* d_SDFBlockDescs, Voxel* d_output, unsigned int nSDFBlocks);
+extern "C" void integrateFromGlobalHashPass1CUDA(const HashParams& hashParams, const HashDataStruct& hashData, uint threadsPerPart, uint start, float radius, const float3& cameraPosition, uint* d_outputCounter, SDFBlockDesc* d_output);
+extern "C" void integrateFromGlobalHashPass2CUDA(const HashParams& hashParams, const HashDataStruct& hashData, uint threadsPerPart, const SDFBlockDesc* d_SDFBlockDescs, Voxel* d_output, unsigned int nSDFBlocks);
 
-extern "C" void chunkToGlobalHashPass1CUDA(const HashParams& hashParams, const HashData& hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks);
-extern "C" void chunkToGlobalHashPass2CUDA(const HashParams& hashParams, const HashData& hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks);
+extern "C" void chunkToGlobalHashPass1CUDA(const HashParams& hashParams, const HashDataStruct& hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks);
+extern "C" void chunkToGlobalHashPass2CUDA(const HashParams& hashParams, const HashDataStruct& hashData, uint numSDFBlockDescs, uint heapCountPrev, const SDFBlockDesc* d_SDFBlockDescs, const Voxel* d_SDFBlocks);
 
 
 LONG WINAPI StreamingFunc(LPVOID lParam);
@@ -181,7 +181,7 @@ public:
 	}
 
 	
-	const HashData& getHashData() const {
+	const HashDataStruct& getHashData() const {
 		return m_sceneRepHashSDF->getHashData();
 	}
 	const HashParams& getHashParams() const {

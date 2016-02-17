@@ -9,7 +9,6 @@
 #include "GlobalAppState.h"
 #include "SiftGPU/SiftCameraParams.h"
 #include "SBA.h"
-#include "sensorData/sensorData.h"
 
 #include "testMatching.h"
 
@@ -2186,7 +2185,7 @@ void TestMatching::debug()
 	if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
 
 	for (unsigned int i = 0; i < sensorData.m_frames.size(); i+=10) {
-		ml::RGBDFrameCacheRead::FrameState frameState;
+		SensorData::RGBDFrameCacheRead::FrameState frameState;
 		frameState.m_colorFrame = sensorData.decompressColorAlloc(i);
 		//frameState.m_depthFrame = sensorData.decompressDepthAlloc(i);
 		FreeImageWrapper::saveImage(outDir + std::to_string(i) + ".png", ColorImageR8G8B8(sensorData.m_colorWidth, sensorData.m_colorHeight, frameState.m_colorFrame));
@@ -2202,7 +2201,7 @@ void TestMatching::loadCachedFramesFromSensorData(CUDACache* cache, const std::s
 	std::cout << "loading cached frames from sensor... ";
 	SensorData sensorData;
 	sensorData.loadFromFile(filename);
-	RGBDFrameCacheRead sensorDataCache(&sensorData, 10);
+	SensorData::RGBDFrameCacheRead sensorDataCache(&sensorData, 10);
 	const unsigned int numOrigFrames = (unsigned int)sensorData.m_frames.size();
 
 	m_colorImages.resize(numFrames);

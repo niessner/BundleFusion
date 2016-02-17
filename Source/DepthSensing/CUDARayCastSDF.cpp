@@ -7,13 +7,13 @@
 #include "CUDARayCastSDF.h"
 
 
-extern "C" void renderCS(const HashData& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams);
+extern "C" void renderCS(const HashDataStruct& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams);
 
 extern "C" void computeNormals(float4* d_output, float4* d_input, unsigned int width, unsigned int height);
 extern "C" void convertDepthFloatToCameraSpaceFloat4(float4* d_output, float* d_input, float4x4 intrinsicsInv, unsigned int width, unsigned int height);
 
 extern "C" void resetRayIntervalSplatCUDA(RayCastData& data, const RayCastParams& params);
-extern "C" void rayIntervalSplatCUDA(const HashData& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams);
+extern "C" void rayIntervalSplatCUDA(const HashDataStruct& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams);
 
 Timer CUDARayCastSDF::m_timer;
 
@@ -37,7 +37,7 @@ void CUDARayCastSDF::destroy(void)
 	m_rayIntervalSplatting.OnD3D11DestroyDevice();
 }
 
-void CUDARayCastSDF::render(const HashData& hashData, const HashParams& hashParams, const mat4f& lastRigidTransform)
+void CUDARayCastSDF::render(const HashDataStruct& hashData, const HashParams& hashParams, const mat4f& lastRigidTransform)
 {
 	rayIntervalSplatting(hashData, hashParams, lastRigidTransform);
 	m_data.d_rayIntervalSplatMinArray = m_rayIntervalSplatting.mapMinToCuda();
@@ -80,7 +80,7 @@ void CUDARayCastSDF::convertToCameraSpace()
 	}
 }
 
-void CUDARayCastSDF::rayIntervalSplatting(const HashData& hashData, const HashParams& hashParams, const mat4f& lastRigidTransform)
+void CUDARayCastSDF::rayIntervalSplatting(const HashDataStruct& hashData, const HashParams& hashParams, const mat4f& lastRigidTransform)
 {
 	if (hashParams.m_numOccupiedBlocks == 0)	return;
 

@@ -12,19 +12,19 @@
 #include "GlobalAppState.h"
 #include "TimingLogDepthSensing.h"
 
-extern "C" void resetCUDA(HashData& hashData, const HashParams& hashParams);
-extern "C" void resetHashBucketMutexCUDA(HashData& hashData, const HashParams& hashParams);
-extern "C" void allocCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams, const unsigned int* d_bitMask);
-extern "C" void fillDecisionArrayCUDA(HashData& hashData, const HashParams& hashParams);
-extern "C" void compactifyHashCUDA(HashData& hashData, const HashParams& hashParams);
-extern "C" unsigned int compactifyHashAllInOneCUDA(HashData& hashData, const HashParams& hashParams);
-extern "C" void integrateDepthMapCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams);
-extern "C" void deIntegrateDepthMapCUDA(HashData& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams);
+extern "C" void resetCUDA(HashDataStruct& hashData, const HashParams& hashParams);
+extern "C" void resetHashBucketMutexCUDA(HashDataStruct& hashData, const HashParams& hashParams);
+extern "C" void allocCUDA(HashDataStruct& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams, const unsigned int* d_bitMask);
+extern "C" void fillDecisionArrayCUDA(HashDataStruct& hashData, const HashParams& hashParams);
+extern "C" void compactifyHashCUDA(HashDataStruct& hashData, const HashParams& hashParams);
+extern "C" unsigned int compactifyHashAllInOneCUDA(HashDataStruct& hashData, const HashParams& hashParams);
+extern "C" void integrateDepthMapCUDA(HashDataStruct& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams);
+extern "C" void deIntegrateDepthMapCUDA(HashDataStruct& hashData, const HashParams& hashParams, const DepthCameraData& depthCameraData, const DepthCameraParams& depthCameraParams);
 extern "C" void bindInputDepthColorTextures(const DepthCameraData& depthCameraData, unsigned int width, unsigned int height);
 
-extern "C" void starveVoxelsKernelCUDA(HashData& hashData, const HashParams& hashParams);
-extern "C" void garbageCollectIdentifyCUDA(HashData& hashData, const HashParams& hashParams);
-extern "C" void garbageCollectFreeCUDA(HashData& hashData, const HashParams& hashParams);
+extern "C" void starveVoxelsKernelCUDA(HashDataStruct& hashData, const HashParams& hashParams);
+extern "C" void garbageCollectIdentifyCUDA(HashDataStruct& hashData, const HashParams& hashParams);
+extern "C" void garbageCollectFreeCUDA(HashDataStruct& hashData, const HashParams& hashParams);
 
 class CUDASceneRepHashSDF
 {
@@ -155,7 +155,7 @@ public:
 	}
 
 
-	HashData& getHashData() {
+	HashDataStruct& getHashData() {
 		return m_hashData;
 	} 
 
@@ -413,7 +413,7 @@ private:
 
 
 	HashParams		m_hashParams;
-	HashData		m_hashData;
+	HashDataStruct		m_hashData;
 
 	CUDAScan		m_cudaScan;
 

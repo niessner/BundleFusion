@@ -14,7 +14,7 @@
 texture<float, cudaTextureType2D, cudaReadModeElementType> rayMinTextureRef;
 texture<float, cudaTextureType2D, cudaReadModeElementType> rayMaxTextureRef;
 
-__global__ void renderKernel(HashData hashData, RayCastData rayCastData) 
+__global__ void renderKernel(HashDataStruct hashData, RayCastData rayCastData) 
 {
 	const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 	const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -56,7 +56,7 @@ __global__ void renderKernel(HashData hashData, RayCastData rayCastData)
 	} 
 }
 
-extern "C" void renderCS(const HashData& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams) 
+extern "C" void renderCS(const HashDataStruct& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams) 
 {
 
 	const dim3 gridSize((rayCastParams.m_width + T_PER_BLOCK - 1)/T_PER_BLOCK, (rayCastParams.m_height + T_PER_BLOCK - 1)/T_PER_BLOCK);
@@ -98,7 +98,7 @@ extern "C" void resetRayIntervalSplatCUDA(RayCastData& data, const RayCastParams
 #endif
 }
 
-__global__ void rayIntervalSplatKernel(HashData hashData, RayCastData rayCastData) 
+__global__ void rayIntervalSplatKernel(HashDataStruct hashData, RayCastData rayCastData) 
 {
 	uint idx = blockIdx.x + blockIdx.y * NUM_GROUPS_X;
 
@@ -175,7 +175,7 @@ __global__ void rayIntervalSplatKernel(HashData hashData, RayCastData rayCastDat
 	}
 }
 
-extern "C" void rayIntervalSplatCUDA(const HashData& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams) 
+extern "C" void rayIntervalSplatCUDA(const HashDataStruct& hashData, const RayCastData &rayCastData, const RayCastParams &rayCastParams) 
 {
 
 	const dim3 gridSize(NUM_GROUPS_X, (rayCastParams.m_numOccupiedSDFBlocks + NUM_GROUPS_X - 1) / NUM_GROUPS_X, 1);
