@@ -804,6 +804,7 @@ void visualizeFrame(ID3D11DeviceContext* pd3dImmediateContext, ID3D11Device* pd3
 				((StructureSensor*)g_depthSensingRGBDSensor)->updateFeedbackImage((BYTE*)tex);
 				SAFE_DELETE_ARRAY(tex);
 			}
+			SAFE_RELEASE(pSurface);
 		}
 #endif
 	}
