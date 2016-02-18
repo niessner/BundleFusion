@@ -196,7 +196,7 @@ int main(int argc, char** argv)
 	try {
 		std::string fileNameDescGlobalApp;
 		std::string fileNameDescGlobalBundling;
-		if (argc == 3) {
+		if (argc >= 3) {
 			fileNameDescGlobalApp = std::string(argv[1]);
 			fileNameDescGlobalBundling = std::string(argv[2]);
 		}
@@ -222,6 +222,11 @@ int main(int argc, char** argv)
 
 		//Read the global app state
 		ParameterFile parameterFileGlobalApp(fileNameDescGlobalApp);
+		if (argc == 4) //for scan net: overwrite .sens file
+		{
+			const std::string filename = std::string(argv[3]);
+			parameterFileGlobalApp.overrideParameter("s_binaryDumpSensorFile", filename);
+		}
 		GlobalAppState::getInstance().readMembers(parameterFileGlobalApp);
 
 		//Read the global camera tracking state
