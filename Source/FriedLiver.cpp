@@ -226,6 +226,7 @@ int main(int argc, char** argv)
 		{
 			const std::string filename = std::string(argv[3]);
 			parameterFileGlobalApp.overrideParameter("s_binaryDumpSensorFile", filename);
+			std::cout << "Overwriting s_binaryDumpSensorFile; now set to " << filename << std::endl;
 		}
 		GlobalAppState::getInstance().readMembers(parameterFileGlobalApp);
 
