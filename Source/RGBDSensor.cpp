@@ -256,16 +256,28 @@ void RGBDSensor::recordFrame()
 	if (m_bUseModernSensFilesForRecording) {
 		if (!m_recordedData) {
 			m_recordedData = new ml::SensorData;
-			m_recordedData->m_sensorName = getSensorName();
-			m_recordedData->m_calibrationColor.m_intrinsic = getColorIntrinsics();
-			m_recordedData->m_calibrationColor.m_extrinsic = getColorExtrinsics();
-			m_recordedData->m_calibrationDepth.m_intrinsic = getDepthIntrinsics();
-			m_recordedData->m_calibrationDepth.m_extrinsic = getDepthExtrinsics();
-			m_recordedData->m_colorWidth = getColorWidth();
-			m_recordedData->m_colorHeight = getColorHeight();
-			m_recordedData->m_depthWidth = getDepthWidth();
-			m_recordedData->m_depthHeight = getDepthHeight();
-			m_recordedData->m_depthShift = 1000.0f;
+			m_recordedData->initDefault(
+				getColorWidth(),
+				getColorHeight(),
+				getDepthWidth(),
+				getDepthHeight(),
+				ml::SensorData::CalibrationData(getColorIntrinsics(), getColorExtrinsics()),
+				ml::SensorData::CalibrationData(getDepthIntrinsics(), getDepthExtrinsics()),
+				ml::SensorData::TYPE_JPEG,
+				ml::SensorData::TYPE_ZLIB_USHORT,
+				1000.0f,
+				getSensorName()
+				);
+			//m_recordedData->m_sensorName = getSensorName();
+			//m_recordedData->m_calibrationColor.m_intrinsic = getColorIntrinsics();
+			//m_recordedData->m_calibrationColor.m_extrinsic = getColorExtrinsics();
+			//m_recordedData->m_calibrationDepth.m_intrinsic = getDepthIntrinsics();
+			//m_recordedData->m_calibrationDepth.m_extrinsic = getDepthExtrinsics();
+			//m_recordedData->m_colorWidth = getColorWidth();
+			//m_recordedData->m_colorHeight = getColorHeight();
+			//m_recordedData->m_depthWidth = getDepthWidth();
+			//m_recordedData->m_depthHeight = getDepthHeight();
+			//m_recordedData->m_depthShift = 1000.0f;
 		}
 		if (!m_recordedDataCache) {
 			const unsigned int cacheSize = 1000;

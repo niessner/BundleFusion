@@ -236,10 +236,10 @@ int main(int argc, char** argv)
 
 		//!!!DEBUGGING
 		if (GlobalAppState::get().s_generateVideo) { std::cout << "remember to change raycast for top-down rendering!" << std::endl; getchar(); }
-		if (!util::fileExists(GlobalAppState::get().s_binaryDumpSensorFile)) {
-			std::cout << "ERROR: " << GlobalAppState::get().s_binaryDumpSensorFile << "does not exist!" << std::endl;
-			getchar();
-		}
+		//if (!util::fileExists(GlobalAppState::get().s_binaryDumpSensorFile)) {
+		//	std::cout << "ERROR: " << GlobalAppState::get().s_binaryDumpSensorFile << " does not exist!" << std::endl;
+		//	getchar();
+		//}
 		//if (false) {
 		//	//process all opt 
 		//	const unsigned int num = 1;
