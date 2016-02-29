@@ -146,6 +146,19 @@ void SensorDataReader::releaseData()
 	}
 }
 
+void SensorDataReader::saveToFile(const std::string& filename, const std::vector<mat4f>& trajectory) const
+{
+	const unsigned int numFrames = (unsigned int)std::min(trajectory.size(), m_sensorData->m_frames.size());
+	for (unsigned int i = 0; i < numFrames; i++) {
+		m_sensorData->m_frames[i].setCameraToWorld(trajectory[i]);
+	}
+	//fill in rest invalid
+	mat4f invalidTransform; invalidTransform.setZero(-std::numeric_limits<float>::infinity());
+	for (unsigned int i = (unsigned int)trajectory.size(); i < m_sensorData->m_frames.size(); i++) {
+		m_sensorData->m_frames[i].setCameraToWorld(invalidTransform);
+	}
 
+	m_sensorData->saveToFile(filename);
+}
 
 #endif

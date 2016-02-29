@@ -36,6 +36,7 @@
 #include "CUDAImageManager.h"
 
 #include "../StructureSensor.h"
+#include "../SensorDataReader.h"
 #include "../TimingLog.h"
 
 #include <iomanip>
@@ -106,7 +107,7 @@ Bundler*					g_depthSensingBundler = NULL;
 mat4f g_transformWorld = mat4f::identity();
 
 void ResetDepthSensing();
-void StopScanningAndExtractIsoSurfaceMC(const std::string& filename = "./scans/scan.ply");
+void StopScanningAndExtractIsoSurfaceMC(const std::string& filename = "./scans/scan.ply", bool overwriteExistingFile = false);
 void DumpinputManagerData(const std::string& filename = "./dump/dump.sensor");
 
 
@@ -326,7 +327,7 @@ void DumpinputManagerData(const std::string& filename)
 	}
 }
 
-void StopScanningAndExtractIsoSurfaceMC(const std::string& filename)
+void StopScanningAndExtractIsoSurfaceMC(const std::string& filename, bool overwriteExistingFile /*= false*/)
 {
 	//g_sceneRep->debugHash();
 	//g_chunkGrid->debugCheckForDuplicates();
@@ -353,7 +354,7 @@ void StopScanningAndExtractIsoSurfaceMC(const std::string& filename)
 	}
 
 	const mat4f& rigidTransform = mat4f::identity();//g_lastRigidTransform
-	g_marchingCubesHashSDF->saveMesh(filename, &rigidTransform);
+	g_marchingCubesHashSDF->saveMesh(filename, &rigidTransform, overwriteExistingFile);
 
 	std::cout << "Mesh generation time " << t.getElapsedTime() << " seconds" << std::endl;
 
@@ -891,11 +892,54 @@ void reintegrate()
 	g_sceneRep->garbageCollect();
 }
 
+void StopScanningAndExit(bool aborted = false)
+{
+	std::cout << "[ stop scanning and exit ]" << std::endl;
+	if (!aborted) {
+		//estimate validity of reconstruction
+		bool valid = true;
+		unsigned int heapFreeCount = g_sceneRep->getHeapFreeCount();
+		if (heapFreeCount < 800) valid = false; // probably a messed up reconstruction (used up all the heap...)
+		unsigned int numValidTransforms = 0, numTransforms = 0;
+		//write trajectory
+		const std::string saveFile = GlobalAppState::get().s_binaryDumpSensorFile;
+		std::vector<mat4f> trajectory;
+		g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+		((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file
+		numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);		numTransforms = (unsigned int)trajectory.size();
+		if (numValidTransforms < (unsigned int)std::round(0.5f * numTransforms)) valid = false; // not enough valid transforms
+		//save ply
+		std::cout << "[marching cubes] ";
+		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
+		std::cout << "done!" << std::endl;
+		//write out confirmation file
+		std::ofstream s(util::directoryFromPath(GlobalAppState::get().s_binaryDumpSensorFile) + "processed.txt");
+		if (valid)  s << "valid = true" << std::endl;
+		else		s << "valid = false" << std::endl;
+		s << "heapFreeCount = " << heapFreeCount << std::endl;
+		s << "numValidOptTransforms = " << numValidTransforms << std::endl;
+		s << "numTransforms = " << numTransforms << std::endl;
+		s.close();
+	}
+	else {
+		std::ofstream s(util::directoryFromPath(GlobalAppState::get().s_binaryDumpSensorFile) + "processed.txt");
+		s << "valid = false" << std::endl;
+		s << "ABORTED" << std::endl; // can only be due to invalid first chunk (i think)
+		s.close();
+	}
+	//exit
+	exit(0);
+}
+
 //--------------------------------------------------------------------------------------
 // Render the scene using the D3D11 device
 //--------------------------------------------------------------------------------------
 void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext)
 {
+	if (ConditionManager::shouldExit()) {
+		StopScanningAndExit(true);
+	}
+
 	Timer t;
 	//double timeReconstruct = 0.0f;
 	//double timeVisualize = 0.0f;
@@ -1041,14 +1085,14 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 		exit(1);
 	}
 
-	//if (g_CudaImageManager->getCurrFrameNumber() == 2000) {
-	//	g_depthSensingRGBDSensor->stopReceivingFrames();
-	//	std::vector<mat4f> trajectory;
-	//	g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
-	//	g_depthSensingRGBDSensor->saveRecordedFramesToFile(GlobalAppState::getInstance().s_recordDataFile, trajectory);
-	//	std::cout << "waiting..." << std::endl;
-	//	getchar();
-	//}
+	if (!g_depthSensingRGBDSensor->isReceivingFrames() && GlobalAppState::get().s_sensorIdx == 8) { //this is a hack...
+		static unsigned int countPastLast = 0;
+		const unsigned int maxPastLast = GlobalAppState::get().s_numFramesBeforeExit;
+		if (maxPastLast != (unsigned int)-1 && countPastLast == maxPastLast) {
+			StopScanningAndExit();
+		}
+		countPastLast++;
+	}
 
 	DXUT_EndPerfEvent();
 }
@@ -1062,7 +1106,7 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	//const std::string inputDepthDir = baseFolder + "input_depth/"; if (!util::directoryExists(inputDepthDir)) util::makeDirectory(inputDepthDir);
 	const std::string reconstructionDir = baseFolder + "self_reconstruction/"; if (!util::directoryExists(reconstructionDir)) util::makeDirectory(reconstructionDir);
 	const std::string reconstructColorDir = baseFolder + "self_reconstruction_color/"; if (!util::directoryExists(reconstructColorDir)) util::makeDirectory(reconstructColorDir);
-	
+
 	//reset intrinsics (no need to render at hi res)
 	const mat4f origRayCastIntrinsics = g_rayCast->getIntrinsics();
 	const mat4f origRayCastIntrinsicsInv = g_rayCast->getIntrinsicsInv();
@@ -1084,7 +1128,7 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 		const mat4f renderIntrinsics = g_rayCast->getIntrinsics();
 		g_CustomRenderTarget.Clear(pd3dImmediateContext);
 		g_CustomRenderTarget.Bind(pd3dImmediateContext);
-		g_RGBDRenderer.RenderDepthMap(pd3dImmediateContext, g_rayCast->getRayCastData().d_depth, g_rayCast->getRayCastData().d_colors, 
+		g_RGBDRenderer.RenderDepthMap(pd3dImmediateContext, g_rayCast->getRayCastData().d_depth, g_rayCast->getRayCastData().d_colors,
 			g_rayCast->getRayCastParams().m_width, g_rayCast->getRayCastParams().m_height,
 			g_rayCast->getIntrinsicsInv(), view, renderIntrinsics, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(),
 			GlobalAppState::get().s_renderingDepthDiscontinuityThresOffset, GlobalAppState::get().s_renderingDepthDiscontinuityThresLin);
@@ -1097,7 +1141,7 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 			overlayColor += vec3f(-1.0f, 0.0f, 0.0f);
 		}
 
-		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3), 
+		DX11PhongLighting::render(pd3dImmediateContext, g_CustomRenderTarget.GetSRV(1), g_CustomRenderTarget.GetSRV(2), g_CustomRenderTarget.GetSRV(3),
 			colored, g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(), overlayColor);
 
 		g_RenderToFileTarget.Clear(pd3dImmediateContext);

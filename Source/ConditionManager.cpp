@@ -10,3 +10,5 @@ std::vector<std::unique_lock<std::mutex>> ConditionManager::s_lockImageManagerFr
 std::mutex ConditionManager::s_mutexBundlerProcessedInput;
 std::condition_variable ConditionManager::s_cvBundlerProcessedCheck;
 std::vector<std::unique_lock<std::mutex>> ConditionManager::s_lockBundlerProcessedInput;
+
+bool ConditionManager::s_exit = false;

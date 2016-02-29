@@ -126,10 +126,7 @@ public:
 	//! optimize global
 	bool optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone);
 
-	void invalidateLastGlobalFrame() {
-		MLIB_ASSERT(m_global->getNumImages() > 1);
-		m_global->invalidateFrame(m_global->getNumImages() - 1);
-	}
+	void invalidateLastGlobalFrame();
 
 	// update complete trajectory with new global trajectory info
 	void updateTrajectory(unsigned int curFrame);
@@ -178,7 +175,6 @@ public:
 		//TODO fix this hack
 	void setEndSolveGlobalDenseWeights();
 	void setNumOptPerResidualRemoval(unsigned int n) { m_numOptPerResidualRemoval = n; }
-
 
 private:
 

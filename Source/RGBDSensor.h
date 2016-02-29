@@ -75,7 +75,7 @@ public:
 	void saveRecordedPointCloudDEBUG(const std::string& filename, const std::vector<int>& validImages, const std::vector<mat4f>& trajectory, unsigned int submapSize);
 
 	//! saves all previously recorded frames to file
-	void saveRecordedFramesToFile(const std::string& filename, const std::vector<mat4f>& trajectory);
+	void saveRecordedFramesToFile(const std::string& filename, const std::vector<mat4f>& trajectory, bool overwriteExistingFile = false);
 
 	//! returns the current rigid transform; if not specified by the 'actual' sensor the identiy is returned
 	virtual mat4f getRigidTransform() const {

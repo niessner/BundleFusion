@@ -53,6 +53,8 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_bHasProcessedInputFrame = false;
 	m_bExitBundlingThread = false;
 	m_bIsScanDoneGlobalOpt = false;
+
+	m_useSolve = true;
 }
 
 Bundler::~Bundler()
@@ -77,17 +79,20 @@ void Bundler::processInput()
 			framePastLast++;
 		}
 		else {
-			if (framePastLast == 10) {
 #ifdef USE_GLOBAL_DENSE_AT_END
-				m_SubmapManager.setEndSolveGlobalDenseWeights();
+			if (framePastLast == 10) {
+				if (m_currentState.m_lastFrameProcessed < 10000) m_SubmapManager.setEndSolveGlobalDenseWeights();
 
 				//saveGlobalSiftManagerAndCacheToFile("debug/global");
 				//saveCompleteTrajectory("debug/curTrajectory.bin");
 				//std::cout << "waiting..." << std::endl;
 				//getchar();
-#endif
-				//m_SubmapManager.setNumOptPerResidualRemoval(100); //!!!debugging
 			}
+			if (framePastLast == 11) {
+				std::cout << "stopping solve" << std::endl;
+				m_useSolve = false;
+			}
+#endif
 			framePastLast++;
 		}
 		return; // nothing new to process
@@ -146,7 +151,7 @@ bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& fra
 
 void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
-	if (m_currentState.m_localToSolve == -1) {
+	if (!m_useSolve || m_currentState.m_localToSolve == -1) {
 		return; // nothing to solve
 	}
 
@@ -173,6 +178,7 @@ void Bundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int numLi
 
 void Bundler::processGlobal()
 {
+	if (!m_useSolve) return;
 	if (m_currentState.m_bProcessGlobal == BundlerState::DO_NOTHING) {
 		if (!m_RGBDSensor->isReceivingFrames()) {
 			m_SubmapManager.tryRevalidation(m_currentState.m_lastLocalSolved, MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv), true);
@@ -186,7 +192,7 @@ void Bundler::processGlobal()
 		m_currentState.m_bOptimizeGlobal = (BundlerState::PROCESS_STATE)m_SubmapManager.computeAndMatchGlobalKeys(m_currentState.m_lastLocalSolved,
 			MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsics), MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
 	}
-	else {
+	else { //invalidate
 		// cache
 		m_SubmapManager.incrementGlobalCache();
 		m_currentState.m_bOptimizeGlobal = BundlerState::INVALIDATE;
@@ -203,7 +209,7 @@ void Bundler::processGlobal()
 
 void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart /*= true*/, bool isEnd /*= true*/)
 {
-	if (m_currentState.m_bOptimizeGlobal == BundlerState::DO_NOTHING) {
+	if (!m_useSolve || m_currentState.m_bOptimizeGlobal == BundlerState::DO_NOTHING) {
 		return; // nothing to solve
 	}
 

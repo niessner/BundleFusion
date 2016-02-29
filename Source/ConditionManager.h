@@ -82,6 +82,12 @@ public:
 	static void notifyBundlerProcessedInput() {}
 #endif
 
+	static void setExit() {
+		s_exit = true;
+	}
+	static bool shouldExit() {
+		return s_exit;
+	}
 private:
 	static std::mutex s_mutexImageManagerHasFrameReady;
 	static std::condition_variable s_cvFrameReadyCheck;
@@ -90,4 +96,6 @@ private:
 	static std::mutex s_mutexBundlerProcessedInput;
 	static std::condition_variable s_cvBundlerProcessedCheck;
 	static std::vector<std::unique_lock<std::mutex>> s_lockBundlerProcessedInput;
+
+	static bool s_exit;
 };

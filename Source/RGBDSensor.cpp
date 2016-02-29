@@ -340,7 +340,7 @@ void RGBDSensor::recordFrame()
 	}
 }
 
-void RGBDSensor::saveRecordedFramesToFile(const std::string& filename, const std::vector<mat4f>& trajectory)
+void RGBDSensor::saveRecordedFramesToFile(const std::string& filename, const std::vector<mat4f>& trajectory, bool overwriteExistingFile /*= false*/)
 {
 	if (m_bUseModernSensFilesForRecording) {
 
@@ -370,17 +370,19 @@ void RGBDSensor::saveRecordedFramesToFile(const std::string& filename, const std
 		std::cout << "dumping recorded frames ... ";
 
 		std::string actualFilename = filename;
-		while (util::fileExists(actualFilename)) {
-			std::string path = util::directoryFromPath(actualFilename);
-			std::string curr = util::fileNameFromPath(actualFilename);
-			std::string ext = util::getFileExtension(curr);
-			curr = util::removeExtensions(curr);
-			std::string base = util::getBaseBeforeNumericSuffix(curr);
-			unsigned int num = util::getNumericSuffix(curr);
-			if (num == (unsigned int)-1) {
-				num = 0;
+		if (!overwriteExistingFile) {
+			while (util::fileExists(actualFilename)) {
+				std::string path = util::directoryFromPath(actualFilename);
+				std::string curr = util::fileNameFromPath(actualFilename);
+				std::string ext = util::getFileExtension(curr);
+				curr = util::removeExtensions(curr);
+				std::string base = util::getBaseBeforeNumericSuffix(curr);
+				unsigned int num = util::getNumericSuffix(curr);
+				if (num == (unsigned int)-1) {
+					num = 0;
+				}
+				actualFilename = path + base + std::to_string(num + 1) + "." + ext;
 			}
-			actualFilename = path + base + std::to_string(num + 1) + "." + ext;
 		}
 
 		m_recordedData->saveToFile(actualFilename);

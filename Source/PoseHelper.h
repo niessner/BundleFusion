@@ -7,6 +7,15 @@ typedef ml::vec6f Pose;
 
 namespace PoseHelper {
 
+	static unsigned int countNumValidTransforms(const std::vector<mat4f>& trajectory)
+	{
+		unsigned int count = 0;
+		for (unsigned int i = 0; i < trajectory.size(); i++) {
+			if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) count++;
+		}
+		return count;
+	}
+
 	static void composeTrajectory(unsigned int submapSize, const std::vector<mat4f>& keys, std::vector<mat4f>& all)
 	{
 		std::vector<mat4f> transforms;

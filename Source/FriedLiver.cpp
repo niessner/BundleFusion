@@ -202,7 +202,8 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			fileNameDescGlobalApp = "zParametersDefault.txt";
+			fileNameDescGlobalApp = "zParametersScanNet.txt";
+			//fileNameDescGlobalApp = "zParametersDefault.txt";
 			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 			//fileNameDescGlobalBundling = "zParametersBundling20K.txt";
 
@@ -236,51 +237,7 @@ int main(int argc, char** argv)
 
 		//!!!DEBUGGING
 		if (GlobalAppState::get().s_generateVideo) { std::cout << "remember to change raycast for top-down rendering!" << std::endl; getchar(); }
-		//if (!util::fileExists(GlobalAppState::get().s_binaryDumpSensorFile)) {
-		//	std::cout << "ERROR: " << GlobalAppState::get().s_binaryDumpSensorFile << " does not exist!" << std::endl;
-		//	getchar();
-		//}
-		//if (false) {
-		//	//process all opt 
-		//	const unsigned int num = 1;
-		//	const std::string outputFile = "dump/liv" + std::to_string(num) + "_s.sensor";
-		//	const std::string sensorFile = "../data/iclnuim/livingroom" + std::to_string(num) + ".sensor";
-		//	const std::string filename = "debug/iclnuim/opt_liv" + std::to_string(num) + "_s.bin";
-		//	if (!util::fileExists(sensorFile) || !util::fileExists(filename)) {
-		//		std::cerr << "ERROR inputs do not exist: " << std::endl << "\t" << sensorFile << std::endl << "\t" << filename << std::endl;
-		//		getchar();
-		//	}
-		//	std::cout << "loading... ";
-		//	std::vector<mat4f> optTrajectory;
-		//	CalibratedSensorData cs;
-		//	{
-		//		BinaryDataStreamFile s(sensorFile, false);
-		//		s >> cs; s.closeStream();
-		//	}
-		//	{
-		//		BinaryDataStreamFile s(filename, false);
-		//		s >> optTrajectory; s.closeStream();
-		//	}
-		//	std::cout << "done!" << std::endl;
-		//	std::vector<mat4f> referenceTrajectory = cs.m_trajectory;
-		//	if (cs.m_trajectory.size() > optTrajectory.size()) {
-		//		std::cout << "#frames from " << cs.m_trajectory.size() << " to " << optTrajectory.size() << std::endl;
-		//		cs.m_DepthNumFrames = (unsigned int)optTrajectory.size();
-		//		cs.m_ColorNumFrames = (unsigned int)optTrajectory.size();
-		//		cs.m_DepthImages.resize(optTrajectory.size());
-		//		cs.m_ColorImages.resize(optTrajectory.size());
-		//	}
-		//	cs.m_trajectory = optTrajectory;
-		//	BinaryDataStreamFile s(outputFile, true);
-		//	s << cs; s.closeStream();
-		//	//sanity check
-		//	auto err = PoseHelper::evaluateAteRmse(optTrajectory, referenceTrajectory);
-		//	std::cout << "ate rmse = " << err.first << " [#frames = " << err.second << "]" << std::endl;
-		//	ColorImageR8G8B8A8 image(cs.m_ColorImageWidth, cs.m_ColorImageHeight, cs.m_ColorImages.front());
-		//	FreeImageWrapper::saveImage("first.png", image);
-		//	std::cout << "first transform: " << referenceTrajectory.front() << std::endl;
-		//	getchar();
-		//}
+		if (GlobalAppState::get().s_numFramesBeforeExit && GlobalAppState::get().s_sensorIdx != 8) std::cout << "warning: overwrite trajectory/save ply not implemented for non-SensorData type sensors" << std::endl;
 		if (false) {
 			TestMatching test;
 			//test.analyzeLocalOpts();
@@ -324,13 +281,12 @@ int main(int argc, char** argv)
 		//start depthSensing render loop
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
-		TimingLog::printAllTimings();
-		g_bundler->saveGlobalSiftManagerAndCacheToFile("debug/global");
-		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
-		g_bundler->saveCompleteTrajectory("trajectory.bin");
-		g_bundler->saveSiftTrajectory("siftTrajectory.bin");
-		g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
-		//g_bundler->saveDEBUG();
+		//TimingLog::printAllTimings();
+		//g_bundler->saveGlobalSiftManagerAndCacheToFile("debug/global");
+		//if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
+		//g_bundler->saveCompleteTrajectory("trajectory.bin");
+		//g_bundler->saveSiftTrajectory("siftTrajectory.bin");
+		//g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
 
 #ifdef RUN_MULTITHREADED
 		g_bundler->exitBundlingThread();

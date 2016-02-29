@@ -34,7 +34,7 @@ public:
 
 	//! copies the intermediate result of extract isoSurfaceCUDA to the CPU and merges it with meshData
 	void copyTrianglesToCPU();
-	void saveMesh(const std::string& filename, const mat4f *transform = NULL);
+	void saveMesh(const std::string& filename, const mat4f *transform = NULL, bool overwriteExistingFile = false);
 
 	void extractIsoSurface(const HashDataStruct& hashData, const HashParams& hashParams, const RayCastData& rayCastData, const vec3f& minCorner = vec3f(0.0f, 0.0f, 0.0f), const vec3f& maxCorner = vec3f(0.0f, 0.0f, 0.0f), bool boxEnabled = false);
 

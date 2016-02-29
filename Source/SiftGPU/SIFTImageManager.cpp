@@ -62,7 +62,7 @@ SIFTImageGPU& SIFTImageManager::createSIFTImageGPU()
 
 void SIFTImageManager::finalizeSIFTImageGPU(unsigned int numKeyPoints)
 {
-	assert(numKeyPoints < m_maxKeyPointsPerImage);
+	assert(numKeyPoints <= m_maxKeyPointsPerImage);
 	assert(!m_bFinalizedGPUImage);
 
 	m_numKeyPointsPerImagePrefixSum.push_back(m_numKeyPoints);
@@ -455,6 +455,11 @@ void SIFTImageManager::fuseToGlobal(SIFTImageManager* global, const float4x4& co
 	} // track
 
 	unsigned int numKeys = std::min((unsigned int)curKeys.size(), m_maxKeyPointsPerImage);
+	if (curKeys.size() > m_maxKeyPointsPerImage) {
+		std::sort(curKeys.begin(), curKeys.end(), [](const SIFTKeyPoint& left, const SIFTKeyPoint& right) {
+			return left.depth < right.depth;
+		});
+	}
 	SIFTImageGPU& cur = global->createSIFTImageGPU();
 	cutilSafeCall(cudaMemcpy(cur.d_keyPoints, curKeys.data(), sizeof(SIFTKeyPoint) * numKeys, cudaMemcpyHostToDevice));
 	cutilSafeCall(cudaMemcpy(cur.d_keyPointDescs, curDesc.data(), sizeof(SIFTKeyPointDesc) * numKeys, cudaMemcpyHostToDevice));

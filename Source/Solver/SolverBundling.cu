@@ -198,8 +198,9 @@ __global__ void WeightDenseCorrespondences_Kernel(unsigned int N, SolverState st
 		float x = state.d_denseCorrCounts[idx];
 		if (x > 0) {
 			//if (x < 3200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
-			if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
-			//if (x < 200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			//if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			//if (x < 400) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			if (x < 200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
 			else {
 				state.d_denseCorrCounts[idx] = 1.0f / min(logf(x), 9.0f); // natural log //TODO PARAMS
 			}
@@ -267,7 +268,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.0f), 2.5f)); //fr2_xyz_half
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 3.5f), 1.8f)); //fr3_nstn
 
-				depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / parameters.denseDepthMax));
+				depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / parameters.denseDepthMax), 1.8f));
 
 				//float wtgt = (pow(max(0.0f, 1.0f - camPosTgt.z / 2.5f), 1.8f));
 				//float wsrc = (pow(max(0.0f, 1.0f - camPosSrc.z / 2.5f), 1.8f));

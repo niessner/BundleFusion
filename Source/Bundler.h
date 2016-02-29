@@ -224,6 +224,7 @@ private:
 
 	// state of processing/optimization
 	BundlerState			m_currentState;
+	bool m_useSolve;
 };
 
 

@@ -7,7 +7,7 @@
 #include <list>
 
 //#define USE_GLOBAL_DENSE_EVERY_FRAME
-//#define USE_GLOBAL_DENSE_AT_END
+#define USE_GLOBAL_DENSE_AT_END
 
 #define X_GLOBAL_BUNDLING_APP_STATE_FIELDS \
 	X(bool, s_enableGlobalTimings) \

@@ -101,7 +101,8 @@
 	X(std::string, s_printConvergenceFile) \
 	X(mat4f, s_topVideoTransformWorld) \
 	X(vec4f, s_topVideoCameraPose) \
-	X(vec2f, s_topVideoMinMax)
+	X(vec2f, s_topVideoMinMax) \
+	X(unsigned int, s_numFramesBeforeExit)
 
 
 #ifndef VAR_NAME

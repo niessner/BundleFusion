@@ -6,6 +6,7 @@
 #include "SiftGPU/SIFTMatchFilter.h"
 #include "GlobalAppState.h"
 #include "SiftVisualization.h"
+#include "ConditionManager.h"
 
 #include "SubmapManager.h"
 
@@ -642,18 +643,12 @@ void SubmapManager::saveGlobalSiftManagerAndCache(const std::string& prefix) con
 
 void SubmapManager::setEndSolveGlobalDenseWeights()
 {
+	GlobalBundlingState::get().s_numGlobalNonLinIterations = 3;
 	const unsigned int maxNumIts = GlobalBundlingState::get().s_numGlobalNonLinIterations;
 	std::vector<float> sparseWeights(maxNumIts, 1.0f);
-	std::vector<float> denseDepthWeights(maxNumIts, 0.5f);
-	//std::vector<float> denseDepthWeights(maxNumIts, 1.0f);
-	//for (unsigned int i = 0; i < maxNumIts; i++) denseDepthWeights[i] = i + 1.0f;
+	std::vector<float> denseDepthWeights(maxNumIts, 15.0f);
 	std::vector<float> denseColorWeights(maxNumIts, 0.0f); //TODO here
 	m_SparseBundler.setGlobalWeights(sparseWeights, denseDepthWeights, denseColorWeights, true);
-	//// for tum data
-	//std::vector<float> globalWeightsSparse(maxNumIts, 1.0f);
-	//std::vector<float> globalWeightsDenseDepth(maxNumIts, 0.0f);
-	//std::vector<float> globalWeightsDenseColor(maxNumIts, 0.1f); //TODO turn on
-	//m_SparseBundler.setGlobalWeights(globalWeightsSparse, globalWeightsDenseDepth, globalWeightsDenseColor, true);
 	std::cout << "set end solve global dense weights" << std::endl;
 }
 
@@ -702,3 +697,15 @@ void SubmapManager::tryRevalidation(unsigned int curGlobalFrame, const float4x4&
 	}
 }
 
+void SubmapManager::invalidateLastGlobalFrame() {
+	if (m_global->getNumImages() <= 1) { //can't invalidate first chunk
+		std::cout << "INVALID FIRST CHUNK" << std::endl; // for nyu data, check for flipped depth/color frames
+		std::ofstream s(util::directoryFromPath(GlobalAppState::get().s_binaryDumpSensorFile) + "processed.txt");
+		s << "valid = false" << std::endl;
+		s << "INVALID_FIRST_CHUNK" << std::endl;
+		s.close();
+		ConditionManager::setExit();
+	}
+	//MLIB_ASSERT(m_global->getNumImages() > 1);
+	m_global->invalidateFrame(m_global->getNumImages() - 1);
+}
