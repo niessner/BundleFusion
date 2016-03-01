@@ -1183,9 +1183,9 @@ void __global__ ComputeDescriptor_Kernel(float4* d_des, int num, int width, int 
 
 	const float rpi = 4.0 / 3.14159265358979323846;
 	int idx = blockIdx.x;
-	int fidx = idx >> 4;
-	if (fidx >= num) return;
-	float4 key = tex1Dfetch(texDataF4, fidx);
+	int ftidx = idx >> 4;
+	if (ftidx >= num) return;
+	float4 key = tex1Dfetch(texDataF4, ftidx);
 	int bidx = idx & 0xf, ix = bidx & 0x3, iy = bidx >> 2;
 	float spt = fabs(key.z * DESCRIPTOR_WINDOW_FACTOR);
 	float s, c; __sincosf(key.w, &s, &c);
@@ -1381,13 +1381,13 @@ void ProgramCU::ComputeDescriptor(CuTexImage*list, CuTexImage* got, float* d_out
 	got->BindTexture2D(texDataF2);
 	list->BindTexture(texDataF4);
 	int block_width = DESCRIPTOR_COMPUTE_BLOCK_SIZE;
-	dim3 grid((num * 16 + block_width - 1) / block_width);
-	dim3 block(block_width);
 
 	if (rect)
 	{
 		printf("ERROR");
 		printf(__FUNCTION__);
+		dim3 grid((num * 16 + block_width - 1) / block_width);
+		dim3 block(block_width);
 		while (1) {
 			//if (GlobalUtil::_UseDynamicIndexing)
 			//	ComputeDescriptorRECT_Kernel<true> << <grid, block >> >((float4*)dtex->_cuData, num, width, height);
@@ -1940,10 +1940,12 @@ void ProgramCU::GetColMatch(CuTexImage* texCRT, float distmax, float ratiomax, C
 
 
 
-void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, int* d_featureCount, unsigned int numInputElements, float keyLocScale)
+void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, int* d_featureCount, unsigned int numInputElements, float keyLocScale,
+	unsigned int maxNumElements)
 {
 	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-	const float factor = 2.0*3.14159265358979323846 / 65535.0;
+	const float twopi = 2.0f*3.14159265358979323846f;
+	const float factor = 65535.0f;
 
 	if (idx < numInputElements) {
 		const float* src = (const float*)d_raw + 4 * idx;
@@ -1951,19 +1953,22 @@ void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, i
 		if (src[2] * keyLocScale >= c_siftCameraParams.m_minKeyScale) {
 			if (orientations[0] != 65535) {
 				int currFeature = atomicAdd(d_featureCount, 1);
-				d_out[currFeature].x = src[0];
-				d_out[currFeature].y = src[1];
-				d_out[currFeature].z = src[2];
-				d_out[currFeature].w = float(factor * orientations[0]);
-
-
-				if (orientations[1] != 65535 && orientations[1] != orientations[0])
-				{
-					int currFeature = atomicAdd(d_featureCount, 1);
+				if (currFeature < maxNumElements) {
 					d_out[currFeature].x = src[0];
 					d_out[currFeature].y = src[1];
 					d_out[currFeature].z = src[2];
-					d_out[currFeature].w = float(factor * orientations[1]);
+					d_out[currFeature].w = twopi * ((float)orientations[0] / factor);
+
+					if (orientations[1] != 65535 && orientations[1] != orientations[0])
+					{
+						int currFeature = atomicAdd(d_featureCount, 1);
+						if (currFeature < maxNumElements) {
+							d_out[currFeature].x = src[0];
+							d_out[currFeature].y = src[1];
+							d_out[currFeature].z = src[2];
+							d_out[currFeature].w = twopi * ((float)orientations[1] / factor);
+						}
+					}
 				}
 			} // valid orientation
 		} // scale
@@ -1974,12 +1979,13 @@ unsigned int ProgramCU::ReshapeFeatureList(CuTexImage* raw, CuTexImage* out, int
 
 	const unsigned int threadsPerBlock = 64;
 	dim3 grid((raw->GetImgWidth() + threadsPerBlock - 1) / threadsPerBlock);
-	dim3 block(threadsPerBlock, 1, 1);
+	dim3 block(threadsPerBlock, 1, 1 );
 
 	cudaMemset(d_featureCount, 0, sizeof(int));
-	ReshapeFeatureList_Kernel << < grid, block >> > ((float4*)raw->_cuData, (float4*)out->_cuData, d_featureCount, raw->GetImgWidth(), keyLocScale);
+	ReshapeFeatureList_Kernel << < grid, block >> > ((float4*)raw->_cuData, (float4*)out->_cuData, d_featureCount, raw->GetImgWidth(), keyLocScale, out->GetImgWidth());
 	unsigned int res;
 	cudaMemcpy(&res, d_featureCount, sizeof(int), cudaMemcpyDeviceToHost);
+	res = min(res, out->GetImgWidth());
 
 	ProgramCU::CheckErrorCUDA(__FUNCTION__);
 

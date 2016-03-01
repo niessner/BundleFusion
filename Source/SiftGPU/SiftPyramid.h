@@ -95,6 +95,7 @@ public:
 
 	int ResizeFeatureStorage();
 	void SetLevelFeatureNum(int idx, int fcount);
+	void SetLevelFinalFeatureNum(int idx, int fcount);
 	CuTexImage* GetBaseLevel(int octave, int dataName = DATA_GAUSSIAN);
 	//////////////////////////
 	//static int CheckCudaDevice(int device);

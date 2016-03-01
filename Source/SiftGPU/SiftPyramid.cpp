@@ -252,8 +252,6 @@ void SiftPyramid::LimitFeatureCount(int have_keylist)
 			_levelFeatureNum[i++] = 0;
 		}
 	}
-
-
 }
 
 int SiftPyramid::GetRequiredOctaveNum(int inputsz)
@@ -278,7 +276,8 @@ void SiftPyramid::GetFeatureDescriptors()
 {
 	//descriptors...
 	unsigned int descOffset = 0;
-	CuTexImage * got, *ftex = _featureTexFinal;
+	CuTexImage * got;
+	CuTexImage *ftex = _featureTexFinal;
 	for (int i = 0, idx = 0; i < _octave_num; i++)
 	{
 		got = GetBaseLevel(i + _octave_min, DATA_GRAD) + 1;
@@ -309,7 +308,7 @@ void SiftPyramid::ReshapeFeatureList()
 		float keyLocScale = os * (1 << (i / param._dog_level_num));
 
 		unsigned int numFeatures = ProgramCU::ReshapeFeatureList(&_featureTexRaw[i], &_featureTexFinal[i], d_featureCount, keyLocScale);
-		SetLevelFeatureNum(i, numFeatures);
+		SetLevelFinalFeatureNum(i, numFeatures);
 		_featureNum += numFeatures;
 	}
 }
@@ -677,6 +676,11 @@ void SiftPyramid::EvaluateTimings()
 void SiftPyramid::SetLevelFeatureNum(int idx, int fcount)
 {
 	_featureTexRaw[idx].InitTexture(fcount, 1, 4);
+	_levelFeatureNum[idx] = fcount;
+}
+
+void SiftPyramid::SetLevelFinalFeatureNum(int idx, int fcount)
+{
 	_featureTexFinal[idx].InitTexture(fcount, 1, 4);
 	_levelFeatureNum[idx] = fcount;
 }
@@ -694,7 +698,7 @@ int SiftPyramid::ResizeFeatureStorage()
 	int idx = 0, n = _octave_num * param._dog_level_num;
 	if (_featureTexRaw == NULL)	_featureTexRaw = new CuTexImage[n];
 	if (_featureTexFinal == NULL) _featureTexFinal = new CuTexImage[n];
-	if (GlobalUtil::_MaxOrientation >1 && GlobalUtil::_OrientationPack2 == 0 && _orientationTex == NULL)
+	if (GlobalUtil::_MaxOrientation > 1 && GlobalUtil::_OrientationPack2 == 0 && _orientationTex == NULL)
 		_orientationTex = new CuTexImage[n];
 
 
