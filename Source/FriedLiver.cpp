@@ -202,11 +202,11 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			fileNameDescGlobalApp = "zParametersScanNet.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
+			//fileNameDescGlobalApp = "zParametersScanNet.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
 
-			//fileNameDescGlobalApp = "zParametersDefault.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			fileNameDescGlobalApp = "zParametersDefault.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 			//fileNameDescGlobalBundling = "zParametersBundling20K.txt";
 
 			//fileNameDescGlobalApp = "zParametersMedium.txt";

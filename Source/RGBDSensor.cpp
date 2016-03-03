@@ -140,6 +140,7 @@ void RGBDSensor::initializeDepthIntrinsics(float fovX, float fovY, float centerX
 		0.0f, 0.0f, 0.0f, 1.0f);
 
 	m_depthIntrinsicsInv = m_depthIntrinsics.getInverse();
+	std::cout << "depth intrinsics" << std::endl;
 	std::cout << m_depthIntrinsics << std::endl;
 
 	m_recordIntrinsics = m_depthIntrinsics;
@@ -159,6 +160,9 @@ void RGBDSensor::initializeColorIntrinsics(float fovX, float fovY, float centerX
 		0.0f, 0.0f, 0.0f, 1.0f);
 
 	m_colorIntrinsicsInv = m_colorIntrinsics.getInverse();
+
+	std::cout << "color intrinsics" << std::endl;
+	std::cout << m_colorIntrinsics << std::endl;
 }
 
 float* RGBDSensor::getDepthFloat() {

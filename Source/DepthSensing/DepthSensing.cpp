@@ -331,11 +331,11 @@ void StopScanningAndExtractIsoSurfaceMC(const std::string& filename, bool overwr
 {
 	//g_sceneRep->debugHash();
 	//g_chunkGrid->debugCheckForDuplicates();
-
 	if (GlobalAppState::get().s_sensorIdx == 7) { //! hack for structure sensor
 		std::cout << "[marching cubes] stopped receiving frames from structure sensor" << std::endl;
 		g_depthSensingRGBDSensor->stopReceivingFrames();
 	}
+	std::cout << "running marching cubes..." << std::endl;
 
 	Timer t;
 

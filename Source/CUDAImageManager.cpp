@@ -63,6 +63,7 @@ bool CUDAImageManager::process()
 
 	const unsigned int bufferDimDepthInput = m_RGBDSensor->getDepthWidth()*m_RGBDSensor->getDepthHeight();
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depthInputRaw, m_RGBDSensor->getDepthFloat(), sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyHostToDevice));
+
 	if (GlobalBundlingState::get().s_erodeSIFTdepth) {
 		unsigned int numIter = 2;
 		numIter = 2 * ((numIter + 1) / 2);

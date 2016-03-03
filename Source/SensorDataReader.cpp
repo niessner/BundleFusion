@@ -45,8 +45,10 @@ void SensorDataReader::createFirstConnected()
 	std::cout << "DONE!" << std::endl;
 	std::cout << *m_sensorData << std::endl;
 
-	//std::cout << "intrinsics:" << std::endl;
-//	std::cout << m_sensorData->m_calibrationDepth.m_intrinsic << std::endl;
+	//std::cout << "depth intrinsics:" << std::endl;
+	//std::cout << m_sensorData->m_calibrationDepth.m_intrinsic << std::endl;
+	//std::cout << "color intrinsics:" << std::endl;
+	//std::cout << m_sensorData->m_calibrationColor.m_intrinsic << std::endl;
 
 	RGBDSensor::init(m_sensorData->m_depthWidth, m_sensorData->m_depthHeight, std::max(m_sensorData->m_colorWidth, 1u), std::max(m_sensorData->m_colorHeight, 1u), 1);
 	initializeDepthIntrinsics(m_sensorData->m_calibrationDepth.m_intrinsic(0, 0), m_sensorData->m_calibrationDepth.m_intrinsic(1, 1), m_sensorData->m_calibrationDepth.m_intrinsic(0, 2), m_sensorData->m_calibrationDepth.m_intrinsic(1, 2));
@@ -93,7 +95,8 @@ bool SensorDataReader::processDepth()
 
 
 		for (unsigned int i = 0; i < getDepthWidth()*getDepthHeight(); i++) {
-			depth[i] = (float)frameState.m_depthFrame[i] / m_sensorData->m_depthShift;
+			if (frameState.m_depthFrame[i] == 0) depth[i] = -std::numeric_limits<float>::infinity();
+			else depth[i] = (float)frameState.m_depthFrame[i] / m_sensorData->m_depthShift;
 		}
 
 		incrementRingbufIdx();
@@ -106,11 +109,6 @@ bool SensorDataReader::processDepth()
 		}
 		frameState.free();
 
-		//if (m_currFrame == 50) {
-		//	m_sensorDataCache->endDecompression();
-		//	std::cout << "END END" << std::endl;
-		//	getchar();
-		//}
 		m_currFrame++;
 		return true;
 	}
