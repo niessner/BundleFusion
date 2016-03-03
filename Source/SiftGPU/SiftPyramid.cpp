@@ -673,11 +673,11 @@ void SiftPyramid::EvaluateTimings()
 	}
 }
 
-void SiftPyramid::SetLevelFeatureNum(int idx, int fcount)
-{
-	_featureTexRaw[idx].InitTexture(fcount, 1, 4);
-	_levelFeatureNum[idx] = fcount;
-}
+//void SiftPyramid::SetLevelFeatureNum(int idx, int fcount)
+//{
+//	_featureTexRaw[idx].InitTexture(fcount, 1, 4);
+//	_levelFeatureNum[idx] = fcount;
+//}
 
 void SiftPyramid::SetLevelFinalFeatureNum(int idx, int fcount)
 {

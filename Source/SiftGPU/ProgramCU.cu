@@ -1940,12 +1940,64 @@ void ProgramCU::GetColMatch(CuTexImage* texCRT, float distmax, float ratiomax, C
 
 
 
+//void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, int* d_featureCount, unsigned int numInputElements, float keyLocScale,
+//	unsigned int maxNumElements)
+//{
+//	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//	//const float twopi = 2.0f*3.14159265358979323846f;
+//	//const float factor = 65535.0f;
+//	const float factor = 2.0*3.14159265358979323846 / 65535.0;
+//
+//	if (idx < numInputElements) {
+//		const float* src = (const float*)d_raw + 4 * idx;
+//		unsigned short * orientations = (unsigned short*)(&src[3]);
+//		if (src[2] * keyLocScale >= c_siftCameraParams.m_minKeyScale) {
+//			if (orientations[0] != 65535) {
+//				int currFeature = atomicAdd(d_featureCount, 1);
+//				if (currFeature < maxNumElements) {
+//					d_out[currFeature].x = src[0];
+//					d_out[currFeature].y = src[1];
+//					d_out[currFeature].z = src[2];
+//					//d_out[currFeature].w = twopi * ((float)orientations[0] / factor);
+//					d_out[currFeature].w = factor * orientations[0];
+//
+//					if (orientations[1] != 65535 && orientations[1] != orientations[0])
+//					{
+//						int currFeature = atomicAdd(d_featureCount, 1);
+//						if (currFeature < maxNumElements) {
+//							d_out[currFeature].x = src[0];
+//							d_out[currFeature].y = src[1];
+//							d_out[currFeature].z = src[2];
+//							//d_out[currFeature].w = twopi * ((float)orientations[1] / factor);
+//							d_out[currFeature].w = factor * orientations[1];
+//						}
+//					}
+//				}
+//			} // valid orientation
+//		} // scale
+//	}
+//}
+//unsigned int ProgramCU::ReshapeFeatureList(CuTexImage* raw, CuTexImage* out, int* d_featureCount, float keyLocScale) {
+//
+//	const unsigned int threadsPerBlock = 64;
+//	dim3 grid((raw->GetImgWidth() + threadsPerBlock - 1) / threadsPerBlock);
+//	dim3 block(threadsPerBlock, 1, 1);
+//
+//	cudaMemset(d_featureCount, 0, sizeof(int));
+//	ReshapeFeatureList_Kernel << < grid, block >> > ((float4*)raw->_cuData, (float4*)out->_cuData, d_featureCount, raw->GetImgWidth(), keyLocScale, out->GetImgWidth());
+//	unsigned int res;
+//	cudaMemcpy(&res, d_featureCount, sizeof(int), cudaMemcpyDeviceToHost);
+//	res = min(res, out->GetImgWidth());
+//
+//	ProgramCU::CheckErrorCUDA(__FUNCTION__);
+//
+//	return res;
+//}
 void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, int* d_featureCount, unsigned int numInputElements, float keyLocScale,
 	unsigned int maxNumElements)
 {
 	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-	const float twopi = 2.0f*3.14159265358979323846f;
-	const float factor = 65535.0f;
+	const float factor = 2.0*3.14159265358979323846 / 65535.0;
 
 	if (idx < numInputElements) {
 		const float* src = (const float*)d_raw + 4 * idx;
@@ -1957,16 +2009,16 @@ void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, i
 					d_out[currFeature].x = src[0];
 					d_out[currFeature].y = src[1];
 					d_out[currFeature].z = src[2];
-					d_out[currFeature].w = twopi * ((float)orientations[0] / factor);
+					d_out[currFeature].w = factor * orientations[0];
 
 					if (orientations[1] != 65535 && orientations[1] != orientations[0])
 					{
-						int currFeature = atomicAdd(d_featureCount, 1);
+						currFeature = atomicAdd(d_featureCount, 1);
 						if (currFeature < maxNumElements) {
 							d_out[currFeature].x = src[0];
 							d_out[currFeature].y = src[1];
 							d_out[currFeature].z = src[2];
-							d_out[currFeature].w = twopi * ((float)orientations[1] / factor);
+							d_out[currFeature].w = factor * orientations[1];
 						}
 					}
 				}
@@ -1974,21 +2026,25 @@ void __global__  ReshapeFeatureList_Kernel(const float4* d_raw, float4* d_out, i
 		} // scale
 	}
 }
-
 unsigned int ProgramCU::ReshapeFeatureList(CuTexImage* raw, CuTexImage* out, int* d_featureCount, float keyLocScale) {
 
 	const unsigned int threadsPerBlock = 64;
 	dim3 grid((raw->GetImgWidth() + threadsPerBlock - 1) / threadsPerBlock);
-	dim3 block(threadsPerBlock, 1, 1 );
+	dim3 block(threadsPerBlock, 1, 1);
+
+	const unsigned int maxNumElements = out->GetDataSize() / (out->GetImgNumChannels() * sizeof(float));
 
 	cudaMemset(d_featureCount, 0, sizeof(int));
-	ReshapeFeatureList_Kernel << < grid, block >> > ((float4*)raw->_cuData, (float4*)out->_cuData, d_featureCount, raw->GetImgWidth(), keyLocScale, out->GetImgWidth());
+	ReshapeFeatureList_Kernel << < grid, block >> > ((float4*)raw->_cuData, (float4*)out->_cuData, d_featureCount, raw->GetImgWidth(), keyLocScale, maxNumElements);
 	unsigned int res;
 	cudaMemcpy(&res, d_featureCount, sizeof(int), cudaMemcpyDeviceToHost);
-	res = min(res, out->GetImgWidth());
 
 	ProgramCU::CheckErrorCUDA(__FUNCTION__);
 
+	if (res > maxNumElements) {
+		//printf("res %d -> %d\n", res, maxNumElements);
+		res = maxNumElements;
+	}
 	return res;
 }
 

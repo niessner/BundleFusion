@@ -64,6 +64,7 @@ public:
 	inline int GetImgWidth(){ return _imgWidth; }
 	inline int GetImgHeight(){ return _imgHeight; }
 	inline int GetDataSize(){ return _numBytes; }
+	inline int GetImgNumChannels(){ return _numChannel; }
 
 
 private:
