@@ -5,7 +5,7 @@
 #include "../CUDACache.h"
 #include "../SiftGPU/MatrixConversion.h"
 
-extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
+extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverStateAnalysis& analysis, SolverParameters& parameters, CUDATimer* timer);
 extern "C" void buildVariablesToCorrespondencesTableCUDA(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int maxNumCorrespondencesPerImage, int* d_variablesToCorrespondences, int* d_numEntriesPerRow, CUDATimer* timer);
 extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, SolverParameters& parameters, float* convergenceAnalysis, CUDATimer* timer);
 
@@ -14,6 +14,7 @@ extern "C" int countHighResiduals(SolverInput& input, SolverState& state, Solver
 extern "C" void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 extern "C" void convertLiePosesToMatricesCU(const float3* d_rot, const float3* d_trans, unsigned int numTransforms, float4x4* d_transforms, float4x4* d_transformInvs);
 
+extern "C" void collectHighResiduals(SolverInput& input, SolverState& state, SolverStateAnalysis& analysis, SolverParameters& parameters, CUDATimer* timer);
 extern "C" void VisualizeCorrespondences(const uint2& imageIndices, const SolverInput& input, SolverState& state, SolverParameters& parameters, float3* d_corrImage);
 
 CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned int maxNumResiduals)
@@ -49,11 +50,11 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_precondionerRot, sizeof(float3)*numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_precondionerTrans, sizeof(float3)*numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_sumResidual, sizeof(float)));
-	unsigned int n = (maxNumResiduals * 3 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_maxResidual, sizeof(float) * n));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_maxResidualIndex, sizeof(int) * n));
-	m_solverState.h_maxResidual = new float[n];
-	m_solverState.h_maxResidualIndex = new int[n];
+	unsigned int n = (maxNumResiduals + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverExtra.d_maxResidual, sizeof(float) * n));
+	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverExtra.d_maxResidualIndex, sizeof(int) * n));
+	m_solverExtra.h_maxResidual = new float[n];
+	m_solverExtra.h_maxResidualIndex = new int[n];
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_variablesToCorrespondences, sizeof(int)*m_maxNumberOfImages*m_maxCorrPerImage));
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_numEntriesPerRow, sizeof(int)*m_maxNumberOfImages));
@@ -78,6 +79,11 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	m_solverState.d_xTransforms = NULL;
 	m_solverState.d_xTransformInverses = NULL;
 #endif
+
+#ifdef NEW_GUIDED_REMOVE
+	cudaMalloc(&d_transforms, sizeof(float4x4)*m_maxNumberOfImages);
+#endif
+
 	//!!!DEBUGGING
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_deltaRot, -1, sizeof(float3)*numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_deltaTrans, -1, sizeof(float3)*numberOfVariables));
@@ -95,8 +101,8 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_precondionerRot, -1, sizeof(float3)*numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_precondionerTrans, -1, sizeof(float3)*numberOfVariables));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_sumResidual, -1, sizeof(float)));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_maxResidual, -1, sizeof(float) * n));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_maxResidualIndex, -1, sizeof(int) * n));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverExtra.d_maxResidual, -1, sizeof(float) * n));
+	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverExtra.d_maxResidualIndex, -1, sizeof(int) * n));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(d_variablesToCorrespondences, -1, sizeof(int)*m_maxNumberOfImages*m_maxCorrPerImage));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(d_numEntriesPerRow, -1, sizeof(int)*m_maxNumberOfImages));
 	MLIB_CUDA_SAFE_CALL(cudaMemset(m_solverState.d_countHighResidual, -1, sizeof(int)));
@@ -136,10 +142,10 @@ CUDASolverBundling::~CUDASolverBundling()
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_precondionerRot);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_precondionerTrans);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_sumResidual);
-	MLIB_CUDA_SAFE_FREE(m_solverState.d_maxResidual);
-	MLIB_CUDA_SAFE_FREE(m_solverState.d_maxResidualIndex);
-	SAFE_DELETE_ARRAY(m_solverState.h_maxResidual);
-	SAFE_DELETE_ARRAY(m_solverState.h_maxResidualIndex);
+	MLIB_CUDA_SAFE_FREE(m_solverExtra.d_maxResidual);
+	MLIB_CUDA_SAFE_FREE(m_solverExtra.d_maxResidualIndex);
+	SAFE_DELETE_ARRAY(m_solverExtra.h_maxResidual);
+	SAFE_DELETE_ARRAY(m_solverExtra.h_maxResidualIndex);
 
 	MLIB_CUDA_SAFE_FREE(d_variablesToCorrespondences);
 	MLIB_CUDA_SAFE_FREE(d_numEntriesPerRow);
@@ -157,13 +163,17 @@ CUDASolverBundling::~CUDASolverBundling()
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCount);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_sumResidualColor);
 	MLIB_CUDA_SAFE_FREE(m_solverState.d_corrCountColor);
+
+#ifdef NEW_GUIDED_REMOVE
+	MLIB_CUDA_SAFE_FREE(d_transforms);
+#endif
 }
 
 void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, const int* d_validImages, unsigned int numberOfImages,
 	unsigned int nNonLinearIterations, unsigned int nLinearIterations, const CUDACache* cudaCache,
 	const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor, bool usePairwiseDense,
 	float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,
-	bool rebuildJT, bool findMaxResidual)
+	bool rebuildJT, bool findMaxResidual, unsigned int revalidateIdx)
 {
 	MLIB_ASSERT(numberOfImages > 1 && nNonLinearIterations <= weightsSparse.size());
 	if (numberOfCorrespondences > m_maxCorrPerImage*m_maxNumberOfImages) {
@@ -185,16 +195,17 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	parameters.nLinIterations = nLinearIterations;
 	parameters.verifyOptDistThresh = m_verifyOptDistThresh;
 	parameters.verifyOptPercentThresh = m_verifyOptPercentThresh;
+	parameters.highResidualThresh = std::numeric_limits<float>::infinity();
 
 	parameters.weightSparse = weightsSparse.front();
 	parameters.weightDenseDepth = weightsDenseDepth.front();
 	parameters.weightDenseColor = weightsDenseColor.front();
-	parameters.denseDistThresh = 0.1f; //TODO params
-	parameters.denseNormalThresh = 0.97f;
+	parameters.denseDistThresh = 0.15f; //0.2f;  //0.1f; //TODO params
+	parameters.denseNormalThresh = 0.97f; //0.9f;
 	parameters.denseColorThresh = 0.1f;
 	parameters.denseColorGradientMin = 0.005f;
 	parameters.denseDepthMin = 0.5f;
-	parameters.denseDepthMax = 4.0f;//2.5f;//3.5f;//4.5f;//TODO 
+	parameters.denseDepthMax = 4.0f;//4.5f;//2.5f;//3.5f;//TODO 
 	parameters.useDense = (parameters.weightDenseDepth > 0 || parameters.weightDenseColor > 0);
 	parameters.useDenseDepthAllPairwise = usePairwiseDense;
 	//parameters.denseOverlapCheckSubsampleFactor = 8; // for 160x120 -> 20x15 image
@@ -293,13 +304,9 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		FreeImageWrapper::saveImage("debug/corr.png", corrImage);
 		std::cout << "waiting..." << std::endl; getchar();
 	}
-	//{
-	//	std::vector<EntryJ> corr(numberOfCorrespondences);
-	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(corr.data(), d_correspondences, sizeof(EntryJ)*numberOfCorrespondences, cudaMemcpyDeviceToHost));
-	//	int a = 5;
-	//}
-	//!!!debugging
-
+#ifdef NEW_GUIDED_REMOVE
+	convertLiePosesToMatricesCU(m_solverState.d_xRot, m_solverState.d_xTrans, solverInput.numberOfImages, d_transforms, m_solverState.d_xTransformInverses); //debugging only (store transforms before opt)
+#endif
 
 
 	if (rebuildJT) {
@@ -309,7 +316,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	solveBundlingStub(solverInput, m_solverState, parameters, convergence, m_timer);
 
 	if (findMaxResidual) {
-		computeMaxResidual(solverInput, parameters);
+		computeMaxResidual(solverInput, parameters, revalidateIdx);
 	}
 }
 
@@ -321,47 +328,207 @@ void CUDASolverBundling::buildVariablesToCorrespondencesTable(EntryJ* d_correspo
 		buildVariablesToCorrespondencesTableCUDA(d_correspondences, numberOfCorrespondences, m_maxCorrPerImage, d_variablesToCorrespondences, d_numEntriesPerRow, m_timer);
 }
 
-void CUDASolverBundling::computeMaxResidual(SolverInput& solverInput, SolverParameters& parameters)
+//not squared (per axis component)
+//#define MAX_RESIDUAL_THRESH 0.16f //sun3d
+#define MAX_RESIDUAL_THRESH 0.08f //0.05f 
+
+#if defined(ENABLE_GUIDED_REMOVE) || defined(NEW_GUIDED_REMOVE)
+#define GUIDED_SEARCH_MAX_RES_THRESH 0.2f // threshold to start searching for other image pairs to invalidate
+template<>
+struct std::hash<ml::vec2ui> : public std::unary_function < ml::vec2ui, size_t > {
+	size_t operator()(const ml::vec2ui& v) const {
+		//TODO larger prime number (64 bit) to match size_t
+		const size_t p0 = 73856093;
+		const size_t p1 = 19349669;
+		//const size_t p2 = 83492791;
+		const size_t res = ((size_t)v.x * p0) ^ ((size_t)v.y * p1);// ^ ((size_t)v.z * p2);
+		return res;
+	}
+};
+#endif
+
+void CUDASolverBundling::computeMaxResidual(SolverInput& solverInput, SolverParameters& parameters, unsigned int revalidateIdx)
 {
+	if (m_timer) m_timer->startEvent(__FUNCTION__);
 	if (parameters.weightSparse > 0.0f) {
-		evalMaxResidual(solverInput, m_solverState, parameters, m_timer);
+		evalMaxResidual(solverInput, m_solverState, m_solverExtra, parameters, m_timer);
 		// copy to cpu
-		unsigned int n = (solverInput.numberOfCorrespondences * 3 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-		cutilSafeCall(cudaMemcpy(m_solverState.h_maxResidual, m_solverState.d_maxResidual, sizeof(float) * n, cudaMemcpyDeviceToHost));
-		cutilSafeCall(cudaMemcpy(m_solverState.h_maxResidualIndex, m_solverState.d_maxResidualIndex, sizeof(int) * n, cudaMemcpyDeviceToHost));
+		unsigned int n = (solverInput.numberOfCorrespondences + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+		cutilSafeCall(cudaMemcpy(m_solverExtra.h_maxResidual, m_solverExtra.d_maxResidual, sizeof(float) * n, cudaMemcpyDeviceToHost));
+		cutilSafeCall(cudaMemcpy(m_solverExtra.h_maxResidualIndex, m_solverExtra.d_maxResidualIndex, sizeof(int) * n, cudaMemcpyDeviceToHost));
 		// compute max
 		float maxResidual = 0.0f; int maxResidualIndex = 0;
 		for (unsigned int i = 0; i < n; i++) {
-			if (maxResidual < m_solverState.h_maxResidual[i]) {
-				maxResidual = m_solverState.h_maxResidual[i];
-				maxResidualIndex = m_solverState.h_maxResidualIndex[i];
+			if (maxResidual < m_solverExtra.h_maxResidual[i]) {
+				maxResidual = m_solverExtra.h_maxResidual[i];
+				maxResidualIndex = m_solverExtra.h_maxResidualIndex[i];
 			}
 		}
-		m_solverState.h_maxResidual[0] = maxResidual;
-		m_solverState.h_maxResidualIndex[0] = maxResidualIndex;
+#ifdef NEW_GUIDED_REMOVE
+
+		//if (revalidateIdx <= 31)
+		//	int a = 5;
+
+		m_maxResImPairs.clear();
+		if (maxResidual > GUIDED_SEARCH_MAX_RES_THRESH) {
+			parameters.highResidualThresh = std::min(std::max(0.2f * maxResidual, 0.1f), 0.4f);
+			collectHighResiduals(solverInput, m_solverState, m_solverExtra, parameters, m_timer);
+			unsigned int highResCount;
+			cutilSafeCall(cudaMemcpy(&highResCount, m_solverState.d_countHighResidual, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+			n = std::min(highResCount, (m_maxCorrPerImage*m_maxNumberOfImages + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK);
+			cutilSafeCall(cudaMemcpy(m_solverExtra.h_maxResidual, m_solverExtra.d_maxResidual, sizeof(float) * n, cudaMemcpyDeviceToHost));
+			cutilSafeCall(cudaMemcpy(m_solverExtra.h_maxResidualIndex, m_solverExtra.d_maxResidualIndex, sizeof(int) * n, cudaMemcpyDeviceToHost));
+
+			if (n > 1) {
+				// check high residuals with previous trajectory as reference //TODO MAKE EFFICIENT
+				std::vector<float4x4> transforms(solverInput.numberOfImages);
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*solverInput.numberOfImages, cudaMemcpyDeviceToHost));
+				std::unordered_map<vec2ui, float> residualMap; //TODO should be something better than this... 
+				std::unordered_map<vec2ui, float> allCollectedResidualMap; //debugging
+				std::vector<EntryJ> corrs(n);
+				for (unsigned int i = 0; i < n; i++) {
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data() + i, solverInput.d_correspondences + m_solverExtra.h_maxResidualIndex[i], sizeof(EntryJ), cudaMemcpyDeviceToHost));
+					const EntryJ& h_corr = corrs[i];
+					vec2ui imageIndices(h_corr.imgIdx_i, h_corr.imgIdx_j);
+					//compute res at previous
+					if (h_corr.imgIdx_j == solverInput.numberOfImages - 1 && std::abs((int)h_corr.imgIdx_i - (int)h_corr.imgIdx_j) > 10) { //introduced by latest image
+						float3 prevRes = fabs(transforms[h_corr.imgIdx_i] * h_corr.pos_i - transforms[h_corr.imgIdx_j] * h_corr.pos_j);
+						float prevMaxRes = fmaxf(prevRes.z, fmaxf(prevRes.x, prevRes.y));
+						if (prevMaxRes > 1.5f*m_solverExtra.h_maxResidual[i]) { //increase?
+							auto it = residualMap.find(imageIndices);
+							if (it == residualMap.end()) residualMap[imageIndices] = m_solverExtra.h_maxResidual[i];
+							else it->second = std::max(m_solverExtra.h_maxResidual[i], it->second);
+						}
+					}
+					else if (h_corr.imgIdx_j == revalidateIdx && std::abs((int)h_corr.imgIdx_i - (int)h_corr.imgIdx_j) > 10) { //introduced by latest revalidate
+						auto it = residualMap.find(imageIndices);
+						if (it == residualMap.end()) residualMap[imageIndices] = m_solverExtra.h_maxResidual[i];
+						else it->second = std::max(m_solverExtra.h_maxResidual[i], it->second);
+					}
+					auto it = allCollectedResidualMap.find(imageIndices);
+					if (it == allCollectedResidualMap.end()) allCollectedResidualMap[imageIndices] = m_solverExtra.h_maxResidual[i];
+					else it->second = std::max(m_solverExtra.h_maxResidual[i], it->second);
+				}
+				if (!residualMap.empty()) { //debug print
+					unsigned int rep = residualMap.begin()->first.x;
+					std::cout << "rep: (" << rep << ", " << solverInput.numberOfImages - 1 << ")" << std::endl;
+				}
+				for (const auto& r : residualMap) m_maxResImPairs.push_back(r.first);
+
+				//!!!debugging
+				//std::vector<std::pair<vec2ui, float>> residuals(allCollectedResidualsMap.begin(), allCollectedResidualsMap.end());
+				//std::sort(residuals.begin(), residuals.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) { //debugging only
+				//	return left.second > right.second;
+				//});
+				if (m_maxResImPairs.size() > 1) {
+					std::ofstream s("debug/_logs/" + std::to_string(solverInput.numberOfImages) + "_" + std::to_string(m_maxResImPairs.front().x) + "-" + std::to_string(m_maxResImPairs.front().y) + ".txt");
+					s << "# im pairs to remove = " << m_maxResImPairs.size() << ", res thresh = " << parameters.highResidualThresh << std::endl;
+					for (unsigned int i = 0; i < m_maxResImPairs.size(); i++) s << m_maxResImPairs[i] << std::endl;
+					s.close();
+				}
+				//!!!debugging
+			}
+		}
+#elif ENABLE_GUIDED_REMOVE
+		m_maxResImPairs.clear();
+		//if (solverInput.numberOfImages >= 130 && solverInput.numberOfImages < 132 ||
+		//if (solverInput.numberOfImages >= 168 && solverInput.numberOfImages < 172 ||
+		//if (solverInput.numberOfImages >= 228 && solverInput.numberOfImages <= 233) {
+		if (maxResidual > GUIDED_SEARCH_MAX_RES_THRESH) {
+			if (solverInput.numberOfImages >= 228 && solverInput.numberOfImages <= 233)
+				int a = 5;
+
+			parameters.highResidualThresh = std::max(0.2f * maxResidual, 0.1f); 
+			collectHighResiduals(solverInput, m_solverState, m_solverExtra, parameters, m_timer);
+			unsigned int highResCount;
+			cutilSafeCall(cudaMemcpy(&highResCount, m_solverState.d_countHighResidual, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+			n = std::min(highResCount, (m_maxCorrPerImage*m_maxNumberOfImages + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK);
+			if (n > 1) {
+				EntryJ h_corr; MLIB_CUDA_SAFE_CALL(cudaMemcpy(&h_corr, solverInput.d_correspondences + maxResidualIndex, sizeof(EntryJ), cudaMemcpyDeviceToHost));
+				vec2ui refImageIndices(h_corr.imgIdx_i, h_corr.imgIdx_j);
+				cutilSafeCall(cudaMemcpy(m_solverExtra.h_maxResidual, m_solverExtra.d_maxResidual, sizeof(float) * n, cudaMemcpyDeviceToHost));
+				cutilSafeCall(cudaMemcpy(m_solverExtra.h_maxResidualIndex, m_solverExtra.d_maxResidualIndex, sizeof(int) * n, cudaMemcpyDeviceToHost));
+
+				std::unordered_map<vec2ui, float> residualMap; //TODO should be something better than this... 
+				for (unsigned int i = 0; i < n; i++) {
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(&h_corr, solverInput.d_correspondences + m_solverExtra.h_maxResidualIndex[i], sizeof(EntryJ), cudaMemcpyDeviceToHost));
+					vec2ui imageIndices(h_corr.imgIdx_i, h_corr.imgIdx_j);
+					auto it = residualMap.find(imageIndices);
+					if (it == residualMap.end()) residualMap[imageIndices] = m_solverExtra.h_maxResidual[i];
+					else it->second = std::max(m_solverExtra.h_maxResidual[i], it->second);
+				}
+				if (residualMap.size() > 15) { //something screwed up everything... need to consider more than just the max residual
+					std::vector<std::vector<vec2ui>> blocks;
+					for (const auto& r : residualMap) {
+						if (std::abs((int)r.first.x - (int)r.first.y) < 15) continue;
+						if (blocks.empty()) { blocks.push_back(std::vector<vec2ui>(1, r.first)); continue; }
+						bool found = false;
+						for (unsigned int i = 0; i < blocks.size(); i++) {
+							if (isSimilarImagePair(r.first, blocks[i].front())) {
+								blocks[i].push_back(r.first);
+								found = true;
+								break;
+							}
+						}
+						if (!found)
+							blocks.push_back(std::vector<vec2ui>(1, r.first));
+					}
+					unsigned int maxBlockSize = 0;
+					for (unsigned int i = 0; i < blocks.size(); i++) {
+						if (blocks[i].size() > maxBlockSize) 
+							maxBlockSize = (unsigned int)blocks[i].size();
+					}
+					unsigned int minSize = (unsigned int)(0.5f * maxBlockSize);
+					for (unsigned int i = 0; i < blocks.size(); i++) {
+						if (blocks[i].size() > minSize)
+							m_maxResImPairs.insert(m_maxResImPairs.end(), blocks[i].begin(), blocks[i].end());
+					}
+					int a = 5;
+				}
+				else {
+					for (const auto& r : residualMap)
+						if (isSimilarImagePair(refImageIndices, r.first) && !(std::abs((int)r.first.x - (int)r.first.y) < 5))
+							m_maxResImPairs.push_back(r.first); //should be image indices not res
+				}
+
+				//!!!debugging
+				std::vector<std::pair<vec2ui, float>> residuals(residualMap.begin(), residualMap.end());
+				std::sort(residuals.begin(), residuals.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) { //debugging only
+					return left.second > right.second;
+				});
+				if (m_maxResImPairs.size() > 1) {
+					std::ofstream s("debug/_logs/tmp/" + std::to_string(refImageIndices.x) + "-" + std::to_string(refImageIndices.y) + ".txt");
+					s << "# im pairs to remove = " << m_maxResImPairs.size() << ", res thresh = " << parameters.highResidualThresh << std::endl;
+					for (unsigned int i = 0; i < m_maxResImPairs.size(); i++) s << m_maxResImPairs[i] << std::endl;
+					s.close();
+				}
+				//!!!debugging
+			}
+			else
+				int a = 5;
+		}
+#endif
+		m_solverExtra.h_maxResidual[0] = maxResidual;
+		m_solverExtra.h_maxResidualIndex[0] = maxResidualIndex;
 	}
 	else {
-		m_solverState.h_maxResidual[0] = 0.0f;
-		m_solverState.h_maxResidualIndex[0] = 0;
+		m_solverExtra.h_maxResidual[0] = 0.0f;
+		m_solverExtra.h_maxResidualIndex[0] = 0;
 	}
+	if (m_timer) m_timer->endEvent();
 }
 
 bool CUDASolverBundling::getMaxResidual(EntryJ* d_correspondences, ml::vec2ui& imageIndices, float& maxRes)
 {
-	const float MAX_RESIDUAL = 0.05f; // nonsquared residual
-	if (m_timer) m_timer->startEvent(__FUNCTION__);
-
-	maxRes = m_solverState.h_maxResidual[0];
+	maxRes = m_solverExtra.h_maxResidual[0];
 
 	// for debugging get image indices regardless
 	EntryJ h_corr;
-	unsigned int imIdx = m_solverState.h_maxResidualIndex[0] / 3;
+	unsigned int imIdx = m_solverExtra.h_maxResidualIndex[0];
 	cutilSafeCall(cudaMemcpy(&h_corr, d_correspondences + imIdx, sizeof(EntryJ), cudaMemcpyDeviceToHost));
 	imageIndices = ml::vec2ui(h_corr.imgIdx_i, h_corr.imgIdx_j);
 
-	if (m_timer) m_timer->endEvent();
-
-	if (m_solverState.h_maxResidual[0] > MAX_RESIDUAL) { // remove!
+	if (m_solverExtra.h_maxResidual[0] > MAX_RESIDUAL_THRESH) { // remove!
 
 		return true;
 	}
@@ -388,8 +555,7 @@ bool CUDASolverBundling::useVerification(EntryJ* d_correspondences, unsigned int
 	solverInput.maxCorrPerImage = m_maxCorrPerImage;
 
 	unsigned int numHighResiduals = countHighResiduals(solverInput, m_solverState, parameters, m_timer);
-	unsigned int total = solverInput.numberOfCorrespondences * 3;
-	//std::cout << "\t[ useVerification ] " << numHighResiduals << " / " << total << " = " << (float)numHighResiduals / total << " vs " << parameters.verifyOptPercentThresh << std::endl;
-	if ((float)numHighResiduals / total >= parameters.verifyOptPercentThresh) return true;
+	//std::cout << "\t[ useVerification ] " << numHighResiduals << " / " << solverInput.numberOfCorrespondences << " = " << (float)numHighResiduals / solverInput.numberOfCorrespondences << " vs " << parameters.verifyOptPercentThresh << std::endl;
+	if ((float)numHighResiduals / solverInput.numberOfCorrespondences >= parameters.verifyOptPercentThresh) return true;
 	return false;
 }

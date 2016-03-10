@@ -17,7 +17,6 @@
 extern "C" void updateConstantSiftCameraParams(const SiftCameraParams& params);
 
 Timer Bundler::s_timer;
-Timer Bundler::s_timerOpt;
 int Bundler::BundlerState::s_markOffset = 2;
 
 
@@ -50,7 +49,10 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 	m_bExitBundlingThread = false;
 	m_bIsScanDoneGlobalOpt = false;
 
-	m_useSolve = true;
+	m_numFramesPastLast = 0;
+	m_numOptPerResidualRemoval = GlobalBundlingState::get().s_numOptPerResidualRemoval;
+
+	m_useSolve = true; //to turn off solve at end
 }
 
 Bundler::~Bundler()
@@ -69,14 +71,12 @@ void Bundler::processInput()
 		}
 		MLIB_ASSERT(!m_RGBDSensor->isReceivingFrames());
 #endif
-		static unsigned int framePastLast = 0;
-		if (framePastLast == 0 && m_currentState.m_localToSolve == -1) {
+		if (m_numFramesPastLast == 0 && m_currentState.m_localToSolve == -1) {
 			if (!m_SubmapManager.isLastLocalFrame(curFrame)) prepareLocalSolve(curFrame, true);
-			framePastLast++;
 		}
 		else {
-#ifdef USE_GLOBAL_DENSE_AT_END
-			if (framePastLast == 10) {
+#ifdef USE_GLOBAL_DENSE_AT_END //150 for aoff1
+			if (m_numFramesPastLast == 10) {
 				if (m_currentState.m_lastFrameProcessed < 10000) m_SubmapManager.setEndSolveGlobalDenseWeights();
 
 				//saveGlobalSiftManagerAndCacheToFile("debug/global");
@@ -84,13 +84,13 @@ void Bundler::processInput()
 				//std::cout << "waiting..." << std::endl;
 				//getchar();
 			}
-			if (framePastLast == 11) {
+			if (m_numFramesPastLast == 11) {
 				std::cout << "stopping solve" << std::endl;
 				m_useSolve = false;
 			}
 #endif
-			framePastLast++;
 		}
+		m_numFramesPastLast++;
 		return; // nothing new to process
 	}
 
@@ -213,7 +213,9 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 	unsigned int numFrames = m_currentState.m_totalNumOptLocalFrames;
 
 	if (m_currentState.m_bOptimizeGlobal == BundlerState::PROCESS) {
-		bool valid = m_SubmapManager.optimizeGlobal(numFrames, numNonLinIterations, numLinIterations, isStart, isEnd, m_bIsScanDoneGlobalOpt);
+		const unsigned int countNumFrames = (m_numFramesPastLast > 0) ? m_numFramesPastLast : numFrames/m_submapSize;
+		bool removeMaxResidual = isEnd && ((countNumFrames % m_numOptPerResidualRemoval) == (m_numOptPerResidualRemoval - 1));
+		bool valid = m_SubmapManager.optimizeGlobal(numFrames, numNonLinIterations, numLinIterations, isStart, removeMaxResidual, m_bIsScanDoneGlobalOpt);
 
 		if (isEnd) {
 			m_SubmapManager.updateTrajectory(numFrames);

@@ -67,6 +67,7 @@ public:
 	//void runLocalOpts();
 	//debug
 	void compareDEBUG();
+	void printColorImages();
 	void debug();
 
 	//// match within first numFrames of sensorFile
@@ -91,7 +92,7 @@ public:
 
 	void printCacheFrames(const std::string& dir, const CUDACache* cache = NULL, unsigned int numPrint = (unsigned int)-1) const;
 
-	void loadCachedFramesFromSensor(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames);
+	void loadCachedFramesFromSensor(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames = (unsigned int)-1);
 
 	void createCUDACache(CUDACache* cache);
 

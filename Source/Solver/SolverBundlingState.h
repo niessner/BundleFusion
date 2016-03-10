@@ -63,13 +63,6 @@ struct SolverState
 	float3*	d_precondionerTrans;		// Preconditioner for linear system
 
 	float*	d_sumResidual;				// sum of the squared residuals //debug
-	
-	// residual pruning
-	int*	d_maxResidualIndex;
-	float*	d_maxResidual;
-	
-	int*	h_maxResidualIndex;
-	float*	h_maxResidual;
 
 	//float* d_residuals; // debugging
 	//float* d_sumLinResidual; // debugging // helper to compute linear residual
@@ -97,6 +90,16 @@ struct SolverState
 	int* d_corrCount;
 	int* d_corrCountColor;
 	float* d_sumResidualColor;
+};
+
+struct SolverStateAnalysis
+{
+	// residual pruning
+	int*	d_maxResidualIndex;
+	float*	d_maxResidual;
+
+	int*	h_maxResidualIndex;
+	float*	h_maxResidual;
 };
 
 #endif

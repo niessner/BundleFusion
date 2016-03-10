@@ -1,6 +1,7 @@
 
 #include "stdafx.h"
 #include "SBA.h"
+#include "CUDACache.h"
 
 #ifdef USE_GPU_SOLVE
 #include "TimingLog.h"
@@ -58,7 +59,7 @@ SBA::SBA()
 
 
 void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal,
-	bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt)
+	bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt, unsigned int revalidateIdx /*= (unsigned int)-1*/)
 {
 	if (recordConvergence) m_recordedConvergence.push_back(std::vector<float>());
 
@@ -104,7 +105,7 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	const int* d_validImages = siftManager->getValidImagesGPU();
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans, d_validImages);
 
-	bool removed = alignCUDA(siftManager, cache, usePairwise, weightsSparse, weightsDenseDepth, weightsDenseColor, maxNumIters, numPCGits, isStart, isEnd);
+	bool removed = alignCUDA(siftManager, cache, usePairwise, weightsSparse, weightsDenseDepth, weightsDenseColor, maxNumIters, numPCGits, isStart, isEnd, revalidateIdx);
 	if (recordConvergence) {
 		const std::vector<float>& conv = m_solver->getConvergenceAnalysis();
 		m_recordedConvergence.back().insert(m_recordedConvergence.back().end(), conv.begin(), conv.end());
@@ -121,7 +122,7 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 }
 
 bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise, const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor,
-	unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd)
+	unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd, unsigned int revalidateIdx)
 {
 	EntryJ* d_correspondences = siftManager->getGlobalCorrespondencesGPU();
 	m_numCorrespondences = siftManager->getNumGlobalCorrespondences();
@@ -129,7 +130,7 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 	// transforms
 	unsigned int numImages = siftManager->getNumImages();
 	m_solver->solve(d_correspondences, m_numCorrespondences, siftManager->getValidImagesGPU(), numImages, numNonLinearIterations, numLinearIterations,
-		cudaCache, weightsSparse, weightsDenseDepth, weightsDenseColor, useDensePairwise, d_xRot, d_xTrans, isStart, isEnd); //isStart -> rebuild jt, isEnd -> remove max residual
+		cudaCache, weightsSparse, weightsDenseDepth, weightsDenseColor, useDensePairwise, d_xRot, d_xTrans, isStart, isEnd, revalidateIdx); //isStart -> rebuild jt, isEnd -> remove max residual
 
 	bool removed = false;
 	if (isEnd && weightsSparse.front() > 0) {
@@ -139,16 +140,110 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 	return removed;
 }
 
+//!!!debugging
+#include "GlobalAppState.h"
+
+#include "MatrixConversion.h"
+#if defined(ENABLE_GUIDED_REMOVE) || defined(NEW_GUIDED_REMOVE)
+template<>
+struct std::hash<ml::vec2ui> : public std::unary_function < ml::vec2ui, size_t > {
+	size_t operator()(const ml::vec2ui& v) const {
+		//TODO larger prime number (64 bit) to match size_t
+		const size_t p0 = 73856093;
+		const size_t p1 = 19349669;
+		//const size_t p2 = 83492791;
+		const size_t res = ((size_t)v.x * p0) ^ ((size_t)v.y * p1);// ^ ((size_t)v.z * p2);
+		return res;
+	}
+};
+#endif
+//!!!debugging
 bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages)
 {
 	ml::vec2ui imageIndices;
 	bool remove = m_solver->getMaxResidual(siftManager->getGlobalCorrespondencesGPU(), imageIndices, m_maxResidual);
 
+	//!!!debugging
+	//if (!GlobalAppState::get().s_playData) { //save debug
+	//	std::ofstream s("debug/maxRes.txt"); s << imageIndices << std::endl << m_maxResidual << std::endl; s.close();
+	//	siftManager->saveToFile("debug/maxRes.sift");
+	//	{
+	//		float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
+	//		convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, siftManager->getValidImagesGPU());
+	//		std::vector<mat4f> transforms(numImages);
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+	//		MLIB_CUDA_SAFE_FREE(d_transforms);
+	//		BinaryDataStreamFile st("debug/maxRes.bin", true);
+	//		st << transforms; st.closeStream();
+	//	}
+	//	std::cout << "\t(saved max res to file)" << std::endl;
+	//}
+	//!!!debugging
+
+	//!!!debugging
+	if (false) {
+		const std::vector<vec2ui>& imPairsToRemove = m_solver->getGuidedMaxResImagesToRemove();
+		static std::vector<mat4f> referenceTrajectory;
+		if (referenceTrajectory.empty()) {
+			std::vector<mat4f> completeTrajectory;
+			BinaryDataStreamFile s("debug/ref_aoff1.bin", false);
+			s >> completeTrajectory; s.closeStream();
+			for (unsigned int i = 0; i < completeTrajectory.size(); i += 10)
+				referenceTrajectory.push_back(completeTrajectory[i]);
+		}
+		std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
+
+		std::vector<std::pair<vec2ui, float>> referenceResiduals;
+		//std::vector<std::pair<vec2ui, float>> residuals;
+		for (unsigned int i = 0; i < correspondences.size(); i++) {
+			const EntryJ& corr = correspondences[i];
+			if (corr.isValid()) {
+				vec2ui images(corr.imgIdx_i, corr.imgIdx_j);
+				vec3f refRes = referenceTrajectory[corr.imgIdx_i] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) - referenceTrajectory[corr.imgIdx_j] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+				referenceResiduals.push_back(std::make_pair(images, std::max(std::max(math::abs(refRes.x), math::abs(refRes.y)), math::abs(refRes.z))));
+			}
+		}
+		std::sort(referenceResiduals.begin(), referenceResiduals.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) {
+			return left.second > right.second;
+		});
+		std::unordered_set<vec2ui> foundToRemove; for (unsigned int i = 0; i < imPairsToRemove.size(); i++) foundToRemove.insert(imPairsToRemove[i]);
+		for (unsigned int i = 0; i < referenceResiduals.size(); i++) {
+			if (referenceResiduals[i].second < 1.0f) break;
+			if (foundToRemove.find(referenceResiduals[i].first) == foundToRemove.end()) {
+				const std::pair<vec2ui, float>& reference = referenceResiduals[i];
+				std::cout << "reference: " << reference.first << ", " << reference.second << std::endl;
+				getchar();
+				int a = 5;
+			}
+		}
+	}
+	//!!!debugging
+
 	if (remove) {
 		if (GlobalBundlingState::get().s_verbose) std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
 
+#if defined(ENABLE_GUIDED_REMOVE) || defined(NEW_GUIDED_REMOVE)
+		const std::vector<vec2ui>& imPairsToRemove = m_solver->getGuidedMaxResImagesToRemove();
+		if (imPairsToRemove.empty()) {
+			siftManager->InvalidateImageToImageCU(make_uint2(imageIndices.x, imageIndices.y));
+			_logRemovedImImCorrs.push_back(std::make_pair(imageIndices, m_maxResidual));
+		}
+		else {
+			std::cout << "guided remove (" << imPairsToRemove.size() << ")" << std::endl;
+			//getchar();
+			for (unsigned int i = 0; i < imPairsToRemove.size(); i++) {
+				siftManager->InvalidateImageToImageCU(make_uint2(imPairsToRemove[i].x, imPairsToRemove[i].y));
+				_logRemovedImImCorrs.push_back(std::make_pair(imPairsToRemove[i], -1.0f)); //unknown res
+			}
+		}
+#else
 		// invalidate correspondence
 		siftManager->InvalidateImageToImageCU(make_uint2(imageIndices.x, imageIndices.y));
+		//!!!debugging
+		_logRemovedImImCorrs.push_back(std::make_pair(imageIndices, m_maxResidual));
+		//!!!debugging
+#endif
 		if (m_bUseComprehensiveFrameInvalidation)
 			siftManager->CheckForInvalidFramesCU(m_solver->getVarToCorrNumEntriesPerRow(), numImages); // need to re-adjust for removed matches
 		else

@@ -47,6 +47,8 @@ public:
 
 	//kind of a hack
 	void saveToFile(const std::string& filename, const std::vector<mat4f>& trajectory) const;
+
+	void evaluateTrajectory(const std::vector<mat4f>& trajectory) const;
 private:
 	//! deletes all allocated data
 	void releaseData();

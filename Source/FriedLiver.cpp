@@ -205,18 +205,21 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersScanNet.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
 
-			fileNameDescGlobalApp = "zParametersDefault.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			//fileNameDescGlobalApp = "zParametersDefault.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 			//fileNameDescGlobalBundling = "zParametersBundling20K.txt";
 
-			//fileNameDescGlobalApp = "zParametersMedium.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
+			//fileNameDescGlobalApp = "zParametersSun3d.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingSun3d.txt";
 
 			//fileNameDescGlobalApp = "zParametersHigh.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingHigh.txt";
 
 			//fileNameDescGlobalApp = "zParametersTUM.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
+
+			fileNameDescGlobalApp = "zParametersAug.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -243,9 +246,9 @@ int main(int argc, char** argv)
 		if (false) {
 			TestMatching test;
 			//test.analyzeLocalOpts();
-			test.testGlobalDense();
+			//test.testGlobalDense();
 			//test.compareDEBUG();
-			//test.debug();
+			test.debug();
 
 			std::cout << "done!" << std::endl;
 			getchar();
@@ -283,12 +286,13 @@ int main(int argc, char** argv)
 		//start depthSensing render loop
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
-		//TimingLog::printAllTimings();
-		//g_bundler->saveGlobalSiftManagerAndCacheToFile("debug/global");
-		//if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
-		//g_bundler->saveCompleteTrajectory("trajectory.bin");
-		//g_bundler->saveSiftTrajectory("siftTrajectory.bin");
-		//g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
+		TimingLog::printAllTimings();
+		g_bundler->saveGlobalSiftManagerAndCacheToFile("debug/global");
+		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
+		g_bundler->saveCompleteTrajectory("trajectory.bin");
+		g_bundler->saveSiftTrajectory("siftTrajectory.bin");
+		g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
+		g_bundler->saveLogsToFile();
 
 #ifdef RUN_MULTITHREADED
 		g_bundler->exitBundlingThread();

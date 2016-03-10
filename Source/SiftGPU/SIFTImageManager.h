@@ -163,17 +163,26 @@ public:
 	const int* getValidImagesGPU() const { return d_validImages; }
 
 	//actually debug function...
+	int* debugGetNumRawMatchesGPU() {
+		return d_currNumMatchesPerImagePair;
+	}
+	int* debugGetNumFiltMatchesGPU() {
+		return d_currNumFilteredMatchesPerImagePair;
+	}
+
 	void setValidImagesDEBUG(const std::vector<int>& valid) {
 		m_validImages = valid;
 	}
 	void getNumRawMatchesDEBUG(std::vector<unsigned int>& numMatches) const {
 		MLIB_ASSERT(getNumImages() > 1);
-		numMatches.resize(getNumImages() - 1);
+		if (getCurrentFrame() + 1 == getNumImages()) numMatches.resize(getNumImages() - 1);
+		else										 numMatches.resize(getNumImages());
 		cutilSafeCall(cudaMemcpy(numMatches.data(), d_currNumMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost));
 	}
 	void getNumFiltMatchesDEBUG(std::vector<unsigned int>& numMatches) const {
 		MLIB_ASSERT(getNumImages() > 1);
-		numMatches.resize(getNumImages() - 1);
+		if (getCurrentFrame() + 1 == getNumImages()) numMatches.resize(getNumImages() - 1);
+		else										 numMatches.resize(getNumImages());
 		cutilSafeCall(cudaMemcpy(numMatches.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost));
 	}
 	void getSIFTKeyPointsDEBUG(std::vector<SIFTKeyPoint>& keys) const {

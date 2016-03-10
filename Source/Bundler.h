@@ -152,6 +152,11 @@ public:
 	void saveSiftTrajectory(const std::string& filename) const;
 	void saveIntegrateTrajectory(const std::string& filename);
 	void saveGlobalSiftManagerAndCacheToFile(const std::string& prefix) const { m_SubmapManager.saveGlobalSiftManagerAndCache(prefix); }
+#ifdef DEBUG_PRINT_MATCHING
+	void saveLogsToFile() const {
+		m_SubmapManager.saveLogImImCorrsToFile("debug/_logs/log");
+	}
+#endif
 
 	TrajectoryManager* getTrajectoryManager() {
 		return m_trajectoryManager;
@@ -218,12 +223,15 @@ private:
 	BundlerInputData		m_bundlerInputData;
 
 	static Timer			s_timer;
-	static Timer			s_timerOpt; //!!!TODO don't need?
 
 	SiftCameraParams		m_siftCameraParams;
 
 	// state of processing/optimization
 	BundlerState			m_currentState;
+
+	unsigned int			m_numFramesPastLast;
+	unsigned int			m_numOptPerResidualRemoval;
+
 	bool m_useSolve;
 };
 

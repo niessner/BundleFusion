@@ -549,13 +549,8 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int curImageIdx, un
 		float err = sumResidual / sumWeight;
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
 
-		//!!!debugging
-		//bool debugPrint = false;
-		//if (imagePairIdx == 1 && curImageIdx == 2) {
-		//	debugPrint = true;
-		//	printf("(%d,%d) err = %f, corr = %f\n", imagePairIdx, curImageIdx, err, corr);
-		//}
-		//!!!debugging
+		//debugging
+		//bool debugPrint = (imagePairIdx == 146 && curImageIdx == 96);
 
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
 			//if (debugPrint) printf("[%d-%d]: %f %f INVALID\n", imagePairIdx, curImageIdx, err, corr);

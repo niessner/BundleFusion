@@ -509,10 +509,11 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 			break;
 		case 'E':
 		{ //TODO this is just a hack to be removed
-			if (GlobalAppState::get().s_sensorIdx == 3) {
+			if (GlobalAppState::get().s_sensorIdx == 3 || GlobalAppState::get().s_sensorIdx == 8) {
 				std::vector<mat4f> trajectory;
 				g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
-				((BinaryDumpReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
+				if (GlobalAppState::get().s_sensorIdx == 3) ((BinaryDumpReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
+				else										((SensorDataReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
 				BinaryDataStreamFile s("debug/opt.trajectory", true);
 				s << trajectory; s.closeStream();
 				std::cout << "press key to continue" << std::endl; getchar();

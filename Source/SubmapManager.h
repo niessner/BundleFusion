@@ -11,7 +11,7 @@
 #include "GlobalBundlingState.h"
 #include "mLibCuda.h"
 
-//#define DEBUG_PRINT_MATCHING
+#define DEBUG_PRINT_MATCHING
 
 
 class SiftGPU;
@@ -124,7 +124,7 @@ public:
 	void addInvalidGlobalKey();
 
 	//! optimize global
-	bool optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone);
+	bool optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool removeMaxResidual, bool isScanDone);
 
 	void invalidateLastGlobalFrame();
 
@@ -146,6 +146,23 @@ public:
 	const SIFTImageManager* getGlobalDEBUG() const { return m_global; }
 #ifdef DEBUG_PRINT_MATCHING
 	void setPrintMatchesDEBUG(bool b) { _debugPrintMatches = b; }
+	void saveLogImImCorrsToFile(const std::string& prefix) const {
+		const std::string corrsPrefix = prefix + "_im-im-corrs";
+		{
+			BinaryDataStreamFile s(corrsPrefix + ".bin", true);
+			s << _logFoundCorrespondences.size();
+			if (!_logFoundCorrespondences.empty()) s.writeData((const BYTE*)_logFoundCorrespondences.data(), sizeof(std::pair<vec2ui, mat4f>)*_logFoundCorrespondences.size());
+			s.closeStream();
+
+			//human-readable version, just print the image indices
+			std::ofstream os(corrsPrefix + ".txt");
+			os << "# logged im-im correspondences = " << _logFoundCorrespondences.size() << std::endl;
+			for (unsigned int i = 0; i < _logFoundCorrespondences.size(); i++)
+				os << _logFoundCorrespondences[i].first << std::endl;
+			os.close();
+		}
+		m_SparseBundler.saveLogRemovedCorrToFile(prefix + "_rm-im-im-corrs");
+	}
 #endif
 	// to fake opt finish when no opt
 	void resetDEBUG(bool initNextGlobal, int numLocalSolved, unsigned int curFrame) { //numLocalSolved == numGlobalFrames
@@ -174,7 +191,6 @@ public:
 	}
 		//TODO fix this hack
 	void setEndSolveGlobalDenseWeights();
-	void setNumOptPerResidualRemoval(unsigned int n) { m_numOptPerResidualRemoval = n; }
 
 private:
 
@@ -240,11 +256,12 @@ private:
 
 	unsigned int m_numTotalFrames;
 	unsigned int m_submapSize;
-	unsigned int m_numOptPerResidualRemoval;
 
 	int m_continueRetry;
+	unsigned int m_revalidatedIdx;
 #ifdef DEBUG_PRINT_MATCHING
 	bool _debugPrintMatches;
+	std::vector<std::pair<vec2ui, mat4f>> _logFoundCorrespondences; // logging the initially found (no invalidation) image-image correspondences; for global; (frame, curframe) transform from cur to frame
 #endif
 };
 

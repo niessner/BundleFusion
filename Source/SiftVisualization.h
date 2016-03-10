@@ -30,8 +30,11 @@ public:
 		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics);
 
 
+	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
+		const mat4f& depthIntrinsicsInv, const vec2ui& imageIndices, const mat4f& transformPrvToCur);
 	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<CUDACachedFrame>& cachedFrames, unsigned int cacheWidth, unsigned int cacheHeight,
-		const vec2ui& imageIndices, const mat4f& transformCurToPrv);
+		const vec2ui& imageIndices, const mat4f& transformPrvToCur);
+	static void saveKeyMatchToPointCloud(const std::string& filename, const EntryJ& corr, const mat4f& transformPrvToCur);
 
 
 	static vec3f depthToCamera(const mat4f& depthIntrinsincsinv, const float* depth, unsigned int width, unsigned int height, unsigned int x, unsigned int y);

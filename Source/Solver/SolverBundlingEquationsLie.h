@@ -24,7 +24,7 @@
 // residual functions only for sparse!
 
 // not squared!
-__inline__ __device__ float evalAbsResidualDeviceFloat3(unsigned int corrIdx, unsigned int componentIdx, SolverInput& input, SolverState& state, SolverParameters& parameters)
+__inline__ __device__ float evalAbsMaxResidualDevice(unsigned int corrIdx, SolverInput& input, SolverState& state, SolverParameters& parameters)
 {
 	float3 r = make_float3(0.0f, 0.0f, 0.0f);
 
@@ -32,11 +32,9 @@ __inline__ __device__ float evalAbsResidualDeviceFloat3(unsigned int corrIdx, un
 	if (corr.isValid()) {
 		float4x4 TI = poseToMatrix(state.d_xRot[corr.imgIdx_i], state.d_xTrans[corr.imgIdx_i]);
 		float4x4 TJ = poseToMatrix(state.d_xRot[corr.imgIdx_j], state.d_xTrans[corr.imgIdx_j]);
-
 		r = parameters.weightSparse * fabs((TI*corr.pos_i) - (TJ*corr.pos_j));
-		if (componentIdx == 0) return r.x;
-		if (componentIdx == 1) return r.y;
-		return r.z; //if (componentIdx == 2) 
+
+		return max(r.z, max(r.x, r.y));
 	}
 	return 0.0f;
 }
@@ -102,7 +100,7 @@ __inline__ __device__ void evalMinusJTFDevice(unsigned int variableIdx, SolverIn
 			const float3 r = (TI*corr.pos_i) - (TJ*corr.pos_j);
 
 			rRot += variableSign * make_float3(dot(da, r), dot(db, r), dot(dc, r));
-			rTrans += variableSign * r; 
+			rTrans += variableSign * r;
 
 			pRot += make_float3(dot(da, da), dot(db, db), dot(dc, dc));
 			pTrans += make_float3(1.0f, 1.0f, 1.0f);

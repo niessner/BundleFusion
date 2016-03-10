@@ -38,7 +38,8 @@ public:
 		MLIB_CUDA_SAFE_FREE(d_xTrans);
 	}
 
-	void align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt);
+	void align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits,
+		bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt, unsigned int revalidateIdx = (unsigned int)-1);
 
 	float getMaxResidual() const { return m_maxResidual; }
 	const std::vector<float>& getLinearConvergenceAnalysis() const { return m_solver->getLinearConvergenceAnalysis(); }
@@ -63,6 +64,22 @@ public:
 		m_globalWeightsMutex.unlock();
 	}
 
+	//!!!debugging
+	void saveLogRemovedCorrToFile(const std::string& prefix) const {
+		BinaryDataStreamFile s(prefix + ".bin", true);
+		s << _logRemovedImImCorrs.size();
+		if (!_logRemovedImImCorrs.empty()) s.writeData((const BYTE*)_logRemovedImImCorrs.data(), sizeof(std::pair<vec2ui, float>)*_logRemovedImImCorrs.size());
+		s.closeStream();
+
+		// human readable version
+		std::ofstream os(prefix + ".txt");
+		os << "# remove im-im correspondences = " << _logRemovedImImCorrs.size() << std::endl;
+		for (unsigned int i = 0; i < _logRemovedImImCorrs.size(); i++) 
+			os << _logRemovedImImCorrs[i].first << "\t\t" << _logRemovedImImCorrs[i].second << std::endl;
+		os.close();
+	}
+	//!!!debugging
+
 private:
 	void evalResidualDEBUG(SIFTImageManager* siftManager, const float4x4* d_transforms) const {
 		std::vector<EntryJ> corrs(siftManager->getNumGlobalCorrespondences());
@@ -83,7 +100,8 @@ private:
 
 	bool alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise,
 		const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor,
-		unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd);
+		unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd,
+		unsigned int revalidateIdx);
 
 	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
 	
@@ -113,6 +131,11 @@ private:
 	std::vector< std::vector<float> > m_recordedConvergence;
 
 	static Timer s_timer;
+
+
+	//!!!debugging
+	std::vector<std::pair<vec2ui, float>> _logRemovedImImCorrs; 
+	//!!!debugging
 };
 
 #endif

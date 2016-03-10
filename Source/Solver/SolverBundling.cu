@@ -451,28 +451,60 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	if (timer) timer->endEvent();
 }
 
+//todo more efficient?? (there are multiple per image-image...)
+//get high residuals
+__global__ void collectHighResidualsDevice(SolverInput input, SolverState state, SolverStateAnalysis analysis, SolverParameters parameters, unsigned int maxNumHighResiduals)
+{
+	const unsigned int N = input.numberOfCorrespondences; // Number of block variables
+	const unsigned int corrIdx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (corrIdx < N) {
+		float residual = evalAbsMaxResidualDevice(corrIdx, input, state, parameters); 
+		if (residual > parameters.highResidualThresh) {
+			int idx = atomicAdd(state.d_countHighResidual, 1);
+			if (idx < maxNumHighResiduals) {
+				analysis.d_maxResidual[idx] = residual;
+				analysis.d_maxResidualIndex[idx] = corrIdx;
+			}
+		}
+	}
+}
+extern "C" void collectHighResiduals(SolverInput& input, SolverState& state, SolverStateAnalysis& analysis, SolverParameters& parameters, CUDATimer* timer)
+{
+	if (timer) timer->startEvent(__FUNCTION__);
+	cutilSafeCall(cudaMemset(state.d_countHighResidual, 0, sizeof(int)));
+
+	const unsigned int N = input.numberOfCorrespondences; // Number of correspondences 
+	unsigned int maxNumHighResiduals = (input.maxCorrPerImage*input.maxNumberOfImages + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+	collectHighResidualsDevice << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(input, state, analysis, parameters, maxNumHighResiduals);
+
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+	if (timer) timer->endEvent();
+}
+
 /////////////////////////////////////////////////////////////////////////
 // Eval Max Residual
 /////////////////////////////////////////////////////////////////////////
 
-__global__ void EvalMaxResidualDevice(SolverInput input, SolverState state, SolverParameters parameters)
+__global__ void EvalMaxResidualDevice(SolverInput input, SolverState state, SolverStateAnalysis analysis, SolverParameters parameters)
 {
 	__shared__ int maxResIndex[THREADS_PER_BLOCK];
 	__shared__ float maxRes[THREADS_PER_BLOCK];
 
-	const unsigned int N = input.numberOfCorrespondences * 3; // Number of block variables
-	const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+	const unsigned int N = input.numberOfCorrespondences; // Number of block variables
+	const unsigned int corrIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	maxResIndex[threadIdx.x] = 0;
 	maxRes[threadIdx.x] = 0.0f;
 
-	if (x < N) {
-		const unsigned int corrIdx = x / 3;
-		const unsigned int componentIdx = x - corrIdx * 3;
-		float residual = evalAbsResidualDeviceFloat3(corrIdx, componentIdx, input, state, parameters);
+	if (corrIdx < N) {
+		float residual = evalAbsMaxResidualDevice(corrIdx, input, state, parameters); 
 
 		maxRes[threadIdx.x] = residual;
-		maxResIndex[threadIdx.x] = x;
+		maxResIndex[threadIdx.x] = corrIdx;
 
 		__syncthreads();
 
@@ -492,18 +524,18 @@ __global__ void EvalMaxResidualDevice(SolverInput input, SolverState state, Solv
 
 		if (threadIdx.x == 0) {
 			//printf("d_maxResidual[%d] = %f (index %d)\n", blockIdx.x, maxRes[0], maxResIndex[0]);
-			state.d_maxResidual[blockIdx.x] = maxRes[0];
-			state.d_maxResidualIndex[blockIdx.x] = maxResIndex[0];
+			analysis.d_maxResidual[blockIdx.x] = maxRes[0];
+			analysis.d_maxResidualIndex[blockIdx.x] = maxResIndex[0];
 		}
 	}
 }
 
-extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
+extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverStateAnalysis& analysis, SolverParameters& parameters, CUDATimer* timer)
 {
 	if (timer) timer->startEvent(__FUNCTION__);
 
-	const unsigned int N = input.numberOfCorrespondences * 3; // Number of correspondences (*3 per xyz)
-	EvalMaxResidualDevice << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(input, state, parameters);
+	const unsigned int N = input.numberOfCorrespondences; // Number of correspondences 
+	EvalMaxResidualDevice << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(input, state, analysis, parameters);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
@@ -605,13 +637,11 @@ float EvalResidual(SolverInput& input, SolverState& state, SolverParameters& par
 
 __global__ void CountHighResidualsDevice(SolverInput input, SolverState state, SolverParameters parameters)
 {
-	const unsigned int N = input.numberOfCorrespondences * 3; // Number of block variables
-	const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+	const unsigned int N = input.numberOfCorrespondences; // Number of block variables
+	const unsigned int corrIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (x < N) {
-		const unsigned int corrIdx = x / 3;
-		const unsigned int componentIdx = x - corrIdx * 3;
-		float residual = evalAbsResidualDeviceFloat3(corrIdx, componentIdx, input, state, parameters);
+	if (corrIdx < N) {
+		float residual = evalAbsMaxResidualDevice(corrIdx, input, state, parameters);
 
 		if (residual > parameters.verifyOptDistThresh)
 			atomicAdd(state.d_countHighResidual, 1);
@@ -622,7 +652,7 @@ extern "C" int countHighResiduals(SolverInput& input, SolverState& state, Solver
 {
 	if (timer) timer->startEvent(__FUNCTION__);
 
-	const unsigned int N = input.numberOfCorrespondences * 3; // Number of correspondences (*3 per xyz)
+	const unsigned int N = input.numberOfCorrespondences; // Number of correspondences
 	cutilSafeCall(cudaMemset(state.d_countHighResidual, 0, sizeof(int)));
 	CountHighResidualsDevice << <(N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >> >(input, state, parameters);
 

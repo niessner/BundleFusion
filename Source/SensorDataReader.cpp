@@ -4,6 +4,7 @@
 #include "SensorDataReader.h"
 #include "GlobalAppState.h"
 #include "MatrixConversion.h"
+#include "PoseHelper.h"
 
 #ifdef SENSOR_DATA_READER
 
@@ -157,6 +158,28 @@ void SensorDataReader::saveToFile(const std::string& filename, const std::vector
 	}
 
 	m_sensorData->saveToFile(filename);
+}
+
+void SensorDataReader::evaluateTrajectory(const std::vector<mat4f>& trajectory) const
+{
+	std::vector<mat4f> referenceTrajectory;
+	for (const auto& f : m_sensorData->m_frames) referenceTrajectory.push_back(f.getCameraToWorld());
+	const size_t numTransforms = std::min(trajectory.size(), referenceTrajectory.size());
+	// make sure reference trajectory starts at identity
+	mat4f offset = referenceTrajectory.front().getInverse();
+	for (unsigned int i = 0; i < referenceTrajectory.size(); i++) referenceTrajectory[i] = offset * referenceTrajectory[i];
+
+	const auto transErr = PoseHelper::evaluateAteRmse(trajectory, referenceTrajectory);
+	std::cout << "*********************************" << std::endl;
+	std::cout << "ate rmse = " << transErr.first << ", " << transErr.second << std::endl;
+	std::cout << "*********************************" << std::endl;
+	{
+		std::vector<mat4f> optTrajectory = trajectory;
+		optTrajectory.resize(numTransforms);
+		referenceTrajectory.resize(numTransforms);
+		PoseHelper::saveToPoseFile("debug/opt.txt", optTrajectory);
+		PoseHelper::saveToPoseFile("debug/gt.txt", referenceTrajectory);
+	}
 }
 
 #endif

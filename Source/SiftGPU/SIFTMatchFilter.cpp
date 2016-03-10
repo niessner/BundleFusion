@@ -270,7 +270,7 @@ float2 SIFTMatchFilter::computeProjectiveError(const float* inputDepth, const fl
 	computeCorrespondences(width, height, inputDepth, inputCamPos, inputNormals, inputColor,
 		modelDepth, modelCamPos, modelNormals, modelColor,
 		transformEstimate, distThres, normalThres, colorThresh,
-		depthIntrinsics, depthMin, depthMax,	sumResidual0, sumWeight0, numCorr0);
+		depthIntrinsics, depthMin, depthMax, sumResidual0, sumWeight0, numCorr0);
 
 	// model -> input
 	transformEstimate = transform.getInverse();
@@ -457,7 +457,7 @@ unsigned int SIFTMatchFilter::filterImagePairKeyPointMatchesRANSAC(const std::ve
 			for (unsigned int i = 0; i < curNumMatches; i++) std::cout << "\t" << srcPts[i].x << " " << srcPts[i].y << " " << srcPts[i].z << std::endl;
 			std::cout << "tgt pts:" << std::endl;
 			for (unsigned int i = 0; i < curNumMatches; i++) std::cout << "\t" << tgtPts[i].x << " " << tgtPts[i].y << " " << tgtPts[i].z << std::endl;
-			std::cout << "max res = " << curMaxResidual <<  "(cond = " << eigenvalues.x / eigenvalues.y << ")" << std::endl;
+			std::cout << "max res = " << curMaxResidual << "(cond = " << eigenvalues.x / eigenvalues.y << ")" << std::endl;
 			getchar();
 		}
 
@@ -749,8 +749,12 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	const float normalThres = GlobalBundlingState::get().s_projCorrNormalThres;
 	const float colorThresh = GlobalBundlingState::get().s_projCorrColorThresh;
 
-	FreeImageWrapper::saveImage("debug/curDepth.png", ColorImageR32G32B32(curDepth));
-	FreeImageWrapper::saveImage("debug/prvDepth.png", ColorImageR32G32B32(prvDepth));
+	for (unsigned int i = 0; i < curDepth.getNumPixels(); i++) {
+		if (curDepth.getData()[i] != -std::numeric_limits<float>::infinity() && curDepth.getData()[i] >= depthMax) curDepth.getData()[i] = -std::numeric_limits<float>::infinity();
+		if (prvDepth.getData()[i] != -std::numeric_limits<float>::infinity() && prvDepth.getData()[i] >= depthMax) prvDepth.getData()[i] = -std::numeric_limits<float>::infinity();
+	}
+	FreeImageWrapper::saveImage("debug/depthCur.png", ColorImageR32G32B32(curDepth));
+	FreeImageWrapper::saveImage("debug/depthPrv.png", ColorImageR32G32B32(prvDepth));
 
 	// input -> model
 	float4x4 transformEstimate = transformCurToPrv;
@@ -759,7 +763,7 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 		prvDepth.getData(), (float4*)prvCamPos.getData(), (float4*)prvNormals.getData(), (float*)prvIntensity.getData(),
 		transformEstimate, distThres, normalThres, colorThresh,
 		depthIntrinsics, depthMin, depthMax, sumResidual0, sumWeight0, numCorr0);
-	
+
 	FreeImageWrapper::saveImage("debug/projCorr-0.png", ColorImageR32G32B32(s_debugCorr, true));
 
 	// model -> input
@@ -811,9 +815,14 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 			float cInput = inputColor[idx];
 			float dInput = inputDepth[idx];
 
+			//if (x == 65 && y == 37) //for first (cur to prv)
+			//	int a = 5;
+			//if (x == 37 && y == 37) //for second (prv to cur)
+			//	int a = 5;
+
 			if (pInput.x != INVALID && nInput.x != INVALID && dInput >= depthMin && dInput <= depthMax) {
 				const float4 pTransInput = transform * pInput;
-				const float4 nTransInput = transform * nInput;
+				const float3 nTransInput = transform.getFloat3x3() * make_float3(nInput.x, nInput.y, nInput.z);
 
 				float2 screenPosf = cameraToDepth(depthIntrinsics, pTransInput);
 				int2 screenPos = make_int2((int)round(screenPosf.x), (int)round(screenPosf.y)); // subsampled space
@@ -824,7 +833,7 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 
 					if (pTarget.x != INVALID && nTarget.x != INVALID) {
 						float d = length(pTransInput - pTarget);
-						float dNormal = dot(make_float3(nTransInput.x, nTransInput.y, nTransInput.z), make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
+						float dNormal = dot(nTransInput, make_float3(nTarget.x, nTarget.y, nTarget.z)); // should be able to do dot(nTransInput, nTarget)
 						//float c = length(cInput - cTarget);
 
 						float projInputDepth = pTransInput.z;//cameraToDepthZ(pTransInput);
@@ -858,10 +867,10 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 		} // x
 	} // y
 
-
+	std::cout << "transform:" << std::endl; transform.print();
 	PointCloudIOf::saveToFile("debug/src.ply", pcSrc);
 	PointCloudIOf::saveToFile("debug/tgt.ply", pcTgt);
-	std::cout << "press key" << std::endl;
-	getchar();
+	//std::cout << "press key" << std::endl;
+	//getchar();
 	int a = 5;
 }

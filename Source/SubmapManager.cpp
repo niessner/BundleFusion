@@ -37,6 +37,7 @@ SubmapManager::SubmapManager()
 	d_siftTrajectory = NULL;
 
 	m_continueRetry = 0;
+	m_revalidatedIdx = (unsigned int)-1;
 #ifdef DEBUG_PRINT_MATCHING
 	_debugPrintMatches = false;
 #endif
@@ -74,7 +75,6 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 
 	m_numTotalFrames = numTotalFrames;
 	m_submapSize = submapSize;
-	m_numOptPerResidualRemoval = GlobalBundlingState::get().s_numOptPerResidualRemoval;
 
 	// sift manager
 	m_currentLocal = new SIFTImageManager(m_submapSize, maxNumLocalImages, maxNumKeysPerImage);
@@ -157,13 +157,21 @@ unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIF
 
 bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, const float4x4& siftIntrinsicsInv)
 {
+	//!!!debugging
+	//const unsigned int curFrame = siftManager->getCurrentFrame();
+	//if (!isLocal && curFrame == 224 && siftManager->getNumImages() > 233) {
+	//	_debugPrintMatches = true;
+	//	int a = 5;
+	//}
+	//!!!debugging
+
 	const std::vector<int>& validImages = siftManager->getValidImages();
 	Timer timer;
 
 	// match with every other
 	const unsigned int numFrames = siftManager->getNumImages();
 	const unsigned int curFrame = siftManager->getCurrentFrame();
-	const unsigned int startFrame = numFrames == curFrame + 1 ? 0 : curFrame + 1; //TODO HERE
+	const unsigned int startFrame = numFrames == curFrame + 1 ? 0 : curFrame + 1;
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 	if (isLocal) m_mutexMatcher.lock();
 	for (unsigned int prev = startFrame; prev < numFrames; prev++) {
@@ -237,15 +245,21 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		if (printDebug) {
 			siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesSA);
 			SiftVisualization::printCurrentMatches("debug/matchesSAFilt" + suffix, siftManager, cudaCache, true);
+
+			std::vector<mat4f> filtRelativeTransforms(curFrame);
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(filtRelativeTransforms.data(), siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*curFrame, cudaMemcpyDeviceToHost));
+			for (unsigned int p = 0; p < curFrame; p++) {
+				//for (unsigned int p = 12; p < 16; p++) {
+				//std::cout << "images (" << p << ", " << curFrame << "):" << std::endl;
+				//std::cout << filtRelativeTransforms[p] << std::endl;
+				if (_numFiltMatchesSA[p] > 0) saveImPairToPointCloud("debug/", cudaCache, NULL, vec2ui(p, curFrame), filtRelativeTransforms[p]);
+			}
+			//unsigned int prv = 34;
+			//SIFTMatchFilter::visualizeProjError(siftManager, vec2ui(prv, curFrame), cudaCache->getCacheFrames(),
+			//	MatrixConversion::toCUDA(cudaCache->getIntrinsics()), MatrixConversion::toCUDA(filtRelativeTransforms[prv].getInverse()),
+			//	GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
+			////		//0.1f, 3.0f);
 		}
-		//if (_debugPrintMatches && !isLocal) {
-		//	std::vector<mat4f> filtRelativeTransforms(curFrame);
-		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(filtRelativeTransforms.data(), siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*curFrame, cudaMemcpyDeviceToHost));
-		//	for (unsigned int p = 0; p < curFrame; p++)
-		//		saveImPairToPointCloud("debug/", cudaCache, NULL, vec2ui(p, curFrame), filtRelativeTransforms[p]);
-		//	//SIFTMatchFilter::visualizeProjError(siftManager, vec2ui(42, 43), cudaCache->getCacheFrames(),
-		//	//	MatrixConversion::toCUDA(cudaCache->getIntrinsics()), MatrixConversion::toCUDA(filtRelativeTransforms[42].getInverse()), 0.1f, 3.0f);
-		//}
 #endif
 		// --- dense verify filter
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
@@ -254,8 +268,8 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		siftManager->FilterMatchesByDenseVerifyCU(curFrame, startFrame, numFrames, cudaCache->getWidth(), cudaCache->getHeight(), MatrixConversion::toCUDA(cudaCache->getIntrinsics()),
 			cachedFramesCUDA, GlobalBundlingState::get().s_projCorrDistThres, GlobalBundlingState::get().s_projCorrNormalThres,
 			GlobalBundlingState::get().s_projCorrColorThresh, GlobalBundlingState::get().s_verifySiftErrThresh, GlobalBundlingState::get().s_verifySiftCorrThresh,
-			//GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax); //TODO PARAMS
-			0.1f, 3.0f);
+			GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax); //TODO PARAMS
+		//0.1f, 3.0f);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMatchFilterDenseVerify = timer.getElapsedTimeMS(); }
 
 #ifdef DEBUG_PRINT_MATCHING
@@ -265,6 +279,20 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 			SiftVisualization::printCurrentMatches("debug/filtMatches" + suffix, siftManager, cudaCache, true);
 			int a = 5;
 		}
+		//!!!debugging
+		else if (!isLocal) {
+			siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
+		}
+		if (!isLocal && !_numFiltMatchesDV.empty()) {
+			std::vector<mat4f> transformsCurToMatch(numFrames);
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(transformsCurToMatch.data(), siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*curFrame, cudaMemcpyDeviceToHost));
+			for (unsigned int i = startFrame; i < numFrames; i++) {
+				if (i != curFrame && _numFiltMatchesDV[i] > 0) {
+					_logFoundCorrespondences.push_back(std::make_pair(vec2ui(i, curFrame), transformsCurToMatch[i]));
+				}
+			} //potential frame matches
+		}
+		//!!!debugging
 #endif
 
 		// --- filter frames
@@ -276,6 +304,10 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		else lastValid = false;
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMisc = timer.getElapsedTimeMS(); }
 	}
+
+	//!!!debugging
+	if (!isLocal && _debugPrintMatches) _debugPrintMatches = false;
+	//!!!debugging
 
 	return lastValid;
 }
@@ -423,13 +455,13 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (curGlobalFrame > 0) {
 			//!!!DEBUGGING
-			//if (curGlobalFrame == 47) {
-			//	setPrintMatchesDEBUG(true);
+			//if (curGlobalFrame == 170) {
+			//	//setPrintMatchesDEBUG(true);
 			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (curGlobalFrame == 47) {
+			//if (curGlobalFrame == 170) {
 			//	setPrintMatchesDEBUG(false);
 			//	std::cout << "waiting..." << std::endl;
 			//	getchar();
@@ -444,7 +476,6 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			}
 			else {
 				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << curGlobalFrame << ") not valid! no new global images for solve" << std::endl;
-				std::cout << "WARNING: last image (" << curGlobalFrame << ") not valid! no new global images for solve" << std::endl;
 				//getchar();
 #ifdef USE_RETRY
 				m_global->addToRetryList(curGlobalFrame);
@@ -470,23 +501,16 @@ void SubmapManager::addInvalidGlobalKey()
 	initializeNextGlobalTransform(true);
 }
 
-bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool isEnd, bool isScanDone)
+bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool removeMaxResidual, bool isScanDone)
 {
 	bool ret = false;
 	const unsigned int numGlobalFrames = m_global->getNumImages();
 
-	bool removeMaxResidual = isEnd && ((numGlobalFrames % m_numOptPerResidualRemoval) == (m_numOptPerResidualRemoval - 1));
 	const bool useVerify = false;
 	m_SparseBundler.align(m_global, m_globalCache, d_globalTrajectory, numNonLinIterations, numLinIterations,
-		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, removeMaxResidual, isScanDone);
+		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, removeMaxResidual, isScanDone, m_revalidatedIdx);
 
-	if (isEnd) {
-		//!!!DEBUGGING
-		//if (numFrames >= 400) {
-		//	saveOptToPointCloud("debug/global-" + std::to_string(getCurrLocal(numFrames)) + ".ply", m_globalCache, m_global->getValidImages(), d_globalTrajectory, m_global->getNumImages());
-		//}
-		//!!!DEBUGGING
-
+	if (removeMaxResidual) {
 		// may invalidate already invalidated images
 		const std::vector<int>& validImagesGlobal = m_global->getValidImages();
 		for (unsigned int i = 0; i < numGlobalFrames; i++) {
@@ -647,7 +671,7 @@ void SubmapManager::setEndSolveGlobalDenseWeights()
 	const unsigned int maxNumIts = GlobalBundlingState::get().s_numGlobalNonLinIterations;
 	std::vector<float> sparseWeights(maxNumIts, 1.0f);
 	std::vector<float> denseDepthWeights(maxNumIts, 15.0f);
-	std::vector<float> denseColorWeights(maxNumIts, 0.0f); //TODO here
+	std::vector<float> denseColorWeights(maxNumIts, 0.0f); 
 	m_SparseBundler.setGlobalWeights(sparseWeights, denseDepthWeights, denseColorWeights, true);
 	std::cout << "set end solve global dense weights" << std::endl;
 }
@@ -664,6 +688,7 @@ void SubmapManager::updateTrajectory(unsigned int curFrame)
 
 void SubmapManager::tryRevalidation(unsigned int curGlobalFrame, const float4x4& siftIntrinsicsInv, bool isScanningDone /*= false*/)
 {
+	m_revalidatedIdx = (unsigned int)-1;
 	if (m_continueRetry < 0) return; // nothing to do
 	// see if have any invalid images which match
 	unsigned int idx;
@@ -688,6 +713,7 @@ void SubmapManager::tryRevalidation(unsigned int curGlobalFrame, const float4x4&
 				if (validLocal[i] == 1)	validateImages(idx * m_submapSize + i);
 			}
 			if (GlobalBundlingState::get().s_verbose) std::cout << "re-validating " << idx << std::endl;
+			m_revalidatedIdx = idx;
 		}
 		else {
 			m_global->addToRetryList(idx);
