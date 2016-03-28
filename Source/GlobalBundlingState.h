@@ -51,7 +51,15 @@
 	X(unsigned int, s_numOptPerResidualRemoval) \
 	X(float, s_colorDownSigma) \
 	X(float, s_depthDownSigmaD) \
-	X(float, s_depthDownSigmaR)
+	X(float, s_depthDownSigmaR) \
+	X(float, s_optMaxResThresh) \
+	X(float, s_denseDistThresh) \
+	X(float, s_denseNormalThresh) \
+	X(float, s_denseColorThresh) \
+	X(float, s_denseColorGradientMin) \
+	X(float, s_denseDepthMin) \
+	X(float, s_denseDepthMax) \
+	X(unsigned int, s_denseOverlapCheckSubsampleFactor)
 
 using namespace ml;
 

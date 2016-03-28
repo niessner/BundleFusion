@@ -144,7 +144,7 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 #include "GlobalAppState.h"
 
 #include "MatrixConversion.h"
-#if defined(ENABLE_GUIDED_REMOVE) || defined(NEW_GUIDED_REMOVE)
+#ifdef NEW_GUIDED_REMOVE
 template<>
 struct std::hash<ml::vec2ui> : public std::unary_function < ml::vec2ui, size_t > {
 	size_t operator()(const ml::vec2ui& v) const {
@@ -164,66 +164,48 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 	bool remove = m_solver->getMaxResidual(siftManager->getGlobalCorrespondencesGPU(), imageIndices, m_maxResidual);
 
 	//!!!debugging
-	//if (!GlobalAppState::get().s_playData) { //save debug
-	//	std::ofstream s("debug/maxRes.txt"); s << imageIndices << std::endl << m_maxResidual << std::endl; s.close();
-	//	siftManager->saveToFile("debug/maxRes.sift");
-	//	{
-	//		float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
-	//		convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, siftManager->getValidImagesGPU());
-	//		std::vector<mat4f> transforms(numImages);
-	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-	//		MLIB_CUDA_SAFE_FREE(d_transforms);
-	//		BinaryDataStreamFile st("debug/maxRes.bin", true);
-	//		st << transforms; st.closeStream();
+	//if (false) {
+	//	const std::vector<vec2ui>& imPairsToRemove = m_solver->getGuidedMaxResImagesToRemove();
+	//	static std::vector<mat4f> referenceTrajectory;
+	//	if (referenceTrajectory.empty()) {
+	//		std::vector<mat4f> completeTrajectory;
+	//		BinaryDataStreamFile s("debug/ref_aoff1.bin", false);
+	//		s >> completeTrajectory; s.closeStream();
+	//		for (unsigned int i = 0; i < completeTrajectory.size(); i += 10)
+	//			referenceTrajectory.push_back(completeTrajectory[i]);
 	//	}
-	//	std::cout << "\t(saved max res to file)" << std::endl;
+	//	std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
+	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
+	//	std::vector<std::pair<vec2ui, float>> referenceResiduals;
+	//	//std::vector<std::pair<vec2ui, float>> residuals;
+	//	for (unsigned int i = 0; i < correspondences.size(); i++) {
+	//		const EntryJ& corr = correspondences[i];
+	//		if (corr.isValid()) {
+	//			vec2ui images(corr.imgIdx_i, corr.imgIdx_j);
+	//			vec3f refRes = referenceTrajectory[corr.imgIdx_i] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) - referenceTrajectory[corr.imgIdx_j] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+	//			referenceResiduals.push_back(std::make_pair(images, std::max(std::max(math::abs(refRes.x), math::abs(refRes.y)), math::abs(refRes.z))));
+	//		}
+	//	}
+	//	std::sort(referenceResiduals.begin(), referenceResiduals.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) {
+	//		return left.second > right.second;
+	//	});
+	//	std::unordered_set<vec2ui> foundToRemove; for (unsigned int i = 0; i < imPairsToRemove.size(); i++) foundToRemove.insert(imPairsToRemove[i]);
+	//	for (unsigned int i = 0; i < referenceResiduals.size(); i++) {
+	//		if (referenceResiduals[i].second < 1.0f) break;
+	//		if (foundToRemove.find(referenceResiduals[i].first) == foundToRemove.end()) {
+	//			const std::pair<vec2ui, float>& reference = referenceResiduals[i];
+	//			std::cout << "reference: " << reference.first << ", " << reference.second << std::endl;
+	//			getchar();
+	//			int a = 5;
+	//		}
+	//	}
 	//}
-	//!!!debugging
-
-	//!!!debugging
-	if (false) {
-		const std::vector<vec2ui>& imPairsToRemove = m_solver->getGuidedMaxResImagesToRemove();
-		static std::vector<mat4f> referenceTrajectory;
-		if (referenceTrajectory.empty()) {
-			std::vector<mat4f> completeTrajectory;
-			BinaryDataStreamFile s("debug/ref_aoff1.bin", false);
-			s >> completeTrajectory; s.closeStream();
-			for (unsigned int i = 0; i < completeTrajectory.size(); i += 10)
-				referenceTrajectory.push_back(completeTrajectory[i]);
-		}
-		std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
-
-		std::vector<std::pair<vec2ui, float>> referenceResiduals;
-		//std::vector<std::pair<vec2ui, float>> residuals;
-		for (unsigned int i = 0; i < correspondences.size(); i++) {
-			const EntryJ& corr = correspondences[i];
-			if (corr.isValid()) {
-				vec2ui images(corr.imgIdx_i, corr.imgIdx_j);
-				vec3f refRes = referenceTrajectory[corr.imgIdx_i] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) - referenceTrajectory[corr.imgIdx_j] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
-				referenceResiduals.push_back(std::make_pair(images, std::max(std::max(math::abs(refRes.x), math::abs(refRes.y)), math::abs(refRes.z))));
-			}
-		}
-		std::sort(referenceResiduals.begin(), referenceResiduals.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) {
-			return left.second > right.second;
-		});
-		std::unordered_set<vec2ui> foundToRemove; for (unsigned int i = 0; i < imPairsToRemove.size(); i++) foundToRemove.insert(imPairsToRemove[i]);
-		for (unsigned int i = 0; i < referenceResiduals.size(); i++) {
-			if (referenceResiduals[i].second < 1.0f) break;
-			if (foundToRemove.find(referenceResiduals[i].first) == foundToRemove.end()) {
-				const std::pair<vec2ui, float>& reference = referenceResiduals[i];
-				std::cout << "reference: " << reference.first << ", " << reference.second << std::endl;
-				getchar();
-				int a = 5;
-			}
-		}
-	}
 	//!!!debugging
 
 	if (remove) {
 		if (GlobalBundlingState::get().s_verbose) std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
 
-#if defined(ENABLE_GUIDED_REMOVE) || defined(NEW_GUIDED_REMOVE)
+#ifdef NEW_GUIDED_REMOVE
 		const std::vector<vec2ui>& imPairsToRemove = m_solver->getGuidedMaxResImagesToRemove();
 		if (imPairsToRemove.empty()) {
 			siftManager->InvalidateImageToImageCU(make_uint2(imageIndices.x, imageIndices.y));

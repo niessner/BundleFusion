@@ -11,7 +11,7 @@
 #include "GlobalBundlingState.h"
 #include "mLibCuda.h"
 
-#define DEBUG_PRINT_MATCHING
+//#define DEBUG_PRINT_MATCHING
 
 
 class SiftGPU;

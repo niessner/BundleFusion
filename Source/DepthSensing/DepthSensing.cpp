@@ -906,7 +906,8 @@ void StopScanningAndExit(bool aborted = false)
 		const std::string saveFile = GlobalAppState::get().s_binaryDumpSensorFile;
 		std::vector<mat4f> trajectory;
 		g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
-		((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file
+		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file
+		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile)+"_fried.sens", trajectory); //overwrite the original file
 		numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);		numTransforms = (unsigned int)trajectory.size();
 		if (numValidTransforms < (unsigned int)std::round(0.5f * numTransforms)) valid = false; // not enough valid transforms
 		//save ply

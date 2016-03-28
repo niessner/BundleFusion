@@ -157,14 +157,6 @@ unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIF
 
 bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, const float4x4& siftIntrinsicsInv)
 {
-	//!!!debugging
-	//const unsigned int curFrame = siftManager->getCurrentFrame();
-	//if (!isLocal && curFrame == 224 && siftManager->getNumImages() > 233) {
-	//	_debugPrintMatches = true;
-	//	int a = 5;
-	//}
-	//!!!debugging
-
 	const std::vector<int>& validImages = siftManager->getValidImages();
 	Timer timer;
 
@@ -208,7 +200,6 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		siftManager->SortKeyPointMatchesCU(curFrame, startFrame, numFrames);
 
 #ifdef DEBUG_PRINT_MATCHING
-		//_debugPrintMatches = true;
 		const bool printDebug = _debugPrintMatches && !isLocal;
 		const std::string suffix = isLocal ? "Local/" : "Global/";
 		std::vector<unsigned int> _numRawMatches;
@@ -304,10 +295,6 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		else lastValid = false;
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMisc = timer.getElapsedTimeMS(); }
 	}
-
-	//!!!debugging
-	if (!isLocal && _debugPrintMatches) _debugPrintMatches = false;
-	//!!!debugging
 
 	return lastValid;
 }

@@ -13,8 +13,7 @@
 #include <conio.h>
 
 class CUDACache;
-//#define ENABLE_GUIDED_REMOVE
-#define NEW_GUIDED_REMOVE //this
+#define NEW_GUIDED_REMOVE 
 
 
 class CUDASolverBundling
@@ -56,7 +55,7 @@ public:
 		if (m_timer) m_timer->reset();
 	}
 
-#if defined(ENABLE_GUIDED_REMOVE) || defined(NEW_GUIDED_REMOVE)
+#ifdef NEW_GUIDED_REMOVE
 	const std::vector<vec2ui>& getGuidedMaxResImagesToRemove() const { return m_maxResImPairs; }
 #endif
 private:
@@ -127,11 +126,13 @@ private:
 	bool		m_bRecordConvergence;
 	CUDATimer *m_timer;
 
-#if defined(ENABLE_GUIDED_REMOVE) || defined(NEW_GUIDED_REMOVE)
+	SolverParameters m_defaultParams;
+	float			 m_maxResidualThresh;
+
+#ifdef NEW_GUIDED_REMOVE
 	//for more than one im-pair removal
 	std::vector<vec2ui> m_maxResImPairs;
-#endif
-#ifdef NEW_GUIDED_REMOVE
+
 	//!!!debugging
 	float4x4*	d_transforms;
 	//!!!debugging

@@ -205,8 +205,8 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersScanNet.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
 
-			//fileNameDescGlobalApp = "zParametersDefault.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			fileNameDescGlobalApp = "zParametersDefault.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 			//fileNameDescGlobalBundling = "zParametersBundling20K.txt";
 
 			//fileNameDescGlobalApp = "zParametersSun3d.txt";
@@ -218,8 +218,8 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersTUM.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
 
-			fileNameDescGlobalApp = "zParametersAug.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
+			//fileNameDescGlobalApp = "zParametersAug.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -228,11 +228,18 @@ int main(int argc, char** argv)
 
 		//Read the global app state
 		ParameterFile parameterFileGlobalApp(fileNameDescGlobalApp);
+		std::ofstream out;
 		if (argc == 4) //for scan net: overwrite .sens file
 		{
 			const std::string filename = std::string(argv[3]);
 			parameterFileGlobalApp.overrideParameter("s_binaryDumpSensorFile", filename);
 			std::cout << "Overwriting s_binaryDumpSensorFile; now set to " << filename << std::endl;
+
+			//redirect stdout to file
+			out.open(util::removeExtensions(filename) + ".friedliver.log");
+			if (!out.is_open()) throw MLIB_EXCEPTION("unable to open log file " + util::removeExtensions(filename) + ".friedliver.log");
+			//std::streambuf *coutbuf = std::cout.rdbuf(); //save old buf
+			std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
 		}
 		GlobalAppState::getInstance().readMembers(parameterFileGlobalApp);
 
@@ -286,13 +293,13 @@ int main(int argc, char** argv)
 		//start depthSensing render loop
 		startDepthSensing(g_bundler, getRGBDSensor(), g_imageManager);
 
-		TimingLog::printAllTimings();
-		g_bundler->saveGlobalSiftManagerAndCacheToFile("debug/global");
-		if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
-		g_bundler->saveCompleteTrajectory("trajectory.bin");
-		g_bundler->saveSiftTrajectory("siftTrajectory.bin");
-		g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
-		g_bundler->saveLogsToFile();
+		//TimingLog::printAllTimings();
+		//g_bundler->saveGlobalSiftManagerAndCacheToFile("debug/global");
+		//if (GlobalBundlingState::get().s_recordSolverConvergence) g_bundler->saveConvergence("convergence.txt");
+		//g_bundler->saveCompleteTrajectory("trajectory.bin");
+		//g_bundler->saveSiftTrajectory("siftTrajectory.bin");
+		//g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
+		//g_bundler->saveLogsToFile();
 
 #ifdef RUN_MULTITHREADED
 		g_bundler->exitBundlingThread();
