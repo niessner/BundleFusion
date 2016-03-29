@@ -12,7 +12,7 @@ void SiftVisualization::printKey(const std::string& filename, const CUDACache* c
 	ColorImageR32 intensityImage(cudaCache->getWidth(), cudaCache->getHeight());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getData(), frames[frame].d_intensityDownsampled, sizeof(float)*intensityImage.getNumPixels(), cudaMemcpyDeviceToHost));
 	ColorImageR8G8B8A8 image(intensityImage);
-	image.reSample(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
+	image.resize(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 
 	printKey(filename, image, siftManager, frame);
 }
@@ -24,7 +24,7 @@ void SiftVisualization::printKey(const std::string& filename, CUDAImageManager* 
 
 	ColorImageR8G8B8A8 im(cudaImageManager->getIntegrationWidth(), cudaImageManager->getIntegrationHeight());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(im.getData(), integrateFrame.getColorFrameGPU(), sizeof(uchar4) * cudaImageManager->getIntegrationWidth() * cudaImageManager->getIntegrationHeight(), cudaMemcpyDeviceToHost));
-	im.reSample(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
+	im.resize(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 
 	std::vector<SIFTKeyPoint> keys(siftManager->getNumKeyPointsPerImage(frame));
 	const SIFTImageGPU& cur = siftManager->getImageGPU(frame);
@@ -195,7 +195,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curIntensity.getData(), cachedFrames[curFrame].d_intensityDownsampled,
 		sizeof(float) * curIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
 	ColorImageR8G8B8A8 curImage(curIntensity);
-	curImage.reSample(widthSIFT, heightSIFT);
+	curImage.resize(widthSIFT, heightSIFT);
 
 	//print out images
 	for (unsigned int prev = startFrame; prev < numFrames; prev++) {
@@ -205,7 +205,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevIntensity.getData(), cachedFrames[prev].d_intensityDownsampled,
 			sizeof(float) * prevIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
 		ColorImageR8G8B8A8 prevImage(prevIntensity);
-		prevImage.reSample(widthSIFT, heightSIFT);
+		prevImage.resize(widthSIFT, heightSIFT);
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
 			prevImage, curImage, 0.7f, filtered, maxNumMatches);

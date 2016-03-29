@@ -706,7 +706,7 @@ void TestMatching::initSiftParams(unsigned int widthDepth, unsigned int heightDe
 		m_colorCalibration.m_IntrinsicInverse._m00 /= scaleWidth; m_colorCalibration.m_IntrinsicInverse._m11 /= scaleHeight;
 
 		for (unsigned int i = 0; i < m_colorImages.size(); i++) {
-			m_colorImages[i].reSample(m_widthSift, m_heightSift);
+			m_colorImages[i].resize(m_widthSift, m_heightSift);
 		}
 	}
 
