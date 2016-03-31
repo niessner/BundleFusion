@@ -76,17 +76,19 @@ void Bundler::processInput()
 		}
 		else {
 #ifdef USE_GLOBAL_DENSE_AT_END //150 for aoff1
-			if (m_numFramesPastLast == 10) {
-				if (m_currentState.m_lastFrameProcessed < 10000) m_SubmapManager.setEndSolveGlobalDenseWeights();
+			if (GlobalAppState::get().s_numFramesBeforeExit != (unsigned int)-1) {
+				if (m_numFramesPastLast == 10) {
+					if (m_currentState.m_lastFrameProcessed < 10000) m_SubmapManager.setEndSolveGlobalDenseWeights();
 
-				//saveGlobalSiftManagerAndCacheToFile("debug/global");
-				//saveCompleteTrajectory("debug/curTrajectory.bin");
-				//std::cout << "waiting..." << std::endl;
-				//getchar();
-			}
-			if (m_numFramesPastLast == 11) {
-				std::cout << "stopping solve" << std::endl;
-				m_useSolve = false;
+					//saveGlobalSiftManagerAndCacheToFile("debug/global");
+					//saveCompleteTrajectory("debug/curTrajectory.bin");
+					//std::cout << "waiting..." << std::endl;
+					//getchar();
+				}
+				if (m_numFramesPastLast == 11) {
+					std::cout << "stopping solve" << std::endl;
+					m_useSolve = false;
+				}
 			}
 #endif
 		}

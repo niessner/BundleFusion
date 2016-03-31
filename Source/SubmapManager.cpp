@@ -135,6 +135,9 @@ unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIF
 	int success = m_sift->RunSIFT(d_intensitySIFT, d_inputDepthFilt);
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection");
 	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(curImage, d_inputDepthFilt);
+	//!!!debugging
+	if (numKeypoints > GlobalBundlingState::get().s_maxNumKeysPerImage) throw MLIB_EXCEPTION("too many keypoints");
+	//!!!debugging
 	m_currentLocal->finalizeSIFTImageGPU(numKeypoints);
 
 	// process cuda cache
