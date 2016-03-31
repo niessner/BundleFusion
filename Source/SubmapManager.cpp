@@ -168,6 +168,8 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 	const unsigned int curFrame = siftManager->getCurrentFrame();
 	const unsigned int startFrame = numFrames == curFrame + 1 ? 0 : curFrame + 1;
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
+	int num2 = (int)siftManager->getNumKeyPointsPerImage(curFrame);
+	if (num2 == 0) return false;
 	if (isLocal) m_mutexMatcher.lock();
 	for (unsigned int prev = startFrame; prev < numFrames; prev++) {
 		if (prev == curFrame) continue;
@@ -177,7 +179,6 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		SIFTImageGPU& image_i = siftManager->getImageGPU(prev);
 		SIFTImageGPU& image_j = siftManager->getImageGPU(curFrame);
 		int num1 = (int)siftManager->getNumKeyPointsPerImage(prev);
-		int num2 = (int)siftManager->getNumKeyPointsPerImage(curFrame);
 
 		if (validImages[prev] == 0 || num1 == 0 || num2 == 0) {
 			unsigned int numMatch = 0;
@@ -203,7 +204,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		siftManager->SortKeyPointMatchesCU(curFrame, startFrame, numFrames);
 
 #ifdef DEBUG_PRINT_MATCHING
-		const bool printDebug = _debugPrintMatches && !isLocal;
+		const bool printDebug = _debugPrintMatches && isLocal;
 		const std::string suffix = isLocal ? "Local/" : "Global/";
 		std::vector<unsigned int> _numRawMatches;
 		if (printDebug) {
@@ -274,18 +275,18 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 			int a = 5;
 		}
 		//!!!debugging
-		else if (!isLocal) {
-			siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
-		}
-		if (!isLocal && !_numFiltMatchesDV.empty()) {
-			std::vector<mat4f> transformsCurToMatch(numFrames);
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(transformsCurToMatch.data(), siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*curFrame, cudaMemcpyDeviceToHost));
-			for (unsigned int i = startFrame; i < numFrames; i++) {
-				if (i != curFrame && _numFiltMatchesDV[i] > 0) {
-					_logFoundCorrespondences.push_back(std::make_pair(vec2ui(i, curFrame), transformsCurToMatch[i]));
-				}
-			} //potential frame matches
-		}
+		//else if (!isLocal) {
+		//	siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
+		//}
+		//if (!isLocal && !_numFiltMatchesDV.empty()) {
+		//	std::vector<mat4f> transformsCurToMatch(numFrames);
+		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transformsCurToMatch.data(), siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*curFrame, cudaMemcpyDeviceToHost));
+		//	for (unsigned int i = startFrame; i < numFrames; i++) {
+		//		if (i != curFrame && _numFiltMatchesDV[i] > 0) {
+		//			_logFoundCorrespondences.push_back(std::make_pair(vec2ui(i, curFrame), transformsCurToMatch[i]));
+		//		}
+		//	} //potential frame matches
+		//}
 		//!!!debugging
 #endif
 
@@ -445,13 +446,13 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (curGlobalFrame > 0) {
 			//!!!DEBUGGING
-			//if (curGlobalFrame == 170) {
-			//	//setPrintMatchesDEBUG(true);
+			//if (curGlobalFrame == 10) {
+			//	setPrintMatchesDEBUG(true);
 			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (curGlobalFrame == 170) {
+			//if (curGlobalFrame == 10) {
 			//	setPrintMatchesDEBUG(false);
 			//	std::cout << "waiting..." << std::endl;
 			//	getchar();
@@ -472,14 +473,14 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 #endif
 				ret = 2;
 			}
-		}
+			}
 		else {
 			ret = 0;
 		}
-	}
+		}
 
 	return ret;
-}
+	}
 
 void SubmapManager::addInvalidGlobalKey()
 {
@@ -661,7 +662,7 @@ void SubmapManager::setEndSolveGlobalDenseWeights()
 	const unsigned int maxNumIts = GlobalBundlingState::get().s_numGlobalNonLinIterations;
 	std::vector<float> sparseWeights(maxNumIts, 1.0f);
 	std::vector<float> denseDepthWeights(maxNumIts, 15.0f);
-	std::vector<float> denseColorWeights(maxNumIts, 0.0f); 
+	std::vector<float> denseColorWeights(maxNumIts, 0.0f);
 	m_SparseBundler.setGlobalWeights(sparseWeights, denseDepthWeights, denseColorWeights, true);
 	std::cout << "set end solve global dense weights" << std::endl;
 }

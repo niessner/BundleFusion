@@ -80,6 +80,7 @@ public:
 	unsigned int getNumImages() const;
 
 	unsigned int getNumKeyPointsPerImage(unsigned int imageIdx) const;
+	unsigned int getMaxNumKeyPointsPerImage() const { return m_maxKeyPointsPerImage; }
 
 	SIFTImageGPU& createSIFTImageGPU();
 

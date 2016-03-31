@@ -108,8 +108,8 @@ void Bundler::processInput()
 	// match with every other local
 	m_currentState.m_bLastFrameValid = 1;
 	if (curLocalFrame > 0) {
-		//const bool debugLocalMatching = false;
-		//const unsigned int stop = 140;
+		//const bool debugLocalMatching = true;
+		//const unsigned int stop = 90;
 		//if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
 		//	m_SubmapManager.setPrintMatchesDEBUG(true);
 		//}

@@ -14,7 +14,8 @@ DesktopServer::DesktopServer (const std::string& serviceName, int servicePort, o
         //, _ui(0)
 		, m_depthWidth(0), m_depthHeight(0), m_colorWidth(0), m_colorHeight(0), m_numColorChannels(4)
 		, m_bHasCalibration(false)
-		, m_bIsReceiving(false)
+		, m_bRecordPressed(false)
+		, m_bIsRecording(false)
 		, m_feedbackImageData(NULL), m_feedbackWidth(0), m_feedbackHeight(0)
     {
 # if UPLINK_HAS_DESKTOP_UI

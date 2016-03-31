@@ -249,7 +249,7 @@ int main(int argc, char** argv)
 
 		//!!!DEBUGGING
 		if (GlobalAppState::get().s_generateVideo) { std::cout << "remember to change raycast for top-down rendering!" << std::endl; getchar(); }
-		if (GlobalAppState::get().s_numFramesBeforeExit && GlobalAppState::get().s_sensorIdx != 8) std::cout << "warning: overwrite trajectory/save ply not implemented for non-SensorData type sensors" << std::endl;
+		if (GlobalAppState::get().s_numFramesBeforeExit != (unsigned int)-1 && GlobalAppState::get().s_sensorIdx != 8) std::cout << "warning: overwrite trajectory/save ply not implemented for non-SensorData type sensors" << std::endl;
 		if (false) {
 			TestMatching test;
 			//test.analyzeLocalOpts();

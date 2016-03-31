@@ -26,27 +26,36 @@ public:
 			printf("  Peak Memory Bandwidth (GB/s): %f\n\n", 2.0*prop.memoryClockRate*(prop.memoryBusWidth / 8) / 1.0e6);
 		}
 
-		size_t getFreeMemoryMB() const {
+		static size_t getFreeMemoryMB() {
 			size_t mem_free, mem_total;
-			cudaMemGetInfo(&mem_free, &mem_total);	
-			mem_free /= (1024 * 1024);	
+			cudaMemGetInfo(&mem_free, &mem_total);
+			mem_free /= (1024 * 1024);
 			mem_total /= (1024 * 1024);
 			return mem_free;
 
 		}
-		size_t getTotalMemoryMB() const {
+		static size_t getTotalMemoryMB() {
 			size_t mem_free, mem_total;
 			cudaMemGetInfo(&mem_free, &mem_total);
 			mem_free /= (1024 * 1024);
 			mem_total /= (1024 * 1024);
 			return mem_total;
 		}
-		size_t getUsedMemoryMB() const {
+		static size_t getUsedMemoryMB() {
 			size_t mem_free, mem_total;
 			cudaMemGetInfo(&mem_free, &mem_total);
 			mem_free /= (1024 * 1024);
 			mem_total /= (1024 * 1024);
 			return mem_total - mem_free;
+		}
+		static void printMemoryStats() {
+			size_t mem_free, mem_total;
+			cudaMemGetInfo(&mem_free, &mem_total);
+			mem_free /= (1024 * 1024);
+			mem_total /= (1024 * 1024);
+			printf("total memory: %d\n", mem_total);
+			printf("free memory : %d\n", mem_free);
+			printf("used memory : %d\n", mem_total - mem_free);
 		}
 		std::string getName() const {
 			cudaDeviceProp prop;

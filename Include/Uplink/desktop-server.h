@@ -25,13 +25,17 @@ public:
 		unsigned int& depthWidth, unsigned int& depthHeight, unsigned int& colorWidth, unsigned int& colorHeight);
 	bool hasCalibration() { const MutexLocker _(m_mutex); return m_bHasCalibration; }
 
-	void startReceiving() { m_bIsReceiving = true; }
-	void stopReceiving() { m_bIsReceiving = false; }
+	void setRecordPressed(bool b) { m_bRecordPressed = b; }
+	bool isRecordPressed() const { return m_bRecordPressed; }
+
+	void startRecording() { if (m_bRecordPressed) m_bIsRecording = true; }
+	void stopRecording() { m_bIsRecording = false; }
+	bool isRecording() const { return m_bIsRecording; }
 
 	std::pair<float*, uint8*> process(float* oldDepth, uint8* oldColor) {
 
 		//std::cout << "[get]: " << m_depthFilledList.size() << ", " << m_depthEmptyList.size() << std::endl;
-		if (m_depthFilledList.empty() && !m_bIsReceiving) return std::pair<float*, uint8*>(NULL, NULL);
+		if (m_depthFilledList.empty() && !m_bIsRecording) return std::pair<float*, uint8*>(NULL, NULL);
 		while (m_depthFilledList.empty()) {
 			//std::cerr << "waiting for frames" << std::endl;
 			sleep(0.01f);
@@ -53,7 +57,7 @@ public:
 
 	void receive(uint16* recDepth, uint8* recColor) {
 
-		if (!m_bIsReceiving || recColor == NULL || recDepth == NULL) return;
+		if (!m_bIsRecording || recColor == NULL || recDepth == NULL) return;
 		//std::cout << "[receive]: " << m_depthFilledList.size() << ", " << m_depthEmptyList.size() << std::endl;
 		while (m_depthEmptyList.empty()) {
 			//std::cout << "list full -- frame lost" << std::endl;
@@ -143,7 +147,8 @@ private:
 	uplink::CameraCalibration m_calibrationColor;
 	bool					  m_bHasCalibration;
 
-	bool					  m_bIsReceiving;
+	bool					  m_bIsRecording;
+	bool					  m_bRecordPressed;
 
 	Image m_feedbackImage; // sent back to app
 	uint8* m_feedbackImageData;

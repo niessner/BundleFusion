@@ -382,7 +382,7 @@ void __global__ FilterMatchesBySurfaceAreaCU_Kernel(
 
 	if (threadIdx.x == 0) {
 		if (area0 < areaThresh && area1 < areaThresh) {
-			//if (imagePairIdx > 40) printf("INVALID AREA [%d %d] (%f %f)\n", imagePairIdx, gridDim.x, area0, area1);
+			//printf("INVALID AREA [%d %d] (%f %f)\n", imagePairIdx, gridDim.x, area0, area1);
 			d_numFilteredMatchesPerImagePair[imagePairIdx] = 0;
 		}
 	}
@@ -550,7 +550,7 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int curImageIdx, un
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
 
 		//debugging
-		//bool debugPrint = (imagePairIdx == 146 && curImageIdx == 96);
+		//bool debugPrint = (imagePairIdx == 9 && curImageIdx == 10);
 
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
 			//if (debugPrint) printf("[%d-%d]: %f %f INVALID\n", imagePairIdx, curImageIdx, err, corr);

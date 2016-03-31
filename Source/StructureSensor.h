@@ -28,9 +28,49 @@ struct ExampleServerSession : uplink::DesktopServerSession
 		m_bSendFeedbackImage = sendFeedbackImage;
 	}
 
+	void toggleExposureAndWhiteBalance(bool lock = false) //lock forces the lock
+	{
+		uplink::SessionSetup sessionSetup;
+
+		static bool toggle = true;
+
+		if (toggle || lock)
+		{
+			sessionSetup.addSetColorCameraExposureModeAction(uplink::ColorCameraExposureMode_Locked);
+			sessionSetup.addSetColorCameraWhiteBalanceModeAction(uplink::ColorCameraWhiteBalanceMode_Locked);
+
+			std::cout << "awb/exp LOCKED" << std::endl;
+			//uplink_log_info("Locked exposure and white balance.");
+		}
+		else
+		{
+			sessionSetup.addSetColorCameraExposureModeAction(uplink::ColorCameraExposureMode_ContinuousAuto);
+			sessionSetup.addSetColorCameraWhiteBalanceModeAction(uplink::ColorCameraWhiteBalanceMode_ContinuousAuto);
+
+			std::cout << "awb/exp unlocked" << std::endl;
+			//uplink_log_info("Automatic exposure and white balance.");
+		}
+
+		server()._currentSession->sendSessionSetup(sessionSetup);
+
+		toggle = !toggle;
+	}
+
 	virtual void onCustomCommand(const std::string& command)
 	{
-		// FIXME: Implement.
+		if (command == "RecordButtonPressed")
+		{
+			if (!server().isRecording()) {
+				toggleExposureAndWhiteBalance(true); //lock the awb/autoexp
+				std::cout << "record button pressed" << std::endl;
+				server().setRecordPressed(true);
+			}
+		}
+		else if (command == "AutoLevelButtonPressed")
+		{
+			if (!server().isRecording()) toggleExposureAndWhiteBalance();
+			// cannot toggle during scanning!
+		}
 	}
 
 	virtual bool onMessage(const uplink::Message& message)
@@ -47,7 +87,7 @@ struct ExampleServerSession : uplink::DesktopServerSession
 			{
 				//s_timer.frame();
 				const uplink::CameraFrame& cameraFrame = message.as<uplink::CameraFrame>();
-				static unsigned long long count = 0;
+				//static unsigned long long count = 0;
 				//std::cout << "RGBD " << count << std::endl;
 
 				UCHAR* colorBuffer = NULL;
@@ -59,9 +99,6 @@ struct ExampleServerSession : uplink::DesktopServerSession
 				USHORT* depthBuffer = (USHORT*)cameraFrame.depthImage.planes[0].buffer;
 				int     depthWidth  = int(cameraFrame.depthImage.width);
 				int     depthHeight = int(cameraFrame.depthImage.height);
-				
-				// Convert shifts to depth values.
-				uplink::shift2depth(depthBuffer, depthWidth * depthHeight);
 
 				static bool storeCalibration = true;
 
@@ -77,27 +114,24 @@ struct ExampleServerSession : uplink::DesktopServerSession
 							storeCalibration = false;
 						}
 					}
-					server().receive(depthBuffer, colorBuffer);
-					count++;
+					if (server().isRecording()) { //receive
+						// Convert shifts to depth values.
+						uplink::shift2depth(depthBuffer, depthWidth * depthHeight);
+						server().receive(depthBuffer, colorBuffer);
+					}
+					//count++;
 				}
 
 				// Send ping-pong feedback image.
 				// FIXME: This const-cast sucks.
-				//if (sendPingPongColorFeedback && !cameraFrame.colorImage.isEmpty())
-				//	sendImage(const_cast<uplink::Image&>(cameraFrame.colorImage));
-				if (m_bSendFeedbackImage) {
-					const uplink::Image& feedback = server().getFeedbackImage();
-					if (!feedback.isEmpty()) {
-						//FreeImageWrapper::saveImage("test.png", ColorImageR8G8B8(feedback.height, feedback.width, (vec3uc*)feedback.planes[0].buffer));
-						sendImage(const_cast<uplink::Image&>(feedback));
-					}
-				}
-				//static unsigned long long count = 0; // FIXME: Use a real steady-rate timer.
-				//if (0 == count++ % 150)
-				//{
-				//	uplink_log_info("Camera frame input rate: %f Hz", server()._currentSession->channelStats[uplink::MessageKind_CameraFrame].receiving.adapteredRate());
-				//	uplink_log_info("Device motion event input rate: %f Hz", server()._currentSession->channelStats[uplink::MessageKind_DeviceMotionEvent].receiving.adapteredRate());
-				//	uplink_log_info("Feedback Image output rate: %f Hz", server()._currentSession->imageQueue.currentPoppingRate());
+				if (!cameraFrame.colorImage.isEmpty())
+					sendImage(const_cast<uplink::Image&>(cameraFrame.colorImage));
+				//if (m_bSendFeedbackImage) {
+				//	const uplink::Image& feedback = server().getFeedbackImage();
+				//	if (!feedback.isEmpty()) {
+				//		//FreeImageWrapper::saveImage("test.png", ColorImageR8G8B8(feedback.height, feedback.width, (vec3uc*)feedback.planes[0].buffer));
+				//		sendImage(const_cast<uplink::Image&>(feedback));
+				//	}
 				//}
 				//std::cout << "FPS: " << s_timer.framesPerSecond() << std::endl;
 
@@ -149,8 +183,10 @@ struct ExampleSessionSetup : uplink::SessionSetup
 		addSetSendMotionAction(false);
 		addSetMotionRateAction(100);
 
-		addSetColorCameraExposureModeAction(uplink::ColorCameraExposureMode_Locked);
-		addSetColorCameraWhiteBalanceModeAction(uplink::ColorCameraWhiteBalanceMode_Locked);
+		//addSetColorCameraExposureModeAction(uplink::ColorCameraExposureMode_Locked);
+		//addSetColorCameraWhiteBalanceModeAction(uplink::ColorCameraWhiteBalanceMode_Locked);
+		addSetColorCameraExposureModeAction(uplink::ColorCameraExposureMode_ContinuousAuto);		//default unlocked, can lock with button
+		addSetColorCameraWhiteBalanceModeAction(uplink::ColorCameraWhiteBalanceMode_ContinuousAuto);
 
 		addSetDepthCameraCodecAction(uplink::ImageCodecId_CompressedShifts);
 		addSetColorCameraCodecAction(uplink::ImageCodecId_JPEG);
@@ -162,6 +198,27 @@ struct ExampleSessionSetup : uplink::SessionSetup
 
 struct ExampleServerDelegate : uplink::ServerDelegate
 {
+	void sendClearAllButtonsCommand()
+	{
+		_server->_currentSession->sendCustomCommand("button:clear:*");
+	}
+
+	void sendButtonCreateCommand(std::string buttonPngFilepath, std::string commandName)
+	{
+		uplink::CustomCommand customCommand;
+		customCommand.command += "button:create:";
+		customCommand.command += char(0);
+		customCommand.command += commandName;
+		customCommand.command += '\0';
+
+		std::ifstream f(buttonPngFilepath, std::ios::binary);
+		if (!f.is_open()) throw MLIB_EXCEPTION("could not open button path " + buttonPngFilepath);
+		std::string imageBytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+		customCommand.command.insert(customCommand.command.end(), imageBytes.begin(), imageBytes.end());
+
+		_server->_currentSession->sendCustomCommand(customCommand);
+	}
+
 	virtual uplink::ServerSession* newSession(int socketDescriptor, uplink::Server* server)
 	{
 		_server = server;
@@ -171,11 +228,12 @@ struct ExampleServerDelegate : uplink::ServerDelegate
 
 	virtual void onConnect(uintptr_t sessionId)
 	{
+		sendClearAllButtonsCommand();
+		sendButtonCreateCommand("Media/record-button.png", "RecordButtonPressed");
+		sendButtonCreateCommand("Media/auto-level-button.png", "AutoLevelButtonPressed");
+
 		_server->_currentSession->sendSessionSetup(
 			ExampleSessionSetup()
-			//SporadicColorSessionSetup()
-			//Depth60FPSSessionSetup()
-			//WXGASessionSetup()
 			);
 	}
 
@@ -222,10 +280,10 @@ public:
 		RGBDSensor::initializeColorIntrinsics(calibrationColor.fx, calibrationColor.fy, calibrationColor.cx, calibrationColor.cy);
 		RGBDSensor::initializeColorExtrinsics(mat4f::identity());
 
-		std::cout << "depth intrinsics: " << std::endl << m_depthIntrinsics << std::endl;
-		std::cout << "color intrinsics: " << std::endl << m_colorIntrinsics << std::endl;
-		std::cout << "depth extrinsics: " << std::endl << m_depthExtrinsics << std::endl;
-		std::cout << "color extrinsics: " << std::endl << m_colorExtrinsics << std::endl;
+		//std::cout << "depth intrinsics: " << std::endl << m_depthIntrinsics << std::endl;
+		//std::cout << "color intrinsics: " << std::endl << m_colorIntrinsics << std::endl;
+		//std::cout << "depth extrinsics: " << std::endl << m_depthExtrinsics << std::endl;
+		//std::cout << "color extrinsics: " << std::endl << m_colorExtrinsics << std::endl;
 	}
 
 	bool processDepth();
@@ -237,8 +295,8 @@ public:
 		return "StructureSensor";
 	}
 
-	void startReceivingFrames() { m_bIsReceivingFrames = true; m_server.startReceiving(); }
-	void stopReceivingFrames() { m_bIsReceivingFrames = false; m_server.stopReceiving(); }
+	void startReceivingFrames() { m_bIsReceivingFrames = true; waitForRecord(); }
+	void stopReceivingFrames() { m_bIsReceivingFrames = false; m_server.stopRecording(); }
 
 	void updateFeedbackImage(BYTE* tex) {
 		m_server.updateFeedbackImage(tex);
@@ -250,9 +308,17 @@ private:
 		std::cout << "waiting for connection... ";
 		m_server.startListening();
 		while (!m_server.hasCalibration()) {
-			// wait for calibration
+			Sleep(0); // wait for calibration
 		}
 		std::cout << "ready!" << std::endl;
+	}
+	void waitForRecord() {
+		std::cout << "waiting for record..." << std::endl;
+		while (!m_server.isRecordPressed()) {
+			Sleep(0); // wait for start record button
+		}
+		std::cout << "server: start recording" << std::endl;
+		m_server.startRecording();
 	}
 
 	ExampleServerDelegate m_serverDelegate;

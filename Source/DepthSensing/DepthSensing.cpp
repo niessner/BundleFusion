@@ -623,10 +623,6 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 		GlobalAppState::get().s_RenderMode = 2;
 	}
 
-	if (GlobalAppState::get().s_sensorIdx == 7) { // structure sensor
-		g_depthSensingRGBDSensor->startReceivingFrames();
-	}
-
 
 	g_depthCameraParams.fx = g_CudaImageManager->getIntrinsics()(0, 0);
 	g_depthCameraParams.fy = g_CudaImageManager->getIntrinsics()(1, 1);
@@ -641,6 +637,10 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	std::vector<DXGI_FORMAT> rtfFormat;
 	rtfFormat.push_back(DXGI_FORMAT_R8G8B8A8_UNORM); // _SRGB
 	V_RETURN(g_RenderToFileTarget.OnD3D11CreateDevice(pd3dDevice, GlobalAppState::get().s_rayCastWidth, GlobalAppState::get().s_rayCastHeight, rtfFormat));
+
+	if (GlobalAppState::get().s_sensorIdx == 7) { // structure sensor
+		g_depthSensingRGBDSensor->startReceivingFrames();
+	}
 
 	return hr;
 }
@@ -955,7 +955,9 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	///////////////////////////////////////
 #ifdef RUN_MULTITHREADED
 	ConditionManager::lockImageManagerFrameReady(ConditionManager::Recon);
-	while (g_CudaImageManager->hasBundlingFrameRdy()) ConditionManager::waitImageManagerFrameReady(ConditionManager::Recon);
+	while (g_CudaImageManager->hasBundlingFrameRdy()) {
+		ConditionManager::waitImageManagerFrameReady(ConditionManager::Recon);
+	}
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
 		g_CudaImageManager->setBundlingFrameRdy();					//ready for bundling thread

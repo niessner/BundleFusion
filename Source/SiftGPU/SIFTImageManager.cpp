@@ -327,7 +327,7 @@ void SIFTImageManager::free()
 
 	MLIB_CUDA_SAFE_FREE(d_keyPoints);
 	MLIB_CUDA_SAFE_FREE(d_keyPointDescs);
-	//CUDA_SAFE_CALL(cudaFree(d_keyPointCounters));
+	//MLIB_CUDA_SAFE_FREE(cudaFree(d_keyPointCounters));
 
 	m_currImagePairMatches.clear();
 
@@ -353,6 +353,8 @@ void SIFTImageManager::free()
 
 	MLIB_CUDA_SAFE_FREE(d_fuseGlobalKeyCount);
 	MLIB_CUDA_SAFE_FREE(d_fuseGlobalKeyMarker);
+
+	m_imagesToRetry.clear();
 
 	SAFE_DELETE(m_timer);
 }
