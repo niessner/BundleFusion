@@ -550,7 +550,7 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int curImageIdx, un
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
 
 		//debugging
-		//bool debugPrint = (imagePairIdx == 9 && curImageIdx == 10);
+		//bool debugPrint = curImageIdx == 1;//(imagePairIdx == 9 && curImageIdx == 10);
 
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
 			//if (debugPrint) printf("[%d-%d]: %f %f INVALID\n", imagePairIdx, curImageIdx, err, corr);

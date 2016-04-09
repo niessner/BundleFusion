@@ -115,8 +115,7 @@ void bundlingOptimization() {
 	g_bundler->processGlobal();
 	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 
-	// for no opt
-	//g_bundler->resetDEBUG();
+	//g_bundler->resetDEBUG(false, false); // for no opt
 }
 
 void bundlingOptimizationThreadFunc() {
@@ -190,7 +189,7 @@ int main(int argc, char** argv)
 	// Enable run-time memory check for debug builds.
 #if defined(DEBUG) | defined(_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-	//_CrtSetBreakAlloc(3333);
+	//_CrtSetBreakAlloc(24628);
 #endif 
 
 	try {
@@ -281,7 +280,6 @@ int main(int argc, char** argv)
 
 #ifdef RUN_MULTITHREADED
 		std::thread bundlingThread(bundlingThreadFunc);
-
 		//waiting until bundler is initialized
 		while (!g_bundler)	Sleep(0);
 #else
@@ -301,7 +299,7 @@ int main(int argc, char** argv)
 		//g_bundler->saveIntegrateTrajectory("intTrajectory.bin");
 		//g_bundler->saveLogsToFile();
 
-#ifdef RUN_MULTITHREADED
+#ifdef RUN_MULTITHREADED 
 		g_bundler->exitBundlingThread();
 
 		g_imageManager->setBundlingFrameRdy();			//release all bundling locks

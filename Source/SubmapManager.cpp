@@ -204,7 +204,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 		siftManager->SortKeyPointMatchesCU(curFrame, startFrame, numFrames);
 
 #ifdef DEBUG_PRINT_MATCHING
-		const bool printDebug = _debugPrintMatches && isLocal;
+		const bool printDebug = _debugPrintMatches && !isLocal;
 		const std::string suffix = isLocal ? "Local/" : "Global/";
 		std::vector<unsigned int> _numRawMatches;
 		if (printDebug) {
@@ -446,13 +446,13 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (curGlobalFrame > 0) {
 			//!!!DEBUGGING
-			//if (curGlobalFrame == 10) {
+			//if (curGlobalFrame == 1) {
 			//	setPrintMatchesDEBUG(true);
 			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (curGlobalFrame == 10) {
+			//if (curGlobalFrame == 1) {
 			//	setPrintMatchesDEBUG(false);
 			//	std::cout << "waiting..." << std::endl;
 			//	getchar();

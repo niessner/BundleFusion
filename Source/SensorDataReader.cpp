@@ -69,7 +69,7 @@ void SensorDataReader::createFirstConnected()
 	}
 
 	const unsigned int cacheSize = 10;
-	//m_sensorDataCache = new RGBDFrameCacheRead(m_sensorData, cacheSize);
+	m_sensorDataCache = new ml::SensorData::RGBDFrameCacheRead(m_sensorData, cacheSize);
 }
 
 bool SensorDataReader::processDepth()
@@ -89,10 +89,10 @@ bool SensorDataReader::processDepth()
 		//memcpy(depth, m_data.m_DepthImages[m_currFrame], sizeof(float)*getDepthWidth()*getDepthHeight());
 
 		//TODO check why the frame cache is not used?
-		//ml::RGBDFrameCacheRead::FrameState frameState = m_sensorDataCache->getNext();
-		ml::SensorData::RGBDFrameCacheRead::FrameState frameState;
-		frameState.m_colorFrame = m_sensorData->decompressColorAlloc(m_currFrame);
-		frameState.m_depthFrame = m_sensorData->decompressDepthAlloc(m_currFrame);
+		ml::SensorData::RGBDFrameCacheRead::FrameState frameState = m_sensorDataCache->getNext();
+		//ml::SensorData::RGBDFrameCacheRead::FrameState frameState;
+		//frameState.m_colorFrame = m_sensorData->decompressColorAlloc(m_currFrame);
+		//frameState.m_depthFrame = m_sensorData->decompressDepthAlloc(m_currFrame);
 
 
 		for (unsigned int i = 0; i < getDepthWidth()*getDepthHeight(); i++) {

@@ -13,7 +13,7 @@
 #include <conio.h>
 
 class CUDACache;
-#define NEW_GUIDED_REMOVE 
+//#define NEW_GUIDED_REMOVE 
 
 
 class CUDASolverBundling

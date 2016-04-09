@@ -461,7 +461,7 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 		}
 		break;
 		case '6':
-			DumpinputManagerData("./dump/dump.sensor");
+			//DumpinputManagerData("./dump/dump.sensor");
 			//std::cout << "press 8" << std::endl;
 			break;
 		case '7':
@@ -520,6 +520,15 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 			}
 			else {
 				std::cout << "Cannot evaluate trajectory (sensorIdx != 3)" << std::endl;
+			}
+		}
+		case 'C':
+		{
+			if (GlobalAppState::get().s_sensorIdx == 8) {
+				std::vector<mat4f> trajectory;
+				g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+				unsigned int numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);
+				std::cout << "#opt transforms = " << numValidTransforms << " of " << trajectory.size() << std::endl;
 			}
 		}
 		break;
@@ -846,14 +855,12 @@ void reintegrate()
 	TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
 
 	if (tm->getNumActiveOperations() < maxPerFrameFixes) {
-		//Timer t;
 		tm->generateUpdateLists();
 		//if (GlobalBundlingState::get().s_verbose) {
 		//	if (tm->getNumActiveOperations() == 0) {
 		//		std::cout << __FUNCTION__ << " :  no more work (everything is reintegrated)" << std::endl;
 		//	}
 		//}
-		//std::cout << "generateUpdateList " << t.getElapsedTimeMS() << " [ms] " << std::endl;
 	}
 
 	for (unsigned int fixes = 0; fixes < maxPerFrameFixes; fixes++) {
@@ -906,10 +913,11 @@ void StopScanningAndExit(bool aborted = false)
 		const std::string saveFile = GlobalAppState::get().s_binaryDumpSensorFile;
 		std::vector<mat4f> trajectory;
 		g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
-		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file
-		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile)+"_fried.sens", trajectory); //overwrite the original file
 		numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);		numTransforms = (unsigned int)trajectory.size();
 		if (numValidTransforms < (unsigned int)std::round(0.5f * numTransforms)) valid = false; // not enough valid transforms
+		std::cout << "#VALID TRANSFORMS = " << numValidTransforms << std::endl;
+		((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file
+		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile)+"_fried.sens", trajectory); //overwrite the original file
 		//save ply
 		std::cout << "[marching cubes] ";
 		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
@@ -929,6 +937,7 @@ void StopScanningAndExit(bool aborted = false)
 		s << "ABORTED" << std::endl; // can only be due to invalid first chunk (i think)
 		s.close();
 	}
+	fflush(stdout);
 	//exit
 	exit(0);
 }
@@ -943,9 +952,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	}
 
 	Timer t;
-	//double timeReconstruct = 0.0f;
-	//double timeVisualize = 0.0f;
-	//double timeReintegrate = 0.0f;
+	//double timeReconstruct = 0.0f;	double timeVisualize = 0.0f;	double timeReintegrate = 0.0f;
 
 	//Start Timing
 	if (GlobalBundlingState::get().s_enablePerFrameTimings) { GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.start(); }
@@ -975,14 +982,13 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	bool bGotDepth = g_CudaImageManager->process();
 	g_depthSensingBundler->processInput();
 #endif
-
+	
 	///////////////////////////////////////
 	// Fix old frames
 	///////////////////////////////////////
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.start(); }
 	reintegrate();
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeReIntegrate = t.getElapsedTimeMS(); }
-
 
 
 	//wait until the bundling thread is done with: sift extraction, sift matching, and key point filtering
@@ -993,8 +999,6 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 		//while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
 	}
 #endif
-
-	const bool outputDebug = false;//g_CudaImageManager->getCurrFrameNumber() >= 2078; //debug hack output to stderr
 
 	///////////////////////////////////////
 	// Reconstruction of current frame
@@ -1009,7 +1013,6 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 		g_depthSensingBundler->confirmProcessedInputFrame();
 		ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Recon);
 #endif
-		if (outputDebug) std::cerr << "[ frame " << frameIdx << "]: sift transform " << PoseHelper::MatrixToPose(transformation) << std::endl;
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
 			//overwrite transform and use given trajectory in this case
@@ -1054,22 +1057,21 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	g_depthSensingBundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
 	g_depthSensingBundler->processGlobal();
 	g_depthSensingBundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+	//g_depthSensingBundler->resetDEBUG(true);
 #endif
-
+	
 	// Stop Timing
 	if (GlobalBundlingState::get().s_enablePerFrameTimings) {
 		GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop();
 		TimingLog::addTotalFrameTime(GlobalAppState::get().s_Timer.getElapsedTimeMS());
 		std::cout << "<<< [Frame: " << g_CudaImageManager->getCurrFrameNumber() << " ] Total Frame Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
 	}
-
+	
 	//std::cout << VAR_NAME(timeReconstruct) << " : " << timeReconstruct << " [ms]" << std::endl;
 	//std::cout << VAR_NAME(timeVisualize) << " : " << timeVisualize << " [ms]" << std::endl;
 	//std::cout << VAR_NAME(timeReintegrate) << " : " << timeReintegrate << " [ms]" << std::endl;
 	//std::cout << std::endl;
-
 	//std::cout << "<<HEAP FREE>> " << g_sceneRep->getHeapFreeCount() << std::endl;
-
 	//TimingLogDepthSensing::printTimings();
 
 	if (g_renderText) RenderText();
@@ -1088,7 +1090,6 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 		TimingLog::printAllTimings(outDir); // might skip the last frames but whatever
 		exit(1);
 	}
-
 	if (!g_depthSensingRGBDSensor->isReceivingFrames() && GlobalAppState::get().s_sensorIdx == 8) { //this is a hack...
 		static unsigned int countPastLast = 0;
 		const unsigned int maxPastLast = GlobalAppState::get().s_numFramesBeforeExit;
@@ -1097,7 +1098,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 		}
 		countPastLast++;
 	}
-
+	
 	DXUT_EndPerfEvent();
 }
 

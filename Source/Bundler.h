@@ -197,10 +197,10 @@ public:
 	}
 
 	//! fake finish local opt without actually optimizing anything
-	void resetDEBUG(bool updateTrajectory, bool validLocalSolve) {
+	void resetDEBUG(bool updateTrajectory) {
 		m_currentState.m_localToSolve = -1;
 		unsigned int curFrame = (m_currentState.m_lastLocalSolved < 0) ? (unsigned int)-1 : m_currentState.m_totalNumOptLocalFrames;
-		m_SubmapManager.resetDEBUG(updateTrajectory && validLocalSolve, m_currentState.m_lastLocalSolved, curFrame);
+		m_SubmapManager.resetDEBUG(updateTrajectory && m_currentState.m_bProcessGlobal == BundlerState::PROCESS, m_currentState.m_lastLocalSolved, curFrame);
 	}
 
 private:
