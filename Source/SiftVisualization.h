@@ -9,28 +9,29 @@ class CUDAImageManager;
 class SiftVisualization {
 public:
 	static void printKey(const std::string& filename, const CUDACache* cudaCache, const SIFTImageManager* siftManager, unsigned int frame);
-	static void printKey(const std::string& filename, const ColorImageR8G8B8A8& image, const SIFTImageManager* siftManager, unsigned int frame);
+	static void printKey(const std::string& filename, const ColorImageR8G8B8& image, const SIFTImageManager* siftManager, unsigned int frame);
 	static void printKey(const std::string& filename, CUDAImageManager* cudaImageManager, unsigned int allFrame, const SIFTImageManager* siftManager, unsigned int frame);
 
 	static void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache,
 		bool filtered, int maxNumMatches = -1);
-	static void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8A8>& colorImages,
+	static void printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8>& colorImages,
 		bool filtered, int maxNumMatches = -1);
 
-	static void printMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8A8>& colorImages,
+	static void printMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8>& colorImages,
 		unsigned int frame, bool filtered, int maxNumMatches = -1);
 
 
+	static void printMatch(const std::string& filename, const SIFTImageManager* siftManager, const CUDACache* cudaCache, const vec2ui& imageIndices);
 	static void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
-		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered, int maxNumMatches);
+		const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, float distMax, bool filtered, int maxNumMatches);
 
 	static void printMatch(const std::string& filename, const EntryJ& correspondence,
-		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics);
+		const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics);
 	static void printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences,
-		const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics);
+		const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics);
 
 
-	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
+	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages,
 		const mat4f& depthIntrinsicsInv, const vec2ui& imageIndices, const mat4f& transformPrvToCur);
 	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<CUDACachedFrame>& cachedFrames, unsigned int cacheWidth, unsigned int cacheHeight,
 		const vec2ui& imageIndices, const mat4f& transformPrvToCur);
@@ -41,18 +42,34 @@ public:
 	static vec3f getNormal(const float* depth, unsigned int width, unsigned int height, const mat4f& depthIntrinsicsInv,
 		unsigned int x, unsigned int y);
 	static void computePointCloud(PointCloudf& pc, const float* depth, unsigned int depthWidth, unsigned int depthHeight,
-		const vec4uc* color, unsigned int colorWidth, unsigned int colorHeight,
+		const vec3uc* color, unsigned int colorWidth, unsigned int colorHeight,
 		const mat4f& depthIntrinsicsInv, const mat4f& transform, float maxDepth);
 
-	static void saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
+	static void saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages,
 		const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, float maxDepth = 3.5f, bool saveFrameByFrame = false);
 
 	static void saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory, float maxDepth = 3.5f, bool saveFrameByFrame = false);
 
-	static void computePointCloud(PointCloudf& pc, const ColorImageR8G8B8A8& color,
+	static void computePointCloud(PointCloudf& pc, const ColorImageR8G8B8& color,
 		const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal,
 		const mat4f& transform, float maxDepth);
 
 	static void saveCamerasToPLY(const std::string& filename, const std::vector<mat4f>& trajectory);
+
+	static void visualizeImageImageCorrespondences(const std::string& filename, SIFTImageManager* siftManager);
+	static void visualizeImageImageCorrespondences(const std::string& filename, const std::vector<EntryJ>& correspondences, const std::vector<int>& valid, unsigned int numImages);
+
+	static void getImageImageCorrespondences(const std::vector<EntryJ>& correspondences, unsigned int numImages, std::vector< std::vector<unsigned int> >& imageImageCorrs);
+
+	static void printAllMatches(const std::string& outDirectory, SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8>& colorImages, const mat4f& colorIntrinsics);
+	static void printAllMatches(const std::string& outDirectory, const std::vector<EntryJ>& correspondences, unsigned int numImages,
+		const std::vector<ColorImageR8G8B8>& colorImages, const mat4f& colorIntrinsics);
 private:
+
+	static void convertIntensityToRGB(const ColorImageR32& intensity, ColorImageR8G8B8& image) {
+		image.allocateSameSize(intensity);
+		for (unsigned int i = 0; i < intensity.getNumPixels(); i++) {
+			image.getData()[i] = vec3uc((unsigned char)std::round(255.0f * intensity.getData()[i]));
+		}
+	}
 };

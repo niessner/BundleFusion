@@ -459,7 +459,7 @@ __global__ void collectHighResidualsDevice(SolverInput input, SolverState state,
 	const unsigned int corrIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (corrIdx < N) {
-		float residual = evalAbsMaxResidualDevice(corrIdx, input, state, parameters); 
+		float residual = evalAbsMaxResidualDevice(corrIdx, input, state, parameters);
 		if (residual > parameters.highResidualThresh) {
 			int idx = atomicAdd(state.d_countHighResidual, 1);
 			if (idx < maxNumHighResiduals) {
@@ -501,7 +501,7 @@ __global__ void EvalMaxResidualDevice(SolverInput input, SolverState state, Solv
 	maxRes[threadIdx.x] = 0.0f;
 
 	if (corrIdx < N) {
-		float residual = evalAbsMaxResidualDevice(corrIdx, input, state, parameters); 
+		float residual = evalAbsMaxResidualDevice(corrIdx, input, state, parameters);
 
 		maxRes[threadIdx.x] = residual;
 		maxResIndex[threadIdx.x] = corrIdx;
@@ -749,12 +749,12 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 
 	//cutilSafeCall(cudaMemcpy(rRot, state.d_rRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//cutilSafeCall(cudaMemcpy(rTrans, state.d_rTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr rRot %d\n", i); getchar(); } }
-	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr rTrans %d\n", i); getchar(); } }
+	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr rRot %d\n", i); getchar(); } }
+	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr rTrans %d\n", i); getchar(); } }
 	//cutilSafeCall(cudaMemcpy(rRot, state.d_pRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//cutilSafeCall(cudaMemcpy(rTrans, state.d_pTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr pRot %d\n", i); getchar(); } }
-	////for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr pTrans %d\n", i); getchar(); } }
+	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rRot[i].x)) { printf("NaN in jtr pRot %d\n", i); getchar(); } }
+	//for (unsigned int i = 1; i < input.numberOfImages; i++) { if (isnan(rTrans[i].x)) { printf("NaN in jtr pTrans %d\n", i); getchar(); } }
 
 	PCGInit_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(N, state);
 #ifdef _DEBUG
@@ -764,6 +764,8 @@ void Initialization(SolverInput& input, SolverState& state, SolverParameters& pa
 
 	if (timer) timer->endEvent();
 
+	//float scanAlpha;
+	//cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
 	//if (rRot) delete[] rRot;
 	//if (rTrans) delete[] rTrans;
 }
@@ -987,8 +989,8 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	//float3* Ap_Trans = new float3[input.numberOfImages];
 	//cutilSafeCall(cudaMemcpy(Ap_Rot, state.d_Ap_XRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 	//cutilSafeCall(cudaMemcpy(Ap_Trans, state.d_Ap_XTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
-	//if (isnan(Ap_Rot[1].x)) { printf("NaN in Ap rot\n"); getchar(); }
-	//if (isnan(Ap_Trans[1].x)) { printf("NaN in Ap trans\n"); getchar(); }
+	//for (unsigned int i = 1; i < input.maxNumberOfImages; i++) { if (isnan(Ap_Rot[i].x)) { printf("NaN at Ap rot %d\n", i); getchar(); } }
+	//for (unsigned int i = 1; i < input.maxNumberOfImages; i++) { if (isnan(Ap_Trans[i].x)) { printf("NaN at Ap trans %d\n", i); getchar(); } }
 	//if (Ap_Rot) delete[] Ap_Rot;
 	//if (Ap_Trans) delete[] Ap_Trans;
 	//!!!debugging
@@ -998,6 +1000,9 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
+
+	//float scanAlpha;
+	//cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
 
 	PCGStep_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 #ifdef _DEBUG
@@ -1141,6 +1146,7 @@ __global__ void BuildVariablesToCorrespondencesTableDevice(EntryJ* d_corresponde
 			}
 			else { //invalidate
 				corr.setInvalid(); //make sure j corresponds to jt
+				printf("EXCEEDED MAX NUM CORR PER IMAGE IN SOLVER, INVALIDATING (%d,%d)\n", corr.imgIdx_i, corr.imgIdx_j); //debugging
 			}
 		}
 	}

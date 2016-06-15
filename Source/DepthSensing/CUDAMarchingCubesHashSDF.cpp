@@ -77,6 +77,10 @@ void CUDAMarchingCubesHashSDF::saveMesh(const std::string& filename, const mat4f
 	}
 	std::cout << "size before:\t" << m_meshData.m_Vertices.size() << std::endl;
 
+	//std::cout << "saving initial mesh...";
+	//MeshIOf::saveToFile("./Scans/scan_initial.ply", m_meshData);
+	//std::cout << "done!" << std::endl;
+	
 	//m_meshData.removeDuplicateVertices();
 	//m_meshData.mergeCloseVertices(0.00001f);
 	std::cout << "merging close vertices... ";

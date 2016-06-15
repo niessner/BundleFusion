@@ -11,7 +11,7 @@ void SiftVisualization::printKey(const std::string& filename, const CUDACache* c
 	const std::vector<CUDACachedFrame>& frames = cudaCache->getCacheFrames();
 	ColorImageR32 intensityImage(cudaCache->getWidth(), cudaCache->getHeight());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getData(), frames[frame].d_intensityDownsampled, sizeof(float)*intensityImage.getNumPixels(), cudaMemcpyDeviceToHost));
-	ColorImageR8G8B8A8 image(intensityImage);
+	ColorImageR8G8B8 image(intensityImage);
 	image.resize(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 
 	printKey(filename, image, siftManager, frame);
@@ -22,8 +22,10 @@ void SiftVisualization::printKey(const std::string& filename, CUDAImageManager* 
 	//TODO get color cpu for these functions
 	CUDAImageManager::ManagedRGBDInputFrame& integrateFrame = cudaImageManager->getIntegrateFrame(allFrame);
 
-	ColorImageR8G8B8A8 im(cudaImageManager->getIntegrationWidth(), cudaImageManager->getIntegrationHeight());
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(im.getData(), integrateFrame.getColorFrameGPU(), sizeof(uchar4) * cudaImageManager->getIntegrationWidth() * cudaImageManager->getIntegrationHeight(), cudaMemcpyDeviceToHost));
+	ColorImageR8G8B8A8 tmp(cudaImageManager->getIntegrationWidth(), cudaImageManager->getIntegrationHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(tmp.getData(), integrateFrame.getColorFrameGPU(), sizeof(uchar4) * cudaImageManager->getIntegrationWidth() * cudaImageManager->getIntegrationHeight(), cudaMemcpyDeviceToHost));
+	ColorImageR8G8B8 im(cudaImageManager->getIntegrationWidth(), cudaImageManager->getIntegrationHeight());
+	for (unsigned int i = 0; i < tmp.getNumPixels(); i++) im.getData()[i] = tmp.getData()[i].getVec3();
 	im.resize(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 
 	std::vector<SIFTKeyPoint> keys(siftManager->getNumKeyPointsPerImage(frame));
@@ -33,7 +35,7 @@ void SiftVisualization::printKey(const std::string& filename, CUDAImageManager* 
 	for (unsigned int i = 0; i < keys.size(); i++) {
 		const SIFTKeyPoint& key = keys[i];
 		RGBColor c = RGBColor::randomColor();
-		vec4uc color(c.r, c.g, c.b, c.a);
+		vec3uc color(c.r, c.g, c.b);
 		vec2i p0 = math::round(vec2f(key.pos.x, key.pos.y));
 		ImageHelper::drawCircle(im, p0, math::round(key.scale), color);
 	}
@@ -41,9 +43,9 @@ void SiftVisualization::printKey(const std::string& filename, CUDAImageManager* 
 }
 
 
-void SiftVisualization::printKey(const std::string& filename, const ColorImageR8G8B8A8& image, const SIFTImageManager* siftManager, unsigned int frame)
+void SiftVisualization::printKey(const std::string& filename, const ColorImageR8G8B8& image, const SIFTImageManager* siftManager, unsigned int frame)
 {
-	ColorImageR8G8B8A8 im = image;
+	ColorImageR8G8B8 im = image;
 
 	std::vector<SIFTKeyPoint> keys(siftManager->getNumKeyPointsPerImage(frame));
 	const SIFTImageGPU& cur = siftManager->getImageGPU(frame);
@@ -52,7 +54,7 @@ void SiftVisualization::printKey(const std::string& filename, const ColorImageR8
 	for (unsigned int i = 0; i < keys.size(); i++) {
 		const SIFTKeyPoint& key = keys[i];
 		RGBColor c = RGBColor::randomColor();
-		vec4uc color(c.r, c.g, c.b, c.a);
+		vec3uc color(c.r, c.g, c.b);
 		vec2i p0 = math::round(vec2f(key.pos.x, key.pos.y));
 		ImageHelper::drawCircle(im, p0, math::round(key.scale), color);
 	}
@@ -60,7 +62,7 @@ void SiftVisualization::printKey(const std::string& filename, const ColorImageR8
 }
 
 void SiftVisualization::printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
-	const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, float distMax, bool filtered, int maxNumMatches)
+	const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, float distMax, bool filtered, int maxNumMatches)
 {
 	// get data
 	std::vector<SIFTKeyPoint> keys;
@@ -104,7 +106,7 @@ void SiftVisualization::printMatch(const SIFTImageManager* siftManager, const st
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
-void SiftVisualization::printMatch(const std::string& filename, const EntryJ& correspondence, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics)
+void SiftVisualization::printMatch(const std::string& filename, const EntryJ& correspondence, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics)
 {
 	ColorImageR32G32B32 matchImage;
 	if (!util::fileExists(filename)) {
@@ -138,7 +140,7 @@ void SiftVisualization::printMatch(const std::string& filename, const EntryJ& co
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
-void SiftVisualization::printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences, const ColorImageR8G8B8A8& image1, const ColorImageR8G8B8A8& image2, const mat4f& colorIntrinsics)
+void SiftVisualization::printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics)
 {
 	ColorImageR32G32B32 matchImage;
 	matchImage.allocate(image1.getWidth() * 2, image1.getHeight());
@@ -175,6 +177,42 @@ void SiftVisualization::printMatch(const std::string& filename, const vec2ui& im
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
+void SiftVisualization::printMatch(const std::string& filename, const SIFTImageManager* siftManager, const CUDACache* cudaCache, const vec2ui& imageIndices)
+{
+	const unsigned int widthSIFT = GlobalBundlingState::get().s_widthSIFT;
+	const unsigned int heightSIFT = GlobalBundlingState::get().s_heightSIFT;
+
+	//get images
+	const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
+
+	ColorImageR32 xIntensity(cudaCache->getWidth(), cudaCache->getHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(xIntensity.getData(), cachedFrames[imageIndices.x].d_intensityDownsampled, sizeof(float) * xIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	ColorImageR8G8B8 xImage; convertIntensityToRGB(xIntensity, xImage);
+	xImage.resize(widthSIFT, heightSIFT);
+	ColorImageR32 yIntensity(cudaCache->getWidth(), cudaCache->getHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(yIntensity.getData(), cachedFrames[imageIndices.y].d_intensityDownsampled, sizeof(float) * yIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	ColorImageR8G8B8 yImage; convertIntensityToRGB(yIntensity, yImage);
+	yImage.resize(widthSIFT, heightSIFT);
+
+	//get matches for these images
+	const unsigned int numImages = siftManager->getNumImages();
+	std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
+	MLIB_ASSERT(!correspondences.empty());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
+	std::vector<EntryJ> imagePairMatches;
+	for (const auto& corr : correspondences) {
+		if (corr.isValid() && corr.imgIdx_i == imageIndices.x && corr.imgIdx_j == imageIndices.y)
+			imagePairMatches.push_back(corr);
+	}
+
+	mat4f colorIntrinsics = cudaCache->getIntrinsics();
+	const float scaleWidth = (float)widthSIFT / (float)cudaCache->getWidth();
+	const float scaleHeight = (float)heightSIFT / (float)cudaCache->getHeight();
+	colorIntrinsics._m00 *= scaleWidth;  colorIntrinsics._m02 *= scaleWidth;
+	colorIntrinsics._m11 *= scaleHeight; colorIntrinsics._m12 *= scaleHeight;
+	printMatch(filename, imageIndices, imagePairMatches, xImage, yImage, colorIntrinsics);
+}
+
 void SiftVisualization::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache, bool filtered, int maxNumMatches /*= -1*/)
 {
 	const unsigned int numFrames = siftManager->getNumImages();
@@ -194,7 +232,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	ColorImageR32 curIntensity(cudaCache->getWidth(), cudaCache->getHeight());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(curIntensity.getData(), cachedFrames[curFrame].d_intensityDownsampled,
 		sizeof(float) * curIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
-	ColorImageR8G8B8A8 curImage(curIntensity);
+	ColorImageR8G8B8 curImage; convertIntensityToRGB(curIntensity, curImage);
 	curImage.resize(widthSIFT, heightSIFT);
 
 	//print out images
@@ -204,7 +242,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 		ColorImageR32 prevIntensity(cudaCache->getWidth(), cudaCache->getHeight());
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(prevIntensity.getData(), cachedFrames[prev].d_intensityDownsampled,
 			sizeof(float) * prevIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
-		ColorImageR8G8B8A8 prevImage(prevIntensity);
+		ColorImageR8G8B8 prevImage; convertIntensityToRGB(prevIntensity, prevImage);
 		prevImage.resize(widthSIFT, heightSIFT);
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
@@ -212,7 +250,7 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	}
 }
 
-void SiftVisualization::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8A8>& colorImages, bool filtered, int maxNumMatches /*= -1*/)
+void SiftVisualization::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8>& colorImages, bool filtered, int maxNumMatches /*= -1*/)
 {
 	const unsigned int numFrames = siftManager->getNumImages();
 	if (numFrames <= 1) return;
@@ -223,19 +261,19 @@ void SiftVisualization::printCurrentMatches(const std::string& outPath, const SI
 	MLIB_ASSERT(util::directoryExists(dir));
 
 	// get images
-	const ColorImageR8G8B8A8& curImage = colorImages[curFrame];
+	const ColorImageR8G8B8& curImage = colorImages[curFrame];
 
 	//print out images
 	for (unsigned int prev = startFrame; prev < numFrames; prev++) {
 		if (prev == curFrame) continue;
-		const ColorImageR8G8B8A8& prevImage = colorImages[prev];
+		const ColorImageR8G8B8& prevImage = colorImages[prev];
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(curFrame) + ".png", ml::vec2ui(prev, curFrame),
 			prevImage, curImage, 0.7f, filtered, maxNumMatches);
 	}
 }
 
-void SiftVisualization::printMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8A8>& colorImages, unsigned int frame, bool filtered, int maxNumMatches /*= -1*/)
+void SiftVisualization::printMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8>& colorImages, unsigned int frame, bool filtered, int maxNumMatches /*= -1*/)
 {
 	const unsigned int numFrames = siftManager->getNumImages();
 	if (numFrames <= 1) return;
@@ -245,11 +283,11 @@ void SiftVisualization::printMatches(const std::string& outPath, const SIFTImage
 	MLIB_ASSERT(util::directoryExists(dir));
 
 	// get images
-	const ColorImageR8G8B8A8& curImage = colorImages[frame];
+	const ColorImageR8G8B8& curImage = colorImages[frame];
 
 	//print out images
 	for (unsigned int prev = 0; prev < frame; prev++) {
-		const ColorImageR8G8B8A8& prevImage = colorImages[prev];
+		const ColorImageR8G8B8& prevImage = colorImages[prev];
 
 		printMatch(siftManager, outPath + std::to_string(prev) + "-" + std::to_string(frame) + ".png", ml::vec2ui(prev, frame),
 			prevImage, curImage, 0.7f, filtered, maxNumMatches);
@@ -301,7 +339,7 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 	PointCloudIOf::saveToFile(pre + ".ply", pc);
 }
 
-void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
+void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages,
 	const mat4f& depthIntrinsicsInv, const vec2ui& imageIndices, const mat4f& transformPrvToCur)
 {
 	//transforms
@@ -331,12 +369,12 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 					if (!sameColorDepthRes) {
 						unsigned int cx = (unsigned int)std::round(scaleWidthColor * x);
 						unsigned int cy = (unsigned int)std::round(scaleHeightColor * y);
-						c = vec4f(vec3f(colorImages[frameIdx](cx, cy).getVec3()) / 255.0f);
+						c = vec4f(vec3f(colorImages[frameIdx](cx, cy)) / 255.0f);
 					}
 					else {
-						c = vec4f(vec3f(colorImages[frameIdx](x, y).getVec3()) / 255.0f);
+						c = vec4f(vec3f(colorImages[frameIdx](x, y)) / 255.0f);
 					}
-					pc.m_colors.push_back(vec4f(c));
+					pc.m_colors.push_back(c);
 
 					if (saveFrameByFrame) {
 						framePc.m_points.push_back(pc.m_points.back());
@@ -381,8 +419,12 @@ ml::vec3f SiftVisualization::getNormal(const float* depth, unsigned int width, u
 	return ret;
 }
 
-void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, unsigned int depthWidth, unsigned int depthHeight, const vec4uc* color, unsigned int colorWidth, unsigned int colorHeight, const mat4f& depthIntrinsicsInv, const mat4f& transform, float maxDepth)
+void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, unsigned int depthWidth, unsigned int depthHeight, const vec3uc* color, unsigned int colorWidth, unsigned int colorHeight, const mat4f& depthIntrinsicsInv, const mat4f& transform, float maxDepth)
 {
+	if (isnan(transform[0]) || transform[0] == -std::numeric_limits<float>::infinity()) {
+		std::cerr << "[computePointCloud] ERROR bad transform! skipping..." << std::endl;
+		return;
+	}
 	for (unsigned int y = 0; y < depthHeight; y++) {
 		for (unsigned int x = 0; x < depthWidth; x++) {
 			vec3f p = depthToCamera(depthIntrinsicsInv, depth, depthWidth, depthHeight, x, y);
@@ -392,10 +434,10 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, u
 				if (n.x != -std::numeric_limits<float>::infinity()) {
 					unsigned int cx = (unsigned int)math::round((float)x * (float)colorWidth / (float)depthWidth);
 					unsigned int cy = (unsigned int)math::round((float)y * (float)colorHeight / (float)depthHeight);
-					vec3f c = vec3f(color[cy * colorWidth + cx].getVec3()) / 255.0f;
+					vec3f c = vec3f(color[cy * colorWidth + cx]) / 255.0f;
 					if (!(c.x == 0 && c.y == 0 && c.z == 0)) {
-						pc.m_points.push_back(vec3f(p));
-						pc.m_normals.push_back(vec3f(n));
+						pc.m_points.push_back(p);
+						pc.m_normals.push_back(n);
 						pc.m_colors.push_back(vec4f(c.x, c.y, c.z, 1.0f));
 					}
 				} // valid normal
@@ -413,9 +455,13 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, u
 	}
 }
 
-void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B8A8& color,
+void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B8& color,
 	const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal, const mat4f& transform, float maxDepth)
 {
+	if (isnan(transform[0]) || transform[0] == -std::numeric_limits<float>::infinity()) {
+		std::cerr << "[computePointCloud] ERROR bad transform! skipping..." << std::endl;
+		return;
+	}
 	for (unsigned int y = 0; y < camPos.getHeight(); y++) {
 		for (unsigned int x = 0; x < camPos.getWidth(); x++) {
 			const vec4f& p = camPos(x, y);
@@ -427,10 +473,10 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 					if (color.getWidth() != camPos.getWidth()) {
 						unsigned int cx = (unsigned int)math::round((float)x * (float)color.getWidth() / (float)camPos.getWidth());
 						unsigned int cy = (unsigned int)math::round((float)y * (float)color.getHeight() / (float)camPos.getHeight());
-						c = vec3f(color(cx, cy).getVec3()) / 255.0f;
+						c = vec3f(color(cx, cy)) / 255.0f;
 					}
 					else {
-						c = vec3f(color(x, y).getVec3()) / 255.0f;
+						c = vec3f(color(x, y)) / 255.0f;
 					}
 					pc.m_points.push_back(p.getVec3());
 					pc.m_normals.push_back(n.getVec3());
@@ -449,7 +495,7 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 	}
 }
 
-void SiftVisualization::saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8A8>& colorImages,
+void SiftVisualization::saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages,
 	const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, float maxDepth, bool saveFrameByFrame /*= false*/)
 {
 	std::cout << "#depth = " << depthImages.size() << ", #color = " << colorImages.size() << ", #traj = " << trajectory.size() << std::endl;
@@ -461,6 +507,7 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const std:
 
 	std::list<PointCloudf> pcs; std::vector<unsigned int> frameIdxs;
 	for (unsigned int i = 0; i < depthImages.size(); i++) {
+		std::cout << "frame " << i << std::endl;
 		if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) {
 			pcs.push_back(PointCloudf());
 			computePointCloud(pcs.back(), depthImages[i].getData(), depthWidth, depthHeight, colorImages[i].getData(), colorWidth, colorHeight, depthIntrinsicsInv, trajectory[i], maxDepth);
@@ -483,6 +530,7 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const std:
 		pc.m_colors.insert(pc.m_colors.end(), p.m_colors.begin(), p.m_colors.end());
 		pc.m_normals.insert(pc.m_normals.end(), p.m_normals.begin(), p.m_normals.end());
 	}
+	pc.sparsifyUniform(0.01f, true);
 	PointCloudIOf::saveToFile(filename, pc);
 }
 
@@ -497,7 +545,7 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 
 	const std::vector<CUDACachedFrame>& cachedFrames = cache->getCacheFrames();
 	ColorImageR32G32B32A32 camPos(width, height), normals(width, height);
-	ColorImageR8G8B8A8 color(width, height);
+	ColorImageR8G8B8 color(width, height);
 	ColorImageR32 intensity(width, height);
 	std::list<PointCloudf> pcs; std::vector<unsigned int> frameIdxs;
 	for (unsigned int i = 0; i < numFrames; i++) {
@@ -505,7 +553,7 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPos.getData(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*camPos.getNumPixels(), cudaMemcpyDeviceToHost));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getData(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), cachedFrames[i].d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
-			color = ColorImageR8G8B8A8(intensity);
+			convertIntensityToRGB(intensity, color);
 
 			pcs.push_back(PointCloudf());
 			computePointCloud(pcs.back(), color, camPos, normals, trajectory[i], maxDepth);
@@ -571,4 +619,135 @@ void SiftVisualization::saveKeyMatchToPointCloud(const std::string& filename, co
 	meshData.merge(prv);
 	meshData.merge(cur);
 	MeshIOf::saveToFile(filename, meshData);
+}
+
+void SiftVisualization::visualizeImageImageCorrespondences(const std::string& filename, SIFTImageManager* siftManager)
+{
+	std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
+	if (correspondences.empty()) {
+		std::cout << "warning: no correspondences in siftmanager to visualize" << std::endl;
+		return;
+	}
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
+
+	visualizeImageImageCorrespondences(filename, correspondences, siftManager->getValidImages(), siftManager->getNumImages());
+}
+
+void SiftVisualization::visualizeImageImageCorrespondences(const std::string& filename, const std::vector<EntryJ>& correspondences, const std::vector<int>& valid, unsigned int numImages)
+{
+	const vec3uc red(255, 0, 0);
+	const vec3uc green(0, 255, 0);
+	ColorImageR8G8B8 corrImage(numImages, numImages); corrImage.setPixels(vec3uc(0, 0, 0));
+
+	//image-image connections
+	unsigned int maxNumCorr = 0;
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (corr.isValid() && corr.imgIdx_i < numImages && corr.imgIdx_j < numImages) {
+			corrImage(corr.imgIdx_i, corr.imgIdx_j).x += 1;
+			corrImage(corr.imgIdx_j, corr.imgIdx_i).x += 1;
+
+			unsigned int num = std::max((unsigned int)corrImage(corr.imgIdx_i, corr.imgIdx_j).x, (unsigned int)corrImage(corr.imgIdx_j, corr.imgIdx_i).x);
+			if (num > maxNumCorr) maxNumCorr = num;
+		}
+	}
+	//normalize
+	for (unsigned int y = 0; y < numImages; y++) {
+		for (unsigned int x = y + 1; x < numImages; x++) {
+			if (corrImage(x, y).x > 0) {
+				vec3uc color(0, (unsigned char)(255.0f * (float)corrImage(x, y).x / (float)maxNumCorr), 0); //green
+				corrImage(x, y) = color;
+				corrImage(y, x) = color;
+			}
+		}
+	}
+
+	//invalid images
+	for (unsigned int i = 0; i < numImages; i++) {
+		if (valid[i] == 0) {
+			for (unsigned int k = 0; k < numImages; k++) {
+				corrImage(i, k) = red;
+				corrImage(k, i) = red;
+			}
+		}
+	}
+
+	FreeImageWrapper::saveImage(filename, corrImage);
+}
+
+template<>
+struct std::hash<ml::vec2ui> : public std::unary_function < ml::vec2ui, size_t > {
+	size_t operator()(const ml::vec2ui& v) const {
+		//TODO larger prime number (64 bit) to match size_t
+		const size_t p0 = 73856093;
+		const size_t p1 = 19349669;
+		//const size_t p2 = 83492791;
+		const size_t res = ((size_t)v.x * p0) ^ ((size_t)v.y * p1);// ^ ((size_t)v.z * p2);
+		return res;
+	}
+};
+
+void SiftVisualization::getImageImageCorrespondences(const std::vector<EntryJ>& correspondences, unsigned int numImages, std::vector< std::vector<unsigned int> >& imageImageCorrs)
+{
+	imageImageCorrs.clear();
+	imageImageCorrs.resize(numImages);
+
+	std::unordered_set<vec2ui> imageImageCorrSet;
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (corr.isValid())
+			imageImageCorrSet.insert(vec2ui(corr.imgIdx_i, corr.imgIdx_j));
+	}
+	for (const vec2ui& v : imageImageCorrSet) {
+		imageImageCorrs[v.x].push_back(v.y);
+		imageImageCorrs[v.y].push_back(v.x);
+	}
+}
+
+void SiftVisualization::printAllMatches(const std::string& outDirectory, SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8>& colorImages, const mat4f& colorIntrinsics)
+{
+	const unsigned int numImages = siftManager->getNumImages();
+	std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
+	if (correspondences.empty()) {
+		std::cout << "warning: no correspondences in siftmanager to print" << std::endl;
+		return;
+	}
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
+
+	printAllMatches(outDirectory, correspondences, numImages, colorImages, colorIntrinsics);
+}
+
+void SiftVisualization::printAllMatches(const std::string& outDirectory, const std::vector<EntryJ>& correspondences, unsigned int numImages,
+	const std::vector<ColorImageR8G8B8>& colorImages, const mat4f& colorIntrinsics)
+{
+	std::cout << "printing all matches... ";
+	if (!util::directoryExists(outDirectory)) util::makeDirectory(outDirectory);
+
+	std::unordered_map<vec2ui, unsigned int> imageImageCorrSet; //indexes to below
+	std::vector<std::vector<EntryJ>> matches;
+
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (corr.isValid()) {
+			vec2ui imageIndices(corr.imgIdx_i, corr.imgIdx_j);
+			auto it = imageImageCorrSet.find(imageIndices);
+			if (it == imageImageCorrSet.end()) {
+				unsigned int idx = (unsigned int)matches.size();
+				imageImageCorrSet[imageIndices] = idx;
+				matches.push_back(std::vector<EntryJ>(1, corr));
+			}
+			else {
+				matches[it->second].push_back(corr);
+			}
+		}
+	}
+
+	for (auto& a : imageImageCorrSet) {
+		vec2ui imageIndices = a.first;
+		const std::vector<EntryJ>& imagePairMatches = matches[a.second];
+		//print matches
+		const std::string filename = outDirectory + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y) + ".png";
+		printMatch(filename, imageIndices, imagePairMatches, colorImages[imageIndices.x], colorImages[imageIndices.y], colorIntrinsics);
+	}
+	std::cout << "done!" << std::endl;
 }

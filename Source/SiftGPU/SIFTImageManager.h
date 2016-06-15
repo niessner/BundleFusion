@@ -117,7 +117,7 @@ public:
 		m_numKeyPoints = 0;
 		m_globNumResiduals = 0;
 		m_bFinalizedGPUImage = false;
-		cutilSafeCall(cudaMemset(d_globNumResiduals, 0, sizeof(int)));
+		MLIB_CUDA_SAFE_CALL(cudaMemset(d_globNumResiduals, 0, sizeof(int)));
 
 		m_validImages.clear();
 		m_validImages.resize(m_maxNumImages, 0);
@@ -159,7 +159,7 @@ public:
 	void invalidateFrame(unsigned int frame) { m_validImages[frame] = 0; }
 
 	void updateGPUValidImages() {
-		cutilSafeCall(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int)*getNumImages(), cudaMemcpyHostToDevice));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int)*getNumImages(), cudaMemcpyHostToDevice));
 	}
 	const int* getValidImagesGPU() const { return d_validImages; }
 
@@ -171,6 +171,21 @@ public:
 		return d_currNumFilteredMatchesPerImagePair;
 	}
 
+	void setNumImagesDEBUG(unsigned int numImages) {
+		MLIB_ASSERT(numImages <= m_SIFTImagesGPU.size());
+		if (numImages == m_SIFTImagesGPU.size()) return;
+		m_SIFTImagesGPU.resize(numImages);
+		m_numKeyPointsPerImage.resize(numImages);
+		m_numKeyPointsPerImagePrefixSum.resize(numImages);
+		m_numKeyPoints = m_numKeyPointsPerImagePrefixSum.back();
+	}
+	void setGlobalCorrespondencesDEBUG(const std::vector<EntryJ>& correspondences) {
+		//warning: does not update d_globMatchesKeyPointIndices
+		MLIB_ASSERT(correspondences.size() < MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (m_maxNumImages*(m_maxNumImages - 1)) / 2); //less than max #residuals
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globMatches, correspondences.data(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyHostToDevice));
+		m_globNumResiduals = (unsigned int)correspondences.size();
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globNumResiduals, &m_globNumResiduals, sizeof(unsigned int), cudaMemcpyHostToDevice));
+	}
 	void setValidImagesDEBUG(const std::vector<int>& valid) {
 		m_validImages = valid;
 	}
@@ -178,53 +193,54 @@ public:
 		MLIB_ASSERT(getNumImages() > 1);
 		if (getCurrentFrame() + 1 == getNumImages()) numMatches.resize(getNumImages() - 1);
 		else										 numMatches.resize(getNumImages());
-		cutilSafeCall(cudaMemcpy(numMatches.data(), d_currNumMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatches.data(), d_currNumMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost));
 	}
 	void getNumFiltMatchesDEBUG(std::vector<unsigned int>& numMatches) const {
 		MLIB_ASSERT(getNumImages() > 1);
 		if (getCurrentFrame() + 1 == getNumImages()) numMatches.resize(getNumImages() - 1);
 		else										 numMatches.resize(getNumImages());
-		cutilSafeCall(cudaMemcpy(numMatches.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatches.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost));
 	}
 	void getSIFTKeyPointsDEBUG(std::vector<SIFTKeyPoint>& keys) const {
 		keys.resize(m_numKeyPoints);
-		cutilSafeCall(cudaMemcpy(keys.data(), d_keyPoints, sizeof(SIFTKeyPoint) * keys.size(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(keys.data(), d_keyPoints, sizeof(SIFTKeyPoint) * keys.size(), cudaMemcpyDeviceToHost));
 	}
 	void getSIFTKeyPointDescsDEBUG(std::vector<SIFTKeyPointDesc>& descs) const {
 		descs.resize(m_numKeyPoints);
-		cutilSafeCall(cudaMemcpy(descs.data(), d_keyPointDescs, sizeof(SIFTKeyPointDesc) * descs.size(), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(descs.data(), d_keyPointDescs, sizeof(SIFTKeyPointDesc) * descs.size(), cudaMemcpyDeviceToHost));
 	}
 	void getRawKeyPointIndicesAndMatchDistancesDEBUG(unsigned int imagePairIndex, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances) const
 	{
 		unsigned int numMatches;
-		cutilSafeCall(cudaMemcpy(&numMatches, d_currNumMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&numMatches, d_currNumMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
 		if (numMatches > MAX_MATCHES_PER_IMAGE_PAIR_RAW) numMatches = MAX_MATCHES_PER_IMAGE_PAIR_RAW;
 		keyPointIndices.resize(numMatches);
 		matchDistances.resize(numMatches);
 		if (numMatches > 0) {
-			cutilSafeCall(cudaMemcpy(keyPointIndices.data(), d_currMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_RAW, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(matchDistances.data(), d_currMatchDistances + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_RAW, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(keyPointIndices.data(), d_currMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_RAW, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDistances.data(), d_currMatchDistances + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_RAW, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
 		}
 	}
 	void getFiltKeyPointIndicesAndMatchDistancesDEBUG(unsigned int imagePairIndex, std::vector<uint2>& keyPointIndices, std::vector<float>& matchDistances) const
 	{
 		unsigned int numMatches;
-		cutilSafeCall(cudaMemcpy(&numMatches, d_currNumFilteredMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
-		assert(numMatches <= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&numMatches, d_currNumFilteredMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+		MLIB_ASSERT(numMatches <= MAX_MATCHES_PER_IMAGE_PAIR_FILTERED);
 		keyPointIndices.resize(numMatches);
 		matchDistances.resize(numMatches);
 		if (numMatches > 0) {
-			cutilSafeCall(cudaMemcpy(keyPointIndices.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
-			cutilSafeCall(cudaMemcpy(matchDistances.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(keyPointIndices.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDistances.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
 		}
 	}
 	void getFiltKeyPointIndicesDEBUG(unsigned int imagePairIndex, std::vector<uint2>& keyPointIndices) const
 	{
 		unsigned int numMatches;
-		cutilSafeCall(cudaMemcpy(&numMatches, d_currNumFilteredMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&numMatches, d_currNumFilteredMatchesPerImagePair + imagePairIndex, sizeof(unsigned int), cudaMemcpyDeviceToHost));
 		keyPointIndices.resize(numMatches);
-		cutilSafeCall(cudaMemcpy(keyPointIndices.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(keyPointIndices.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(uint2) * numMatches, cudaMemcpyDeviceToHost));
 	}
+	const EntryJ* getGlobalCorrespondencesGPU() const { return d_globMatches; }
 	EntryJ* getGlobalCorrespondencesGPU() { return d_globMatches; }
 	unsigned int getNumGlobalCorrespondences() const { return m_globNumResiduals; }
 	const float4x4* getFiltTransformsDEBUG() const { return d_currFilteredTransforms; }
@@ -309,9 +325,9 @@ private:
 	std::vector<int> m_validImages;
 	int*			 d_validImages; // for check invalid frames kernel only (from residual invalidation) //TODO some way to not have both?
 
-	unsigned int	m_globNumResiduals;
-	int*			d_globNumResiduals;
-	EntryJ*			d_globMatches;
+	unsigned int	m_globNumResiduals;		//#residuals (host)
+	int*			d_globNumResiduals;		//#residuals (device)
+	EntryJ*			d_globMatches;			
 	uint2*			d_globMatchesKeyPointIndices;
 	int*			d_validOpt;
 

@@ -550,7 +550,7 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int curImageIdx, un
 		float corr = 0.5f * numCorr / (float)(imageWidth * imageHeight);
 
 		//debugging
-		//bool debugPrint = curImageIdx == 1;//(imagePairIdx == 9 && curImageIdx == 10);
+		//bool debugPrint = curImageIdx == 200;
 
 		if (corr < corrThresh || err > errThresh || isnan(err)) { // invalid!
 			//if (debugPrint) printf("[%d-%d]: %f %f INVALID\n", imagePairIdx, curImageIdx, err, corr);
@@ -710,6 +710,7 @@ void __global__ CheckForInvalidFramesCU_Kernel(const int* d_varToCorrNumEntriesP
 				d_globMatches[resIdx].setInvalid();
 			}
 			if (d_validImages[varIdx] != 0) {
+				if (varIdx == 0) printf("ERROR ERROR INVALIDATING THE FIRST FRAME\n");
 				//printf("[CheckForInvalidFramesCU] invalidating frame %d\n", varIdx);
 				d_validImages[varIdx] = 0;
 			}

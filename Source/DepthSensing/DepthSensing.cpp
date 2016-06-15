@@ -486,6 +486,8 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 		break;
 		case '9':
 			StopScanningAndExtractIsoSurfaceMC();
+			//g_depthSensingBundler->saveGlobalSiftManagerAndCacheToFile("debug/_logs/global"); //!!!DEBUGGING TODO REMOVE
+			//g_depthSensingBundler->saveCompleteTrajectory("debug/_logs/complete.trajectory");
 			break;
 		case '0':
 			DX11PhongLighting::OnD3D11DestroyDevice();
@@ -872,14 +874,14 @@ void reintegrate()
 		if (tm->getTopFromDeIntegrateList(oldTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-			MLIB_ASSERT(!isnan(oldTransform[0]));
+			MLIB_ASSERT(!isnan(oldTransform[0]) && oldTransform[0] != -std::numeric_limits<float>::infinity());
 			deIntegrate(depthCameraData, oldTransform);
 			continue;
 		}
 		else if (tm->getTopFromIntegrateList(newTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-			MLIB_ASSERT(!isnan(newTransform[0]));
+			MLIB_ASSERT(!isnan(newTransform[0]) && newTransform[0] != -std::numeric_limits<float>::infinity());
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
 			continue;
@@ -887,7 +889,7 @@ void reintegrate()
 		else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-			MLIB_ASSERT(!isnan(oldTransform[0]) && !isnan(newTransform[0]));
+			MLIB_ASSERT(!isnan(oldTransform[0]) && !isnan(newTransform[0]) && oldTransform[0] != -std::numeric_limits<float>::infinity()  && newTransform[0] != -std::numeric_limits<float>::infinity());
 			deIntegrate(depthCameraData, oldTransform);
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);

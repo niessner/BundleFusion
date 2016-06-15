@@ -81,22 +81,6 @@ public:
 	//!!!debugging
 
 private:
-	void evalResidualDEBUG(SIFTImageManager* siftManager, const float4x4* d_transforms) const {
-		std::vector<EntryJ> corrs(siftManager->getNumGlobalCorrespondences());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*corrs.size(), cudaMemcpyDeviceToHost));
-		std::vector<mat4f> transforms(siftManager->getNumImages());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*transforms.size(), cudaMemcpyDeviceToHost));
-
-		float sumResidual2 = 0.0f;
-		for (unsigned int i = 0; i < corrs.size(); i++) {
-			const EntryJ& corr = corrs[i];
-			if (corr.isValid()) {
-				vec3f r = transforms[corr.imgIdx_i] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) - transforms[corr.imgIdx_j] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
-				sumResidual2 += (r | r);
-			}
-		}
-		std::cout << "sum residual2 = " << sumResidual2 << std::endl;
-	}
 
 	bool alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise,
 		const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor,

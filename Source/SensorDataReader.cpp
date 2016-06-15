@@ -86,7 +86,6 @@ bool SensorDataReader::processDepth()
 	if (GlobalAppState::get().s_playData) {
 
 		float* depth = getDepthFloat();
-		//memcpy(depth, m_data.m_DepthImages[m_currFrame], sizeof(float)*getDepthWidth()*getDepthHeight());
 
 		//TODO check why the frame cache is not used?
 		ml::SensorData::RGBDFrameCacheRead::FrameState frameState = m_sensorDataCache->getNext();
@@ -103,7 +102,6 @@ bool SensorDataReader::processDepth()
 		incrementRingbufIdx();
 
 		if (m_bHasColorData) {
-			//memcpy(m_colorRGBX, m_data.m_ColorImages[m_currFrame], sizeof(vec4uc)*getColorWidth()*getColorHeight());
 			for (unsigned int i = 0; i < getColorWidth()*getColorHeight(); i++) {
 				m_colorRGBX[i] = vec4uc(frameState.m_colorFrame[i]);
 			}

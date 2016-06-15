@@ -85,7 +85,7 @@ public:
 	virtual void startReceivingFrames() {}
 	virtual void stopReceivingFrames() {}
 
-	virtual bool isReceivingFrames() {
+	virtual bool isReceivingFrames() const {
 		return m_bIsReceivingFrames;
 	}
 

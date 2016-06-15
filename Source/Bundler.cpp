@@ -20,7 +20,7 @@ Timer Bundler::s_timer;
 int Bundler::BundlerState::s_markOffset = 2;
 
 
-Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
+Bundler::Bundler(const RGBDSensor* sensor, const CUDAImageManager* imageManager)
 {
 	m_CudaImageManager = imageManager;
 	m_RGBDSensor = sensor;
@@ -30,7 +30,7 @@ Bundler::Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager)
 
 	m_submapSize = GlobalBundlingState::get().s_submapSize;
 	m_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, m_submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage,
-		m_submapSize, m_CudaImageManager, m_RGBDSensor);
+		m_submapSize, m_RGBDSensor);
 
 	m_trajectoryManager = new TrajectoryManager(GlobalBundlingState::get().s_maxNumImages * m_submapSize);
 
@@ -322,7 +322,7 @@ void Bundler::prepareLocalSolve(unsigned int curFrame, bool isLastFrame /*= fals
 	else {
 		// invalidate the local
 		m_currentState.m_localToSolve = -((int)curLocalIdx + m_currentState.s_markOffset);
-		if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << std::endl;
+		if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: invalid local submap " << curFrame << " (idx = " << curLocalIdx << ")" << std::endl;
 	}
 
 	// switch local submaps

@@ -87,7 +87,7 @@ public:
 
 	//void test();
 
-	//void saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices = std::vector<unsigned int>()) const;
+	void saveToPointCloud(const std::string& filename, const std::vector<unsigned int>& frameIndices = std::vector<unsigned int>()) const;
 	//void saveMatchToPLY(const std::string& dir, const vec2ui& imageIndices, bool filtered) const;
 
 	void printCacheFrames(const std::string& dir, const CUDACache* cache = NULL, unsigned int numPrint = (unsigned int)-1) const;
@@ -99,6 +99,15 @@ public:
 	void loadCachedFramesFromSensorData(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames);
 
 private:
+	static ColorImageR32 convertToGrayScale(const ColorImageR8G8B8& image) {
+		ColorImageR32 intensity(image.getWidth(), image.getHeight());
+		for (const auto& p : image) {
+			float v = (0.299f*p.value.x + 0.587f*p.value.y + 0.114f*p.value.z) / 255.0f;
+			intensity(p.x, p.y) = v;
+		}
+		return intensity;
+	}
+
 	void evaluateTrajectory(unsigned int submapSize, std::vector<mat4f>& all, const std::vector<mat4f>& keys, const std::vector<mat4f>& refAll);
 	void loadTrajectory(const std::string& filename, std::vector<mat4f>& trajectory)
 	{
@@ -131,11 +140,11 @@ private:
 	}
 
 	// for global offline matching
-	void detectKeys(const std::vector<ColorImageR8G8B8A8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager) const;
+	void detectKeys(const std::vector<ColorImageR8G8B8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager) const;
 	void initSiftParams(unsigned int widthDepth, unsigned int heightDepth, unsigned int widthColor, unsigned int heightColor);
 
 	// for online
-	void constructSparseSystem(const std::vector<ColorImageR8G8B8A8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager, const CUDACache* cudaCache);
+	void constructSparseSystem(const std::vector<ColorImageR8G8B8> &colorImages, const std::vector<DepthImage32> &depthImages, SIFTImageManager *siftManager, const CUDACache* cudaCache);
 
 	int* getNumMatchesCUDA(unsigned int curFrame, bool filtered) {
 		return const_cast<int*>(static_cast<const TestMatching*>(this)->getNumMatchesCUDA(curFrame, filtered));
@@ -234,7 +243,7 @@ private:
 	CalibrationData m_depthCalibration;
 
 	//! debug stuff
-	std::vector<ColorImageR8G8B8A8> m_colorImages;
+	std::vector<ColorImageR8G8B8>   m_colorImages;
 	std::vector<DepthImage32>		m_depthImages;
 	std::vector<mat4f>				m_referenceTrajectory;
 

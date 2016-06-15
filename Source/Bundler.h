@@ -115,7 +115,7 @@ public:
 	};
 
 
-	Bundler(RGBDSensor* sensor, CUDAImageManager* imageManager);
+	Bundler(const RGBDSensor* sensor, const CUDAImageManager* imageManager);
 	~Bundler();
 
 
@@ -210,8 +210,8 @@ private:
 
 	void getCurrentFrame();
 
-	CUDAImageManager*		m_CudaImageManager;		//managed outside
-	RGBDSensor*				m_RGBDSensor;			//managed outside
+	const CUDAImageManager*	m_CudaImageManager;		//managed outside
+	const RGBDSensor*		m_RGBDSensor;			//managed outside
 
 	SubmapManager			m_SubmapManager;
 

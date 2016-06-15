@@ -460,8 +460,14 @@ bool CUDASolverBundling::getMaxResidual(EntryJ* d_correspondences, ml::vec2ui& i
 	cutilSafeCall(cudaMemcpy(&h_corr, d_correspondences + imIdx, sizeof(EntryJ), cudaMemcpyDeviceToHost));
 	imageIndices = ml::vec2ui(h_corr.imgIdx_i, h_corr.imgIdx_j);
 
-	if (m_solverExtra.h_maxResidual[0] > m_maxResidualThresh) { // remove!
+	//!!!debugging //TODO REMOVE THIS
+	if (m_solverExtra.h_maxResidual[0] > m_maxResidualThresh && imageIndices.x == 0 && imageIndices.y < 10) {
+		std::cout << "warning! max residual invalidates images " << imageIndices << " (" << m_solverExtra.h_maxResidual[0] << ")" << std::endl;
+		getchar();
+	}
+	//!!!debugging
 
+	if (m_solverExtra.h_maxResidual[0] > m_maxResidualThresh && !(imageIndices.x == 0 && imageIndices.y < 10)) { // remove! (except for first frame)
 		return true;
 	}
 

@@ -54,7 +54,7 @@ void SubmapManager::initSIFT(unsigned int widthSift, unsigned int heightSift)
 }
 
 void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage, unsigned int submapSize,
-	const CUDAImageManager* imageManager, const RGBDSensor* sensor, unsigned int numTotalFrames /*= (unsigned int)-1*/)
+	const RGBDSensor* sensor, unsigned int numTotalFrames /*= (unsigned int)-1*/)
 {
 	initSIFT(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
@@ -275,8 +275,9 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 			int a = 5;
 		}
 		//!!!debugging
-		//else if (!isLocal) {
+		//else if (!isLocal && curFrame == 200) {
 		//	siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
+		//	std::cout << "[global " << curFrame << "] " << _numFiltMatchesDV[199] << std::endl;
 		//}
 		//if (!isLocal && !_numFiltMatchesDV.empty()) {
 		//	std::vector<mat4f> transformsCurToMatch(numFrames);
@@ -446,13 +447,13 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		// match with every other global
 		if (curGlobalFrame > 0) {
 			//!!!DEBUGGING
-			//if (curGlobalFrame == 1) {
+			//if (curGlobalFrame == 200) {
 			//	setPrintMatchesDEBUG(true);
 			//}
 			//!!!DEBUGGING
 			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
-			//if (curGlobalFrame == 1) {
+			//if (curGlobalFrame == 200) {
 			//	setPrintMatchesDEBUG(false);
 			//	std::cout << "waiting..." << std::endl;
 			//	getchar();
@@ -473,14 +474,14 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 #endif
 				ret = 2;
 			}
-			}
+		}
 		else {
 			ret = 0;
 		}
-		}
+	}
 
 	return ret;
-	}
+}
 
 void SubmapManager::addInvalidGlobalKey()
 {
