@@ -103,6 +103,8 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 	m_currIntegrateTransform[0].setIdentity();
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_imageInvalidateList, sizeof(int) * maxNumGlobalImages * maxNumLocalImages));
+
+	m_lastMatchedLocal = (unsigned int)-1; m_prevLastMatchedLocal = (unsigned int)-1;
 }
 
 SubmapManager::~SubmapManager()
@@ -158,7 +160,7 @@ unsigned int SubmapManager::runSIFT(unsigned int curFrame, float* d_intensitySIF
 	return curLocalFrame;
 }
 
-bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, const float4x4& siftIntrinsicsInv)
+unsigned int SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, const float4x4& siftIntrinsicsInv)
 {
 	const std::vector<int>& validImages = siftManager->getValidImages();
 	Timer timer;
@@ -169,7 +171,7 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 	const unsigned int startFrame = numFrames == curFrame + 1 ? 0 : curFrame + 1;
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
 	int num2 = (int)siftManager->getNumKeyPointsPerImage(curFrame);
-	if (num2 == 0) return false;
+	if (num2 == 0) return (unsigned int)-1;
 	if (isLocal) m_mutexMatcher.lock();
 	for (unsigned int prev = startFrame; prev < numFrames; prev++) {
 		if (prev == curFrame) continue;
@@ -196,7 +198,8 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 	if (isLocal) m_mutexMatcher.unlock();
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeSiftMatching = timer.getElapsedTimeMS(); }
 
-	bool lastValid = true;
+	//bool lastValid = true;
+	unsigned int lastMatchedFrame = (unsigned int)-1;
 	if (curFrame > 0) { // can have a match to another frame
 
 		// --- sort the current key point matches
@@ -293,15 +296,17 @@ bool SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftManager, 
 
 		// --- filter frames
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
-		siftManager->filterFrames(curFrame, startFrame, numFrames);
+		lastMatchedFrame = siftManager->filterFrames(curFrame, startFrame, numFrames);
 		// --- add to global correspondences
-		if (siftManager->getValidImages()[curFrame] != 0)
+		MLIB_ASSERT((siftManager->getValidImages()[curFrame] != 0 && lastMatchedFrame != (unsigned int)-1) || (lastMatchedFrame == (unsigned int)-1 && siftManager->getValidImages()[curFrame] == 0)); //TODO REMOVE
+		if (lastMatchedFrame != (unsigned int)-1)//if (siftManager->getValidImages()[curFrame] != 0)
 			siftManager->AddCurrToResidualsCU(curFrame, startFrame, numFrames, siftIntrinsicsInv);
-		else lastValid = false;
+		//else lastValid = false;
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.stop(); TimingLog::getFrameTiming(isLocal).timeMisc = timer.getElapsedTimeMS(); }
 	}
 
-	return lastValid;
+	//return lastValid;
+	return lastMatchedFrame;
 }
 
 bool SubmapManager::isCurrentLocalValidChunk()
@@ -355,7 +360,7 @@ bool SubmapManager::optimizeLocal(unsigned int curLocalIdx, unsigned int numNonL
 		useVerify, true, false, buildJt, removeMaxResidual, false);
 	// still need this for global key fuse
 
-	//if (curLocalIdx >= 14) { //debug vis
+	//if (curLocalIdx >= 70) { //debug vis
 	//	saveOptToPointCloud("debug/local-" + std::to_string(curLocalIdx) + ".ply", m_nextLocalCache, m_nextLocal->getValidImages(), getLocalTrajectoryGPU(curLocalIdx), m_nextLocal->getNumImages());
 	//}
 
@@ -436,7 +441,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 				invalidateImages(curGlobalFrame * m_submapSize + i);
 		}
 		m_localTrajectoriesValid[curGlobalFrame] = validImagesLocal; m_localTrajectoriesValid[curGlobalFrame].resize(std::min(m_submapSize, local->getNumImages()));
-		initializeNextGlobalTransform(false);
+		//initializeNextGlobalTransform(false); //THIS DOESN'T USE NEXTLOCAL SO SHOULD BE OK//TODO CHECK
 		// done with local data!
 		finishLocalOpt();
 		mutex_nextLocal.unlock();
@@ -445,13 +450,14 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		//unsigned int gframe = m_global->getCurrentFrame(); SiftVisualization::printKey("debug/keys/" + std::to_string(gframe) + ".png", m_globalCache, m_global, gframe);
 
 		// match with every other global
+		unsigned int lastMatchedGlobal = (unsigned int)-1;
 		if (curGlobalFrame > 0) {
 			//!!!DEBUGGING
 			//if (curGlobalFrame == 200) {
 			//	setPrintMatchesDEBUG(true);
 			//}
 			//!!!DEBUGGING
-			matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
+			lastMatchedGlobal = matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 			//!!!DEBUGGING
 			//if (curGlobalFrame == 200) {
 			//	setPrintMatchesDEBUG(false);
@@ -478,6 +484,8 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		else {
 			ret = 0;
 		}
+
+		initializeNextGlobalTransform(lastMatchedGlobal, m_prevLastMatchedLocal); //TODO THIS SHOULD GO HERE AND SHOULD HAVE LAST MATCHED FRAME //doesn't use nextlocal so ok to have here
 	}
 
 	return ret;
@@ -490,7 +498,7 @@ void SubmapManager::addInvalidGlobalKey()
 	mutex_nextLocal.lock();
 	finishLocalOpt();
 	mutex_nextLocal.unlock();
-	initializeNextGlobalTransform(true);
+	initializeNextGlobalTransform((unsigned int)-1, (unsigned int)-1);
 }
 
 bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart, bool removeMaxResidual, bool isScanDone)

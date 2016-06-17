@@ -876,7 +876,10 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 				transform = d_completeTrajectory[lastValidCompleteTransform] * offset * d_filteredTransformsInv[i];
 			}
 
-			//if (debug) {
+			//!!!debugging
+			//if (d_siftTrajectory[curFrameIndexAll][0] == MINF) printf("INVALID AT FRAME %d,%d (last valid %d)\n", curFrameIndex, curFrameIndexAll, lastValidCompleteTransform);
+			//{
+			//	printf("INVALID AT FRAME %d,%d (last valid %d)\n", curFrameIndex, curFrameIndexAll, lastValidCompleteTransform);
 			//	printf("(%d, %d) -> prev sift known %d, %d, last valid %d\n", curFrameIndexAll, curFrameIndex,
 			//		idxPrevSiftKnown, i, lastValidCompleteTransform);
 			//	printf("sift at prev known:\n");
@@ -889,7 +892,8 @@ __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 			//	d_filteredTransformsInv[i].print();
 			//	printf("transform:\n");
 			//	transform.print();
-			//}
+			//} 
+			//!!!debugging
 
 			d_currIntegrateTrans[0] = transform;
 

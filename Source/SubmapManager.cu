@@ -47,18 +47,26 @@ extern "C" void updateTrajectoryCU(
 
 
 __global__ void initNextGlobalTransformCU_Kernel(float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
+	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory,
+	unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal)
 {
-	d_globalTrajectory[numGlobalTransforms] = d_globalTrajectory[numGlobalTransforms - 1] * d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1];
+	//d_globalTrajectory[numGlobalTransforms] = d_globalTrajectory[numGlobalTransforms - 1] * d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1];
+	if (lastMatchedLocal == (unsigned int)-1) 
+		d_globalTrajectory[numGlobalTransforms-1] = d_globalTrajectory[lastMatchedGlobal]; //no info from local since prev was invalid. best guess is to append relative global transform to this one //TODO maybe try that 
+	else
+		d_globalTrajectory[numGlobalTransforms-1] = d_globalTrajectory[lastMatchedGlobal] * d_localTrajectories[(numGlobalTransforms-2)*numLocalTransformsPerTrajectory + lastMatchedLocal];
 }
 
 extern "C" void initNextGlobalTransformCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
+	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory,
+	unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal)
 {
+	MLIB_ASSERT(numGlobalTransforms > 1);
 	initNextGlobalTransformCU_Kernel <<< 1, 1 >>>(
 		d_globalTrajectory, numGlobalTransforms,
-		d_localTrajectories, numLocalTransformsPerTrajectory);
+		d_localTrajectories, numLocalTransformsPerTrajectory,
+		lastMatchedGlobal, lastMatchedLocal);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());

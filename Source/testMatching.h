@@ -92,11 +92,11 @@ public:
 
 	void printCacheFrames(const std::string& dir, const CUDACache* cache = NULL, unsigned int numPrint = (unsigned int)-1) const;
 
-	void loadCachedFramesFromSensor(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames = (unsigned int)-1);
+	void loadCachedFramesFromSensor(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames = (unsigned int)-1, unsigned int startFrame = 0);
 
 	void createCUDACache(CUDACache* cache);
 
-	void loadCachedFramesFromSensorData(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames);
+	void loadCachedFramesFromSensorData(CUDACache* cache, const std::string& filename, unsigned int skip, unsigned int numFrames, unsigned int startFrame);
 
 private:
 	static ColorImageR32 convertToGrayScale(const ColorImageR8G8B8& image) {

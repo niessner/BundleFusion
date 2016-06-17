@@ -25,7 +25,8 @@ extern "C" void updateTrajectoryCU(
 
 extern "C" void initNextGlobalTransformCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory);
+	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory,
+	unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal);
 
 class SubmapManager {
 public:
@@ -77,8 +78,7 @@ public:
 		if (validImages[localFrameIdx] == 0) {
 			m_currIntegrateTransform[frameIdx].setZero(-std::numeric_limits<float>::infinity());
 			assert(frameIdx > 0);
-			cutilSafeCall(cudaMemcpy(d_siftTrajectory + frameIdx, d_siftTrajectory + frameIdx - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
-			//cutilSafeCall(cudaMemcpy(d_currIntegrateTransform + frameIdx, &m_currIntegrateTransform[frameIdx], sizeof(float4x4), cudaMemcpyHostToDevice)); //TODO this is for debug only
+			cutilSafeCall(cudaMemcpy(d_siftTrajectory + frameIdx, d_siftTrajectory + frameIdx - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice)); //set invalid
 		}
 		else if (frameIdx > 0) {
 			m_currentLocal->computeSiftTransformCU(d_completeTrajectory, lastValidCompleteTransform, d_siftTrajectory, frameIdx, localFrameIdx, d_currIntegrateTransform + frameIdx);
@@ -97,19 +97,23 @@ public:
 	//! valid if at least frames 0, 1 valid
 	bool isCurrentLocalValidChunk();
 	unsigned int getNumNextLocalFrames();
-	bool localMatchAndFilter(const float4x4& siftIntrinsicsInv) {
+	bool localMatchAndFilter(const float4x4& siftIntrinsicsInv, bool isLastLocal) {
 		//!!!debugging
 		//if (m_global->getNumImages() >= 63 && m_global->getNumImages() <= 66) {
 		//	setPrintMatchesDEBUG(true);
 		//}
 		//!!!debugging
-		bool ret = matchAndFilter(true, m_currentLocal, m_currentLocalCache, siftIntrinsicsInv);
+		unsigned int lastMatchedFrame = matchAndFilter(true, m_currentLocal, m_currentLocalCache, siftIntrinsicsInv);
+		if (isLastLocal) {
+			m_prevLastMatchedLocal = m_lastMatchedLocal;
+			m_lastMatchedLocal = lastMatchedFrame;
+		}
 		//!!!debugging
 		//if (m_currentLocal->getNumImages() == m_submapSize + 1 && m_global->getNumImages() == 66) {
 		//	setPrintMatchesDEBUG(false);
 		//}
 		//!!!debugging
-		return ret;
+		return (lastMatchedFrame != (unsigned int)-1);
 	}
 
 	void copyToGlobalCache();
@@ -195,18 +199,18 @@ public:
 private:
 
 	//! sift matching
-	bool matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, const float4x4& siftIntrinsicsInv); //!!!TODO FIX TIMING LOG
+	unsigned int matchAndFilter(bool isLocal, SIFTImageManager* siftManager, CUDACache* cudaCache, const float4x4& siftIntrinsicsInv); //!!!TODO FIX TIMING LOG
 
 	void initSIFT(unsigned int widthSift, unsigned int heightSift);
 	//! called when global locked
-	void initializeNextGlobalTransform(bool useIdentity) {
+	void initializeNextGlobalTransform(unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal) {
 		const unsigned int numGlobalFrames = m_global->getNumImages();
 		MLIB_ASSERT(numGlobalFrames >= 1);
-		if (useIdentity) {
+		if (lastMatchedGlobal == (unsigned int)-1) {
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames, d_globalTrajectory + numGlobalFrames - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
 		}
 		else {
-			initNextGlobalTransformCU(d_globalTrajectory, numGlobalFrames, d_localTrajectories, m_submapSize + 1);
+			initNextGlobalTransformCU(d_globalTrajectory, numGlobalFrames, d_localTrajectories, m_submapSize + 1, lastMatchedGlobal, lastMatchedLocal); //TODO THIS LAST MATCHED GLOBAL AND LAST VALID LOCAL
 		}
 	}
 	//! called when nextlocal locked
@@ -247,6 +251,7 @@ private:
 
 	float4x4*	 d_siftTrajectory; // frame-to-frame sift tracking for all frames in sequence
 	//************************************
+	unsigned int m_lastMatchedLocal, m_prevLastMatchedLocal; //TODO THIS SHOULD NOT LIVE HERE
 
 	std::vector<unsigned int>	m_invalidImagesList;
 	int*						d_imageInvalidateList; // tmp for updateTrajectory //TODO just to update trajectory on CPU

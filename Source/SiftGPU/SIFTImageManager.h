@@ -150,7 +150,7 @@ public:
 
 	unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
 
-	void filterFrames(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames);
+	unsigned int filterFrames(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames);
 
 	void computeSiftTransformCU(const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform, float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans);
 

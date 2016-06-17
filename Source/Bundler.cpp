@@ -63,6 +63,7 @@ Bundler::~Bundler()
 void Bundler::processInput()
 {
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
+	const bool isLastLocal = m_SubmapManager.isLastLocalFrame(curFrame);
 	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame) { // special case the last local solve (needs to run once)
 #ifdef RUN_MULTITHREADED 
 		if (m_RGBDSensor->isReceivingFrames()) { //debugging
@@ -72,7 +73,7 @@ void Bundler::processInput()
 		MLIB_ASSERT(!m_RGBDSensor->isReceivingFrames());
 #endif
 		if (m_numFramesPastLast == 0 && m_currentState.m_localToSolve == -1) {
-			if (!m_SubmapManager.isLastLocalFrame(curFrame)) prepareLocalSolve(curFrame, true);
+			if (!isLastLocal) prepareLocalSolve(curFrame, true);
 		}
 		else {
 #ifdef USE_GLOBAL_DENSE_AT_END //150 for aoff1
@@ -113,7 +114,7 @@ void Bundler::processInput()
 		//if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
 		//	m_SubmapManager.setPrintMatchesDEBUG(true);
 		//}
-		m_currentState.m_bLastFrameValid = m_SubmapManager.localMatchAndFilter(MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv));
+		m_currentState.m_bLastFrameValid = m_SubmapManager.localMatchAndFilter(MatrixConversion::toCUDA(m_bundlerInputData.m_SIFTIntrinsicsInv), isLastLocal);
 		//if (debugLocalMatching && curFrame > stop && curFrame <= stop+m_submapSize) {
 		//	m_SubmapManager.setPrintMatchesDEBUG(false);
 		//	if (curFrame == stop + m_submapSize) {
@@ -135,14 +136,11 @@ void Bundler::processInput()
 bool Bundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx)
 {
 	if (m_currentState.m_bLastFrameValid) {
-		//cutilSafeCall(cudaMemcpy(&siftTransform, m_SubmapManager.getCurrIntegrateTransform(m_currentState.m_lastFrameProcessed), sizeof(float4x4), cudaMemcpyDeviceToHost));	//TODO MT needs to be copied from the other GPU...
 		siftTransform = m_SubmapManager.getCurrentIntegrateTransform(m_currentState.m_lastFrameProcessed);
 		frameIdx = m_currentState.m_lastFrameProcessed;
-		//m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, siftTransform, m_currentState.m_lastFrameProcessed);
 		return true;
 	}
 	else {
-		//m_trajectoryManager->addFrame(TrajectoryManager::TrajectoryFrame::NotIntegrated_NoTransform, mat4f::zero(), m_currentState.m_lastFrameProcessed);
 		return false;
 	}
 }
