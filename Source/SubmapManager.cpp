@@ -485,7 +485,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			ret = 0;
 		}
 
-		initializeNextGlobalTransform(lastMatchedGlobal, m_prevLastMatchedLocal); //TODO THIS SHOULD GO HERE AND SHOULD HAVE LAST MATCHED FRAME //doesn't use nextlocal so ok to have here
+		initializeNextGlobalTransform(lastMatchedGlobal, m_prevLastMatchedLocal); //doesn't use nextlocal so ok to have here
 	}
 
 	return ret;

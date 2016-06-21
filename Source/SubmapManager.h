@@ -205,9 +205,9 @@ private:
 	//! called when global locked
 	void initializeNextGlobalTransform(unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal) {
 		const unsigned int numGlobalFrames = m_global->getNumImages();
-		MLIB_ASSERT(numGlobalFrames >= 1);
+		if (numGlobalFrames <= 1) return;
 		if (lastMatchedGlobal == (unsigned int)-1) {
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames, d_globalTrajectory + numGlobalFrames - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames - 1, d_globalTrajectory + numGlobalFrames - 2, sizeof(float4x4), cudaMemcpyDeviceToDevice));
 		}
 		else {
 			initNextGlobalTransformCU(d_globalTrajectory, numGlobalFrames, d_localTrajectories, m_submapSize + 1, lastMatchedGlobal, lastMatchedLocal); //TODO THIS LAST MATCHED GLOBAL AND LAST VALID LOCAL
