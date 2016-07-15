@@ -247,7 +247,7 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
-		if (true) {
+		if (false) {
 			const std::string runoptDataDir = "../data/runOpt/"; 
 			RunOpt::run(runoptDataDir + "recording15.sens", runoptDataDir + "71.sift", runoptDataDir + "71-initial.trajectory");
 			std::cout << "done!" << std::endl;
