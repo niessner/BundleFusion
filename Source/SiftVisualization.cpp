@@ -784,3 +784,10 @@ void SiftVisualization::saveKeyMatchToPointCloud(const std::string& prefix, cons
 	MeshIOf::saveToFile(prefix + "-keys_" + std::to_string(imageIndices.x) + ".ply", keysMesh0);
 	MeshIOf::saveToFile(prefix + "-keys_" + std::to_string(imageIndices.y) + ".ply", keysMesh1);
 }
+
+void SiftVisualization::saveFrameToPointCloud(const std::string& filename, const DepthImage32& depth, const ColorImageR8G8B8& color, const mat4f& depthIntrinsicsInverse, float maxDepth)
+{
+	PointCloudf pc;
+	computePointCloud(pc, depth.getData(), depth.getWidth(), depth.getHeight(), color.getData(), color.getWidth(), color.getHeight(), depthIntrinsicsInverse, mat4f::identity(), maxDepth);
+	PointCloudIOf::saveToFile(filename, pc);
+}

@@ -3,7 +3,7 @@
 #include "stdafx.h"
 
 #include "FriedLiver.h"
-
+#include "RunOpt.h"
 
 RGBDSensor* getRGBDSensor()
 {
@@ -201,11 +201,11 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			//fileNameDescGlobalApp = "zParametersScanNet.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
+			fileNameDescGlobalApp = "zParametersScanNet.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
 
-			fileNameDescGlobalApp = "zParametersDefault.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			//fileNameDescGlobalApp = "zParametersDefault.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 			//fileNameDescGlobalBundling = "zParametersBundling20K.txt";
 
 			//fileNameDescGlobalApp = "zParametersSun3d.txt";
@@ -247,6 +247,13 @@ int main(int argc, char** argv)
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
 
 		//!!!DEBUGGING
+		if (true) {
+			const std::string runoptDataDir = "../data/runOpt/"; 
+			RunOpt::run(runoptDataDir + "recording15.sens", runoptDataDir + "71.sift", runoptDataDir + "71-initial.trajectory");
+			std::cout << "done!" << std::endl;
+			getchar();
+			return 0;
+		}
 		if (GlobalAppState::get().s_generateVideo) { std::cout << "remember to change raycast for top-down rendering!" << std::endl; getchar(); }
 		if (GlobalAppState::get().s_numFramesBeforeExit != (unsigned int)-1 && GlobalAppState::get().s_sensorIdx != 8) std::cout << "warning: overwrite trajectory/save ply not implemented for non-SensorData type sensors" << std::endl;
 		if (false) {

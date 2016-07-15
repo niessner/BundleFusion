@@ -465,6 +465,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			//	getchar();
 			//}
 			//!!!DEBUGGING
+			initializeNextGlobalTransform(lastMatchedGlobal, m_prevLastMatchedLocal); //doesn't use nextlocal so ok to have here //need this before revalidate
 
 			if (m_global->getValidImages()[curGlobalFrame]) {
 				ret = 1; // ready to solve global
@@ -483,9 +484,9 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 		}
 		else {
 			ret = 0;
+			//don't need to initialize global transform since first global frame is identity
 		}
-
-		initializeNextGlobalTransform(lastMatchedGlobal, m_prevLastMatchedLocal); //doesn't use nextlocal so ok to have here
+		//initializeNextGlobalTransform(lastMatchedGlobal, m_prevLastMatchedLocal); //doesn't use nextlocal so ok to have here
 	}
 
 	return ret;
@@ -704,9 +705,12 @@ void SubmapManager::tryRevalidation(unsigned int curGlobalFrame, const float4x4&
 		}
 		m_global->setCurrentFrame(idx);
 
-		matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
+		unsigned int lastMatchedGlobal = matchAndFilter(false, m_global, m_globalCache, siftIntrinsicsInv);
 
 		if (m_global->getValidImages()[idx] != 0) { //validate
+			//initialize to better transform
+			MLIB_ASSERT(lastMatchedGlobal != (unsigned int)-1);
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + idx, d_globalTrajectory + lastMatchedGlobal, sizeof(float4x4), cudaMemcpyDeviceToDevice));
 			//validate chunk images
 			const std::vector<int>& validLocal = m_localTrajectoriesValid[idx];
 			for (unsigned int i = 0; i < validLocal.size(); i++) {

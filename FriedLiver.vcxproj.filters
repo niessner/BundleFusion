@@ -141,6 +141,7 @@
       <Filter>Sensors</Filter>
     </ClCompile>
     <ClCompile Include="Source\testSIFT.cpp" />
+    <ClCompile Include="Source\RunOpt.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -382,6 +383,7 @@
     </ClInclude>
     <ClInclude Include="Source\CUDACameraUtil.h" />
     <ClInclude Include="Source\testSIFT.h" />
+    <ClInclude Include="Source\RunOpt.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

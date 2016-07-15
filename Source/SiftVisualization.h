@@ -52,6 +52,8 @@ public:
 
 	static void saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory, float maxDepth = 3.5f, bool saveFrameByFrame = false);
 
+	static void saveFrameToPointCloud(const std::string& filename, const DepthImage32& depth, const ColorImageR8G8B8& color, const mat4f& depthIntrinsicsInverse, float maxDepth = 3.5f);
+
 	static void computePointCloud(PointCloudf& pc, const ColorImageR8G8B8& color,
 		const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal,
 		const mat4f& transform, float maxDepth);
