@@ -7,7 +7,7 @@
 
 extern "C" void evalMaxResidual(SolverInput& input, SolverState& state, SolverStateAnalysis& analysis, SolverParameters& parameters, CUDATimer* timer);
 extern "C" void buildVariablesToCorrespondencesTableCUDA(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int maxNumCorrespondencesPerImage, int* d_variablesToCorrespondences, int* d_numEntriesPerRow, CUDATimer* timer);
-extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, SolverParameters& parameters, float* convergenceAnalysis, CUDATimer* timer);
+extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, SolverParameters& parameters, SolverStateAnalysis& analysis, float* convergenceAnalysis, CUDATimer* timer);
 
 extern "C" int countHighResiduals(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer);
 
@@ -185,7 +185,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,
 	bool rebuildJT, bool findMaxResidual, unsigned int revalidateIdx)
 {
-	MLIB_ASSERT(numberOfImages > 1 && nNonLinearIterations <= weightsSparse.size());
+	MLIB_ASSERT(numberOfImages > 1 && nNonLinearIterations > 0 &&  nNonLinearIterations <= weightsSparse.size());
 	if (numberOfCorrespondences > m_maxCorrPerImage*m_maxNumberOfImages) {
 		//warning: correspondences will be invalidated AT RANDOM!
 		std::cerr << "WARNING: #corr (" << numberOfCorrespondences << ") exceeded limit (" << m_maxCorrPerImage << "*" << m_maxNumberOfImages << "), please increase max #corr per image in the GAS" << std::endl;
@@ -323,7 +323,7 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		buildVariablesToCorrespondencesTable(d_correspondences, numberOfCorrespondences);
 	}
 
-	solveBundlingStub(solverInput, m_solverState, parameters, convergence, m_timer);
+	solveBundlingStub(solverInput, m_solverState, parameters, m_solverExtra, convergence, m_timer);
 
 	if (findMaxResidual) {
 		computeMaxResidual(solverInput, parameters, revalidateIdx);

@@ -40,6 +40,9 @@ public:
 
 	static void jointBilateralFilterFloat(float* d_output, float* d_input, float* d_depth, float sigmaD, float sigmaR, unsigned int width, unsigned int height);
 	static void adaptiveBilateralFilterIntensity(float* d_output, const float* d_input, const float* d_depth, float sigmaD, float sigmaR, float adaptFactor, unsigned int width, unsigned int height);
+
+	//static void undistort(float* d_depth, const mat3f& intrinsics, const float3& distortionParams, T defaultValue, const BaseImage<T>& noiseMask = BaseImage<T>())
+
 };
 
 //TODO 

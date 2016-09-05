@@ -201,11 +201,8 @@ int main(int argc, char** argv)
 		}
 		else {
 			std::cout << "usage: DepthSensing [fileNameDescGlobalApp] [fileNameDescGlobalTracking]" << std::endl;
-			fileNameDescGlobalApp = "zParametersScanNet.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
-
-			//fileNameDescGlobalApp = "zParametersDefault.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
+			fileNameDescGlobalApp = "zParametersDefault.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingDefault.txt";
 			//fileNameDescGlobalBundling = "zParametersBundling20K.txt";
 
 			//fileNameDescGlobalApp = "zParametersSun3d.txt";
@@ -219,6 +216,9 @@ int main(int argc, char** argv)
 
 			//fileNameDescGlobalApp = "zParametersAug.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
+
+			//fileNameDescGlobalApp = "zParametersScanNet.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -255,7 +255,7 @@ int main(int argc, char** argv)
 			return 0;
 		}
 		if (GlobalAppState::get().s_generateVideo) { std::cout << "remember to change raycast for top-down rendering!" << std::endl; getchar(); }
-		if (GlobalAppState::get().s_numFramesBeforeExit != (unsigned int)-1 && GlobalAppState::get().s_sensorIdx != 8) std::cout << "warning: overwrite trajectory/save ply not implemented for non-SensorData type sensors" << std::endl;
+		if (GlobalAppState::get().s_numSolveFramesBeforeExit != (unsigned int)-1 && GlobalAppState::get().s_sensorIdx != 8) std::cout << "warning: overwrite trajectory/save ply not implemented for non-SensorData type sensors" << std::endl;
 		if (false) {
 			TestMatching test;
 			//test.analyzeLocalOpts();

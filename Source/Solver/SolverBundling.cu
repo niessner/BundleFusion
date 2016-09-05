@@ -1,9 +1,10 @@
 #include <iostream>
 
-//!!!DEBUGGING
+//for debug purposes
 //#define PRINT_RESIDUALS_SPARSE
 //#define PRINT_RESIDUALS_DENSE
-//!!!DEBUGGING
+
+#define ENABLE_EARLY_OUT
 
 #include "GlobalDefines.h"
 #include "SolverBundlingParameters.h"
@@ -667,8 +668,67 @@ extern "C" int countHighResiduals(SolverInput& input, SolverState& state, Solver
 	return count;
 }
 
+/////////////////////////////////////////////////////////////////////////
+// Convergence Analysis
+/////////////////////////////////////////////////////////////////////////
 
+//uses same data store as max residual
+__global__ void EvalGNConvergenceDevice(SolverInput input, SolverStateAnalysis analysis, SolverState state) //compute max of delta
+{
+	__shared__ float maxVal[THREADS_PER_BLOCK];
 
+	const unsigned int N = input.numberOfImages;
+	const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+
+	maxVal[threadIdx.x] = 0.0f;
+
+	if (x < N)
+	{
+		if (x == 0 || input.d_validImages[x] == 0)
+			maxVal[threadIdx.x] = 0.0f;
+		else {
+			float3 r3 = fmaxf(fabs(state.d_deltaRot[x]), fabs(state.d_deltaTrans[x]));
+			float r = fmaxf(r3.x, fmaxf(r3.y, r3.z));
+			maxVal[threadIdx.x] = r;
+		}
+		__syncthreads();
+
+		for (int stride = THREADS_PER_BLOCK / 2; stride > 0; stride /= 2) {
+			if (threadIdx.x < stride) {
+				int first = threadIdx.x;
+				int second = threadIdx.x + stride;
+				maxVal[first] = fmaxf(maxVal[first], maxVal[second]);
+			}
+			__syncthreads();
+		}
+		if (threadIdx.x == 0) {
+			analysis.d_maxResidual[blockIdx.x] = maxVal[0];
+		}
+	}
+}
+float EvalGNConvergence(SolverInput& input, SolverState& state, SolverStateAnalysis& analysis, CUDATimer* timer)
+{
+	if (timer) timer->startEvent(__FUNCTION__);
+
+	const unsigned int N = input.numberOfImages;
+	const unsigned int blocksPerGrid = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+	EvalGNConvergenceDevice << < blocksPerGrid, THREADS_PER_BLOCK >> >(input, analysis, state);
+
+#ifdef _DEBUG
+	cutilSafeCall(cudaDeviceSynchronize());
+	cutilCheckMsg(__FUNCTION__);
+#endif
+	//copy to host and compute max
+	cutilSafeCall(cudaMemcpy(analysis.h_maxResidual, analysis.d_maxResidual, sizeof(float) * blocksPerGrid, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(analysis.h_maxResidualIndex, analysis.d_maxResidualIndex, sizeof(int) * blocksPerGrid, cudaMemcpyDeviceToHost));
+	float maxVal = 0.0f;
+	for (unsigned int i = 0; i < blocksPerGrid; i++) {
+		if (maxVal < analysis.h_maxResidual[i]) maxVal = analysis.h_maxResidual[i];
+	}
+	if (timer) timer->endEvent();
+
+	return maxVal;
+}
 
 // For the naming scheme of the variables see:
 // http://en.wikipedia.org/wiki/Conjugate_gradient_method
@@ -944,7 +1004,7 @@ __global__ void PCGStep_Kernel3(SolverInput input, SolverState state)
 }
 
 template<bool useSparse, bool useDense>
-void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& parameters, bool lastIteration, CUDATimer *timer)
+bool PCGIteration(SolverInput& input, SolverState& state, SolverParameters& parameters, SolverStateAnalysis& analysis, bool lastIteration, CUDATimer *timer)
 {
 	const unsigned int N = input.numberOfImages;	// Number of block variables
 
@@ -1001,15 +1061,15 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	cutilCheckMsg(__FUNCTION__);
 #endif
 
-	//float scanAlpha;
-	//cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
-
 	PCGStep_Kernel2 << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-
+#ifdef ENABLE_EARLY_OUT //for convergence
+	float scanAlpha; cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
+	if (fabs(scanAlpha) < 0.00005f) lastIteration = true;  //!!! TODO CHECK IF THIS GENERALIZES
+#endif
 	if (lastIteration) {
 		PCGStep_Kernel3<true> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
 	}
@@ -1021,7 +1081,8 @@ void PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-
+	
+	return lastIteration;
 }
 
 #ifdef USE_LIE_SPACE //TODO FOR EULER AS WELL?
@@ -1051,7 +1112,7 @@ void convertLiePosesToMatricesCU(const float3* d_rot, const float3* d_trans, uns
 // Main GN Solver Loop
 ////////////////////////////////////////////////////////////////////
 
-extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, SolverParameters& parameters, float* convergenceAnalysis, CUDATimer *timer)
+extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, SolverParameters& parameters, SolverStateAnalysis& analysis, float* convergenceAnalysis, CUDATimer *timer)
 {
 	if (convergenceAnalysis) {
 		float initialResidual = EvalResidual(input, state, parameters, timer);
@@ -1069,6 +1130,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 	//float3* xRot = new float3[input.numberOfImages];	//remember the delete!
 	//float3* xTrans = new float3[input.numberOfImages];
 	//timer = new CUDATimer();
+	//static unsigned int totalLinIters = 0, numLin = 0, totalNonLinIters = 0, numNonLin = 0;
 	//!!!DEBUGGING
 
 	for (unsigned int nIter = 0; nIter < parameters.nNonLinearIterations; nIter++)
@@ -1086,43 +1148,48 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		if (parameters.weightSparse > 0.0f) {
 			if (parameters.useDense) {
 				for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
-					PCGIteration<true, true>(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
+					if (PCGIteration<true, true>(input, state, parameters, analysis, linIter == parameters.nLinIterations - 1, timer)) break;
 			}
 			else {
 				for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
-					PCGIteration<true, false>(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
+					if (PCGIteration<true, false>(input, state, parameters, analysis, linIter == parameters.nLinIterations - 1, timer)) { 
+						//totalLinIters += (linIter+1); numLin++; 
+						break;
+					}
 			}
 		}
 		else {
 			for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
-				PCGIteration<false, true>(input, state, parameters, linIter == parameters.nLinIterations - 1, timer);
+				if (PCGIteration<false, true>(input, state, parameters, analysis, linIter == parameters.nLinIterations - 1, timer)) break;
 		}
 		//!!!debugging
 		//cutilSafeCall(cudaMemcpy(xRot, state.d_xRot, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 		//cutilSafeCall(cudaMemcpy(xTrans, state.d_xTrans, sizeof(float3)*input.numberOfImages, cudaMemcpyDeviceToHost));
 		//!!!debugging
-
-		//!!!DEBUGGING
 #ifdef PRINT_RESIDUALS_SPARSE
 		if (parameters.weightSparse > 0) {
 			float residual = EvalResidual(input, state, parameters, timer);
 			printf("[niter %d] weight * sparse = %f*%f = %f\t[#corr = %d]\n", nIter, parameters.weightSparse, residual / parameters.weightSparse, residual, input.numberOfCorrespondences);
 		}
 #endif
-		//!!!DEBUGGING
-
 		if (convergenceAnalysis) {
 			float residual = EvalResidual(input, state, parameters, timer);
 			convergenceAnalysis[nIter + 1] = residual;
 		}
+#ifdef ENABLE_EARLY_OUT //convergence
+		//if (nIter < parameters.nNonLinearIterations - 1 && EvalGNConvergence(input, state, analysis, timer) < 0.01f) { //!!! TODO CHECK HOW THESE GENERALIZE
+		if (nIter < parameters.nNonLinearIterations - 1 && EvalGNConvergence(input, state, analysis, timer) < 0.005f) { //0.001?
+			//if (!parameters.useDense) { totalNonLinIters += (nIter+1); numNonLin++; }
+			break;
+		}
+		//else if (!parameters.useDense && nIter == parameters.nNonLinearIterations - 1) { totalNonLinIters += (nIter+1); numNonLin++; }
+#endif
 	}
 	//!!!debugging
 	//if (xRot) delete[] xRot;
 	//if (xTrans) delete[] xTrans;
-	//if (timer) {
-	//	timer->evaluate(true, false);
-	//	delete timer;
-	//}
+	//if (timer) { timer->evaluate(true, false); delete timer; }
+	//if (!parameters.useDense) { printf("mean #pcg its = %f\tmean #gn its = %f\n", (float)totalLinIters / (float)numLin, (float)totalNonLinIters / (float)numNonLin); } //just stats for global solve
 	//!!!debugging
 }
 

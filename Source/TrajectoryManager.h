@@ -74,6 +74,28 @@ public:
 	void unlockUpdateTransforms() {
 		m_mutexUpdateTransforms.unlock();
 	}
+
+	////for debugging
+	//void getIntegratedTransforms(std::vector<mat4f>& transforms) {
+	//	m_mutexUpdateTransforms.lock();
+	//
+	//	unsigned int numFrames = m_numAddedFrames;
+	//	transforms.resize(numFrames);
+	//
+	//	for (unsigned int i = 0; i < numFrames; i++) {
+	//		const auto&f = m_frames[i];
+	//		assert(f.frameIdx == i);
+	//		if (f.type == TrajectoryManager::TrajectoryFrame::Invalid) {
+	//			for (unsigned int k = 0; k < 16; k++) {
+	//				transforms[i][k] = -std::numeric_limits<float>::infinity();
+	//			}
+	//		}
+	//		else {
+	//			transforms[i] = f.integratedTransform;
+	//		}
+	//	}
+	//	m_mutexUpdateTransforms.unlock();
+	//}
 private:
 	void invalidateFrame(unsigned int frameIdx);
 

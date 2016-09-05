@@ -2101,7 +2101,7 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 	m_depthImages.resize(numFrames);
 	m_referenceTrajectory.resize(numFrames);
 	for (unsigned int i = 0; i < numFrames; i++) {
-		const unsigned int oldIndex = (i+startFrame) * skip;
+		const unsigned int oldIndex = (i + startFrame) * skip;
 		MLIB_ASSERT(oldIndex < cs.m_DepthNumFrames);
 		//m_colorImages[i] = ColorImageR8G8B8A8(cs.m_ColorImageWidth, cs.m_ColorImageHeight, cs.m_ColorImages[oldIndex]);
 		m_depthImages[i] = DepthImage32(cs.m_DepthImageWidth, cs.m_DepthImageHeight, cs.m_DepthImages[oldIndex]);
@@ -2163,7 +2163,7 @@ void TestMatching::loadCachedFramesFromSensorData(CUDACache* cache, const std::s
 	m_depthImages.resize(numFrames);
 	m_referenceTrajectory.resize(numFrames);
 	for (unsigned int i = 0; i < numFrames; i++) {
-		const unsigned int oldIndex = (i+startFrame) * skip;
+		const unsigned int oldIndex = (i + startFrame) * skip;
 		MLIB_ASSERT(oldIndex < numOrigFrames);
 		const auto& frame = sensorData.m_frames[oldIndex];
 		vec3uc* colordata = sensorData.decompressColorAlloc(frame);
@@ -2344,12 +2344,246 @@ void dfs(unsigned int frame, const std::vector< std::vector<unsigned int> > imag
 	}
 }
 
+Eigen::MatrixXf applyDistortion(const Eigen::MatrixXf& x, const vec3f& k) //x is 2 x #pixels
+{
+	Eigen::VectorXf r2 = x.row(0).array() * x.row(0).array() + x.row(1).array() * x.row(1).array();
+	Eigen::VectorXf r4 = r2.array() * r2.array();
+	Eigen::VectorXf r6 = r2.array() * r2.array() * r2.array();
+	//radial distortion
+	Eigen::VectorXf cdist = k[0] * r2 + k[1] * r4 + k[2] * r6 + Eigen::VectorXf::Ones(x.cols());
+	Eigen::MatrixXf xd1 = x.array() * ((Eigen::Matrix<float, 2, 1>::Ones() * cdist.transpose()).array()); //x element wise product with [cdist;cdist]
+	//no tangential distortion 
+	return xd1;
+}
+//TODO MAKE EFFICIENT (AND MOVE TO GPU)
+template <typename T>
+void undistort(BaseImage<T>& image, float fx, float fy, float mx, float my,
+	const vec3f& distortionParams, T defaultValue, const BaseImage<T>& noiseMask = BaseImage<T>())
+{
+	BaseImage<T> undistorted(image.getWidth(), image.getHeight()); undistorted.setInvalidValue(image.getInvalidValue());
+	undistorted.setPixels(defaultValue);
+	const unsigned int nrows = image.getHeight();
+	const unsigned int ncols = image.getWidth();
+	const bool useNoiseMask = noiseMask.getWidth() > 0;
+
+	//Eigen::Matrix3f kk_new; kk_new << fx, 0.0f, mx, 0.0f, fy, my, 0.0f, 0.0f, 1.0f;
+	//Eigen::MatrixXf rays(3, image.getNumPixels());
+	Eigen::VectorXi px(image.getNumPixels()), py(image.getNumPixels());
+	for (unsigned int y = 0; y < nrows; y++) { //rows
+		for (unsigned int x = 0; x < ncols; x++) { //cols
+			unsigned int idx = y*ncols + x;
+			px[idx] = x; py[idx] = y;
+			//rays(0, idx) = (float)x;
+			//rays(1, idx) = (float)y;
+			//rays(2, idx) = 1.0f;
+		}
+	}
+	//rays = kk_new.inverse() * rays;	//rays = inv(KK_new)*[(px - 1)';(py - 1)';ones(1,length(px))]; 
+	//Eigen::MatrixXf x(2, image.getNumPixels()); //x = [rays2(1,:)./rays2(3,:);rays2(2,:)./rays2(3,:)]; //x is 2 x #pixels
+	//x.row(0) = rays.row(0).array() / rays.row(2).array();
+	//x.row(1) = rays.row(1).array() / rays.row(2).array();
+	Eigen::MatrixXf x(2, image.getNumPixels());
+	for (unsigned int r = 0; r < nrows; r++) { //rows
+		for (unsigned int c = 0; c < ncols; c++) { //cols
+			unsigned int idx = r*ncols + c;
+			x(0, idx) = ((float)c - mx) / fx;
+			x(1, idx) = ((float)r - my) / fy;
+		}
+	}
+	//distortion
+	Eigen::MatrixXf xd = applyDistortion(x, distortionParams); //xd is 2 x #pixels
+	//reconvert in pixels
+	Eigen::VectorXf test0 = fx * xd.row(0);
+	Eigen::VectorXf test1 = mx * Eigen::VectorXf::Ones(xd.cols());
+	Eigen::VectorXf px2 = test0 + test1; //px2 = f(1)*(xd(1, :) + alpha*xd(2, :)) + c(1); //using alpha 0
+	test0 = fy * xd.row(1);
+	test1 = my * Eigen::VectorXf::Ones(xd.cols());
+	Eigen::VectorXf py2 = test0 + test1; //py2 = f(2)*xd(2, :) + c(2);
+	//interpolate between closest pixels
+	std::vector<unsigned int> validIndices;
+	for (unsigned int i = 0; i < image.getNumPixels(); i++) {
+		int x = math::floor(px2[i]);	int y = math::floor(py2[i]);
+		if (x >= 0 && x < (int)ncols - 1 && y >= 0 && y < (int)nrows - 1) validIndices.push_back(i);
+	}
+	MLIB_ASSERT(!validIndices.empty());
+	Eigen::VectorXf alpha_x(validIndices.size()), alpha_y(validIndices.size());
+	Eigen::VectorXi px_0(validIndices.size()), py_0(validIndices.size());
+	for (unsigned int i = 0; i < validIndices.size(); i++) {
+		alpha_x[i] = math::frac(px2[validIndices[i]]);
+		alpha_y[i] = math::frac(py2[validIndices[i]]);
+		px_0[i] = math::floor(px2[validIndices[i]]);
+		py_0[i] = math::floor(py2[validIndices[i]]);
+	}
+	Eigen::VectorXf onesf = Eigen::VectorXf::Ones(validIndices.size());		Eigen::VectorXi onesi = Eigen::VectorXi::Ones(validIndices.size());
+	Eigen::VectorXf a1 = (onesf - alpha_y).array() * (onesf - alpha_x).array();
+	Eigen::VectorXf a2 = (onesf - alpha_y).array() * alpha_x.array();
+	Eigen::VectorXf a3 = alpha_y.array() * (onesf - alpha_x).array();
+	Eigen::VectorXf a4 = alpha_y.array() * alpha_x.array();
+	//this is flipped from matlab due to different storage
+	Eigen::VectorXi ind_lu = py_0 * ncols + px_0;					//(x, y)
+	Eigen::VectorXi ind_ru = py_0 * ncols + (px_0 + onesi);			//(x+1, y)
+	Eigen::VectorXi ind_ld = (py_0 + onesi) * ncols + px_0;			//(x, y+1)
+	Eigen::VectorXi ind_rd = (py_0 + onesi) * ncols + (px_0 + onesi);//(x+1, y+1)
+	//Eigen::VectorXi ind_new(validIndices.size()); //ind_new = (px(good_points)-1)*nr + py(good_points);
+	//for (unsigned int i = 0; i < validIndices.size(); i++) ind_new[i] = py[validIndices[i]] * ncols + px[validIndices[i]]; //TODO CHECK HERE
+	if (useNoiseMask) { //ignore coeffs when indexing into noise
+		for (unsigned int i = 0; i < validIndices.size(); i++) {
+			if (noiseMask(ind_lu[i] % ncols, ind_lu[i] / ncols) > 0) a1[i] = 0.0f;
+			if (noiseMask(ind_ru[i] % ncols, ind_ru[i] / ncols) > 0) a2[i] = 0.0f;
+			if (noiseMask(ind_ld[i] % ncols, ind_ld[i] / ncols) > 0) a3[i] = 0.0f;
+			if (noiseMask(ind_rd[i] % ncols, ind_rd[i] / ncols) > 0) a4[i] = 0.0f;
+		}
+	}//useNoiseMask
+	Eigen::VectorXf s = a1 + a2 + a3 + a4;
+	for (unsigned int i = 0; i < validIndices.size(); i++) {
+		if (s[i] != 0) {
+			a1[i] /= s[i];	a2[i] /= s[i];	a3[i] /= s[i];	a4[i] /= s[i];
+		}
+	}
+	const T invalid = image.getInvalidValue();
+	for (unsigned int i = 0; i < validIndices.size(); i++) {
+		if (s[i] == 0) continue;
+		T lu = image.getData()[ind_lu[i]]; if (lu == invalid) continue;
+		T ru = image.getData()[ind_ru[i]]; if (ru == invalid) continue;
+		T ld = image.getData()[ind_ld[i]]; if (ld == invalid) continue;
+		T rd = image.getData()[ind_rd[i]]; if (rd == invalid) continue;
+		//undistorted.getData()[ind_new[i]] = a1[i] * lu + a2[i] * ru + a3[i] * ld + a4[i] * rd;
+		undistorted.getData()[validIndices[i]] = a1[i] * lu + a2[i] * ru + a3[i] * ld + a4[i] * rd;
+	}
+	image = undistorted;
+}
+
 //#define LOAD_REFERENCE
 void TestMatching::debug()
 {
+	//{
+	//	const std::string sensFile = "../data/testing/recording3.sens";
+	//	vec3f distortionParams = vec3f(0.126f, -0.236f, 0.0f);
+	//	//
+	//	SensorData sd; sd.loadFromFile(sensFile);
+	//	const mat4f depthIntrinsicsInverse = sd.m_calibrationDepth.m_intrinsic.getInverse();
+	//	float depthFx = sd.m_calibrationDepth.m_intrinsic(0, 0);	float depthFy = sd.m_calibrationDepth.m_intrinsic(1, 1);
+	//	float depthMx = sd.m_calibrationDepth.m_intrinsic(0, 2);	float depthMy = sd.m_calibrationDepth.m_intrinsic(1, 2);
+	//	float colorFx = sd.m_calibrationColor.m_intrinsic(0, 0);	float colorFy = sd.m_calibrationColor.m_intrinsic(1, 1);
+	//	float colorMx = sd.m_calibrationColor.m_intrinsic(0, 2);	float colorMy = sd.m_calibrationColor.m_intrinsic(1, 2);
+	//	std::vector<unsigned int> frameIndices = { 0, 100, 200, 300, 400, 500 };
+	//	for (unsigned int f : frameIndices) {
+	//		unsigned short* depth = sd.decompressDepthAlloc(f);
+	//		vec3uc* color = sd.decompressColorAlloc(f);
+	//		//TODO incorporate noise mask compute with rest (doesn't need to be computed before...)
+	//		//TODO also do that with color since same params
+	//		DepthImage16 depthImage16(sd.m_depthWidth, sd.m_depthHeight, depth);
+	//		DepthImage32 depthImage(depthImage16);
+	//		ColorImageR8G8B8 colorImage(sd.m_colorWidth, sd.m_colorHeight, color);
+	//		FreeImageWrapper::saveImage("debug/_depth-" + std::to_string(f) + ".png", ColorImageR32G32B32(depthImage));
+	//		FreeImageWrapper::saveImage("debug/_color-" + std::to_string(f) + ".png", colorImage);
+	//		SiftVisualization::saveFrameToPointCloud("debug/_frame-" + std::to_string(f) + ".ply", depthImage, colorImage, depthIntrinsicsInverse);
+	//		DepthImage32 noiseMask(depthImage.getWidth(), depthImage.getHeight());
+	//		unsigned short depthMax = depthImage16.getMaxElement();
+	//		for (unsigned int y = 0; y < depthImage16.getHeight(); y++) {
+	//			for (unsigned int x = 0; x < depthImage16.getWidth(); x++) {
+	//				if (depthImage16(x, y) == depthMax) noiseMask(x, y) = 1.0f;
+	//				else                                noiseMask(x, y) = 0.0f;
+	//			}
+	//		}
+	//		FreeImageWrapper::saveImage("debug/_noisemask-" + std::to_string(f) + ".png", ColorImageR32G32B32(noiseMask));
+	//		undistort(noiseMask, depthFx, depthFy, depthMx, depthMy, distortionParams, 1.0f);
+	//		FreeImageWrapper::saveImage("debug/_noisemask-" + std::to_string(f) + "-undistort.png", ColorImageR32G32B32(noiseMask));
+	//		undistort(depthImage, depthFx, depthFy, depthMx, depthMy, distortionParams, depthImage.getInvalidValue(), noiseMask);
+	//		FreeImageWrapper::saveImage("debug/_depth-" + std::to_string(f) + "-undistort.png", ColorImageR32G32B32(depthImage));
+	//		ColorImageR32G32B32 colorImage32(colorImage);
+	//		undistort(colorImage32, colorFx, colorFy, colorMx, colorMy, distortionParams, colorImage32.getInvalidValue());
+	//		colorImage = ColorImageR8G8B8(colorImage32);
+	//		FreeImageWrapper::saveImage("debug/_color-" + std::to_string(f) + "-undistort.png", colorImage);
+	//		SiftVisualization::saveFrameToPointCloud("debug/_frame-" + std::to_string(f) + "-undistort.ply", depthImage, colorImage, depthIntrinsicsInverse);
+	//		std::free(depth);
+	//		std::free(color);
+	//	}
+	//	std::cout << "DONE" << std::endl;
+	//	return;
+	//}
+	{
+		const std::string sensFile = "../data/sun3d/annotated/hotel_umd_3.sens";
+		std::cout << "loading from file... ";
+		SensorData sd; sd.loadFromFile(sensFile);
+		std::cout << "done!" << std::endl;
+
+		const std::string refSensFile = "../data/sun3d/maryland_hotel3.sens";
+		std::cout << "loading ref from file... ";
+		SensorData refSd; refSd.loadFromFile(refSensFile);
+		std::cout << "done!" << std::endl;
+
+		if (refSd.m_frames.size() != sd.m_frames.size()) {
+			std::cerr << "ERROR different number of frames! (" << sd.m_frames.size() << " vs " << refSd.m_frames.size() << ")" << std::endl;
+			getchar();
+		}
+		//compare calibration
+		mat4f depthIntrinsicsDiff = sd.m_calibrationDepth.m_intrinsic - refSd.m_calibrationDepth.m_intrinsic;
+		mat4f colorIntrinsicsDiff = sd.m_calibrationColor.m_intrinsic - refSd.m_calibrationColor.m_intrinsic;
+		mat4f depthExtrinsicsDiff = sd.m_calibrationDepth.m_extrinsic - refSd.m_calibrationDepth.m_extrinsic;
+		mat4f colorExtrinsicsDiff = sd.m_calibrationColor.m_extrinsic - refSd.m_calibrationColor.m_extrinsic;
+		for (unsigned int k = 0; k < 16; k++) {
+			if (std::abs(depthIntrinsicsDiff[k]) > 0.00001f || std::abs(colorIntrinsicsDiff[k]) > 0.00001f || std::abs(depthExtrinsicsDiff[k]) > 0.00001f || std::abs(colorExtrinsicsDiff[k]) > 0.00001f) {
+				std::cerr << "intrinsics/extrinsics mismatch!" << std::endl;
+				getchar();
+			}
+		}
+		//compare frames
+		for (unsigned int f = 0; f < refSd.m_frames.size(); f++) {
+			vec3uc* refColor = refSd.decompressColorAlloc(f);
+			unsigned short* refDepth = refSd.decompressDepthAlloc(f);
+			vec3uc* color = sd.decompressColorAlloc(f);
+			unsigned short* depth = sd.decompressDepthAlloc(f);
+			for (unsigned int i = 0; i < refSd.m_depthWidth*refSd.m_depthHeight; i++) {
+				if (refDepth[i] != depth[i]) {
+					std::cerr << "ERROR different depth at frame " << f << ", pixel (" << i%refSd.m_depthWidth << ", " << i / refSd.m_depthWidth << ") = " << depth[i] << " vs " << refDepth[i] << std::endl;
+					getchar();
+				}
+			}
+			for (unsigned int i = 0; i < refSd.m_colorWidth*refSd.m_colorHeight; i++) {
+				vec3i colorDiff = vec3i(color[i]) - vec3i(refColor[i]);
+				if (std::abs(colorDiff.x) + std::abs(colorDiff.y) + std::abs(colorDiff.z) > 1) {
+					std::cerr << "ERROR different color at frame " << f << ", pixel (" << i%refSd.m_colorWidth << ", " << i / refSd.m_colorHeight << ") = " << color[i] << " vs " << refColor[i] << std::endl;
+					getchar();
+				}
+			}
+			std::free(refColor); std::free(refDepth);
+			std::free(color); std::free(depth);
+		}
+		//compare transforms
+		for (unsigned int f = 0; f < refSd.m_frames.size(); f++) {
+			Pose refTrans = PoseHelper::MatrixToPose(refSd.m_frames[f].getCameraToWorld());
+			Pose trans = PoseHelper::MatrixToPose(sd.m_frames[f].getCameraToWorld());
+			Pose diff = trans - refTrans;
+			float diffSum = 0.0f; for (unsigned int k = 0; k < 6; k++) diffSum += std::abs(diff[k]);
+			if (diffSum > 0.3f) {
+				std::cerr << "WARNING different transform at frame " << f << std::endl;
+				std::cerr << "\tref trans" << std::endl << refTrans << std::endl;
+				std::cerr << "\ttrans" << std::endl << trans << std::endl;
+				getchar();
+			}
+		}
+
+		//std::vector<mat4f> trajectory(sd.m_frames.size());
+		//for (unsigned int i = 0; i < sd.m_frames.size(); i++) trajectory[i] = sd.m_frames[i].getCameraToWorld();
+		//sd.saveToPointCloud("debug/_logs/test0-499.ply", 0, 500, true);
+		//sd.saveToPointCloud("debug/_logs/test500-999.ply", 500, 1000, true);
+		//sd.saveToPointCloud("debug/_logs/test1000-1499.ply", 1000, 1500, true);
+		//sd.saveToPointCloud("debug/_logs/test1500-1749.ply", 1500, 1750, true);
+		//SiftVisualization::saveCamerasToPLY("debug/_logs/cameras.ply", trajectory);
+		//////find largest translations
+		////std::vector<mat
+		////for (unsigned int i = 1; i < sd.m_frames.size(); i++) {
+		////	float dist = (trajectory[i - 1].getTranslation() - trajectory[i].getTranslation()).length();
+		////}
+		//std::cout << std::endl;
+		return;
+	}
 	const std::string okSiftFile = "debug/_logs/71.sift";
-	const std::string siftFile = "debug/_logs/74.sift";
-	const std::string trajFile = "debug/_logs/74-initial.trajectory";
+	const std::string siftFile = "debug/_logs/71.sift";
+	const std::string trajFile = "debug/_logs/71-initial.trajectory";
+	//const std::string siftFile = "debug/_logs/74.sift";
+	//const std::string trajFile = "debug/_logs/74-initial.trajectory";
 	const std::string sensFile = "../data/testing/recording15.sens";
 	const unsigned int submapSize = GlobalBundlingState::get().s_submapSize;
 
@@ -2473,32 +2707,9 @@ void TestMatching::debug()
 	//
 	////print out point clouds
 	//SiftVisualization::saveToPointCloud("debug/_logs/broken.ply", m_depthImages, m_colorImages, keysTrajectory, m_depthCalibration.m_IntrinsicInverse)
-	//{//debug - find max residuals
-	//	std::vector< std::pair<unsigned int, float> > residuals;
-	//	//std::vector<float> debugResiduals;
-	//	for (unsigned int i = 0; i < correspondences.size(); i++) {
-	//		const EntryJ& c = correspondences[i];
-	//		if (c.isValid()) {
-	//			vec3f d = keysTrajectory[c.imgIdx_i] * vec3f(c.pos_i.x, c.pos_i.y, c.pos_i.z) - keysTrajectory[c.imgIdx_j] * vec3f(c.pos_j.x, c.pos_j.y, c.pos_j.z);
-	//			d = math::abs(d);
-	//			float r = std::max(d.x, std::max(d.y, d.z));
-	//			residuals.push_back(std::make_pair(i, r));
-
-	//			//if (c.imgIdx_i == 200 && c.imgIdx_j == 201)
-	//			//	debugResiduals.push_back(r);
-	//		}
-	//	}
-	//	std::sort(residuals.begin(), residuals.end(), [](const std::pair<unsigned int, float> &left, const std::pair<unsigned int, float> &right) {
-	//		return fabs(left.second) > fabs(right.second);
-	//	});
-	//	//std::sort(debugResiduals.begin(), debugResiduals.end());
-	//	//SiftVisualization::printMatch("debug/_logs/test.png", vec2ui(200, 201), correspondences, m_colorImages[200], m_colorImages[201], m_colorCalibration.m_Intrinsic);
-	//	//SiftVisualization::saveToPointCloud("debug/_logs/cur.ply", m_depthImages, m_colorImages, keysTrajectory, m_depthCalibration.m_IntrinsicInverse);
-	//	std::cout << "waiting..." << std::endl; getchar();
-	//}
 	//re-optimize (no dense)
 	//const unsigned int maxNumIters = 2; const unsigned int numPCGIts = 100;
-	const unsigned int maxNumIters = 3; const unsigned int numPCGIts = 120;
+	const unsigned int maxNumIters = 10; const unsigned int numPCGIts = 150;//3; const unsigned int numPCGIts = 150;
 	//const unsigned int maxNumIters = 5; const unsigned int numPCGIts = 50;
 	const bool useVerify = false;
 	SBA sba;
@@ -2533,6 +2744,23 @@ void TestMatching::debug()
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(optTrajectory.data(), d_transforms, sizeof(float4x4)*numKeys, cudaMemcpyDeviceToHost));
 	MLIB_CUDA_SAFE_FREE(d_transforms);
 	//SiftVisualization::saveToPointCloud("debug/_logs/_opt.ply", m_depthImages, m_colorImages, optTrajectory, m_depthCalibration.m_IntrinsicInverse);
+
+	{//debug - find max residuals
+		std::vector< std::pair<unsigned int, float> > residuals;
+		for (unsigned int i = 0; i < correspondences.size(); i++) {
+			const EntryJ& c = correspondences[i];
+			if (c.isValid()) {
+				vec3f d = optTrajectory[c.imgIdx_i] * vec3f(c.pos_i.x, c.pos_i.y, c.pos_i.z) - optTrajectory[c.imgIdx_j] * vec3f(c.pos_j.x, c.pos_j.y, c.pos_j.z);
+				d = math::abs(d);
+				float r = std::max(d.x, std::max(d.y, d.z));
+				residuals.push_back(std::make_pair(i, r));
+			}
+		}
+		std::sort(residuals.begin(), residuals.end(), [](const std::pair<unsigned int, float> &left, const std::pair<unsigned int, float> &right) {
+			return fabs(left.second) > fabs(right.second);
+		});
+		std::cout << "waiting..." << std::endl; getchar();
+	}
 
 	////check for disconnected parts
 	//std::vector< std::vector<unsigned int> > imageImageCorrs;
@@ -2572,7 +2800,7 @@ void TestMatching::debug()
 	//}
 	//
 	//int a = 5;
-}
+	}
 
 
 

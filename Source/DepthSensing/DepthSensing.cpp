@@ -486,7 +486,7 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 		break;
 		case '9':
 			StopScanningAndExtractIsoSurfaceMC();
-			//g_depthSensingBundler->saveGlobalSiftManagerAndCacheToFile("debug/_logs/global"); //!!!DEBUGGING TODO REMOVE
+			//g_depthSensingBundler->saveGlobalSiftManagerAndCacheToFile("debug/_logs/global"); //debugging only
 			//g_depthSensingBundler->saveCompleteTrajectory("debug/_logs/complete.trajectory");
 			break;
 		case '0':
@@ -859,9 +859,8 @@ void reintegrate()
 	if (tm->getNumActiveOperations() < maxPerFrameFixes) {
 		tm->generateUpdateLists();
 		//if (GlobalBundlingState::get().s_verbose) {
-		//	if (tm->getNumActiveOperations() == 0) {
+		//	if (tm->getNumActiveOperations() == 0) 
 		//		std::cout << __FUNCTION__ << " :  no more work (everything is reintegrated)" << std::endl;
-		//	}
 		//}
 	}
 
@@ -889,7 +888,7 @@ void reintegrate()
 		else if (tm->getTopFromReIntegrateList(oldTransform, newTransform, frameIdx)) {
 			auto& f = g_CudaImageManager->getIntegrateFrame(frameIdx);
 			DepthCameraData depthCameraData(f.getDepthFrameGPU(), f.getColorFrameGPU());
-			MLIB_ASSERT(!isnan(oldTransform[0]) && !isnan(newTransform[0]) && oldTransform[0] != -std::numeric_limits<float>::infinity()  && newTransform[0] != -std::numeric_limits<float>::infinity());
+			MLIB_ASSERT(!isnan(oldTransform[0]) && !isnan(newTransform[0]) && oldTransform[0] != -std::numeric_limits<float>::infinity() && newTransform[0] != -std::numeric_limits<float>::infinity());
 			deIntegrate(depthCameraData, oldTransform);
 			integrate(depthCameraData, newTransform);
 			tm->confirmIntegration(frameIdx);
@@ -918,8 +917,8 @@ void StopScanningAndExit(bool aborted = false)
 		numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);		numTransforms = (unsigned int)trajectory.size();
 		if (numValidTransforms < (unsigned int)std::round(0.5f * numTransforms)) valid = false; // not enough valid transforms
 		std::cout << "#VALID TRANSFORMS = " << numValidTransforms << std::endl;
-		((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file
-		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile)+"_fried.sens", trajectory); //overwrite the original file
+		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file
+		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile) + "_fried.sens", trajectory); //overwrite the original file
 		//save ply
 		std::cout << "[marching cubes] ";
 		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
@@ -984,7 +983,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	bool bGotDepth = g_CudaImageManager->process();
 	g_depthSensingBundler->processInput();
 #endif
-	
+
 	///////////////////////////////////////
 	// Fix old frames
 	///////////////////////////////////////
@@ -1061,14 +1060,14 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	g_depthSensingBundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 	//g_depthSensingBundler->resetDEBUG(true);
 #endif
-	
+
 	// Stop Timing
 	if (GlobalBundlingState::get().s_enablePerFrameTimings) {
 		GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop();
 		TimingLog::addTotalFrameTime(GlobalAppState::get().s_Timer.getElapsedTimeMS());
 		std::cout << "<<< [Frame: " << g_CudaImageManager->getCurrFrameNumber() << " ] Total Frame Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
 	}
-	
+
 	//std::cout << VAR_NAME(timeReconstruct) << " : " << timeReconstruct << " [ms]" << std::endl;
 	//std::cout << VAR_NAME(timeVisualize) << " : " << timeVisualize << " [ms]" << std::endl;
 	//std::cout << VAR_NAME(timeReintegrate) << " : " << timeReintegrate << " [ms]" << std::endl;
@@ -1092,15 +1091,20 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 		TimingLog::printAllTimings(outDir); // might skip the last frames but whatever
 		exit(1);
 	}
-	if (!g_depthSensingRGBDSensor->isReceivingFrames() && GlobalAppState::get().s_sensorIdx == 8) { //this is a hack...
+	if (!g_depthSensingRGBDSensor->isReceivingFrames() && GlobalAppState::get().s_sensorIdx == 8 && GlobalAppState::get().s_numSolveFramesBeforeExit != (unsigned int)-1) { //todo something better?
 		static unsigned int countPastLast = 0;
-		const unsigned int maxPastLast = GlobalAppState::get().s_numFramesBeforeExit;
-		if (maxPastLast != (unsigned int)-1 && countPastLast == maxPastLast) {
-			StopScanningAndExit();
+		const unsigned int endSolveFrame = GlobalAppState::get().s_numSolveFramesBeforeExit + 1;
+		if (countPastLast >= endSolveFrame) {
+			TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
+			tm->generateUpdateLists();
+			if (tm->getNumActiveOperations() == 0) {
+				std::cout << "[no more reintegration ops] " << countPastLast << " frames past end" << std::endl;
+				StopScanningAndExit();
+			}
 		}
 		countPastLast++;
 	}
-	
+
 	DXUT_EndPerfEvent();
 }
 

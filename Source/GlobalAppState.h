@@ -102,7 +102,7 @@
 	X(mat4f, s_topVideoTransformWorld) \
 	X(vec4f, s_topVideoCameraPose) \
 	X(vec2f, s_topVideoMinMax) \
-	X(unsigned int, s_numFramesBeforeExit)
+	X(unsigned int, s_numSolveFramesBeforeExit)
 
 
 #ifndef VAR_NAME

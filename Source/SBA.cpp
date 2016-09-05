@@ -180,11 +180,10 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 			}
 		}
 #else
-		//!!!debugging
+		////!!!debugging
 		//{
-		//	//	std::ofstream s("debug/_logs/" + std::to_string(siftManager->getNumImages()) + "-" + std::to_string(siftManager->getCurrentFrame()) + ".txt");
-		//	//	s << imageIndices << " : " << m_maxResidual << std::endl;
-
+		//	std::ofstream s("debug/_logs/" + std::to_string(siftManager->getNumImages()) + "-" + std::to_string(siftManager->getCurrentFrame()) + ".txt");
+		//	s << imageIndices << " : " << m_maxResidual << std::endl;
 		//	//if (siftManager->getCurrentFrame() >= 70) {
 		//	//	float4x4* d_transforms = NULL;
 		//	//	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
@@ -203,7 +202,7 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 		//	//	getchar();
 		//	//}
 		//}
-		//!!!debugging
+		////!!!debugging
 
 		// invalidate correspondence
 		siftManager->InvalidateImageToImageCU(make_uint2(imageIndices.x, imageIndices.y));
