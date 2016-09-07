@@ -455,7 +455,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 						const float cameraToKinectProjZ = (pTransInput.z - sensorDepthMin) / (sensorDepthMax - sensorDepthMin);
 						const float weight = max(0.0f, 0.5f*((1.0f - d / distThresh) + (1.0f - cameraToKinectProjZ))); // for weighted ICP;
 
-						out.x = length(pTransInput - pTarget);	//residual
+						out.x = d;	//residual
 						out.y = weight;							//corr weight
 						out.z = 1.0f;
 					}

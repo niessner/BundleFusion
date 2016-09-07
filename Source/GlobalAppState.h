@@ -18,7 +18,6 @@
 #include <list>
 
 
-
 #define RENDERMODE_INTEGRATE 0 
 #define RENDERMODE_VIEW 1
 

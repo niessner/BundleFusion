@@ -10,7 +10,9 @@
 
 #include "SubmapManager.h"
 
-
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+#include "SensorDataReader.h"
+#endif
 
 SubmapManager::SubmapManager()
 {
@@ -40,6 +42,13 @@ SubmapManager::SubmapManager()
 	m_revalidatedIdx = (unsigned int)-1;
 #ifdef DEBUG_PRINT_MATCHING
 	_debugPrintMatches = false;
+#endif
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	_siftMatch_frameFrameLocal = vec2ui(0, 0);
+	_siftVerify_frameFrameLocal = vec2ui(0, 0);
+	_siftMatch_frameFrameGlobal = vec2ui(0, 0);
+	_siftVerify_frameFrameGlobal = vec2ui(0, 0);
+	_opt_frameFrameGlobal = vec2ui(0, 0);
 #endif
 }
 
@@ -105,6 +114,16 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_imageInvalidateList, sizeof(int) * maxNumGlobalImages * maxNumLocalImages));
 
 	m_lastMatchedLocal = (unsigned int)-1; m_prevLastMatchedLocal = (unsigned int)-1;
+
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	const std::string name = "F:/Work/FriedLiver/data/iclnuim/Frame2FrameCorrespondences/output/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile));
+	BinaryDataStreamFile sLocal(name + ".local", false);
+	sLocal >> _gtFrameFrameTransformsLocal;
+	sLocal.closeStream();
+	BinaryDataStreamFile sGlobal(name + ".global", false);
+	sGlobal >> _gtFrameFrameTransformsGlobal;
+	sGlobal.closeStream();
+#endif
 }
 
 SubmapManager::~SubmapManager()
@@ -230,6 +249,64 @@ unsigned int SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftM
 			SiftVisualization::printCurrentMatches("debug/matchesKeyFilt" + suffix, siftManager, cudaCache, true);
 		}
 #endif
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+		std::vector<SIFTKeyPoint> keyPoints;
+		siftManager->getSIFTKeyPointsDEBUG(keyPoints);
+		{
+			std::vector<unsigned int> numFiltMatches; siftManager->getNumFiltMatchesDEBUG(numFiltMatches);
+			MLIB_ASSERT(!numFiltMatches.empty());
+			std::vector<uint2> keyPointIndices; std::vector<float> matchDistances;
+			//evaluate
+			for (unsigned int f = 0; f < numFiltMatches.size(); f++) {
+				siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(f, keyPointIndices, matchDistances);
+				if (numFiltMatches[f] > 0) { //found a frame-frame match
+					bool flip = false;
+					vec2ui frameIndices(f, curFrame); 
+					if (f > curFrame) {
+						frameIndices = vec2ui(curFrame, f);
+						flip = true;
+					}
+					bool good = false; mat4f transform; //todo make sure the ones not in gt set are actually bad
+					if (isLocal) {
+						frameIndices += m_global->getNumImages() * m_submapSize;
+						auto it = _gtFrameFrameTransformsLocal.find(frameIndices);
+						if (it != _gtFrameFrameTransformsLocal.end()) {
+							good = true;
+							transform = it->second;
+						}
+					}
+					else {
+						frameIndices *= m_submapSize;
+						auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
+						if (it != _gtFrameFrameTransformsGlobal.end()) {
+							good = true;
+							transform = it->second;
+						}
+					}
+					if (good) { //eval corrs 
+						float meanErr = 0.0f;
+						for (unsigned int k = 0; k < keyPointIndices.size(); k++) {
+							const SIFTKeyPoint& ki = keyPoints[keyPointIndices[k].x]; const SIFTKeyPoint& kj = keyPoints[keyPointIndices[k].y];
+							vec3f pos_i = MatrixConversion::toMlib(siftIntrinsicsInv) * (ki.depth * vec3f(ki.pos.x, ki.pos.y, 1.0f));
+							vec3f pos_j = MatrixConversion::toMlib(siftIntrinsicsInv) * (kj.depth * vec3f(kj.pos.x, kj.pos.y, 1.0f));
+							if (flip)	meanErr += (transform * pos_j - pos_i).lengthSq();
+							else		meanErr += (transform * pos_i - pos_j).lengthSq();
+						}
+						meanErr /= (float)keyPointIndices.size();
+						if (meanErr > 0.04f) good = false;//0.2f^2
+					}
+					if (isLocal) {
+						if (good) _siftMatch_frameFrameLocal.x++;
+						_siftMatch_frameFrameLocal.y++;
+					}
+					else {
+						if (good) _siftMatch_frameFrameGlobal.x++;
+						_siftMatch_frameFrameGlobal.y++;
+					}
+				}//sift matches found
+			}
+		}
+#endif
 
 		// --- surface area filter
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); timer.start(); }
@@ -277,21 +354,62 @@ unsigned int SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftM
 			SiftVisualization::printCurrentMatches("debug/filtMatches" + suffix, siftManager, cudaCache, true);
 			int a = 5;
 		}
-		//!!!debugging
-		//else if (!isLocal && curFrame == 200) {
-		//	siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
-		//	std::cout << "[global " << curFrame << "] " << _numFiltMatchesDV[199] << std::endl;
-		//}
-		//if (!isLocal && !_numFiltMatchesDV.empty()) {
-		//	std::vector<mat4f> transformsCurToMatch(numFrames);
-		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transformsCurToMatch.data(), siftManager->getFiltTransformsDEBUG(), sizeof(float4x4)*curFrame, cudaMemcpyDeviceToHost));
-		//	for (unsigned int i = startFrame; i < numFrames; i++) {
-		//		if (i != curFrame && _numFiltMatchesDV[i] > 0) {
-		//			_logFoundCorrespondences.push_back(std::make_pair(vec2ui(i, curFrame), transformsCurToMatch[i]));
-		//		}
-		//	} //potential frame matches
-		//}
-		//!!!debugging
+#endif
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+		{
+			std::vector<unsigned int> numFiltMatches; siftManager->getNumFiltMatchesDEBUG(numFiltMatches);
+			MLIB_ASSERT(!numFiltMatches.empty());
+			std::vector<uint2> keyPointIndices; std::vector<float> matchDistances;
+			//evaluate
+			for (unsigned int f = 0; f < numFiltMatches.size(); f++) {
+				siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(f, keyPointIndices, matchDistances);
+				if (numFiltMatches[f] > 0) { //found a frame-frame match
+					bool flip = false;
+					vec2ui frameIndices(f, curFrame); 
+					if (f > curFrame) {
+						frameIndices = vec2ui(curFrame, f);
+						flip = true;
+					}
+					bool good = false; mat4f transform; //todo make sure the ones not in gt set are actually bad
+					if (isLocal) {
+						frameIndices += m_global->getNumImages() * m_submapSize;
+						auto it = _gtFrameFrameTransformsLocal.find(frameIndices);
+						if (it != _gtFrameFrameTransformsLocal.end()) {
+							good = true;
+							transform = it->second;
+						}
+					}
+					else {
+						frameIndices *= m_submapSize;
+						auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
+						if (it != _gtFrameFrameTransformsGlobal.end()) {
+							good = true;
+							transform = it->second;
+						}
+					}
+					if (good) { //eval corrs 
+						float meanErr = 0.0f;
+						for (unsigned int k = 0; k < keyPointIndices.size(); k++) {
+							const SIFTKeyPoint& ki = keyPoints[keyPointIndices[k].x]; const SIFTKeyPoint& kj = keyPoints[keyPointIndices[k].y];
+							vec3f pos_i = MatrixConversion::toMlib(siftIntrinsicsInv) * (ki.depth * vec3f(ki.pos.x, ki.pos.y, 1.0f));
+							vec3f pos_j = MatrixConversion::toMlib(siftIntrinsicsInv) * (kj.depth * vec3f(kj.pos.x, kj.pos.y, 1.0f));
+							if (flip)	meanErr += (transform * pos_j - pos_i).lengthSq();
+							else		meanErr += (transform * pos_i - pos_j).lengthSq();
+						}
+						meanErr /= (float)keyPointIndices.size();
+						if (meanErr > 0.04f) good = false;//0.2f^2
+					}
+					if (isLocal) {
+						if (good) _siftVerify_frameFrameLocal.x++;
+						_siftVerify_frameFrameLocal.y++;
+					}
+					else {
+						if (good) _siftVerify_frameFrameGlobal.x++;
+						_siftVerify_frameFrameGlobal.y++;
+					}
+				}//sift matches found
+			}
+		}
 #endif
 
 		// --- filter frames
@@ -441,7 +559,6 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 				invalidateImages(curGlobalFrame * m_submapSize + i);
 		}
 		m_localTrajectoriesValid[curGlobalFrame] = validImagesLocal; m_localTrajectoriesValid[curGlobalFrame].resize(std::min(m_submapSize, local->getNumImages()));
-		//initializeNextGlobalTransform(false); //THIS DOESN'T USE NEXTLOCAL SO SHOULD BE OK//TODO CHECK
 		// done with local data!
 		finishLocalOpt();
 		mutex_nextLocal.unlock();
@@ -486,7 +603,6 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			ret = 0;
 			//don't need to initialize global transform since first global frame is identity
 		}
-		//initializeNextGlobalTransform(lastMatchedGlobal, m_prevLastMatchedLocal); //doesn't use nextlocal so ok to have here
 	}
 
 	return ret;
@@ -522,6 +638,48 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 
 		if (validImagesGlobal[numGlobalFrames - 1] != 0) ret = true;
 	}
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	if (isScanDone) {
+		vec2ui optFrameGlobal = vec2ui(0, 0);
+		std::vector<EntryJ> corrs(m_global->getNumGlobalCorrespondences());
+		MLIB_ASSERT(!corrs.empty());
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), m_global->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*corrs.size(), cudaMemcpyDeviceToHost));
+		//evaluate
+		std::unordered_map<vec2ui, vec2f> corrEval;
+		for (unsigned int f = 0; f < corrs.size(); f++) {
+			const EntryJ& c = corrs[f];
+			if (c.isValid()) { //found a frame-frame match
+				bool flip = false;
+				vec2ui frameIndices(c.imgIdx_i, c.imgIdx_j); 
+				if (c.imgIdx_j < c.imgIdx_i) {
+					frameIndices = vec2ui(c.imgIdx_j, c.imgIdx_i);
+					flip = true;
+				}
+				frameIndices *= m_submapSize;
+				auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
+				if (it != _gtFrameFrameTransformsGlobal.end()) {
+					float err2 = flip ? 
+						(it->second * vec3f(c.pos_j.x, c.pos_j.y, c.pos_j.z) - vec3f(c.pos_i.x, c.pos_i.y, c.pos_i.z)).lengthSq() :
+						(it->second * vec3f(c.pos_i.x, c.pos_i.y, c.pos_i.z) - vec3f(c.pos_j.x, c.pos_j.y, c.pos_j.z)).lengthSq();
+					auto itCorrEval = corrEval.find(frameIndices);
+					if (itCorrEval == corrEval.end()) corrEval[frameIndices] = vec2f(err2, 1.0f);
+					else itCorrEval->second += vec2f(err2, 1.0f);
+				}
+				else {
+					corrEval[frameIndices] = vec2f(-std::numeric_limits<float>::infinity());
+				}
+			} //valid corrs
+		}//correspondences
+		for (const auto& ce : corrEval) {
+			if (ce.second.x != -std::numeric_limits<float>::infinity()) {
+				float meanErr = ce.second.x / ce.second.y;
+				if (meanErr <= 0.04f) optFrameGlobal.x++;
+				optFrameGlobal.y++;
+			}
+		}
+		_opt_frameFrameGlobal = optFrameGlobal;
+	}
+#endif
 	return ret;
 }
 

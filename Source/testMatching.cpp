@@ -14,6 +14,18 @@
 
 extern "C" void updateConstantSiftCameraParams(const SiftCameraParams& params);
 
+template<>
+struct std::hash<vec2ui> : public std::unary_function < vec2ui, size_t > {
+	size_t operator()(const vec2ui& v) const {
+		//TODO larger prime number (64 bit) to match size_t
+		const size_t p0 = 73856093;
+		const size_t p1 = 19349669;
+		//const size_t p2 = 83492791;
+		const size_t res = ((size_t)v.x * p0) ^ ((size_t)v.y * p1);// ^ ((size_t)v.z * p2);
+		return res;
+	}
+};
+
 TestMatching::TestMatching()
 {
 	unsigned maxNumImages = GlobalBundlingState::get().s_maxNumImages;

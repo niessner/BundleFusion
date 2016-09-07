@@ -171,6 +171,7 @@ public:
 		return d_currNumFilteredMatchesPerImagePair;
 	}
 
+	unsigned int getTotalNumKeyPoints() const { return m_numKeyPoints; }
 	void setNumImagesDEBUG(unsigned int numImages) {
 		MLIB_ASSERT(numImages <= m_SIFTImagesGPU.size());
 		if (numImages == m_SIFTImagesGPU.size()) return;

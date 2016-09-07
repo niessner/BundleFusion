@@ -65,6 +65,7 @@ void Bundler::processInput()
 	const unsigned int curFrame = m_CudaImageManager->getCurrFrameNumber();
 	const bool isLastLocal = m_SubmapManager.isLastLocalFrame(curFrame);
 	if (curFrame > 0 && m_currentState.m_lastFrameProcessed == curFrame) { // special case the last local solve (needs to run once)
+		m_bIsScanDoneGlobalOpt = true;
 #ifdef RUN_MULTITHREADED 
 		if (m_RGBDSensor->isReceivingFrames()) { //debugging
 			std::cout << "WHY IS processInput called on same frame but still receiving frames???" << std::endl;

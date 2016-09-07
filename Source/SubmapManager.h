@@ -11,8 +11,20 @@
 #include "GlobalBundlingState.h"
 #include "mLibCuda.h"
 
-#define DEBUG_PRINT_MATCHING
-
+//#define DEBUG_PRINT_MATCHING
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+template<>
+struct std::hash<ml::vec2ui> : public std::unary_function < ml::vec2ui, size_t > {
+	size_t operator()(const ml::vec2ui& v) const {
+		//TODO larger prime number (64 bit) to match size_t
+		const size_t p0 = 73856093;
+		const size_t p1 = 19349669;
+		//const size_t p2 = 83492791;
+		const size_t res = ((size_t)v.x * p0) ^ ((size_t)v.y * p1);// ^ ((size_t)v.z * p2);
+		return res;
+	}
+};
+#endif
 
 class SiftGPU;
 class SiftMatchGPU;
@@ -144,6 +156,33 @@ public:
 	void printConvergence(const std::string& filename) const {
 		m_SparseBundler.printConvergence(filename);
 	}
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	void printSparseCorrEval() const {
+		std::cout << "========= LOCAL =========" << std::endl;
+		std::cout << "SIFT MATCH:" << std::endl;
+		std::cout << "\tprecision: (" << _siftMatch_frameFrameLocal.x << " / " << _siftMatch_frameFrameLocal.y << ") = " << ((float)_siftMatch_frameFrameLocal.x / (float)_siftMatch_frameFrameLocal.y) << std::endl;
+		std::cout << "\trecall:    (" << _siftMatch_frameFrameLocal.x << " / " << _gtFrameFrameTransformsLocal.size() << ") = " << ((float)_siftMatch_frameFrameLocal.x / (float)_gtFrameFrameTransformsLocal.size()) << std::endl;
+		std::cout << "SIFT VERIFY:" << std::endl;
+		std::cout << "\tprecision: (" << _siftVerify_frameFrameLocal.x << " / " << _siftVerify_frameFrameLocal.y << ") = " << ((float)_siftVerify_frameFrameLocal.x / (float)_siftVerify_frameFrameLocal.y) << std::endl;
+		std::cout << "\trecall:    (" << _siftVerify_frameFrameLocal.x << " / " << _gtFrameFrameTransformsLocal.size() << ") = " << ((float)_siftVerify_frameFrameLocal.x / (float)_gtFrameFrameTransformsLocal.size()) << std::endl;
+		std::cout << "========= GLOBAL =========" << std::endl;
+		std::cout << "SIFT MATCH:" << std::endl;
+		std::cout << "\tprecision: (" << _siftMatch_frameFrameGlobal.x << " / " << _siftMatch_frameFrameGlobal.y << ") = " << ((float)_siftMatch_frameFrameGlobal.x / (float)_siftMatch_frameFrameGlobal.y) << std::endl;
+		std::cout << "\trecall:    (" << _siftMatch_frameFrameGlobal.x << " / " << _gtFrameFrameTransformsGlobal.size() << ") = " << ((float)_siftMatch_frameFrameGlobal.x / (float)_gtFrameFrameTransformsGlobal.size()) << std::endl;
+		std::cout << "SIFT VERIFY:" << std::endl;
+		std::cout << "\tprecision: (" << _siftVerify_frameFrameGlobal.x << " / " << _siftVerify_frameFrameGlobal.y << ") = " << ((float)_siftVerify_frameFrameGlobal.x / (float)_siftVerify_frameFrameGlobal.y) << std::endl;
+		std::cout << "\trecall:    (" << _siftVerify_frameFrameGlobal.x << " / " << _gtFrameFrameTransformsGlobal.size() << ") = " << ((float)_siftVerify_frameFrameGlobal.x / (float)_gtFrameFrameTransformsGlobal.size()) << std::endl;
+		std::cout << "OPT VERIFY:" << std::endl;
+		std::cout << "\tprecision: (" << _opt_frameFrameGlobal.x << " / " << _opt_frameFrameGlobal.y << ") = " << ((float)_opt_frameFrameGlobal.x / (float)_opt_frameFrameGlobal.y) << std::endl;
+		std::cout << "\trecall:    (" << _opt_frameFrameGlobal.x << " / " << _gtFrameFrameTransformsGlobal.size() << ") = " << ((float)_opt_frameFrameGlobal.x / (float)_gtFrameFrameTransformsGlobal.size()) << std::endl;
+	}
+#endif
+#ifdef PRINT_MEM_STATS
+	void printMemStats() const {
+		std::cout << "#sift keys = " << m_global->getTotalNumKeyPoints() << std::endl;
+		std::cout << "#residuals = " << m_global->getNumGlobalCorrespondences() << std::endl;
+	}
+#endif
 
 	//! only debug 
 	const SIFTImageManager* getCurrentLocalDEBUG() const { return m_currentLocal; }
@@ -267,6 +306,16 @@ private:
 #ifdef DEBUG_PRINT_MATCHING
 	bool _debugPrintMatches;
 	std::vector<std::pair<vec2ui, mat4f>> _logFoundCorrespondences; // logging the initially found (no invalidation) image-image correspondences; for global; (frame, curframe) transform from cur to frame
+#endif
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	vec2ui _siftMatch_frameFrameLocal; //#correct, #total got
+	vec2ui _siftVerify_frameFrameLocal; //#correct, #total got
+	std::unordered_map<vec2ui, mat4f> _gtFrameFrameTransformsLocal; //from x -> y
+
+	vec2ui _siftMatch_frameFrameGlobal; //#correct, #total got
+	vec2ui _siftVerify_frameFrameGlobal; //#correct, #total got
+	vec2ui _opt_frameFrameGlobal; //#correct, #total got
+	std::unordered_map<vec2ui, mat4f> _gtFrameFrameTransformsGlobal;
 #endif
 };
 

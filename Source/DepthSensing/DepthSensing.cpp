@@ -903,6 +903,17 @@ void reintegrate()
 
 void StopScanningAndExit(bool aborted = false)
 {
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	g_depthSensingBundler->printSparseCorrEval();
+#endif
+#ifdef PRINT_MEM_STATS
+	unsigned int heapOccCount = g_sceneRep->getHashParams().m_numSDFBlocks - g_sceneRep->getHeapFreeCount();
+	std::cout << "=============== RECONSTRUCTION ===============" << std::endl;
+	std::cout << "#hash buckets = " << g_sceneRep->getHashParams().m_hashNumBuckets << std::endl;
+	std::cout << "#voxel blocks = " << heapOccCount << std::endl;
+	std::cout << "=============== OPTIMIZATION ===============" << std::endl;
+	g_depthSensingBundler->printMemStats();
+#endif
 	std::cout << "[ stop scanning and exit ]" << std::endl;
 	if (!aborted) {
 		//estimate validity of reconstruction

@@ -153,9 +153,13 @@ public:
 	void saveIntegrateTrajectory(const std::string& filename);
 	void saveGlobalSiftManagerAndCacheToFile(const std::string& prefix) const { m_SubmapManager.saveGlobalSiftManagerAndCache(prefix); }
 #ifdef DEBUG_PRINT_MATCHING
-	void saveLogsToFile() const {
-		m_SubmapManager.saveLogImImCorrsToFile("debug/_logs/log");
-	}
+	void saveLogsToFile() const { m_SubmapManager.saveLogImImCorrsToFile("debug/_logs/log"); }
+#endif
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	void printSparseCorrEval() const { m_SubmapManager.printSparseCorrEval(); }
+#endif
+#ifdef PRINT_MEM_STATS
+	void printMemStats() const { m_SubmapManager.printMemStats(); }
 #endif
 
 	TrajectoryManager* getTrajectoryManager() {
