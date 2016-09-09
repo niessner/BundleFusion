@@ -523,6 +523,7 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 			else {
 				std::cout << "Cannot evaluate trajectory (sensorIdx != 3)" << std::endl;
 			}
+			//g_depthSensingBundler->printSparseCorrEval();
 		}
 		case 'C':
 		{
@@ -904,6 +905,11 @@ void reintegrate()
 void StopScanningAndExit(bool aborted = false)
 {
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	{
+		std::vector<mat4f> trajectory;
+		g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+		((SensorDataReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
+	}
 	g_depthSensingBundler->printSparseCorrEval();
 #endif
 #ifdef PRINT_MEM_STATS

@@ -12,6 +12,7 @@
 
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
 #include "SensorDataReader.h"
+#include "FrameProjection.h"
 #endif
 
 SubmapManager::SubmapManager()
@@ -44,8 +45,9 @@ SubmapManager::SubmapManager()
 	_debugPrintMatches = false;
 #endif
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
-	_siftMatch_frameFrameLocal = vec2ui(0, 0);
-	_siftVerify_frameFrameLocal = vec2ui(0, 0);
+	//_siftMatch_frameFrameLocal = vec2ui(0, 0);
+	//_siftVerify_frameFrameLocal = vec2ui(0, 0);
+	_siftRaw_frameFrameGlobal = vec2ui(0, 0);
 	_siftMatch_frameFrameGlobal = vec2ui(0, 0);
 	_siftVerify_frameFrameGlobal = vec2ui(0, 0);
 	_opt_frameFrameGlobal = vec2ui(0, 0);
@@ -113,13 +115,13 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_imageInvalidateList, sizeof(int) * maxNumGlobalImages * maxNumLocalImages));
 
-	m_lastMatchedLocal = (unsigned int)-1; m_prevLastMatchedLocal = (unsigned int)-1;
+	m_lastValidLocal = (unsigned int)-1; m_prevLastValidLocal = (unsigned int)-1;
 
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
-	const std::string name = "F:/Work/FriedLiver/data/iclnuim/Frame2FrameCorrespondences/output/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile));
-	BinaryDataStreamFile sLocal(name + ".local", false);
-	sLocal >> _gtFrameFrameTransformsLocal;
-	sLocal.closeStream();
+	const std::string name = "F:/Work/FriedLiver/data/iclnuim/Frame2FrameCorrespondences/output/30percent/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile));
+	//BinaryDataStreamFile sLocal(name + ".local", false);
+	//sLocal >> _gtFrameFrameTransformsLocal;
+	//sLocal.closeStream();
 	BinaryDataStreamFile sGlobal(name + ".global", false);
 	sGlobal >> _gtFrameFrameTransformsGlobal;
 	sGlobal.closeStream();
@@ -234,6 +236,78 @@ unsigned int SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftM
 			SiftVisualization::printCurrentMatches("debug/rawMatches" + suffix, siftManager, cudaCache, false);
 		}
 #endif
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+		const float minOverlapPercent = 0.3f;
+		std::vector<SIFTKeyPoint> keyPoints;
+		if (!isLocal) {
+			siftManager->getSIFTKeyPointsDEBUG(keyPoints);
+			std::vector<unsigned int> numRawMatches; siftManager->getNumRawMatchesDEBUG(numRawMatches);
+			MLIB_ASSERT(!numRawMatches.empty());
+			std::vector<uint2> keyPointIndices; std::vector<float> matchDistances;
+			//begin determine if enough overlap
+			std::vector<mat4f> estimatedTransforms(numRawMatches.size());
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(estimatedTransforms.data(), siftManager->getFiltTransformsDEBUG(), sizeof(mat4f)*estimatedTransforms.size(), cudaMemcpyDeviceToHost));
+			const std::vector<CUDACachedFrame>& cachedFrames = m_globalCache->getCacheFrames();
+			DepthImage32 depthImageCur(m_globalCache->getWidth(), m_globalCache->getHeight()); ColorImageR8G8B8 dummy;
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImageCur.getData(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float)*depthImageCur.getNumPixels(), cudaMemcpyDeviceToHost));
+			//end determine if enough overlap
+			//evaluate
+			std::unordered_set<vec2ui> notEnoughOverlapSet;
+			for (unsigned int f = startFrame; f < numRawMatches.size(); f++) {
+				if (f == curFrame) continue;
+				if (numRawMatches[f] > 0) { //found a frame-frame match
+					if (notEnoughOverlapSet.find(vec2ui(f, curFrame)) != notEnoughOverlapSet.end()) continue;
+					siftManager->getRawKeyPointIndicesAndMatchDistancesDEBUG(f, keyPointIndices, matchDistances);
+					//begin determine if enough overlap
+					if (!FrameProjection::isApproxOverlapping(m_globalCache->getIntrinsics(), bbox2f(vec2f::origin, vec2f((float)m_globalCache->getWidth(), (float)m_globalCache->getHeight())),
+						estimatedTransforms[f], mat4f::identity())) {
+						notEnoughOverlapSet.insert(vec2ui(f, curFrame));
+						continue;
+					}
+					DepthImage32 depthImageOther(m_globalCache->getWidth(), m_globalCache->getHeight()); ColorImageR8G8B8 dummy;
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImageOther.getData(), cachedFrames[f].d_depthDownsampled, sizeof(float)*depthImageOther.getNumPixels(), cudaMemcpyDeviceToHost));
+					vec2ui overlap = FrameProjection::computeOverlap(depthImageOther, dummy, depthImageCur, dummy, estimatedTransforms[f],
+						m_globalCache->getIntrinsics(), 0.5f, 4.5f, 0.15f, 0.9f, 0.1f, false);
+					float overlapPercent = (float)overlap.x / (float)overlap.y;
+					if (overlapPercent < minOverlapPercent) {
+						notEnoughOverlapSet.insert(vec2ui(f, curFrame));
+						continue;
+					}
+					//end determine if enough overlap
+					bool flip = false;
+					vec2ui frameIndices(f, curFrame);
+					if (f > curFrame) {
+						frameIndices = vec2ui(curFrame, f);
+						flip = true;
+					}
+					bool good = false; mat4f transform; //todo make sure the ones not in gt set are actually bad
+					frameIndices *= m_submapSize;
+					auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
+					if (it != _gtFrameFrameTransformsGlobal.end()) {
+						good = true;
+						transform = it->second;
+					}
+					if (good) { //eval corrs 
+						float meanErr = 0.0f;
+						for (unsigned int k = 0; k < keyPointIndices.size(); k++) {
+							const SIFTKeyPoint& ki = keyPoints[keyPointIndices[k].x]; const SIFTKeyPoint& kj = keyPoints[keyPointIndices[k].y];
+							vec3f pos_i = MatrixConversion::toMlib(siftIntrinsicsInv) * (ki.depth * vec3f(ki.pos.x, ki.pos.y, 1.0f));
+							vec3f pos_j = MatrixConversion::toMlib(siftIntrinsicsInv) * (kj.depth * vec3f(kj.pos.x, kj.pos.y, 1.0f));
+							if (flip)	meanErr += (transform * pos_j - pos_i).lengthSq();
+							else		meanErr += (transform * pos_i - pos_j).lengthSq();
+						}
+						meanErr /= (float)keyPointIndices.size();
+						if (meanErr > 0.04f) good = false;//0.2f^2
+						if (good) _siftRaw_frameFrameGlobal.x++;
+						_siftRaw_frameFrameGlobal.y++;
+					}
+					else {
+						_siftRaw_frameFrameGlobal.y++;
+					}
+				}//sift matches found
+			}
+		}
+#endif
 
 		// --- filter matches
 		const unsigned int minNumMatches = isLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
@@ -250,39 +324,63 @@ unsigned int SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftM
 		}
 #endif
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
-		std::vector<SIFTKeyPoint> keyPoints;
-		siftManager->getSIFTKeyPointsDEBUG(keyPoints);
-		{
+		if (!isLocal) {
 			std::vector<unsigned int> numFiltMatches; siftManager->getNumFiltMatchesDEBUG(numFiltMatches);
 			MLIB_ASSERT(!numFiltMatches.empty());
 			std::vector<uint2> keyPointIndices; std::vector<float> matchDistances;
+			//begin determine if enough overlap
+			std::vector<mat4f> estimatedTransforms(numFiltMatches.size());
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(estimatedTransforms.data(), siftManager->getFiltTransformsDEBUG(), sizeof(mat4f)*estimatedTransforms.size(), cudaMemcpyDeviceToHost));
+			const std::vector<CUDACachedFrame>& cachedFrames = m_globalCache->getCacheFrames();
+			DepthImage32 depthImageCur(m_globalCache->getWidth(), m_globalCache->getHeight()); ColorImageR8G8B8 dummy;
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImageCur.getData(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float)*depthImageCur.getNumPixels(), cudaMemcpyDeviceToHost));
+			//end determine if enough overlap
 			//evaluate
-			for (unsigned int f = 0; f < numFiltMatches.size(); f++) {
-				siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(f, keyPointIndices, matchDistances);
+			std::unordered_set<vec2ui> notEnoughOverlapSet;
+			for (unsigned int f = startFrame; f < numFiltMatches.size(); f++) {
+				if (f == curFrame) continue;
 				if (numFiltMatches[f] > 0) { //found a frame-frame match
+					if (notEnoughOverlapSet.find(vec2ui(f, curFrame)) != notEnoughOverlapSet.end()) continue;
+					siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(f, keyPointIndices, matchDistances);
+					//begin determine if enough overlap
+					if (!FrameProjection::isApproxOverlapping(m_globalCache->getIntrinsics(), bbox2f(vec2f::origin, vec2f((float)m_globalCache->getWidth(), (float)m_globalCache->getHeight())),
+						estimatedTransforms[f], mat4f::identity())) {
+						notEnoughOverlapSet.insert(vec2ui(f, curFrame));
+						continue;
+					}
+					DepthImage32 depthImageOther(m_globalCache->getWidth(), m_globalCache->getHeight()); ColorImageR8G8B8 dummy;
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImageOther.getData(), cachedFrames[f].d_depthDownsampled, sizeof(float)*depthImageOther.getNumPixels(), cudaMemcpyDeviceToHost));
+					vec2ui overlap = FrameProjection::computeOverlap(depthImageOther, dummy, depthImageCur, dummy, estimatedTransforms[f],
+						m_globalCache->getIntrinsics(), 0.5f, 4.5f, 0.15f, 0.9f, 0.1f, false);
+					float overlapPercent = (float)overlap.x / (float)overlap.y;
+					if (overlapPercent < minOverlapPercent){
+						notEnoughOverlapSet.insert(vec2ui(f, curFrame));
+						continue;
+					}
+					//end determine if enough overlap
 					bool flip = false;
-					vec2ui frameIndices(f, curFrame); 
+					vec2ui frameIndices(f, curFrame);
 					if (f > curFrame) {
 						frameIndices = vec2ui(curFrame, f);
 						flip = true;
 					}
 					bool good = false; mat4f transform; //todo make sure the ones not in gt set are actually bad
-					if (isLocal) {
-						frameIndices += m_global->getNumImages() * m_submapSize;
-						auto it = _gtFrameFrameTransformsLocal.find(frameIndices);
-						if (it != _gtFrameFrameTransformsLocal.end()) {
-							good = true;
-							transform = it->second;
-						}
+					//if (isLocal) {
+					//	frameIndices += m_global->getNumImages() * m_submapSize;
+					//	auto it = _gtFrameFrameTransformsLocal.find(frameIndices);
+					//	if (it != _gtFrameFrameTransformsLocal.end()) {
+					//		good = true;
+					//		transform = it->second;
+					//	}
+					//}
+					//else {
+					frameIndices *= m_submapSize;
+					auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
+					if (it != _gtFrameFrameTransformsGlobal.end()) {
+						good = true;
+						transform = it->second;
 					}
-					else {
-						frameIndices *= m_submapSize;
-						auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
-						if (it != _gtFrameFrameTransformsGlobal.end()) {
-							good = true;
-							transform = it->second;
-						}
-					}
+					//}
 					if (good) { //eval corrs 
 						float meanErr = 0.0f;
 						for (unsigned int k = 0; k < keyPointIndices.size(); k++) {
@@ -294,14 +392,19 @@ unsigned int SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftM
 						}
 						meanErr /= (float)keyPointIndices.size();
 						if (meanErr > 0.04f) good = false;//0.2f^2
-					}
-					if (isLocal) {
-						if (good) _siftMatch_frameFrameLocal.x++;
-						_siftMatch_frameFrameLocal.y++;
-					}
-					else {
+						//if (isLocal) {
+						//	if (good) _siftMatch_frameFrameLocal.x++;
+						//	_siftMatch_frameFrameLocal.y++;
+						//}
+						//else {
 						if (good) _siftMatch_frameFrameGlobal.x++;
 						_siftMatch_frameFrameGlobal.y++;
+						//}
+					}
+					else {
+						//if (isLocal) { _siftMatch_frameFrameLocal.y++; }
+						//else { 
+						_siftMatch_frameFrameGlobal.y++;//	}
 					}
 				}//sift matches found
 			}
@@ -352,41 +455,66 @@ unsigned int SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftM
 		if (printDebug) {
 			siftManager->getNumFiltMatchesDEBUG(_numFiltMatchesDV);
 			SiftVisualization::printCurrentMatches("debug/filtMatches" + suffix, siftManager, cudaCache, true);
-			int a = 5;
 		}
 #endif
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
-		{
+		if (!isLocal) {
 			std::vector<unsigned int> numFiltMatches; siftManager->getNumFiltMatchesDEBUG(numFiltMatches);
 			MLIB_ASSERT(!numFiltMatches.empty());
 			std::vector<uint2> keyPointIndices; std::vector<float> matchDistances;
+			//begin determine if enough overlap
+			std::vector<mat4f> estimatedTransforms(numFiltMatches.size());
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(estimatedTransforms.data(), siftManager->getFiltTransformsDEBUG(), sizeof(mat4f)*estimatedTransforms.size(), cudaMemcpyDeviceToHost));
+			const std::vector<CUDACachedFrame>& cachedFrames = m_globalCache->getCacheFrames();
+			DepthImage32 depthImageCur(m_globalCache->getWidth(), m_globalCache->getHeight()); ColorImageR8G8B8 dummy;
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImageCur.getData(), cachedFrames[curFrame].d_depthDownsampled, sizeof(float)*depthImageCur.getNumPixels(), cudaMemcpyDeviceToHost));
+			//end determine if enough overlap
 			//evaluate
-			for (unsigned int f = 0; f < numFiltMatches.size(); f++) {
-				siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(f, keyPointIndices, matchDistances);
+			std::unordered_set<vec2ui> notEnoughOverlapSet;
+			for (unsigned int f = startFrame; f < numFiltMatches.size(); f++) {
+				if (f == curFrame) continue;
 				if (numFiltMatches[f] > 0) { //found a frame-frame match
+					if (notEnoughOverlapSet.find(vec2ui(f, curFrame)) != notEnoughOverlapSet.end()) continue;
+					siftManager->getFiltKeyPointIndicesAndMatchDistancesDEBUG(f, keyPointIndices, matchDistances);
+					//begin determine if enough overlap
+					if (!FrameProjection::isApproxOverlapping(m_globalCache->getIntrinsics(), bbox2f(vec2f::origin, vec2f((float)m_globalCache->getWidth(), (float)m_globalCache->getHeight())),
+						estimatedTransforms[f], mat4f::identity())) {
+						notEnoughOverlapSet.insert(vec2ui(f, curFrame));
+						continue;
+					}
+					DepthImage32 depthImageOther(m_globalCache->getWidth(), m_globalCache->getHeight()); ColorImageR8G8B8 dummy;
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImageOther.getData(), cachedFrames[f].d_depthDownsampled, sizeof(float)*depthImageOther.getNumPixels(), cudaMemcpyDeviceToHost));
+					vec2ui overlap = FrameProjection::computeOverlap(depthImageOther, dummy, depthImageCur, dummy, estimatedTransforms[f],
+						m_globalCache->getIntrinsics(), 0.5f, 4.5f, 0.15f, 0.9f, 0.1f, false);
+					float overlapPercent = (float)overlap.x / (float)overlap.y;
+					if (overlapPercent < minOverlapPercent) {
+						notEnoughOverlapSet.insert(vec2ui(f, curFrame));
+						continue;
+					}
+					//end determine if enough overlap
 					bool flip = false;
-					vec2ui frameIndices(f, curFrame); 
+					vec2ui frameIndices(f, curFrame);
 					if (f > curFrame) {
 						frameIndices = vec2ui(curFrame, f);
 						flip = true;
 					}
 					bool good = false; mat4f transform; //todo make sure the ones not in gt set are actually bad
-					if (isLocal) {
-						frameIndices += m_global->getNumImages() * m_submapSize;
-						auto it = _gtFrameFrameTransformsLocal.find(frameIndices);
-						if (it != _gtFrameFrameTransformsLocal.end()) {
-							good = true;
-							transform = it->second;
-						}
+					//if (isLocal) {
+					//	frameIndices += m_global->getNumImages() * m_submapSize;
+					//	auto it = _gtFrameFrameTransformsLocal.find(frameIndices);
+					//	if (it != _gtFrameFrameTransformsLocal.end()) {
+					//		good = true;
+					//		transform = it->second;
+					//	}
+					//}
+					//else {
+					frameIndices *= m_submapSize;
+					auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
+					if (it != _gtFrameFrameTransformsGlobal.end()) {
+						good = true;
+						transform = it->second;
 					}
-					else {
-						frameIndices *= m_submapSize;
-						auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
-						if (it != _gtFrameFrameTransformsGlobal.end()) {
-							good = true;
-							transform = it->second;
-						}
-					}
+					//}
 					if (good) { //eval corrs 
 						float meanErr = 0.0f;
 						for (unsigned int k = 0; k < keyPointIndices.size(); k++) {
@@ -398,14 +526,19 @@ unsigned int SubmapManager::matchAndFilter(bool isLocal, SIFTImageManager* siftM
 						}
 						meanErr /= (float)keyPointIndices.size();
 						if (meanErr > 0.04f) good = false;//0.2f^2
-					}
-					if (isLocal) {
-						if (good) _siftVerify_frameFrameLocal.x++;
-						_siftVerify_frameFrameLocal.y++;
-					}
-					else {
+						//if (isLocal) {
+						//	if (good) _siftVerify_frameFrameLocal.x++;
+						//	_siftVerify_frameFrameLocal.y++;
+						//}
+						//else {
 						if (good) _siftVerify_frameFrameGlobal.x++;
 						_siftVerify_frameFrameGlobal.y++;
+						//}
+					}
+					else {
+						//if (isLocal) { _siftVerify_frameFrameLocal.y++; }
+						//else { 
+						_siftVerify_frameFrameGlobal.y++; //}
 					}
 				}//sift matches found
 			}
@@ -559,6 +692,7 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 				invalidateImages(curGlobalFrame * m_submapSize + i);
 		}
 		m_localTrajectoriesValid[curGlobalFrame] = validImagesLocal; m_localTrajectoriesValid[curGlobalFrame].resize(std::min(m_submapSize, local->getNumImages()));
+		initializeNextGlobalTransform(curGlobalFrame, (unsigned int)-1); //TODO try local idx too?
 		// done with local data!
 		finishLocalOpt();
 		mutex_nextLocal.unlock();
@@ -582,8 +716,10 @@ int SubmapManager::computeAndMatchGlobalKeys(unsigned int lastLocalSolved, const
 			//	getchar();
 			//}
 			//!!!DEBUGGING
-			initializeNextGlobalTransform(lastMatchedGlobal, m_prevLastMatchedLocal); //doesn't use nextlocal so ok to have here //need this before revalidate
-
+			if (lastMatchedGlobal != (unsigned int)-1 && lastMatchedGlobal + 1 != curGlobalFrame) { //re-initialize to better location based off of last match
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + curGlobalFrame, d_globalTrajectory + lastMatchedGlobal, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + curGlobalFrame + 1, d_globalTrajectory + lastMatchedGlobal, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+			}
 			if (m_global->getValidImages()[curGlobalFrame]) {
 				ret = 1; // ready to solve global
 #ifdef USE_RETRY
@@ -622,62 +758,96 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 {
 	bool ret = false;
 	const unsigned int numGlobalFrames = m_global->getNumImages();
+	const unsigned int curGlobalFrame = m_global->getCurrentFrame();
 
 	const bool useVerify = false;
-	m_SparseBundler.align(m_global, m_globalCache, d_globalTrajectory, numNonLinIterations, numLinIterations,
+	bool removed = m_SparseBundler.align(m_global, m_globalCache, d_globalTrajectory, numNonLinIterations, numLinIterations,
 		useVerify, false, GlobalBundlingState::get().s_recordSolverConvergence, isStart, removeMaxResidual, isScanDone, m_revalidatedIdx);
 
-	if (removeMaxResidual) {
+	const std::vector<int>& validImagesGlobal = m_global->getValidImages();
+	if (removed) {
 		// may invalidate already invalidated images
-		const std::vector<int>& validImagesGlobal = m_global->getValidImages();
 		for (unsigned int i = 0; i < numGlobalFrames; i++) {
 			if (validImagesGlobal[i] == 0) {
 				invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numFrames));
 			}
 		}
-
-		if (validImagesGlobal[numGlobalFrames - 1] != 0) ret = true;
 	}
+	if (removeMaxResidual && validImagesGlobal[numGlobalFrames - 1] != 0) ret = true;
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
 	if (isScanDone) {
-		vec2ui optFrameGlobal = vec2ui(0, 0);
-		std::vector<EntryJ> corrs(m_global->getNumGlobalCorrespondences());
-		MLIB_ASSERT(!corrs.empty());
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), m_global->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*corrs.size(), cudaMemcpyDeviceToHost));
-		//evaluate
-		std::unordered_map<vec2ui, vec2f> corrEval;
-		for (unsigned int f = 0; f < corrs.size(); f++) {
-			const EntryJ& c = corrs[f];
-			if (c.isValid()) { //found a frame-frame match
-				bool flip = false;
-				vec2ui frameIndices(c.imgIdx_i, c.imgIdx_j); 
-				if (c.imgIdx_j < c.imgIdx_i) {
-					frameIndices = vec2ui(c.imgIdx_j, c.imgIdx_i);
-					flip = true;
-				}
-				frameIndices *= m_submapSize;
-				auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
-				if (it != _gtFrameFrameTransformsGlobal.end()) {
-					float err2 = flip ? 
-						(it->second * vec3f(c.pos_j.x, c.pos_j.y, c.pos_j.z) - vec3f(c.pos_i.x, c.pos_i.y, c.pos_i.z)).lengthSq() :
-						(it->second * vec3f(c.pos_i.x, c.pos_i.y, c.pos_i.z) - vec3f(c.pos_j.x, c.pos_j.y, c.pos_j.z)).lengthSq();
-					auto itCorrEval = corrEval.find(frameIndices);
-					if (itCorrEval == corrEval.end()) corrEval[frameIndices] = vec2f(err2, 1.0f);
-					else itCorrEval->second += vec2f(err2, 1.0f);
+		static unsigned int counter = 0;
+		if (counter >= 10 && (counter % 10) == 0) {
+			vec2ui optFrameGlobal = vec2ui(0, 0);
+			std::vector<EntryJ> corrs(m_global->getNumGlobalCorrespondences());
+			MLIB_ASSERT(!corrs.empty());
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), m_global->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*corrs.size(), cudaMemcpyDeviceToHost));
+			//begin determine if enough overlap
+			std::vector<mat4f> estimatedTransforms(m_global->getNumImages());
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(estimatedTransforms.data(), d_globalTrajectory, sizeof(mat4f)*estimatedTransforms.size(), cudaMemcpyDeviceToHost));
+			const std::vector<CUDACachedFrame>& cachedFrames = m_globalCache->getCacheFrames();
+			//end determine if enough overlap
+			//evaluate
+			std::unordered_map<vec2ui, vec2f> corrEval; std::unordered_set<vec2ui> notEnoughOverlapSet;
+			for (unsigned int f = 0; f < corrs.size(); f++) {
+				const EntryJ& c = corrs[f];
+				if (c.isValid()) { //found a frame-frame match
+					if (notEnoughOverlapSet.find(vec2ui(c.imgIdx_i, c.imgIdx_j)) != notEnoughOverlapSet.end()) continue;
+					//begin determine if enough overlap
+					if (!FrameProjection::isApproxOverlapping(m_globalCache->getIntrinsics(), bbox2f(vec2f::origin, vec2f((float)m_globalCache->getWidth(), (float)m_globalCache->getHeight())),
+						estimatedTransforms[c.imgIdx_i], estimatedTransforms[c.imgIdx_j])) {
+						notEnoughOverlapSet.insert(vec2ui(c.imgIdx_i, c.imgIdx_j));
+						continue;
+					}
+					DepthImage32 depthImage0(m_globalCache->getWidth(), m_globalCache->getHeight()); ColorImageR8G8B8 dummy;
+					DepthImage32 depthImage1(m_globalCache->getWidth(), m_globalCache->getHeight());
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage0.getData(), cachedFrames[c.imgIdx_i].d_depthDownsampled, sizeof(float)*depthImage0.getNumPixels(), cudaMemcpyDeviceToHost));
+					MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage1.getData(), cachedFrames[c.imgIdx_j].d_depthDownsampled, sizeof(float)*depthImage1.getNumPixels(), cudaMemcpyDeviceToHost));
+					vec2ui overlap = FrameProjection::computeOverlap(depthImage0, dummy, depthImage1, dummy, estimatedTransforms[c.imgIdx_j].getInverse() * estimatedTransforms[c.imgIdx_i],
+						m_globalCache->getIntrinsics(), 0.5f, 4.5f, 0.15f, 0.9f, 0.1f, false);
+					float overlapPercent = (float)overlap.x / (float)overlap.y;
+					if (overlapPercent < 0.3f) {
+						notEnoughOverlapSet.insert(vec2ui(c.imgIdx_i, c.imgIdx_j));
+						continue;
+					}
+					//end determine if enough overlap
+					bool flip = false;
+					vec2ui frameIndices(c.imgIdx_i, c.imgIdx_j);
+					if (c.imgIdx_j < c.imgIdx_i) {
+						frameIndices = vec2ui(c.imgIdx_j, c.imgIdx_i);
+						flip = true;
+					}
+					frameIndices *= m_submapSize;
+					auto it = _gtFrameFrameTransformsGlobal.find(frameIndices);
+					if (it != _gtFrameFrameTransformsGlobal.end()) {
+						float err2 = flip ?
+							(it->second * vec3f(c.pos_j.x, c.pos_j.y, c.pos_j.z) - vec3f(c.pos_i.x, c.pos_i.y, c.pos_i.z)).lengthSq() :
+							(it->second * vec3f(c.pos_i.x, c.pos_i.y, c.pos_i.z) - vec3f(c.pos_j.x, c.pos_j.y, c.pos_j.z)).lengthSq();
+						auto itCorrEval = corrEval.find(frameIndices);
+						if (itCorrEval == corrEval.end()) corrEval[frameIndices] = vec2f(err2, 1.0f);
+						else itCorrEval->second += vec2f(err2, 1.0f);
+					}
+					else {
+						corrEval[frameIndices] = vec2f(-std::numeric_limits<float>::infinity());
+						vec2ui overlap = FrameProjection::computeOverlap(depthImage0, dummy, depthImage1, dummy, estimatedTransforms[c.imgIdx_j].getInverse() * estimatedTransforms[c.imgIdx_i],
+							m_globalCache->getIntrinsics(), 0.5f, 4.5f, 0.15f, 0.9f, 0.1f, true);
+						int a = 5;
+					}
+				} //valid corrs
+			}//correspondences
+			for (const auto& ce : corrEval) {
+				if (ce.second.x != -std::numeric_limits<float>::infinity()) {
+					float meanErr = ce.second.x / ce.second.y;
+					if (meanErr <= 0.04f) optFrameGlobal.x++;
+					optFrameGlobal.y++;
 				}
 				else {
-					corrEval[frameIndices] = vec2f(-std::numeric_limits<float>::infinity());
+					optFrameGlobal.y++;
 				}
-			} //valid corrs
-		}//correspondences
-		for (const auto& ce : corrEval) {
-			if (ce.second.x != -std::numeric_limits<float>::infinity()) {
-				float meanErr = ce.second.x / ce.second.y;
-				if (meanErr <= 0.04f) optFrameGlobal.x++;
-				optFrameGlobal.y++;
 			}
+			_opt_frameFrameGlobal = optFrameGlobal;
 		}
-		_opt_frameFrameGlobal = optFrameGlobal;
+		counter++;
 	}
 #endif
 	return ret;

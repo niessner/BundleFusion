@@ -10,11 +10,10 @@ __global__ void updateTrajectoryCU_Kernel(float4x4* d_globalTrajectory, unsigned
 {
 	const unsigned int idxComplete = blockIdx.x * blockDim.x + threadIdx.x;
 	const unsigned int submapSize = numLocalTransformsPerTrajectory - 1;
-
+	
 	if (idxComplete < numCompleteTransforms) {
 		const unsigned int idxGlobal = idxComplete / submapSize;
 		const unsigned int idxLocal = idxComplete % submapSize;
-
 		if (d_imageInvalidateList[idxComplete] == 0) {
 			d_completeTrajectory[idxComplete].setValue(MINF);
 		}
@@ -47,26 +46,25 @@ extern "C" void updateTrajectoryCU(
 
 
 __global__ void initNextGlobalTransformCU_Kernel(float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory,
-	unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal)
+	unsigned int initGlobalIdx,
+	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
+	//,unsigned int lastMatchedLocal)
 {
-	//d_globalTrajectory[numGlobalTransforms] = d_globalTrajectory[numGlobalTransforms - 1] * d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1];
-	if (lastMatchedLocal == (unsigned int)-1) 
-		d_globalTrajectory[numGlobalTransforms-1] = d_globalTrajectory[lastMatchedGlobal]; //no info from local since prev was invalid. best guess is to append relative global transform to this one //TODO maybe try that 
-	else
-		d_globalTrajectory[numGlobalTransforms-1] = d_globalTrajectory[lastMatchedGlobal] * d_localTrajectories[(numGlobalTransforms-2)*numLocalTransformsPerTrajectory + lastMatchedLocal];
+	if (d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1].m11 == MINF) {
+		printf("[ERROR initNextGlobalTransformCU_Kernel]: d_localTrajectories[%d*%d-1] INVALID!\n", numGlobalTransforms, numLocalTransformsPerTrajectory);//debugging
+	}
+	d_globalTrajectory[numGlobalTransforms] = d_globalTrajectory[initGlobalIdx] * d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1];
 }
 
 extern "C" void initNextGlobalTransformCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory,
-	unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal)
+	unsigned int initGlobalIdx,
+	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
+	//,unsigned int lastMatchedLocal)
 {
-	MLIB_ASSERT(numGlobalTransforms > 1);
 	initNextGlobalTransformCU_Kernel <<< 1, 1 >>>(
-		d_globalTrajectory, numGlobalTransforms,
-		d_localTrajectories, numLocalTransformsPerTrajectory,
-		lastMatchedGlobal, lastMatchedLocal);
+		d_globalTrajectory, numGlobalTransforms, initGlobalIdx,
+		d_localTrajectories, numLocalTransformsPerTrajectory);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());

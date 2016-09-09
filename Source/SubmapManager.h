@@ -36,9 +36,8 @@ extern "C" void updateTrajectoryCU(
 	int* d_imageInvalidateList);
 
 extern "C" void initNextGlobalTransformCU(
-	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory,
-	unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal);
+	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms, unsigned int initGlobalIdx,
+	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory); //,unsigned int lastMatchedLocal)
 
 class SubmapManager {
 public:
@@ -117,8 +116,11 @@ public:
 		//!!!debugging
 		unsigned int lastMatchedFrame = matchAndFilter(true, m_currentLocal, m_currentLocalCache, siftIntrinsicsInv);
 		if (isLastLocal) {
-			m_prevLastMatchedLocal = m_lastMatchedLocal;
-			m_lastMatchedLocal = lastMatchedFrame;
+			m_prevLastValidLocal = m_lastValidLocal;
+			if (lastMatchedFrame != (unsigned int)-1) 
+				m_lastValidLocal = m_currentLocal->getCurrentFrame();
+			else 
+				m_lastValidLocal = (unsigned int)-1;
 		}
 		//!!!debugging
 		//if (m_currentLocal->getNumImages() == m_submapSize + 1 && m_global->getNumImages() == 66) {
@@ -158,14 +160,17 @@ public:
 	}
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
 	void printSparseCorrEval() const {
-		std::cout << "========= LOCAL =========" << std::endl;
-		std::cout << "SIFT MATCH:" << std::endl;
-		std::cout << "\tprecision: (" << _siftMatch_frameFrameLocal.x << " / " << _siftMatch_frameFrameLocal.y << ") = " << ((float)_siftMatch_frameFrameLocal.x / (float)_siftMatch_frameFrameLocal.y) << std::endl;
-		std::cout << "\trecall:    (" << _siftMatch_frameFrameLocal.x << " / " << _gtFrameFrameTransformsLocal.size() << ") = " << ((float)_siftMatch_frameFrameLocal.x / (float)_gtFrameFrameTransformsLocal.size()) << std::endl;
-		std::cout << "SIFT VERIFY:" << std::endl;
-		std::cout << "\tprecision: (" << _siftVerify_frameFrameLocal.x << " / " << _siftVerify_frameFrameLocal.y << ") = " << ((float)_siftVerify_frameFrameLocal.x / (float)_siftVerify_frameFrameLocal.y) << std::endl;
-		std::cout << "\trecall:    (" << _siftVerify_frameFrameLocal.x << " / " << _gtFrameFrameTransformsLocal.size() << ") = " << ((float)_siftVerify_frameFrameLocal.x / (float)_gtFrameFrameTransformsLocal.size()) << std::endl;
+		//std::cout << "========= LOCAL =========" << std::endl;
+		//std::cout << "SIFT MATCH:" << std::endl;
+		//std::cout << "\tprecision: (" << _siftMatch_frameFrameLocal.x << " / " << _siftMatch_frameFrameLocal.y << ") = " << ((float)_siftMatch_frameFrameLocal.x / (float)_siftMatch_frameFrameLocal.y) << std::endl;
+		//std::cout << "\trecall:    (" << _siftMatch_frameFrameLocal.x << " / " << _gtFrameFrameTransformsLocal.size() << ") = " << ((float)_siftMatch_frameFrameLocal.x / (float)_gtFrameFrameTransformsLocal.size()) << std::endl;
+		//std::cout << "SIFT VERIFY:" << std::endl;
+		//std::cout << "\tprecision: (" << _siftVerify_frameFrameLocal.x << " / " << _siftVerify_frameFrameLocal.y << ") = " << ((float)_siftVerify_frameFrameLocal.x / (float)_siftVerify_frameFrameLocal.y) << std::endl;
+		//std::cout << "\trecall:    (" << _siftVerify_frameFrameLocal.x << " / " << _gtFrameFrameTransformsLocal.size() << ") = " << ((float)_siftVerify_frameFrameLocal.x / (float)_gtFrameFrameTransformsLocal.size()) << std::endl;
 		std::cout << "========= GLOBAL =========" << std::endl;
+		std::cout << "SIFT RAW:" << std::endl;
+		std::cout << "\tprecision: (" << _siftRaw_frameFrameGlobal.x << " / " << _siftRaw_frameFrameGlobal.y << ") = " << ((float)_siftRaw_frameFrameGlobal.x / (float)_siftRaw_frameFrameGlobal.y) << std::endl;
+		std::cout << "\trecall:    (" << _siftRaw_frameFrameGlobal.x << " / " << _gtFrameFrameTransformsGlobal.size() << ") = " << ((float)_siftRaw_frameFrameGlobal.x / (float)_gtFrameFrameTransformsGlobal.size()) << std::endl;
 		std::cout << "SIFT MATCH:" << std::endl;
 		std::cout << "\tprecision: (" << _siftMatch_frameFrameGlobal.x << " / " << _siftMatch_frameFrameGlobal.y << ") = " << ((float)_siftMatch_frameFrameGlobal.x / (float)_siftMatch_frameFrameGlobal.y) << std::endl;
 		std::cout << "\trecall:    (" << _siftMatch_frameFrameGlobal.x << " / " << _gtFrameFrameTransformsGlobal.size() << ") = " << ((float)_siftMatch_frameFrameGlobal.x / (float)_gtFrameFrameTransformsGlobal.size()) << std::endl;
@@ -232,7 +237,7 @@ public:
 		finishLocalOpt();
 		mutex_nextLocal.unlock();
 	}
-		//TODO fix this hack
+	//TODO fix this hack
 	void setEndSolveGlobalDenseWeights();
 
 private:
@@ -242,16 +247,17 @@ private:
 
 	void initSIFT(unsigned int widthSift, unsigned int heightSift);
 	//! called when global locked
-	void initializeNextGlobalTransform(unsigned int lastMatchedGlobal, unsigned int lastMatchedLocal) {
+	void initializeNextGlobalTransform(unsigned int initGlobalIdx, unsigned int lastValidLocal) {
 		const unsigned int numGlobalFrames = m_global->getNumImages();
-		if (numGlobalFrames <= 1) return;
-		if (lastMatchedGlobal == (unsigned int)-1) {
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames - 1, d_globalTrajectory + numGlobalFrames - 2, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+		MLIB_ASSERT(numGlobalFrames >= 1);
+		if (initGlobalIdx == (unsigned int)-1) {
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_globalTrajectory + numGlobalFrames, d_globalTrajectory + numGlobalFrames - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
 		}
 		else {
-			initNextGlobalTransformCU(d_globalTrajectory, numGlobalFrames, d_localTrajectories, m_submapSize + 1, lastMatchedGlobal, lastMatchedLocal); //TODO THIS LAST MATCHED GLOBAL AND LAST VALID LOCAL
+			initNextGlobalTransformCU(d_globalTrajectory, numGlobalFrames, initGlobalIdx, d_localTrajectories, m_submapSize + 1);
 		}
 	}
+
 	//! called when nextlocal locked
 	void finishLocalOpt() {
 		m_nextLocal->reset();
@@ -290,7 +296,7 @@ private:
 
 	float4x4*	 d_siftTrajectory; // frame-to-frame sift tracking for all frames in sequence
 	//************************************
-	unsigned int m_lastMatchedLocal, m_prevLastMatchedLocal; //TODO THIS SHOULD NOT LIVE HERE
+	unsigned int m_lastValidLocal, m_prevLastValidLocal; //TODO THIS SHOULD NOT LIVE HERE
 
 	std::vector<unsigned int>	m_invalidImagesList;
 	int*						d_imageInvalidateList; // tmp for updateTrajectory //TODO just to update trajectory on CPU
@@ -308,10 +314,10 @@ private:
 	std::vector<std::pair<vec2ui, mat4f>> _logFoundCorrespondences; // logging the initially found (no invalidation) image-image correspondences; for global; (frame, curframe) transform from cur to frame
 #endif
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
-	vec2ui _siftMatch_frameFrameLocal; //#correct, #total got
-	vec2ui _siftVerify_frameFrameLocal; //#correct, #total got
-	std::unordered_map<vec2ui, mat4f> _gtFrameFrameTransformsLocal; //from x -> y
-
+	//vec2ui _siftMatch_frameFrameLocal; //#correct, #total got
+	//vec2ui _siftVerify_frameFrameLocal; //#correct, #total got
+	//std::unordered_map<vec2ui, mat4f> _gtFrameFrameTransformsLocal; //from x -> y
+	vec2ui _siftRaw_frameFrameGlobal; //#correct, #total got
 	vec2ui _siftMatch_frameFrameGlobal; //#correct, #total got
 	vec2ui _siftVerify_frameFrameGlobal; //#correct, #total got
 	vec2ui _opt_frameFrameGlobal; //#correct, #total got

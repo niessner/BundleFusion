@@ -129,7 +129,6 @@
     </ClCompile>
     <ClCompile Include="Source\SubmapManager.cpp" />
     <ClCompile Include="Source\ConditionManager.cpp" />
-    <ClCompile Include="Source\testMatching.cpp" />
     <ClCompile Include="Source\SiftVisualization.cpp" />
     <ClCompile Include="Source\PrimeSenseSensor.cpp">
       <Filter>Sensors</Filter>
@@ -140,8 +139,18 @@
     <ClCompile Include="Source\SensorDataReader.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
-    <ClCompile Include="Source\testSIFT.cpp" />
-    <ClCompile Include="Source\RunOpt.cpp" />
+    <ClCompile Include="Source\testMatching.cpp">
+      <Filter>Testing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\testSIFT.cpp">
+      <Filter>Testing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\RunOpt.cpp">
+      <Filter>Testing</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\FrameProjection.cpp">
+      <Filter>Testing</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -363,7 +372,6 @@
       <Filter>Sensors</Filter>
     </ClInclude>
     <ClInclude Include="Source\ConditionManager.h" />
-    <ClInclude Include="Source\testMatching.h" />
     <ClInclude Include="Source\SiftVisualization.h" />
     <ClInclude Include="Source\PrimeSenseSensor.h">
       <Filter>Sensors</Filter>
@@ -382,8 +390,18 @@
       <Filter>SolverBundling</Filter>
     </ClInclude>
     <ClInclude Include="Source\CUDACameraUtil.h" />
-    <ClInclude Include="Source\testSIFT.h" />
-    <ClInclude Include="Source\RunOpt.h" />
+    <ClInclude Include="Source\testSIFT.h">
+      <Filter>Testing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\testMatching.h">
+      <Filter>Testing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\RunOpt.h">
+      <Filter>Testing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\FrameProjection.h">
+      <Filter>Testing</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
@@ -406,6 +424,9 @@
     </Filter>
     <Filter Include="SBA">
       <UniqueIdentifier>{c3dc0052-729c-4526-b930-a469d7d017a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Testing">
+      <UniqueIdentifier>{59055ef3-aacc-44d4-8dd5-079c7f280f78}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

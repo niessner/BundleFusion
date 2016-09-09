@@ -38,7 +38,8 @@ public:
 		MLIB_CUDA_SAFE_FREE(d_xTrans);
 	}
 
-	void align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits,
+	//return if removed res
+	bool align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits,
 		bool useVerify, bool isLocal, bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt, unsigned int revalidateIdx = (unsigned int)-1);
 
 	float getMaxResidual() const { return m_maxResidual; }
@@ -108,8 +109,9 @@ private:
 
 	bool m_bUseComprehensiveFrameInvalidation;
 
+	//record residual removal
+	float m_maxResidual;
 	//for gpu solver
-	float m_maxResidual; //!!!todo why is this here...
 	bool m_bVerify;
 
 	std::vector< std::vector<float> > m_recordedConvergence;

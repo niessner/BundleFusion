@@ -185,7 +185,8 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 	float3* d_rotationAnglesUnknowns, float3* d_translationUnknowns,
 	bool rebuildJT, bool findMaxResidual, unsigned int revalidateIdx)
 {
-	MLIB_ASSERT(numberOfImages > 1 && nNonLinearIterations > 0 &&  nNonLinearIterations <= weightsSparse.size());
+	nNonLinearIterations = std::min(nNonLinearIterations, (unsigned int)weightsSparse.size());
+	MLIB_ASSERT(numberOfImages > 1 && nNonLinearIterations > 0);
 	if (numberOfCorrespondences > m_maxCorrPerImage*m_maxNumberOfImages) {
 		//warning: correspondences will be invalidated AT RANDOM!
 		std::cerr << "WARNING: #corr (" << numberOfCorrespondences << ") exceeded limit (" << m_maxCorrPerImage << "*" << m_maxNumberOfImages << "), please increase max #corr per image in the GAS" << std::endl;
@@ -376,8 +377,13 @@ void CUDASolverBundling::computeMaxResidual(SolverInput& solverInput, SolverPara
 		}
 #ifdef NEW_GUIDED_REMOVE
 
-		//if (revalidateIdx <= 31)
+		//if (solverInput.numberOfImages == 51) {
+		//	SensorData sd; sd.loadFromFile("../data/iclnuim/aliv2.sens");
+		//	std::vector<mat4f> trajectory(solverInput.numberOfImages);
+		//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectory.data(), d_transforms, sizeof(mat4f)*trajectory.size(), cudaMemcpyDeviceToHost));
+		//	sd.saveToPointCloud("debug/tmp.ply", trajectory, 0, solverInput.numberOfImages*10, 10, true);
 		//	int a = 5;
+		//}
 
 		m_maxResImPairs.clear();
 		if (maxResidual > GUIDED_SEARCH_MAX_RES_THRESH) {
@@ -402,9 +408,9 @@ void CUDASolverBundling::computeMaxResidual(SolverInput& solverInput, SolverPara
 					vec2ui imageIndices(h_corr.imgIdx_i, h_corr.imgIdx_j);
 					//compute res at previous
 					if (h_corr.imgIdx_j == solverInput.numberOfImages - 1 && std::abs((int)h_corr.imgIdx_i - (int)h_corr.imgIdx_j) > 10) { //introduced by latest image
-						float3 prevRes = fabs(transforms[h_corr.imgIdx_i] * h_corr.pos_i - transforms[h_corr.imgIdx_j] * h_corr.pos_j);
+						float3 prevRes = fabs(transforms[h_corr.imgIdx_i] * h_corr.pos_i - transforms[h_corr.imgIdx_j] * h_corr.pos_j); //eval new corrs with previous trajectory
 						float prevMaxRes = fmaxf(prevRes.z, fmaxf(prevRes.x, prevRes.y));
-						if (prevMaxRes > 1.5f*m_solverExtra.h_maxResidual[i]) { //increase?
+						if (prevMaxRes > 1.5f*m_solverExtra.h_maxResidual[i]) {
 							auto it = residualMap.find(imageIndices);
 							if (it == residualMap.end()) residualMap[imageIndices] = m_solverExtra.h_maxResidual[i];
 							else it->second = std::max(m_solverExtra.h_maxResidual[i], it->second);
@@ -422,20 +428,38 @@ void CUDASolverBundling::computeMaxResidual(SolverInput& solverInput, SolverPara
 				if (!residualMap.empty()) { //debug print
 					unsigned int rep = residualMap.begin()->first.x;
 					std::cout << "rep: (" << rep << ", " << solverInput.numberOfImages - 1 << ")" << std::endl;
+					for (const auto& r : residualMap) m_maxResImPairs.push_back(r.first);
+
+					////one extra solve
+					//parameters.nNonLinearIterations = 1;
+					//solveBundlingStub(solverInput, m_solverState, parameters, m_solverExtra, NULL, m_timer);
+
+					////!!!debugging
+					//{
+					//	static SensorData sd;
+					//	if (sd.m_frames.empty()) sd.loadFromFile("../data/iclnuim/aliv2.sens");
+					//	std::vector<mat4f> trajectory(solverInput.numberOfImages);
+					//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectory.data(), d_transforms, sizeof(mat4f)*trajectory.size(), cudaMemcpyDeviceToHost));
+					//	sd.saveToPointCloud("debug/tmp/" + std::to_string(solverInput.numberOfImages) + "-init.ply", trajectory, 0, solverInput.numberOfImages*10, 10, true);
+					//	convertLiePosesToMatricesCU(m_solverState.d_xRot, m_solverState.d_xTrans, solverInput.numberOfImages, d_transforms, m_solverState.d_xTransformInverses);
+					//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(trajectory.data(), d_transforms, sizeof(mat4f)*trajectory.size(), cudaMemcpyDeviceToHost));
+					//	sd.saveToPointCloud("debug/tmp/" + std::to_string(solverInput.numberOfImages) + "-opt.ply", trajectory, 0, solverInput.numberOfImages*10, 10, true);
+					//	int a = 5;
+					//}
+					////!!!debugging
 				}
-				for (const auto& r : residualMap) m_maxResImPairs.push_back(r.first);
 
 				//!!!debugging
 				//std::vector<std::pair<vec2ui, float>> residuals(allCollectedResidualsMap.begin(), allCollectedResidualsMap.end());
 				//std::sort(residuals.begin(), residuals.end(), [](const std::pair<vec2ui, float> &left, const std::pair<vec2ui, float> &right) { //debugging only
 				//	return left.second > right.second;
 				//});
-				if (m_maxResImPairs.size() > 1) {
-					std::ofstream s("debug/_logs/" + std::to_string(solverInput.numberOfImages) + "_" + std::to_string(m_maxResImPairs.front().x) + "-" + std::to_string(m_maxResImPairs.front().y) + ".txt");
-					s << "# im pairs to remove = " << m_maxResImPairs.size() << ", res thresh = " << parameters.highResidualThresh << std::endl;
-					for (unsigned int i = 0; i < m_maxResImPairs.size(); i++) s << m_maxResImPairs[i] << std::endl;
-					s.close();
-				}
+				//if (m_maxResImPairs.size() > 1) {
+				//	std::ofstream s("debug/_logs/" + std::to_string(solverInput.numberOfImages) + "_" + std::to_string(m_maxResImPairs.front().x) + "-" + std::to_string(m_maxResImPairs.front().y) + ".txt");
+				//	s << "# im pairs to remove = " << m_maxResImPairs.size() << ", res thresh = " << parameters.highResidualThresh << std::endl;
+				//	for (unsigned int i = 0; i < m_maxResImPairs.size(); i++) s << m_maxResImPairs[i] << std::endl;
+				//	s.close();
+				//}
 				//!!!debugging
 			}
 		}
@@ -463,7 +487,7 @@ bool CUDASolverBundling::getMaxResidual(EntryJ* d_correspondences, ml::vec2ui& i
 	//!!!debugging //TODO REMOVE THIS
 	if (m_solverExtra.h_maxResidual[0] > m_maxResidualThresh && imageIndices.x == 0 && imageIndices.y < 10) {
 		std::cout << "warning! max residual invalidates images " << imageIndices << " (" << m_solverExtra.h_maxResidual[0] << ")" << std::endl;
-		getchar();
+		//getchar();
 	}
 	//!!!debugging
 

@@ -10,7 +10,7 @@
 #define USE_GLOBAL_DENSE_AT_END
 
 //#define EVALUATE_SPARSE_CORRESPONDENCES
-#define PRINT_MEM_STATS
+//#define PRINT_MEM_STATS
 
 #define X_GLOBAL_BUNDLING_APP_STATE_FIELDS \
 	X(bool, s_enableGlobalTimings) \

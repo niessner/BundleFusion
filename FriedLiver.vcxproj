@@ -181,6 +181,7 @@
     <ClInclude Include="Source\DXUT\Optional\DXUTsettingsdlg.h" />
     <ClInclude Include="Source\DXUT\Optional\SDKmesh.h" />
     <ClInclude Include="Source\DXUT\Optional\SDKmisc.h" />
+    <ClInclude Include="Source\FrameProjection.h" />
     <ClInclude Include="Source\FriedLiver.h" />
     <ClInclude Include="Source\GlobalAppState.h" />
     <ClInclude Include="Source\GlobalBundlingState.h" />
@@ -293,6 +294,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Source\FrameProjection.cpp" />
     <ClCompile Include="Source\FriedLiver.cpp" />
     <ClCompile Include="Source\GlobalAppState.cpp" />
     <ClCompile Include="Source\mLib.cpp">

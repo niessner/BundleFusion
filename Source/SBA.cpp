@@ -47,6 +47,8 @@ SBA::SBA()
 	//m_globalWeightsDenseDepth.resize(maxNumIts, 0.0f);
 	//m_globalWeightsDenseColor.resize(maxNumIts, 0.1f); //off
 
+	m_maxResidual = -1.0f;
+
 #ifdef USE_GLOBAL_DENSE_EVERY_FRAME
 	m_bUseGlobalDenseOpt = true;
 #else
@@ -58,7 +60,7 @@ SBA::SBA()
 }
 
 
-void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal,
+bool SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float4x4* d_transforms, unsigned int maxNumIters, unsigned int numPCGits, bool useVerify, bool isLocal,
 	bool recordConvergence, bool isStart, bool isEnd, bool isScanDoneOpt, unsigned int revalidateIdx /*= (unsigned int)-1*/)
 {
 	if (recordConvergence) m_recordedConvergence.push_back(std::vector<float>());
@@ -119,6 +121,7 @@ void SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, d_validImages);
 
 	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.stop(); TimingLog::getFrameTiming(isLocal).timeSolve += s_timer.getElapsedTimeMS(); TimingLog::getFrameTiming(isLocal).numItersSolve += maxNumIters; }
+	return removed;
 }
 
 bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, bool useDensePairwise, const std::vector<float>& weightsSparse, const std::vector<float>& weightsDenseDepth, const std::vector<float>& weightsDenseColor,
