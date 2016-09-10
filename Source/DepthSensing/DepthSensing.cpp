@@ -523,7 +523,6 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 			else {
 				std::cout << "Cannot evaluate trajectory (sensorIdx != 3)" << std::endl;
 			}
-			//g_depthSensingBundler->printSparseCorrEval();
 		}
 		case 'C':
 		{
@@ -1082,7 +1081,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	if (GlobalBundlingState::get().s_enablePerFrameTimings) {
 		GlobalAppState::get().WaitForGPU(); GlobalAppState::get().s_Timer.stop();
 		TimingLog::addTotalFrameTime(GlobalAppState::get().s_Timer.getElapsedTimeMS());
-		std::cout << "<<< [Frame: " << g_CudaImageManager->getCurrFrameNumber() << " ] Total Frame Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
+		std::cout << "<<< [Frame: " << g_CudaImageManager->getCurrFrameNumber() << " ] " << g_sceneRep->getHeapFreeCount() << " Frame Time:\t " << GlobalAppState::get().s_Timer.getElapsedTimeMS() << " [ms] >>>" << std::endl;
 	}
 
 	//std::cout << VAR_NAME(timeReconstruct) << " : " << timeReconstruct << " [ms]" << std::endl;
