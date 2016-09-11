@@ -649,6 +649,8 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	rtfFormat.push_back(DXGI_FORMAT_R8G8B8A8_UNORM); // _SRGB
 	V_RETURN(g_RenderToFileTarget.OnD3D11CreateDevice(pd3dDevice, GlobalAppState::get().s_rayCastWidth, GlobalAppState::get().s_rayCastHeight, rtfFormat));
 
+	g_CudaImageManager->OnD3D11CreateDevice(pd3dDevice);
+
 	if (GlobalAppState::get().s_sensorIdx == 7) { // structure sensor
 		g_depthSensingRGBDSensor->startReceivingFrames();
 	}
@@ -1145,10 +1147,6 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	std::stringstream ssFrameNumber;	unsigned int numCountDigits = 6;
 	for (unsigned int i = std::max(1u, (unsigned int)std::ceilf(std::log10f((float)frameNumber + 1))); i < numCountDigits; i++) ssFrameNumber << "0";
 	ssFrameNumber << frameNumber;
-
-	DepthImage32 test(640, 480);
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(test.getData(), g_rayCast->getRayCastData().d_depth, sizeof(float)*test.getNumPixels(), cudaMemcpyDeviceToHost));
-	FreeImageWrapper::saveImage("debug/test.png", ColorImageR32G32B32(test));
 
 	mat4f view = mat4f::identity();
 	{	// reconstruction

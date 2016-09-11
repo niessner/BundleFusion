@@ -86,6 +86,15 @@ bool CUDAImageManager::process()
 		CUDAImageUtil::copy<float>(d_depthInputFiltered, d_depthInputRaw, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
 	}
 
+	////////////////////////////////////////////////////////////////////////////////////
+	// Render to Color Space
+	////////////////////////////////////////////////////////////////////////////////////
+	if (GlobalAppState::get().s_bUseCameraCalibration)
+	{
+		m_imageCalibrator.process(DXUTGetD3D11DeviceContext(), d_depthInputFiltered, m_RGBDSensor->getDepthIntrinsics(), m_RGBDSensor->getDepthIntrinsicsInv(), m_RGBDSensor->getDepthExtrinsicsInv());
+	}
+	////////////////////////////////////////////////////////////////////////////////////
+
 	if ((m_RGBDSensor->getDepthWidth() == m_widthIntegration) && (m_RGBDSensor->getDepthHeight() == m_heightIntegration)) {
 		if (ManagedRGBDInputFrame::s_bIsOnGPU) {
 			CUDAImageUtil::copy<float>(frame.m_depthIntegration, d_depthInputFiltered, m_widthIntegration, m_heightIntegration);

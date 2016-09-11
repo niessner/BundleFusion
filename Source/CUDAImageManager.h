@@ -1,6 +1,7 @@
 #pragma once
 #include "RGBDSensor.h"
 #include "CUDAImageUtil.h"
+#include "CUDAImageCalibrator.h"
 #include "GlobalBundlingState.h"
 #include "TimingLog.h"
 
@@ -194,9 +195,14 @@ public:
 		//m_SIFTintrinsicsInv = m_RGBDSensor->getColorIntrinsicsInv();
 		//m_SIFTintrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTintrinsicsInv._m11 /= scaleHeightSIFT;
 
-
 		ManagedRGBDInputFrame::globalInit(getIntegrationWidth(), getIntegrationHeight(), storeFramesOnGPU);
 		m_bHasBundlingFrameRdy = false;
+	}
+
+	HRESULT OnD3D11CreateDevice(ID3D11Device* device) {
+		HRESULT hr = S_OK;
+		V_RETURN(m_imageCalibrator.OnD3D11CreateDevice(device, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight()));
+		return hr;
 	}
 
 	~CUDAImageManager() {
@@ -205,6 +211,8 @@ public:
 		MLIB_CUDA_SAFE_FREE(d_depthInputRaw);
 		MLIB_CUDA_SAFE_FREE(d_depthInputFiltered);
 		MLIB_CUDA_SAFE_FREE(d_colorInput);
+
+		//m_imageCalibrator.OnD3D11DestroyDevice();
 
 		ManagedRGBDInputFrame::globalFree();
 	}
@@ -301,6 +309,7 @@ private:
 	bool m_bHasBundlingFrameRdy;
 
 	RGBDSensor* m_RGBDSensor;
+	CUDAImageCalibrator m_imageCalibrator;
 
 	mat4f m_intrinsics;
 	mat4f m_intrinsicsInv;

@@ -141,6 +141,7 @@
     <ClInclude Include="Source\CUDACache.h" />
     <ClInclude Include="Source\CUDACacheUtil.h" />
     <ClInclude Include="Source\CUDACameraUtil.h" />
+    <ClInclude Include="Source\CUDAImageCalibrator.h" />
     <ClInclude Include="Source\CUDAImageManager.h" />
     <ClInclude Include="Source\CUDAImageUtil.h" />
     <ClInclude Include="Source\DepthSensing\BitArray.h" />
@@ -236,6 +237,7 @@
     <ClCompile Include="Source\Bundler.cpp" />
     <ClCompile Include="Source\ConditionManager.cpp" />
     <ClCompile Include="Source\CUDACache.cpp" />
+    <ClCompile Include="Source\CUDAImageCalibrator.cpp" />
     <ClCompile Include="Source\CUDAImageManager.cpp" />
     <ClCompile Include="Source\DepthSensing\CUDAHistogramHashSDF.cpp" />
     <ClCompile Include="Source\DepthSensing\CUDAImageHelper.cpp" />

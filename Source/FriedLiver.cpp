@@ -214,11 +214,11 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersTUM.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
 
-			fileNameDescGlobalApp = "zParametersAug.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
+			//fileNameDescGlobalApp = "zParametersAug.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
 
-			//fileNameDescGlobalApp = "zParametersScanNet.txt";
-			//fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
+			fileNameDescGlobalApp = "zParametersScanNet.txt";
+			fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;

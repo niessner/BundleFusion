@@ -16,6 +16,7 @@
 #include "mLibFreeImage.h"
 #include "mLibDepthCamera.h"
 //#include "mLibZlib.h"
+//#include "mLibFreeImage.h"
 #include "mLibLodePNG.h"
 #include "mLibD3D11.h"
 

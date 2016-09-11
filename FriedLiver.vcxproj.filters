@@ -151,6 +151,9 @@
     <ClCompile Include="Source\FrameProjection.cpp">
       <Filter>Testing</Filter>
     </ClCompile>
+    <ClCompile Include="Source\CUDAImageCalibrator.cpp">
+      <Filter>Sensors</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -401,6 +404,9 @@
     </ClInclude>
     <ClInclude Include="Source\FrameProjection.h">
       <Filter>Testing</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\CUDAImageCalibrator.h">
+      <Filter>Sensors</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
