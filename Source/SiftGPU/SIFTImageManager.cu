@@ -636,7 +636,7 @@ void __global__ AddCurrToResidualsCU_Kernel(
 void SIFTImageManager::AddCurrToResidualsCU(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames, const float4x4& colorIntrinsicsInv) {
 	if (numFrames == 0) return;
 
-	dim3 grid(numFrames);
+	dim3 grid(numFrames - startFrame);
 	const unsigned int threadsPerBlock = ((MAX_MATCHES_PER_IMAGE_PAIR_FILTERED + 31) / 32) * 32;
 	dim3 block(threadsPerBlock);
 
