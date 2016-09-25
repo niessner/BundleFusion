@@ -48,11 +48,11 @@ public:
 		const mat4f& depthIntrinsicsInv, const mat4f& transform, float maxDepth);
 
 	static void saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages,
-		const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, float maxDepth = 3.5f, bool saveFrameByFrame = false);
+		const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, unsigned int skip = 1, unsigned int numFrames = (unsigned int)-1, float maxDepth = 3.5f, bool saveFrameByFrame = false);
 
 	static void saveToPointCloud(const std::string& filename, const CUDACache* cache, const std::vector<mat4f>& trajectory, float maxDepth = 3.5f, bool saveFrameByFrame = false);
 
-	static void saveFrameToPointCloud(const std::string& filename, const DepthImage32& depth, const ColorImageR8G8B8& color, const mat4f& depthIntrinsicsInverse, float maxDepth = 3.5f);
+	static void saveFrameToPointCloud(const std::string& filename, const DepthImage32& depth, const ColorImageR8G8B8& color, const mat4f& transform, const mat4f& depthIntrinsicsInverse, float maxDepth = 3.5f);
 
 	static void computePointCloud(PointCloudf& pc, const ColorImageR8G8B8& color,
 		const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal,

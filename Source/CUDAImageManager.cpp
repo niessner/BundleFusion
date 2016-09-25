@@ -91,7 +91,7 @@ bool CUDAImageManager::process()
 	////////////////////////////////////////////////////////////////////////////////////
 	if (GlobalAppState::get().s_bUseCameraCalibration)
 	{
-		m_imageCalibrator.process(DXUTGetD3D11DeviceContext(), d_depthInputFiltered, m_RGBDSensor->getDepthIntrinsics(), m_RGBDSensor->getDepthIntrinsicsInv(), m_RGBDSensor->getDepthExtrinsicsInv());
+		m_imageCalibrator.process(DXUTGetD3D11DeviceContext(), d_depthInputFiltered, m_SIFTdepthIntrinsics, m_RGBDSensor->getDepthIntrinsicsInv(), m_RGBDSensor->getDepthExtrinsicsInv());
 	}
 	////////////////////////////////////////////////////////////////////////////////////
 

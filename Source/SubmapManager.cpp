@@ -65,7 +65,7 @@ void SubmapManager::initSIFT(unsigned int widthSift, unsigned int heightSift)
 }
 
 void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage, unsigned int submapSize,
-	const RGBDSensor* sensor, unsigned int numTotalFrames /*= (unsigned int)-1*/)
+	const CUDAImageManager* manager, unsigned int numTotalFrames /*= (unsigned int)-1*/)
 {
 	initSIFT(GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT);
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
@@ -73,12 +73,12 @@ void SubmapManager::init(unsigned int maxNumGlobalImages, unsigned int maxNumLoc
 	m_SparseBundler.init(GlobalBundlingState::get().s_maxNumImages, maxNumResiduals);
 
 	// cache
-	const unsigned int cacheInputWidth = sensor->getDepthWidth();
-	const unsigned int cacheInputHeight = sensor->getDepthHeight();
+	const unsigned int cacheInputWidth = manager->getSIFTDepthWidth();
+	const unsigned int cacheInputHeight = manager->getSIFTDepthHeight();
 	const unsigned int downSampWidth = GlobalBundlingState::get().s_downsampledWidth;
 	const unsigned int downSampHeight = GlobalBundlingState::get().s_downsampledHeight;
 
-	const mat4f inputIntrinsics = sensor->getDepthIntrinsics();
+	const mat4f inputIntrinsics = manager->getSIFTDepthIntrinsics();
 	m_currentLocalCache = new CUDACache(cacheInputWidth, cacheInputHeight, downSampWidth, downSampHeight, maxNumLocalImages, inputIntrinsics);
 	m_nextLocalCache = new CUDACache(cacheInputWidth, cacheInputHeight, downSampWidth, downSampHeight, maxNumLocalImages, inputIntrinsics);
 	m_optLocalCache = new CUDACache(cacheInputWidth, cacheInputHeight, downSampWidth, downSampHeight, maxNumLocalImages, inputIntrinsics);
@@ -856,6 +856,7 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 		counter++;
 	}
 #endif
+
 	return ret;
 }
 

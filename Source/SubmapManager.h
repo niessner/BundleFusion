@@ -43,7 +43,7 @@ class SubmapManager {
 public:
 	SubmapManager();
 	void init(unsigned int maxNumGlobalImages, unsigned int maxNumLocalImages, unsigned int maxNumKeysPerImage,
-		unsigned int submapSize, const RGBDSensor* sensor, unsigned int numTotalFrames = (unsigned int)-1);
+		unsigned int submapSize, const CUDAImageManager* manager, unsigned int numTotalFrames = (unsigned int)-1);
 
 	void setTotalNumFrames(unsigned int n) {
 		m_numTotalFrames = n;

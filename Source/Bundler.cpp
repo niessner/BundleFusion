@@ -30,7 +30,7 @@ Bundler::Bundler(const RGBDSensor* sensor, const CUDAImageManager* imageManager)
 
 	m_submapSize = GlobalBundlingState::get().s_submapSize;
 	m_SubmapManager.init(GlobalBundlingState::get().s_maxNumImages, m_submapSize + 1, GlobalBundlingState::get().s_maxNumKeysPerImage,
-		m_submapSize, m_RGBDSensor);
+		m_submapSize, imageManager);
 
 	m_trajectoryManager = new TrajectoryManager(GlobalBundlingState::get().s_maxNumImages * m_submapSize);
 
@@ -269,38 +269,7 @@ void Bundler::getCurrentFrame()
 	if (GlobalAppState::get().s_colorFilter) {
 		CUDAImageUtil::gaussFilterIntensity(m_bundlerInputData.d_intensityFilterHelper, m_bundlerInputData.d_intensitySIFT, GlobalAppState::get().s_colorSigmaD, m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
 		std::swap(m_bundlerInputData.d_intensityFilterHelper, m_bundlerInputData.d_intensitySIFT);
-
-		////!!!debugging
-		//ColorImageR32 image(m_bundlerInputData.m_widthSIFT, m_bundlerInputData.m_heightSIFT);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getData(), m_bundlerInputData.d_intensityFilterHelper, sizeof(float) * image.getNumPixels(), cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("debug/_intensityOrig.png", image);
-		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getData(), m_bundlerInputData.d_intensitySIFT, sizeof(float) * image.getNumPixels(), cudaMemcpyDeviceToHost));
-		//FreeImageWrapper::saveImage("debug/_intensityFilt.png", image);
-
-		//std::cout << "waiting (check intensity filter)..." << std::endl;
-		//getchar();
-		////!!!debugging
 	}
-	//if (GlobalBundlingState::get().s_erodeSIFTdepth) {
-	//	unsigned int numIter = 2;
-	//	numIter = 2 * ((numIter + 1) / 2);
-	//	for (unsigned int i = 0; i < numIter; i++) {
-	//		if (i % 2 == 0) {
-	//			CUDAImageUtil::erodeDepthMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepth, 3,
-	//				m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, 0.05f, 0.3f);
-	//		}
-	//		else {
-	//			CUDAImageUtil::erodeDepthMap(m_bundlerInputData.d_inputDepth, m_bundlerInputData.d_depthErodeHelper, 3,
-	//				m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight, 0.05f, 0.3f);
-	//		}
-	//	}
-	//}
-	//if (m_bundlerInputData.m_bFilterDepthValues) {
-	//	CUDAImageUtil::gaussFilterDepthMap(m_bundlerInputData.d_depthErodeHelper, m_bundlerInputData.d_inputDepthFilt,
-	//		m_bundlerInputData.m_fBilateralFilterSigmaD, m_bundlerInputData.m_fBilateralFilterSigmaR,
-	//		m_bundlerInputData.m_inputDepthWidth, m_bundlerInputData.m_inputDepthHeight);
-	//	std::swap(m_bundlerInputData.d_inputDepthFilt, m_bundlerInputData.d_depthErodeHelper);
-	//}
 }
 
 void Bundler::prepareLocalSolve(unsigned int curFrame, bool isLastFrame /*= false*/)

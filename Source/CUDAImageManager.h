@@ -9,23 +9,6 @@
 
 class CUDAImageManager {
 public:
-	//struct CUDARGBDInputFrame {
-	//public:
-
-
-	//	void alloc(unsigned int widthIntegration, unsigned int heightIntegration) {
-	//		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_depthIntegration, sizeof(float)*widthIntegration*heightIntegration));
-	//		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_colorIntegration, sizeof(uchar4)*widthIntegration*heightIntegration));
-	//	}
-	//	void free() {
-	//		MLIB_CUDA_SAFE_FREE(d_depthIntegration);
-	//		MLIB_CUDA_SAFE_FREE(d_colorIntegration);
-	//	}
-
-	//	float*	d_depthIntegration;
-	//	uchar4*	d_colorIntegration;
-
-	//};
 
 	class ManagedRGBDInputFrame {
 	public:
@@ -157,8 +140,9 @@ public:
 	CUDAImageManager(unsigned int widthIntegration, unsigned int heightIntegration, unsigned int widthSIFT, unsigned int heightSIFT, RGBDSensor* sensor, bool storeFramesOnGPU = false) {
 		m_RGBDSensor = sensor;
 
-		//m_widthSIFT = widthSIFT;
-		//m_heightSIFT = heightSIFT;
+		m_widthSIFTdepth = sensor->getDepthWidth();
+		m_heightSIFTdepth = sensor->getDepthHeight();
+		m_SIFTdepthIntrinsics = sensor->getDepthIntrinsics();
 		m_widthIntegration = widthIntegration;
 		m_heightIntegration = heightIntegration;
 
@@ -176,24 +160,34 @@ public:
 		const float scaleHeightDepth = (float)m_heightIntegration / (float)m_RGBDSensor->getDepthHeight();
 
 		// adapt intrinsics
-		m_intrinsics = m_RGBDSensor->getDepthIntrinsics();
-		m_intrinsics._m00 *= scaleWidthDepth;  m_intrinsics._m02 *= scaleWidthDepth;
-		m_intrinsics._m11 *= scaleHeightDepth; m_intrinsics._m12 *= scaleHeightDepth;
+		m_depthIntrinsics = m_RGBDSensor->getDepthIntrinsics();
+		m_depthIntrinsics._m00 *= scaleWidthDepth;  m_depthIntrinsics._m02 *= scaleWidthDepth;
+		m_depthIntrinsics._m11 *= scaleHeightDepth; m_depthIntrinsics._m12 *= scaleHeightDepth;
 
-		m_intrinsicsInv = m_RGBDSensor->getDepthIntrinsicsInv();
-		m_intrinsicsInv._m00 /= scaleWidthDepth; m_intrinsicsInv._m11 /= scaleHeightDepth;
+		m_depthIntrinsicsInv = m_RGBDSensor->getDepthIntrinsicsInv();
+		m_depthIntrinsicsInv._m00 /= scaleWidthDepth; m_depthIntrinsicsInv._m11 /= scaleHeightDepth;
+
+		const float scaleWidthColor = (float)m_widthIntegration / (float)m_RGBDSensor->getColorWidth();
+		const float scaleHeightColor = (float)m_heightIntegration / (float)m_RGBDSensor->getColorHeight();
+
+		m_colorIntrinsics = m_RGBDSensor->getColorIntrinsics();
+		m_colorIntrinsics._m00 *= scaleWidthColor;  m_colorIntrinsics._m02 *= scaleWidthColor;
+		m_colorIntrinsics._m11 *= scaleHeightColor; m_colorIntrinsics._m12 *= scaleHeightColor;
+
+		m_colorIntrinsicsInv = m_RGBDSensor->getColorIntrinsicsInv();
+		m_colorIntrinsicsInv._m00 /= scaleWidthColor; m_colorIntrinsicsInv._m11 /= scaleHeightColor;
 
 		// adapt extrinsics
-		m_extrinsics = m_RGBDSensor->getDepthExtrinsics();
-		m_extrinsicsInv = m_RGBDSensor->getDepthExtrinsicsInv();
+		m_depthExtrinsics = m_RGBDSensor->getDepthExtrinsics();
+		m_depthExtrinsicsInv = m_RGBDSensor->getDepthExtrinsicsInv();
 
-		//const float scaleWidthSIFT = (float)m_widthSIFT / (float)m_RGBDSensor->getColorWidth();
-		//const float scaleHeightSIFT = (float)m_heightSIFT / (float)m_RGBDSensor->getColorHeight();
-		//m_SIFTintrinsics = m_RGBDSensor->getColorIntrinsics();
-		//m_SIFTintrinsics._m00 *= scaleWidthSIFT;  m_SIFTintrinsics._m02 *= scaleWidthSIFT;
-		//m_SIFTintrinsics._m11 *= scaleHeightSIFT; m_SIFTintrinsics._m12 *= scaleHeightSIFT;
-		//m_SIFTintrinsicsInv = m_RGBDSensor->getColorIntrinsicsInv();
-		//m_SIFTintrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTintrinsicsInv._m11 /= scaleHeightSIFT;
+		if (GlobalAppState::get().s_bUseCameraCalibration) {
+			const float scaleWidth = (float)m_widthSIFTdepth / (float)m_RGBDSensor->getColorWidth();
+			const float scaleHeight = (float)m_heightSIFTdepth / (float)m_RGBDSensor->getColorHeight();
+			m_SIFTdepthIntrinsics = m_RGBDSensor->getColorIntrinsics();
+			m_SIFTdepthIntrinsics._m00 *= scaleWidth;  m_SIFTdepthIntrinsics._m02 *= scaleWidth;
+			m_SIFTdepthIntrinsics._m11 *= scaleHeight; m_SIFTdepthIntrinsics._m12 *= scaleHeight;
+		}
 
 		ManagedRGBDInputFrame::globalInit(getIntegrationWidth(), getIntegrationHeight(), storeFramesOnGPU);
 		m_bHasBundlingFrameRdy = false;
@@ -267,29 +261,39 @@ public:
 
 
 
-	const mat4f& getIntrinsics() const	{
-		return m_intrinsics;
+	const mat4f& getDepthIntrinsics() const	{
+		return m_depthIntrinsics;
 	}
 
-	const mat4f& getIntrinsicsInv() const {
-		return m_intrinsicsInv;
+	const mat4f& getDepthIntrinsicsInv() const {
+		return m_depthIntrinsicsInv;
 	}
 
-	const mat4f& getExtrinsics() const	{
-		return m_extrinsics;
+	const mat4f& getColorIntrinsics() const	{
+		return m_colorIntrinsics;
 	}
 
-	const mat4f& getExtrinsicsInv() const {
-		return m_extrinsicsInv;
+	const mat4f& getColorIntrinsicsInv() const {
+		return m_colorIntrinsicsInv;
 	}
 
-	//const mat4f& getSIFTIntrinsics() const	{
-	//	return m_SIFTintrinsics;
-	//}
+	const mat4f& getDepthExtrinsics() const	{
+		return m_depthExtrinsics;
+	}
 
-	//const mat4f& getSIFTIntrinsicsInv() const {
-	//	return m_SIFTintrinsicsInv;
-	//}
+	const mat4f& getDepthExtrinsicsInv() const {
+		return m_depthExtrinsicsInv;
+	}
+
+	const unsigned int getSIFTDepthWidth() const {
+		return m_widthSIFTdepth;
+	}
+	const unsigned int getSIFTDepthHeight() const {
+		return m_heightSIFTdepth;
+	}
+	const mat4f& getSIFTDepthIntrinsics() const	{
+		return m_SIFTdepthIntrinsics;
+	}
 
 
 	bool hasBundlingFrameRdy() const {
@@ -311,22 +315,27 @@ private:
 	RGBDSensor* m_RGBDSensor;
 	CUDAImageCalibrator m_imageCalibrator;
 
-	mat4f m_intrinsics;
-	mat4f m_intrinsicsInv;
-	mat4f m_extrinsics;
-	mat4f m_extrinsicsInv;
+	mat4f m_colorIntrinsics;
+	mat4f m_colorIntrinsicsInv;
+	mat4f m_depthIntrinsics;
+	mat4f m_depthIntrinsicsInv;
+	mat4f m_depthExtrinsics;
+	mat4f m_depthExtrinsicsInv;
 
 	//! resolution for integration both depth and color data
 	unsigned int m_widthIntegration;
 	unsigned int m_heightIntegration;
+	mat4f m_SIFTdepthIntrinsics;
 
 	//! temporary GPU storage for inputting the current frame
 	float*	d_depthInputRaw;
 	uchar4*	d_colorInput;
 	float*	d_depthInputFiltered;
 
+	unsigned int m_widthSIFTdepth;
+	unsigned int m_heightSIFTdepth;
+
 	//! all image data on the GPU
-	//std::vector<CUDARGBDInputFrame>	m_data;
 	std::vector<ManagedRGBDInputFrame> m_data;
 
 	unsigned int m_currFrame;

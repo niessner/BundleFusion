@@ -496,17 +496,18 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 }
 
 void SiftVisualization::saveToPointCloud(const std::string& filename, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages,
-	const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, float maxDepth, bool saveFrameByFrame /*= false*/)
+	const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv, unsigned int skip /*= 1*/, unsigned int numFrames /*= (unsigned int)-1*/, float maxDepth, bool saveFrameByFrame /*= false*/)
 {
 	std::cout << "#depth = " << depthImages.size() << ", #color = " << colorImages.size() << ", #traj = " << trajectory.size() << std::endl;
-	MLIB_ASSERT(depthImages.size() > 0 && depthImages.size() == colorImages.size() && depthImages.size() <= trajectory.size());
+	if (numFrames == (unsigned int)-1) numFrames = (unsigned int)depthImages.size();
+	MLIB_ASSERT(colorImages.size() >= numFrames && depthImages.size() >= numFrames && trajectory.size() >= numFrames);
 	const unsigned int depthWidth = depthImages.front().getWidth();
 	const unsigned int depthHeight = depthImages.front().getHeight();
 	const unsigned int colorWidth = colorImages.front().getWidth();
 	const unsigned int colorHeight = colorImages.front().getHeight();
 
 	std::list<PointCloudf> pcs; std::vector<unsigned int> frameIdxs;
-	for (unsigned int i = 0; i < depthImages.size(); i++) {
+	for (unsigned int i = 0; i < numFrames; i+=skip) {
 		if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) {
 			pcs.push_back(PointCloudf());
 			computePointCloud(pcs.back(), depthImages[i].getData(), depthWidth, depthHeight, colorImages[i].getData(), colorWidth, colorHeight, depthIntrinsicsInv, trajectory[i], maxDepth);
@@ -785,7 +786,7 @@ void SiftVisualization::saveKeyMatchToPointCloud(const std::string& prefix, cons
 	MeshIOf::saveToFile(prefix + "-keys_" + std::to_string(imageIndices.y) + ".ply", keysMesh1);
 }
 
-void SiftVisualization::saveFrameToPointCloud(const std::string& filename, const DepthImage32& depth, const ColorImageR8G8B8& color, const mat4f& depthIntrinsicsInverse, float maxDepth)
+void SiftVisualization::saveFrameToPointCloud(const std::string& filename, const DepthImage32& depth, const ColorImageR8G8B8& color, const mat4f& transform, const mat4f& depthIntrinsicsInverse, float maxDepth /*= 3.5f*/)
 {
 	PointCloudf pc;
 	computePointCloud(pc, depth.getData(), depth.getWidth(), depth.getHeight(), color.getData(), color.getWidth(), color.getHeight(), depthIntrinsicsInverse, mat4f::identity(), maxDepth);

@@ -148,9 +148,6 @@
     <ClCompile Include="Source\RunOpt.cpp">
       <Filter>Testing</Filter>
     </ClCompile>
-    <ClCompile Include="Source\FrameProjection.cpp">
-      <Filter>Testing</Filter>
-    </ClCompile>
     <ClCompile Include="Source\CUDAImageCalibrator.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
@@ -400,9 +397,6 @@
       <Filter>Testing</Filter>
     </ClInclude>
     <ClInclude Include="Source\RunOpt.h">
-      <Filter>Testing</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\FrameProjection.h">
       <Filter>Testing</Filter>
     </ClInclude>
     <ClInclude Include="Source\CUDAImageCalibrator.h">
