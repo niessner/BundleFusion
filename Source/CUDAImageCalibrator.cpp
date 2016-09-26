@@ -36,7 +36,7 @@ HRESULT CUDAImageCalibrator::OnD3D11CreateDevice(ID3D11Device* device, unsigned 
 	return hr;
 }
 
-HRESULT CUDAImageCalibrator::process(ID3D11DeviceContext* context, float* d_depth, const mat4f& colorIntrinsics, const mat4f& depthIntrinsicsInv, const mat4f& depthExtrinsicsInv)
+HRESULT CUDAImageCalibrator::process(ID3D11DeviceContext* context, float* d_depth, const mat4f& colorIntrinsics, const mat4f& depthIntrinsicsInv, const mat4f& depthExtrinsics)
 {
 	HRESULT hr = S_OK;
 
@@ -45,13 +45,13 @@ HRESULT CUDAImageCalibrator::process(ID3D11DeviceContext* context, float* d_dept
 	////////////////////////////////////////////////////////////////////////////////////
 
 	//Start Timing
-	if (GlobalAppState::get().s_timingsDetailledEnabled) { cutilSafeCall(cudaDeviceSynchronize()); m_timer.start(); }
+	//if (GlobalAppState::get().s_timingsDetailledEnabled) { cutilSafeCall(cudaDeviceSynchronize()); m_timer.start(); }
 
 	g_CustomRenderTarget.Clear(context);
 	g_CustomRenderTarget.Bind(context);
 	g_RGBDRenderer.RenderDepthMap(context,
 		d_depth, d_dummyColor, m_width, m_height,
-		depthIntrinsicsInv, depthExtrinsicsInv, colorIntrinsics,
+		depthIntrinsicsInv, depthExtrinsics, colorIntrinsics,
 		g_CustomRenderTarget.getWidth(), g_CustomRenderTarget.getHeight(),
 		GlobalAppState::get().s_remappingDepthDiscontinuityThresOffset, GlobalAppState::get().s_remappingDepthDiscontinuityThresLin);
 	g_CustomRenderTarget.Unbind(context);

@@ -64,6 +64,28 @@ bool CUDAImageManager::process()
 	const unsigned int bufferDimDepthInput = m_RGBDSensor->getDepthWidth()*m_RGBDSensor->getDepthHeight();
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_depthInputRaw, m_RGBDSensor->getDepthFloat(), sizeof(float)*m_RGBDSensor->getDepthWidth()* m_RGBDSensor->getDepthHeight(), cudaMemcpyHostToDevice));
 
+	////////////////////////////////////////////////////////////////////////////////////
+	// Render to Color Space
+	////////////////////////////////////////////////////////////////////////////////////
+	if (GlobalAppState::get().s_bUseCameraCalibration)
+	{
+		//DepthImage32 depthImage(m_widthSIFTdepth, m_heightSIFTdepth);
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getData(), d_depthInputRaw, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/_depth-orig.png", ColorImageR32G32B32(depthImage));
+		
+		m_imageCalibrator.process(DXUTGetD3D11DeviceContext(), d_depthInputRaw, m_SIFTdepthIntrinsics, m_RGBDSensor->getDepthIntrinsicsInv(), m_RGBDSensor->getDepthExtrinsics());
+		
+		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getData(), d_depthInputRaw, sizeof(float)*depthImage.getNumPixels(), cudaMemcpyDeviceToHost));
+		//FreeImageWrapper::saveImage("debug/_depth-new.png", ColorImageR32G32B32(depthImage));
+		//ColorImageR8G8B8A8 colorImage(m_RGBDSensor->getColorWidth(), m_RGBDSensor->getColorHeight());
+		//memcpy(colorImage.getData(), m_RGBDSensor->getColorRGBX(), sizeof(vec4uc)*colorImage.getNumPixels());
+		//for (unsigned int i = 0; i < colorImage.getNumPixels(); i++) colorImage.getData()[i].w = 255;
+		//colorImage.resize(m_widthSIFTdepth, m_heightSIFTdepth);
+		//FreeImageWrapper::saveImage("debug/_color.png", colorImage);
+		//int a = 5;
+	}
+	////////////////////////////////////////////////////////////////////////////////////
+
 	if (GlobalBundlingState::get().s_erodeSIFTdepth) {
 		unsigned int numIter = 2;
 		numIter = 2 * ((numIter + 1) / 2);
@@ -86,14 +108,14 @@ bool CUDAImageManager::process()
 		CUDAImageUtil::copy<float>(d_depthInputFiltered, d_depthInputRaw, m_RGBDSensor->getDepthWidth(), m_RGBDSensor->getDepthHeight());
 	}
 
-	////////////////////////////////////////////////////////////////////////////////////
-	// Render to Color Space
-	////////////////////////////////////////////////////////////////////////////////////
-	if (GlobalAppState::get().s_bUseCameraCalibration)
-	{
-		m_imageCalibrator.process(DXUTGetD3D11DeviceContext(), d_depthInputFiltered, m_SIFTdepthIntrinsics, m_RGBDSensor->getDepthIntrinsicsInv(), m_RGBDSensor->getDepthExtrinsicsInv());
-	}
-	////////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////////
+	//// Render to Color Space
+	//////////////////////////////////////////////////////////////////////////////////////
+	//if (GlobalAppState::get().s_bUseCameraCalibration)
+	//{
+	//	m_imageCalibrator.process(DXUTGetD3D11DeviceContext(), d_depthInputFiltered, m_SIFTdepthIntrinsics, m_RGBDSensor->getDepthIntrinsicsInv(), m_RGBDSensor->getDepthExtrinsicsInv());
+	//}
+	//////////////////////////////////////////////////////////////////////////////////////
 
 	if ((m_RGBDSensor->getDepthWidth() == m_widthIntegration) && (m_RGBDSensor->getDepthHeight() == m_heightIntegration)) {
 		if (ManagedRGBDInputFrame::s_bIsOnGPU) {
