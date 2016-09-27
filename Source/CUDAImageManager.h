@@ -252,12 +252,6 @@ public:
 	unsigned int getIntegrationHeight() const {
 		return m_heightIntegration;
 	}
-	//unsigned int getSIFTWidth() const {
-	//	return m_widthSIFT;
-	//}
-	//unsigned int getSIFTHeight() const {
-	//	return m_heightSIFT;
-	//}
 
 
 
@@ -269,13 +263,13 @@ public:
 		return m_depthIntrinsicsInv;
 	}
 
-	const mat4f& getColorIntrinsics() const	{
-		return m_colorIntrinsics;
-	}
+	//const mat4f& getColorIntrinsics() const	{
+	//	return m_colorIntrinsics;
+	//}
 
-	const mat4f& getColorIntrinsicsInv() const {
-		return m_colorIntrinsicsInv;
-	}
+	//const mat4f& getColorIntrinsicsInv() const {
+	//	return m_colorIntrinsicsInv;
+	//}
 
 	const mat4f& getDepthExtrinsics() const	{
 		return m_depthExtrinsics;

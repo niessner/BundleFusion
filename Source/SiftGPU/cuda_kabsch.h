@@ -428,7 +428,7 @@ unsigned int filterKeyPointMatches(
 	float maxKabschRes2)
 	//, bool printDebug)
 {
-	const float maxResThresh = maxKabschRes2;//MAX_KABSCH_RESIDUAL_THRESH * MAX_KABSCH_RESIDUAL_THRESH;
+	const float maxResThresh = maxKabschRes2;
 
 #ifdef __CUDACC__
 	__shared__ float3 srcPts[MAX_MATCHES_PER_IMAGE_PAIR_FILTERED];

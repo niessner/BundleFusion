@@ -158,7 +158,7 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 #else
 		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
 		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
-		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
+		float4x4 invTransform_i = transform_i.getInverse();						
 		float4x4 transform = invTransform_i * transform_j;
 #endif
 		// find correspondence
@@ -389,6 +389,9 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 #endif
 	//!!!DEBUGGING
 	//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
+	//totalCount = 0;
+	//for (unsigned int i = 0; i < maxDenseImPairs; i++) { if (denseCorrCounts[i] > 0.0f) totalCount++; }
+	//printf("total count = %d\n", totalCount);
 	//if (denseCorrCounts) delete[] denseCorrCounts;
 	//!!!DEBUGGING
 	if (timer) timer->endEvent();
@@ -574,7 +577,7 @@ __global__ void EvalResidualDevice(SolverInput input, SolverState state, SolverP
 	}
 }
 
-float EvalResidual(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
+extern "C" float EvalResidual(SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
 	if (timer) timer->startEvent(__FUNCTION__);
 

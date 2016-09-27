@@ -48,7 +48,6 @@ extern "C" void updateTrajectoryCU(
 __global__ void initNextGlobalTransformCU_Kernel(float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
 	unsigned int initGlobalIdx,
 	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
-	//,unsigned int lastMatchedLocal)
 {
 	if (d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1].m11 == MINF) {
 		printf("[ERROR initNextGlobalTransformCU_Kernel]: d_localTrajectories[%d*%d-1] INVALID!\n", numGlobalTransforms, numLocalTransformsPerTrajectory);//debugging
@@ -60,7 +59,6 @@ extern "C" void initNextGlobalTransformCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
 	unsigned int initGlobalIdx,
 	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
-	//,unsigned int lastMatchedLocal)
 {
 	initNextGlobalTransformCU_Kernel <<< 1, 1 >>>(
 		d_globalTrajectory, numGlobalTransforms, initGlobalIdx,
@@ -72,5 +70,28 @@ extern "C" void initNextGlobalTransformCU(
 #endif
 }
 
+
+////update with local opt result
+//__global__ void refineNextGlobalTransformCU_Kernel(float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
+//	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory, unsigned int lastValidLocal)
+//{
+//	//d_globalTrajectory[numGlobalTransforms] already init from above
+//	d_globalTrajectory[numGlobalTransforms] = d_globalTrajectory[numGlobalTransforms] * d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1];
+//}
+//
+//extern "C" void refineNextGlobalTransformCU(
+//	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
+//	unsigned int initGlobalIdx,
+//	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
+//{
+//	initNextGlobalTransformCU_Kernel <<< 1, 1 >>>(
+//		d_globalTrajectory, numGlobalTransforms, initGlobalIdx,
+//		d_localTrajectories, numLocalTransformsPerTrajectory);
+//
+//#ifdef _DEBUG
+//	cutilSafeCall(cudaDeviceSynchronize());
+//	cutilCheckMsg(__FUNCTION__);
+//#endif
+//}
 
 

@@ -137,7 +137,8 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 
 	bool removed = false;
 	if (isEnd && weightsSparse.front() > 0) {
-		removed = removeMaxResidualCUDA(siftManager, numImages);
+		const unsigned int curFrame = (revalidateIdx == (unsigned int)-1) ? siftManager->getCurrentFrame() : revalidateIdx;
+		removed = removeMaxResidualCUDA(siftManager, numImages, curFrame);
 	}
 
 	return removed;
@@ -160,14 +161,92 @@ struct std::hash<ml::vec2ui> : public std::unary_function < ml::vec2ui, size_t >
 	}
 };
 #endif
+
+#include "SiftVisualization.h"
+template<>
+struct std::hash<vec2ui> : public std::unary_function < vec2ui, size_t > {
+	size_t operator()(const vec2ui& v) const {
+		//TODO larger prime number (64 bit) to match size_t
+		const size_t p0 = 73856093;
+		const size_t p1 = 19349669;
+		//const size_t p2 = 83492791;
+		const size_t res = ((size_t)v.x * p0) ^ ((size_t)v.y * p1);// ^ ((size_t)v.z * p2);
+		return res;
+	}
+};
+
 //!!!debugging
-bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages)
+bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages, unsigned int curFrame)
 {
 	ml::vec2ui imageIndices;
-	bool remove = m_solver->getMaxResidual(siftManager->getGlobalCorrespondencesGPU(), imageIndices, m_maxResidual);
+	bool remove = m_solver->getMaxResidual(curFrame, siftManager->getGlobalCorrespondencesGPU(), imageIndices, m_maxResidual);
 	if (remove) {
 		if (GlobalBundlingState::get().s_verbose) std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
 
+		/*if (false) {
+			static SensorData sd; 
+			if (sd.m_frames.empty()) sd.loadFromFile(GlobalAppState::get().s_binaryDumpSensorFile);
+			//get residual corrs
+			std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
+			//get transforms
+			float4x4* d_transforms = NULL;
+			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages))
+			convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, siftManager->getValidImagesGPU());
+			std::vector<mat4f> transforms(numImages);
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_FREE(d_transforms);
+			//get residuals
+			std::vector< std::pair<float, vec2ui> > residuals;
+			for (unsigned int i = 0; i < correspondences.size(); i++) {
+				const EntryJ& corr = correspondences[i];
+				if (corr.isValid()) {
+					vec3f res = transforms[corr.imgIdx_i] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) - transforms[corr.imgIdx_j] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+					res = math::abs(res);
+					float r = std::max(res.x, std::max(res.y, res.z));
+					residuals.push_back(std::make_pair(r, vec2ui(corr.imgIdx_i, corr.imgIdx_j)));
+				}
+			} //correspondences
+			std::sort(residuals.begin(), residuals.end(), [](const std::pair<float, vec2ui> &left, const std::pair<float, vec2ui> &right) {
+				return fabs(left.first) > fabs(right.first);
+			});
+			//find image-image 
+			const float thresh = 0.05f;
+			std::unordered_map<vec2ui, float> imageImageResidualsSet;
+			for (unsigned int i = 0; i < residuals.size(); i++) {
+				if (residuals[i].first < thresh) break;
+				auto it = imageImageResidualsSet.find(residuals[i].second);
+				if (it == imageImageResidualsSet.end()) imageImageResidualsSet[residuals[i].second] = residuals[i].first;
+				else it->second = std::max(it->second, residuals[i].first);
+			}//residuals
+			const unsigned int maxToPrint = 10;
+			residuals.clear();
+			for (const auto& a : imageImageResidualsSet) residuals.push_back(std::make_pair(a.second, a.first));
+			std::sort(residuals.begin(), residuals.end(), [](const std::pair<float, vec2ui> &left, const std::pair<float, vec2ui> &right) {
+				return fabs(left.first) > fabs(right.first);
+			});
+			if (residuals.size() > maxToPrint) residuals.resize(maxToPrint);
+			std::cout << "printing " << residuals.size() << " high residual" << std::endl;
+			for (const auto& impair : residuals) {
+				vec3uc* im1 = sd.decompressColorAlloc(impair.second.x * 10);
+				vec3uc* im2 = sd.decompressColorAlloc(impair.second.y * 10);
+				ColorImageR8G8B8 image1(sd.m_colorWidth, sd.m_colorHeight, im1);
+				ColorImageR8G8B8 image2(sd.m_colorWidth, sd.m_colorHeight, im2);
+				std::free(im1);		std::free(im2);
+				SiftVisualization::printMatch("debug/maxres/" + std::to_string((int)(100 * impair.first)) + "_" + std::to_string(impair.second.x) + "-" + std::to_string(impair.second.y) + ".png",
+					impair.second, correspondences, image1, image2, sd.m_calibrationColor.m_intrinsic);
+				unsigned short* d1 = sd.decompressDepthAlloc(impair.second.x * 10);
+				unsigned short* d2 = sd.decompressDepthAlloc(impair.second.y * 10);
+				DepthImage32 depth1(DepthImage16(sd.m_depthWidth, sd.m_depthHeight, d1));
+				DepthImage32 depth2(DepthImage16(sd.m_depthWidth, sd.m_depthHeight, d2));
+				std::free(d1);		std::free(d2);
+				image1.resize(depth1.getWidth(), depth1.getHeight());	image2.resize(depth2.getWidth(), depth2.getHeight());
+				SiftVisualization::saveKeyMatchToPointCloud("debug/maxres/" + std::to_string((int)(100 * impair.first)) + "_" + std::to_string(impair.second.x) + "-" + std::to_string(impair.second.y),
+					impair.second, correspondences, depth1, image1, depth2, image2, transforms, sd.m_calibrationDepth.m_intrinsic.getInverse());
+			} //print
+			std::cout << "waiting..." << std::endl;
+			getchar();
+		}*/
 #ifdef NEW_GUIDED_REMOVE
 		const std::vector<vec2ui>& imPairsToRemove = m_solver->getGuidedMaxResImagesToRemove();
 		if (imPairsToRemove.empty()) {

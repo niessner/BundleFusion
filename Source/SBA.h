@@ -88,7 +88,7 @@ private:
 		unsigned int numNonLinearIterations, unsigned int numLinearIterations, bool isStart, bool isEnd,
 		unsigned int revalidateIdx);
 
-	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages);
+	bool removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages, unsigned int curFrame);
 	
 	float3*			d_xRot;
 	float3*			d_xTrans;

@@ -13,7 +13,7 @@
 #include <conio.h>
 
 class CUDACache;
-#define NEW_GUIDED_REMOVE 
+//#define NEW_GUIDED_REMOVE 
 
 
 class CUDASolverBundling
@@ -37,7 +37,7 @@ public:
 		max = m_solverExtra.h_maxResidual[0];
 		index = m_solverExtra.h_maxResidualIndex[0];
 	};
-	bool getMaxResidual(EntryJ* d_correspondences, ml::vec2ui& imageIndices, float& maxRes);
+	bool getMaxResidual(unsigned int curFrame, EntryJ* d_correspondences, ml::vec2ui& imageIndices, float& maxRes);
 	bool useVerification(EntryJ* d_correspondences, unsigned int numberOfCorrespondences);
 
 	const int* getVariablesToCorrespondences() const { return d_variablesToCorrespondences; }

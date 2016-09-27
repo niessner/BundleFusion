@@ -240,7 +240,7 @@ LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, boo
 
 	return 0;
 }
-
+/*
 void DumpinputManagerData(const std::string& filename)
 {
 	TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
@@ -330,7 +330,7 @@ void DumpinputManagerData(const std::string& filename)
 		cs.m_ColorImages[i] = NULL;
 	}
 }
-
+*/
 void StopScanningAndExtractIsoSurfaceMC(const std::string& filename, bool overwriteExistingFile /*= false*/)
 {
 	//g_sceneRep->debugHash();
@@ -619,7 +619,8 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 
 
 	g_sceneRep = new CUDASceneRepHashSDF(CUDASceneRepHashSDF::parametersFromGlobalAppState(GlobalAppState::get()));
-	g_rayCast = new CUDARayCastSDF(CUDARayCastSDF::parametersFromGlobalAppState(GlobalAppState::get(), g_CudaImageManager->getColorIntrinsics(), g_CudaImageManager->getColorIntrinsicsInv()));
+	//g_rayCast = new CUDARayCastSDF(CUDARayCastSDF::parametersFromGlobalAppState(GlobalAppState::get(), g_CudaImageManager->getColorIntrinsics(), g_CudaImageManager->getColorIntrinsicsInv()));
+	g_rayCast = new CUDARayCastSDF(CUDARayCastSDF::parametersFromGlobalAppState(GlobalAppState::get(), g_CudaImageManager->getDepthIntrinsics(), g_CudaImageManager->getDepthIntrinsicsInv()));
 
 	g_marchingCubesHashSDF = new CUDAMarchingCubesHashSDF(CUDAMarchingCubesHashSDF::parametersFromGlobalAppState(GlobalAppState::get()));
 	g_historgram = new CUDAHistrogramHashSDF(g_sceneRep->getHashParams());
@@ -639,10 +640,10 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	}
 
 
-	g_depthCameraParams.fx = g_CudaImageManager->getColorIntrinsics()(0, 0); //everything should be in color space
-	g_depthCameraParams.fy = g_CudaImageManager->getColorIntrinsics()(1, 1);
-	g_depthCameraParams.mx = g_CudaImageManager->getColorIntrinsics()(0, 2);
-	g_depthCameraParams.my = g_CudaImageManager->getColorIntrinsics()(1, 2);
+	g_depthCameraParams.fx = g_CudaImageManager->getDepthIntrinsics()(0, 0);//TODO check intrinsics
+	g_depthCameraParams.fy = g_CudaImageManager->getDepthIntrinsics()(1, 1);
+	g_depthCameraParams.mx = g_CudaImageManager->getDepthIntrinsics()(0, 2);
+	g_depthCameraParams.my = g_CudaImageManager->getDepthIntrinsics()(1, 2);
 	g_depthCameraParams.m_sensorDepthWorldMin = GlobalAppState::get().s_renderDepthMin;
 	g_depthCameraParams.m_sensorDepthWorldMax = GlobalAppState::get().s_renderDepthMax;
 	g_depthCameraParams.m_imageWidth = g_CudaImageManager->getIntegrationWidth();
@@ -1144,7 +1145,8 @@ void renderToFile(ID3D11DeviceContext* pd3dImmediateContext, const mat4f& lastRi
 	const mat4f origRayCastIntrinsics = g_rayCast->getIntrinsics();
 	const mat4f origRayCastIntrinsicsInv = g_rayCast->getIntrinsicsInv();
 	const unsigned int origRayCastWidth = g_rayCast->getRayCastParams().m_width; const unsigned int origRayCastHeight = g_rayCast->getRayCastParams().m_height;
-	g_rayCast->setRayCastIntrinsics(g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight(), g_CudaImageManager->getColorIntrinsics(), g_CudaImageManager->getColorIntrinsicsInv());
+	//g_rayCast->setRayCastIntrinsics(g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight(), g_CudaImageManager->getColorIntrinsics(), g_CudaImageManager->getColorIntrinsicsInv());
+	g_rayCast->setRayCastIntrinsics(g_CudaImageManager->getIntegrationWidth(), g_CudaImageManager->getIntegrationHeight(), g_CudaImageManager->getDepthIntrinsics(), g_CudaImageManager->getDepthIntrinsicsInv());
 	g_sceneRep->setLastRigidTransformAndCompactify(lastRigidTransform);	//TODO check that
 	g_rayCast->render(g_sceneRep->getHashData(), g_sceneRep->getHashParams(), lastRigidTransform);
 
@@ -1421,7 +1423,7 @@ void renderFrustum(const mat4f& transform, const mat4f& cameraMatrix, const vec4
 
 	vec3f eye = vec3f(0, 0, 0);
 	vec3f farPlane[4];
-	const mat4f& intrinsicsInv = g_CudaImageManager->getColorIntrinsicsInv();
+	const mat4f& intrinsicsInv = g_CudaImageManager->getDepthIntrinsicsInv();
 	farPlane[0] = intrinsicsInv * (maxDepth * vec3f(0, 0, 1.0f));
 	farPlane[1] = intrinsicsInv * (maxDepth * vec3f(g_CudaImageManager->getIntegrationWidth() - 1.0f, 0, 1.0f));
 	farPlane[2] = intrinsicsInv * (maxDepth * vec3f(g_CudaImageManager->getIntegrationWidth() - 1.0f, g_CudaImageManager->getIntegrationHeight() - 1.0f, 1.0f));

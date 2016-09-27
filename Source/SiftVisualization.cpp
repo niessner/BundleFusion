@@ -339,7 +339,8 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 	PointCloudIOf::saveToFile(pre + ".ply", pc);
 }
 
-void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages,
+void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const DepthImage32& depthImage0, const ColorImageR8G8B8& colorImage0,
+	const DepthImage32& depthImage1, const ColorImageR8G8B8& colorImage1,
 	const mat4f& depthIntrinsicsInv, const vec2ui& imageIndices, const mat4f& transformPrvToCur)
 {
 	//transforms
@@ -349,9 +350,9 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 	const std::string separator = (prefix.back() == '/' || prefix.back() == '\\') ? "" : "_";
 	const std::string pre = prefix + separator + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y);
 
-	const float scaleWidthColor = (float)colorImages.front().getWidth() / (float)depthImages.front().getWidth();
-	const float scaleHeightColor = (float)colorImages.front().getHeight() / (float)depthImages.front().getHeight();
-	bool sameColorDepthRes = colorImages.front().getDimensions() == depthImages.front().getDimensions();
+	const float scaleWidthColor = (float)colorImage0.getWidth() / (float)depthImage0.getWidth();
+	const float scaleHeightColor = (float)colorImage0.getHeight() / (float)depthImage0.getHeight();
+	bool sameColorDepthRes = colorImage0.getDimensions() == depthImage0.getDimensions();
 
 	PointCloudf pc;
 	for (unsigned int i = 0; i < 2; i++) {
@@ -359,20 +360,21 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 		unsigned int frameIdx = imageIndices[i];
 		PointCloudf framePc;
 
-		const DepthImage32& depth = depthImages[frameIdx];
-		for (unsigned int y = 0; y < depth.getHeight(); y++) {
-			for (unsigned int x = 0; x < depth.getWidth(); x++) {
-				vec3f p = depthToCamera(depthIntrinsicsInv, depth.getData(), depth.getWidth(), depth.getHeight(), x, y);
+		const DepthImage32& depthImage = i == 0 ? depthImage0 : depthImage1;
+		const ColorImageR8G8B8& colorImage = i == 0 ? colorImage0 : colorImage1;
+		for (unsigned int y = 0; y < depthImage.getHeight(); y++) {
+			for (unsigned int x = 0; x < depthImage.getWidth(); x++) {
+				vec3f p = depthToCamera(depthIntrinsicsInv, depthImage.getData(), depthImage.getWidth(), depthImage.getHeight(), x, y);
 				if (p.x != -std::numeric_limits<float>::infinity()) {
 					pc.m_points.push_back(transform * p);
 					vec4f c;
 					if (!sameColorDepthRes) {
 						unsigned int cx = (unsigned int)std::round(scaleWidthColor * x);
 						unsigned int cy = (unsigned int)std::round(scaleHeightColor * y);
-						c = vec4f(vec3f(colorImages[frameIdx](cx, cy)) / 255.0f);
+						c = vec4f(vec3f(colorImage(cx, cy)) / 255.0f);
 					}
 					else {
-						c = vec4f(vec3f(colorImages[frameIdx](x, y)) / 255.0f);
+						c = vec4f(vec3f(colorImage(x, y)) / 255.0f);
 					}
 					pc.m_colors.push_back(c);
 
@@ -580,7 +582,7 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 	}
 }
 
-void SiftVisualization::saveCamerasToPLY(const std::string& filename, const std::vector<mat4f>& trajectory)
+void SiftVisualization::saveCamerasToPLY(const std::string& filename, const std::vector<mat4f>& trajectory, bool printDir /*= true*/)
 {
 	const float radius = 0.05f;
 	const vec3f up = vec3f::eY;
@@ -589,14 +591,18 @@ void SiftVisualization::saveCamerasToPLY(const std::string& filename, const std:
 	MeshDataf meshData;
 	for (unsigned int i = 0; i < trajectory.size(); i++) {
 		const mat4f& t = trajectory[i];
-		const vec3f eye = t.getTranslation();
-		MeshDataf eyeMesh = Shapesf::sphere(radius, eye, 10, 10, vec4f(0.0f, 1.0f, 0.0f, 1.0f)).getMeshData(); // green for eye
-		MeshDataf upMesh = Shapesf::cylinder(eye, eye + t.getRotation() * up, radius, 10, 10, vec4f(0.0f, 0.0f, 1.0f, 1.0f)).getMeshData(); // blue for up
-		MeshDataf lookMesh = Shapesf::cylinder(eye, eye + t.getRotation() * look, radius, 10, 10, vec4f(1.0f, 0.0f, 1.0f, 0.0f)).getMeshData(); // red for look
-
-		meshData.merge(eyeMesh);
-		meshData.merge(upMesh);
-		meshData.merge(lookMesh);
+		if (t._m00 != -std::numeric_limits<float>::infinity()) {
+			const vec3f color = BaseImageHelper::convertDepthToRGB((float)i, 0.0f, (float)trajectory.size());
+			const vec3f eye = t.getTranslation();
+			MeshDataf eyeMesh = Shapesf::sphere(radius, eye, 10, 10, vec4f(color, 1.0f)).getMeshData();
+			meshData.merge(eyeMesh);
+			if (printDir) {
+				MeshDataf upMesh = Shapesf::cylinder(eye, eye + t.getRotation() * up, radius, 10, 10, vec4f(0.0f, 0.0f, 1.0f, 1.0f)).getMeshData(); // blue for up
+				MeshDataf lookMesh = Shapesf::cylinder(eye, eye + t.getRotation() * look, radius, 10, 10, vec4f(1.0f, 0.0f, 1.0f, 0.0f)).getMeshData(); // red for look
+				meshData.merge(upMesh);
+				meshData.merge(lookMesh);
+			}
+		}
 	}
 	MeshIOf::saveToFile(filename, meshData);
 }
@@ -753,24 +759,26 @@ void SiftVisualization::printAllMatches(const std::string& outDirectory, const s
 }
 
 void SiftVisualization::saveKeyMatchToPointCloud(const std::string& prefix, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences,
-	const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages, const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv)
+	const DepthImage32& depthImage0, const ColorImageR8G8B8& colorImage0,
+	const DepthImage32& depthImage1, const ColorImageR8G8B8& colorImage1, const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv)
 {
 	PointCloudf pc0, pc1;
-	computePointCloud(pc0, depthImages[imageIndices.x].getData(), depthImages[imageIndices.x].getWidth(), depthImages[imageIndices.x].getHeight(),
-		colorImages[imageIndices.x].getData(), colorImages[imageIndices.x].getWidth(), colorImages[imageIndices.x].getHeight(), depthIntrinsicsInv,
+	computePointCloud(pc0, depthImage0.getData(), depthImage0.getWidth(), depthImage0.getHeight(),
+		colorImage0.getData(), colorImage0.getWidth(), colorImage0.getHeight(), depthIntrinsicsInv,
 		trajectory[imageIndices.x], 3.5f);
-	computePointCloud(pc1, depthImages[imageIndices.y].getData(), depthImages[imageIndices.y].getWidth(), depthImages[imageIndices.y].getHeight(),
-		colorImages[imageIndices.y].getData(), colorImages[imageIndices.y].getWidth(), colorImages[imageIndices.y].getHeight(), depthIntrinsicsInv,
+	computePointCloud(pc1, depthImage1.getData(), depthImage1.getWidth(), depthImage1.getHeight(),
+		colorImage1.getData(), colorImage1.getWidth(), colorImage1.getHeight(), depthIntrinsicsInv,
 		trajectory[imageIndices.y], 3.5f);
 	PointCloudIOf::saveToFile(prefix + "-" + std::to_string(imageIndices.x) + ".ply", pc0);
 	PointCloudIOf::saveToFile(prefix + "-" + std::to_string(imageIndices.y) + ".ply", pc1);
 
-	std::vector<vec3f> keys0, keys1;
+	std::vector<vec3f> keys0, keys1; std::vector<vec3f> res;
 	for (unsigned int i = 0; i < correspondences.size(); i++) {
 		const EntryJ& corr = correspondences[i];
 		if (corr.isValid() && corr.imgIdx_i == imageIndices.x && corr.imgIdx_j == imageIndices.y) {
 			keys0.push_back(vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z));
 			keys1.push_back(vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z));
+			res.push_back(trajectory[imageIndices.x] * keys0.back() - trajectory[imageIndices.y] * keys1.back());
 		}
 	}
 	if (keys0.empty()) { std::cout << "no matches to print for images " << imageIndices << std::endl; return; }
@@ -778,10 +786,13 @@ void SiftVisualization::saveKeyMatchToPointCloud(const std::string& prefix, cons
 	const float radius = 0.01f;
 	MeshDataf keysMesh0, keysMesh1;
 	for (unsigned int i = 0; i < keys0.size(); i++) {
-		const vec3f color = vec3f(RGBColor::randomColor());
+		const vec3f color = BaseImageHelper::convertDepthToRGB(res[i].length(), 0.0f, 0.2f);//vec3f(RGBColor::randomColor());
 		keysMesh0.merge(Shapesf::sphere(radius, trajectory[imageIndices.x] * keys0[i], 10, 10, vec4f(color)).getMeshData());
 		keysMesh1.merge(Shapesf::sphere(radius, trajectory[imageIndices.y] * keys1[i], 10, 10, vec4f(color)).getMeshData());
 	}
+	std::ofstream s(prefix + "-residuals.txt");
+	for (unsigned int i = 0; i < res.size(); i++) s << res[i] << std::endl;
+	s.close();
 	MeshIOf::saveToFile(prefix + "-keys_" + std::to_string(imageIndices.x) + ".ply", keysMesh0);
 	MeshIOf::saveToFile(prefix + "-keys_" + std::to_string(imageIndices.y) + ".ply", keysMesh1);
 }
@@ -792,3 +803,49 @@ void SiftVisualization::saveFrameToPointCloud(const std::string& filename, const
 	computePointCloud(pc, depth.getData(), depth.getWidth(), depth.getHeight(), color.getData(), color.getWidth(), color.getHeight(), depthIntrinsicsInverse, mat4f::identity(), maxDepth);
 	PointCloudIOf::saveToFile(filename, pc);
 }
+
+//void SiftVisualization::visualizeTrajectory(const std::vector<mat4f>& trajectory, const std::string& filename) //doesn't work
+//{
+//	if (trajectory.size() < 3) return; //cannot vis
+//
+//	//get camera positions (translation only)
+//	std::vector<vec3f> pts; std::vector<unsigned int> indices;
+//	for (unsigned int i = 0; i < trajectory.size(); i++) {
+//		if (trajectory[i]._m00 != -std::numeric_limits<float>::infinity()) {
+//			pts.push_back(trajectory[i].getTranslation());
+//			indices.push_back(i);
+//		}
+//	}
+//
+//	auto axes = math::pointSetPCA(pts);
+//	vec3f mean = std::accumulate(pts.begin(), pts.end(), vec3f::origin) / (float)pts.size();
+//	// project points to plane(axes[2].first, mean)
+//	std::vector<vec2f> ptsProj(pts.size()); 
+//	const vec3f& normal = axes[2].first;
+//	for (unsigned int i = 0; i < pts.size(); i++) {
+//		pts[i] = pts[i] - (normal | (pts[i] - mean)) * normal; // projected point (3d)
+//		ml::vec3f s = pts[i] - mean;
+//		ptsProj[i] = ml::vec2f(s | axes[0].first, s | axes[1].first); // projected point (2d plane basis)
+//	}
+//
+//	//re-center
+//	vec2f rangeMin(std::numeric_limits<float>::infinity()), rangeMax(-std::numeric_limits<float>::infinity());
+//	for (const vec2f& p : ptsProj) {
+//		if (p.x < rangeMin.x) rangeMin.x = p.x;
+//		if (p.y < rangeMin.y) rangeMin.y = p.y;
+//		if (p.x > rangeMax.x) rangeMax.x = p.x;
+//		if (p.y > rangeMax.y) rangeMax.y = p.y;
+//	}
+//
+//	float scaleFactor = 1.0f; const unsigned int minImageDim = 500;
+//	vec2i imageBounds = math::ceil(rangeMax - rangeMin);
+//	if (std::max(imageBounds.x, imageBounds.y) < minImageDim) scaleFactor = (float)minImageDim / (float)std::min(imageBounds.x, imageBounds.y);
+//	imageBounds *= scaleFactor;
+//	ColorImageR8G8B8 image(imageBounds.x, imageBounds.y); image.setPixels(vec3uc(255, 255, 255)); // white background
+//	for (unsigned int i = 0; i < ptsProj.size(); i++) { //plot points
+//		vec3uc color = vec3uc(255.0f * BaseImageHelper::convertDepthToRGB((float)indices[i], 0.0f, (float)indices.size()));
+//		vec2i position = math::round(scaleFactor * (ptsProj[i] - rangeMin));
+//		ImageHelper::drawCircle(image, position, 3, color);
+//	}
+//	FreeImageWrapper::saveImage(filename, image);
+//}

@@ -20,7 +20,7 @@ class CUDAImageCalibrator
 			
 		HRESULT OnD3D11CreateDevice(ID3D11Device* device, unsigned int width, unsigned int height);
 
-		HRESULT process(ID3D11DeviceContext* context, float* d_depth, const mat4f& colorIntrinsics, const mat4f& depthIntrinsicsInv, const mat4f& depthExtrinsicsInv);
+		HRESULT process(ID3D11DeviceContext* context, float* d_depth, const mat4f& colorIntrinsics, const mat4f& depthIntrinsicsInv, const mat4f& depthExtrinsics);
 
 	private:
 

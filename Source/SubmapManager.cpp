@@ -857,6 +857,34 @@ bool SubmapManager::optimizeGlobal(unsigned int numFrames, unsigned int numNonLi
 	}
 #endif
 
+	////debugging
+	//if (isScanDone) {
+	//	static unsigned int counter = 0;
+	//	if (counter == 20) {
+	//		m_global->saveToFile("debug/global.sift");
+	//		m_globalCache->saveToFile("debug/global.cache");
+	//		//std::vector<mat4f> keysTrajectory(m_global->getNumImages());
+	//		//MLIB_CUDA_SAFE_CALL(cudaMemcpy(keysTrajectory.data(), d_globalTrajectory, sizeof(mat4f)*keysTrajectory.size(), cudaMemcpyDeviceToHost));
+	//		{
+	//			std::vector<mat4f> completeTrajectory(2991); //debugging
+	//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(completeTrajectory.data(), d_completeTrajectory, sizeof(mat4f)*completeTrajectory.size(), cudaMemcpyDeviceToHost));
+	//			BinaryDataStreamFile s("debug/complete.trajectory", true);
+	//			s << completeTrajectory;
+	//			s.closeStream();
+	//		}
+	//		{
+	//			std::vector<mat4f> localTrajectories(300*11); //debugging
+	//			MLIB_CUDA_SAFE_CALL(cudaMemcpy(localTrajectories.data(), d_localTrajectories, sizeof(mat4f)*localTrajectories.size(), cudaMemcpyDeviceToHost));
+	//			BinaryDataStreamFile s("debug/locals.trajectory", true);
+	//			s << localTrajectories;
+	//			s.closeStream();
+	//		}
+	//		std::cout << "waiting..." << std::endl;
+	//		getchar();
+	//	}
+	//	counter++;
+	//}
+	////debugging
 	return ret;
 }
 

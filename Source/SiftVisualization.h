@@ -31,13 +31,15 @@ public:
 		const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics);
 
 
-	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages,
+	static void saveImPairToPointCloud(const std::string& prefix, const DepthImage32& depthImage0, const ColorImageR8G8B8& colorImage0,
+		const DepthImage32& depthImage1, const ColorImageR8G8B8& colorImage1,
 		const mat4f& depthIntrinsicsInv, const vec2ui& imageIndices, const mat4f& transformPrvToCur);
 	static void saveImPairToPointCloud(const std::string& prefix, const std::vector<CUDACachedFrame>& cachedFrames, unsigned int cacheWidth, unsigned int cacheHeight,
 		const vec2ui& imageIndices, const mat4f& transformPrvToCur);
 	static void saveKeyMatchToPointCloud(const std::string& filename, const EntryJ& corr, const mat4f& transformPrvToCur);
 	static void saveKeyMatchToPointCloud(const std::string& prefix, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences,
-		const std::vector<DepthImage32>& depthImages, const std::vector<ColorImageR8G8B8>& colorImages, const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv);
+		const DepthImage32& depthImage0, const ColorImageR8G8B8& colorImage0,
+		const DepthImage32& depthImage1, const ColorImageR8G8B8& colorImage1, const std::vector<mat4f>& trajectory, const mat4f& depthIntrinsicsInv);
 
 
 	static vec3f depthToCamera(const mat4f& depthIntrinsincsinv, const float* depth, unsigned int width, unsigned int height, unsigned int x, unsigned int y);
@@ -58,7 +60,7 @@ public:
 		const ColorImageR32G32B32A32& camPos, const ColorImageR32G32B32A32& normal,
 		const mat4f& transform, float maxDepth);
 
-	static void saveCamerasToPLY(const std::string& filename, const std::vector<mat4f>& trajectory);
+	static void saveCamerasToPLY(const std::string& filename, const std::vector<mat4f>& trajectory, bool printDir = true);
 
 	static void visualizeImageImageCorrespondences(const std::string& filename, SIFTImageManager* siftManager);
 	static void visualizeImageImageCorrespondences(const std::string& filename, const std::vector<EntryJ>& correspondences, const std::vector<int>& valid, unsigned int numImages);
@@ -68,6 +70,8 @@ public:
 	static void printAllMatches(const std::string& outDirectory, SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8>& colorImages, const mat4f& colorIntrinsics);
 	static void printAllMatches(const std::string& outDirectory, const std::vector<EntryJ>& correspondences, unsigned int numImages,
 		const std::vector<ColorImageR8G8B8>& colorImages, const mat4f& colorIntrinsics);
+
+	//static void visualizeTrajectory(const std::vector<mat4f>& trajectory, const std::string& filename);//doesn't work //todo figure out
 private:
 
 	static void convertIntensityToRGB(const ColorImageR32& intensity, ColorImageR8G8B8& image) {
