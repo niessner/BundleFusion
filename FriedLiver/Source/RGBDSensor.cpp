@@ -124,8 +124,15 @@ const mat4f& RGBDSensor::getColorExtrinsicsInv() const
 
 
 void RGBDSensor::initializeDepthExtrinsics(const mat4f& m) {
-	m_depthExtrinsics = m;
-	m_depthExtrinsicsInv = m.getInverse();
+	if (m == mat4f::identity()) {
+		GlobalAppState::get().s_bUseCameraCalibration = false;
+		m_depthExtrinsics = mat4f::identity();
+		m_depthExtrinsicsInv = mat4f::identity();
+	}
+	else {
+		m_depthExtrinsics = m;
+		m_depthExtrinsicsInv = m.getInverse();
+	}
 }
 void RGBDSensor::initializeColorExtrinsics(const mat4f& m) {
 	m_colorExtrinsics = m;
