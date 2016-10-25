@@ -50,13 +50,12 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputColor, sizeof(uchar4)*m_inputColorWidth*m_inputColorHeight));
 			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
 
-			const float scaleWidthSIFT = (float)m_widthSIFT / (float)m_inputColorWidth;
-			const float scaleHeightSIFT = (float)m_heightSIFT / (float)m_inputColorHeight;
 			m_SIFTIntrinsics = sensor->getColorIntrinsics();
-			m_SIFTIntrinsics._m00 *= scaleWidthSIFT;  m_SIFTIntrinsics._m02 *= scaleWidthSIFT;
-			m_SIFTIntrinsics._m11 *= scaleHeightSIFT; m_SIFTIntrinsics._m12 *= scaleHeightSIFT;
-			m_SIFTIntrinsicsInv = sensor->getColorIntrinsicsInv();
-			m_SIFTIntrinsicsInv._m00 /= scaleWidthSIFT; m_SIFTIntrinsicsInv._m11 /= scaleHeightSIFT;
+			m_SIFTIntrinsics._m00 *= (float)m_widthSIFT / (float)m_inputColorWidth;
+			m_SIFTIntrinsics._m11 *= (float)m_heightSIFT / (float)m_inputColorHeight;
+			m_SIFTIntrinsics._m02 *= (float)(m_widthSIFT -1)/ (float)(m_inputColorWidth-1);
+			m_SIFTIntrinsics._m12 *= (float)(m_heightSIFT-1) / (float)(m_inputColorHeight-1);
+			m_SIFTIntrinsicsInv = m_SIFTIntrinsics.getInverse();
 
 			m_bFilterDepthValues = GlobalBundlingState::get().s_depthFilter;
 			m_fBilateralFilterSigmaR = GlobalBundlingState::get().s_depthSigmaR;

@@ -12,11 +12,11 @@ CUDACache::CUDACache(unsigned int widthDepthInput, unsigned int heightDepthInput
 	m_height = heightDownSampled;
 	m_maxNumImages = maxNumImages;
 
-	const float scaleWidth = (float)widthDownSampled / (float)widthDepthInput;
-	const float scaleHeight = (float)heightDownSampled / (float)heightDepthInput;
 	m_intrinsics = inputIntrinsics;
-	m_intrinsics._m00 *= scaleWidth;  m_intrinsics._m02 *= scaleWidth;
-	m_intrinsics._m11 *= scaleHeight; m_intrinsics._m12 *= scaleHeight;
+	m_intrinsics._m00 *= (float)widthDownSampled / (float)widthDepthInput;
+	m_intrinsics._m11 *= (float)heightDownSampled / (float)heightDepthInput;
+	m_intrinsics._m02 *= (float)(widthDownSampled -1)/ (float)(widthDepthInput-1);
+	m_intrinsics._m12 *= (float)(heightDownSampled-1) / (float)(heightDepthInput-1);
 	m_intrinsicsInv = m_intrinsics.getInverse();
 
 	d_intensityHelper = NULL;

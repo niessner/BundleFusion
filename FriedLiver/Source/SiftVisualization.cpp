@@ -206,10 +206,10 @@ void SiftVisualization::printMatch(const std::string& filename, const SIFTImageM
 	}
 
 	mat4f colorIntrinsics = cudaCache->getIntrinsics();
-	const float scaleWidth = (float)widthSIFT / (float)cudaCache->getWidth();
-	const float scaleHeight = (float)heightSIFT / (float)cudaCache->getHeight();
-	colorIntrinsics._m00 *= scaleWidth;  colorIntrinsics._m02 *= scaleWidth;
-	colorIntrinsics._m11 *= scaleHeight; colorIntrinsics._m12 *= scaleHeight;
+	colorIntrinsics._m00 *= (float)widthSIFT / (float)cudaCache->getWidth();
+	colorIntrinsics._m11 *= (float)heightSIFT / (float)cudaCache->getHeight();
+	colorIntrinsics._m02 *= (float)(widthSIFT -1)/ (float)(cudaCache->getWidth()-1);
+	colorIntrinsics._m12 *= (float)(heightSIFT-1) / (float)(cudaCache->getHeight()-1);
 	printMatch(filename, imageIndices, imagePairMatches, xImage, yImage, colorIntrinsics);
 }
 

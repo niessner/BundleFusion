@@ -24,16 +24,16 @@ public:
 	static RayCastParams parametersFromGlobalAppState(const GlobalAppState& gas, const mat4f& intrinsics, const mat4f& intrinsicsInv) {
 		mat4f rayCastIntrinsics = intrinsics;
 		if (gas.s_rayCastWidth != gas.s_integrationWidth || gas.s_rayCastHeight != gas.s_integrationHeight) {
-			const float scaleWidthDepth = (float)gas.s_rayCastWidth / (float)gas.s_integrationWidth;
-			const float scaleHeightDepth = (float)gas.s_rayCastHeight / (float)gas.s_integrationHeight;
 			// adapt intrinsics
-			rayCastIntrinsics._m00 *= scaleWidthDepth;  rayCastIntrinsics._m02 *= scaleWidthDepth;
-			rayCastIntrinsics._m11 *= scaleHeightDepth; rayCastIntrinsics._m12 *= scaleHeightDepth;
+			rayCastIntrinsics._m00 *= (float)gas.s_rayCastWidth / (float)gas.s_integrationWidth;
+			rayCastIntrinsics._m11 *= (float)gas.s_rayCastHeight / (float)gas.s_integrationHeight;
+			rayCastIntrinsics._m02 *= (float)(gas.s_rayCastWidth - 1) / (float)(gas.s_integrationWidth - 1);
+			rayCastIntrinsics._m12 *= (float)(gas.s_rayCastHeight - 1) / (float)(gas.s_integrationHeight - 1);
 		}
 
 		RayCastParams params;
-		params.m_width = gas.s_rayCastWidth;			
-		params.m_height = gas.s_rayCastHeight;			
+		params.m_width = gas.s_rayCastWidth;
+		params.m_height = gas.s_rayCastHeight;
 		params.fx = rayCastIntrinsics(0, 0);
 		params.fy = rayCastIntrinsics(1, 1);
 		params.mx = rayCastIntrinsics(0, 2);
