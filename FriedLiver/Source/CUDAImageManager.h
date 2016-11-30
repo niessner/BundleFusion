@@ -155,23 +155,26 @@ public:
 
 		m_currFrame = 0;
 
-		const float scaleWidthDepth = (float)m_widthIntegration / (float)m_RGBDSensor->getDepthWidth();
-		const float scaleHeightDepth = (float)m_heightIntegration / (float)m_RGBDSensor->getDepthHeight();
 
-		// adapt depth intrinsics
+		const unsigned int rgbdSensorWidthDepth = m_RGBDSensor->getDepthWidth();
+		const unsigned int rgbdSensorHeightDepth = m_RGBDSensor->getDepthHeight();
+
+		// adapt intrinsics
 		m_depthIntrinsics = m_RGBDSensor->getDepthIntrinsics();
-		m_depthIntrinsics._m00 *= (float)m_widthIntegration / (float)m_RGBDSensor->getDepthWidth();
-		m_depthIntrinsics._m11 *= (float)m_heightIntegration / (float)m_RGBDSensor->getDepthHeight();
-		m_depthIntrinsics._m02 *= (float)(m_widthIntegration-1) / (float)(m_RGBDSensor->getDepthWidth()-1);
-		m_depthIntrinsics._m12 *= (float)(m_heightIntegration-1) / (float)(m_RGBDSensor->getDepthHeight()-1);
+		m_depthIntrinsics._m00 *= (float)m_widthIntegration / (float)rgbdSensorWidthDepth;  //focal 
+		m_depthIntrinsics._m11 *= (float)m_heightIntegration/ (float)rgbdSensorHeightDepth; 
+		m_depthIntrinsics._m02 *= (float)(m_widthIntegration-1) / (float)(rgbdSensorWidthDepth-1);	//principal point
+		m_depthIntrinsics._m12 *= (float)(m_heightIntegration-1) / (float)(rgbdSensorHeightDepth-1);
 		m_depthIntrinsicsInv = m_depthIntrinsics.getInverse();
 
-		// adapt color intrinsics
+		const unsigned int rgbdSensorWidthColor = m_RGBDSensor->getColorWidth();
+		const unsigned int rgbdSensorHeightColor = m_RGBDSensor->getColorHeight();
+
 		m_colorIntrinsics = m_RGBDSensor->getColorIntrinsics();
-		m_colorIntrinsics._m00 *= (float)m_widthIntegration / (float)m_RGBDSensor->getColorWidth();
-		m_colorIntrinsics._m11 *= (float)m_heightIntegration / (float)m_RGBDSensor->getColorHeight();
-		m_colorIntrinsics._m02 *= (float)(m_widthIntegration-1) / (float)(m_RGBDSensor->getColorWidth()-1);
-		m_colorIntrinsics._m12 *= (float)(m_heightIntegration-1) / (float)(m_RGBDSensor->getColorHeight()-1);
+		m_colorIntrinsics._m00 *= (float)m_widthIntegration / (float)rgbdSensorWidthColor;  //focal 
+		m_colorIntrinsics._m11 *= (float)m_heightIntegration/ (float)rgbdSensorHeightColor; 
+		m_colorIntrinsics._m02 *=  (float)(m_widthIntegration-1) / (float)(rgbdSensorWidthColor-1);	//principal point
+		m_colorIntrinsics._m12 *= (float)(m_heightIntegration-1) / (float)(rgbdSensorHeightColor-1);
 		m_colorIntrinsicsInv = m_colorIntrinsics.getInverse();
 
 		// adapt extrinsics
@@ -180,8 +183,8 @@ public:
 
 		if (GlobalAppState::get().s_bUseCameraCalibration) {
 			m_SIFTdepthIntrinsics = m_RGBDSensor->getColorIntrinsics();
-			m_SIFTdepthIntrinsics._m00 *= (float)m_widthSIFTdepth / (float)m_RGBDSensor->getColorWidth();
-			m_SIFTdepthIntrinsics._m11 *= (float)m_heightSIFTdepth / (float)m_RGBDSensor->getColorHeight();
+			m_SIFTdepthIntrinsics._m00 *= (float)m_widthSIFTdepth / (float)rgbdSensorWidthColor;  
+			m_SIFTdepthIntrinsics._m11 *= (float)m_heightSIFTdepth / (float)rgbdSensorHeightColor; 
 			m_SIFTdepthIntrinsics._m02 *= (float)(m_widthSIFTdepth-1) / (float)(m_RGBDSensor->getColorWidth()-1);
 			m_SIFTdepthIntrinsics._m12 *= (float)(m_heightSIFTdepth-1) / (float)(m_RGBDSensor->getColorHeight()-1);
 		}

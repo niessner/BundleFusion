@@ -3,6 +3,7 @@
 
 #include "SensorDataReader.h"
 #include "GlobalAppState.h"
+#include "GlobalBundlingState.h"
 #include "MatrixConversion.h"
 #include "PoseHelper.h"
 
@@ -60,6 +61,12 @@ void SensorDataReader::createFirstConnected()
 
 
 	m_numFrames = (unsigned int)m_sensorData->m_frames.size();
+	if (m_numFrames > GlobalBundlingState::get().s_maxNumImages * GlobalBundlingState::get().s_submapSize) {
+		throw MLIB_EXCEPTION("sens file #frames = " + std::to_string(m_numFrames) + ", please change param file to accommodate");
+		//std::cout << "WARNING: sens file #frames = " << m_numFrames << ", please change param file to accommodate" << std::endl;
+		//std::cout << "(press key to continue)" << std::endl;
+		//getchar();
+	}
 
 	if (m_numFrames > 0 && m_sensorData->m_frames[0].getColorCompressed()) {
 		m_bHasColorData = true;
@@ -113,7 +120,7 @@ bool SensorDataReader::processDepth()
 	}
 	else {
 		return false;
-	} 
+	}
 }
 
 std::string SensorDataReader::getSensorName() const
@@ -135,7 +142,7 @@ void SensorDataReader::releaseData()
 	m_currFrame = 0;
 	m_bHasColorData = false;
 
-	 
+
 	SAFE_DELETE(m_sensorDataCache);
 	if (m_sensorData) {
 		m_sensorData->free();

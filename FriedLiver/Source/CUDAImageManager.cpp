@@ -23,6 +23,10 @@ bool CUDAImageManager::process()
 {
 	if (!m_RGBDSensor->processDepth()) return false;	// Order is important!
 	if (!m_RGBDSensor->processColor()) return false;
+	if (m_currFrame + 1 > GlobalBundlingState::get().s_maxNumImages * GlobalBundlingState::get().s_submapSize) {
+		std::cout << "WARNING: reached max #images, truncating sequence" << std::endl;
+		return false;
+	}
 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { TimingLog::addLocalFrameTiming(); cudaDeviceSynchronize(); s_timer.start(); }
 

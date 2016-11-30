@@ -124,8 +124,15 @@ const mat4f& RGBDSensor::getColorExtrinsicsInv() const
 
 
 void RGBDSensor::initializeDepthExtrinsics(const mat4f& m) {
-	m_depthExtrinsics = m;
-	m_depthExtrinsicsInv = m.getInverse();
+	if (m == mat4f::identity()) {
+		GlobalAppState::get().s_bUseCameraCalibration = false;
+		m_depthExtrinsics = mat4f::identity();
+		m_depthExtrinsicsInv = mat4f::identity();
+	}
+	else {
+		m_depthExtrinsics = m;
+		m_depthExtrinsicsInv = m.getInverse();
+	}
 }
 void RGBDSensor::initializeColorExtrinsics(const mat4f& m) {
 	m_colorExtrinsics = m;
@@ -144,12 +151,11 @@ void RGBDSensor::initializeDepthIntrinsics(float fovX, float fovY, float centerX
 	std::cout << m_depthIntrinsics << std::endl;
 
 	m_recordIntrinsics = m_depthIntrinsics;
-	const float scaleWidth = (float)m_recordDataWidth / (float)getDepthWidth();
-	const float scaleHeight = (float)m_recordDataHeight / (float)getDepthHeight();
-	m_recordIntrinsics._m00 *= scaleWidth;  m_recordIntrinsics._m02 *= scaleWidth;
-	m_recordIntrinsics._m11 *= scaleHeight; m_recordIntrinsics._m12 *= scaleHeight;
-	m_recordIntrinsicsInv = m_depthIntrinsicsInv;
-	m_recordIntrinsicsInv._m00 /= scaleWidth; m_depthIntrinsicsInv._m11 /= scaleHeight;
+	m_recordIntrinsics._m00 *= (float)m_recordDataWidth / (float)getDepthWidth();
+	m_recordIntrinsics._m11 *= (float)m_recordDataHeight / (float)getDepthHeight();
+	m_recordIntrinsics._m02 *= (float)(m_recordDataWidth -1)/ (float)(getDepthWidth()-1);
+	m_recordIntrinsics._m12 *= (float)(m_recordDataHeight-1) / (float)(getDepthHeight()-1);
+	m_recordIntrinsicsInv = m_recordIntrinsics.getInverse();
 }
 
 void RGBDSensor::initializeColorIntrinsics(float fovX, float fovY, float centerX, float centerY)

@@ -52,10 +52,10 @@ public:
 		const unsigned int colorHeight = m_colorImages.front().getHeight();
 		m_intensityIntrinsics = m_colorIntrinsics;
 		if (siftWidth != colorWidth || siftHeight != colorHeight) { // adapt intrinsics
-			const float scaleWidth = (float)siftWidth / (float)colorWidth;
-			const float scaleHeight = (float)siftHeight / (float)colorHeight;
-			m_intensityIntrinsics._m00 *= scaleWidth;  m_intensityIntrinsics._m02 *= scaleWidth;
-			m_intensityIntrinsics._m11 *= scaleHeight; m_intensityIntrinsics._m12 *= scaleHeight;
+			m_intensityIntrinsics._m00 *= (float)siftWidth / (float)colorWidth;
+			m_intensityIntrinsics._m11 *= (float)siftHeight / (float)colorHeight;
+			 m_intensityIntrinsics._m02 *= (float)(siftWidth-1) / (float)(colorWidth-1);
+			m_intensityIntrinsics._m12 *= (float)(siftHeight-1) / (float)(colorHeight-1);
 		}
 
 		for (size_t i = 0; i < m_colorImages.size(); i++) {
