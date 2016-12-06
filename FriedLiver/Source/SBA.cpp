@@ -132,6 +132,7 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 
 	// transforms
 	unsigned int numImages = siftManager->getNumImages();
+
 	m_solver->solve(d_correspondences, m_numCorrespondences, siftManager->getValidImagesGPU(), numImages, numNonLinearIterations, numLinearIterations,
 		cudaCache, weightsSparse, weightsDenseDepth, weightsDenseColor, useDensePairwise, d_xRot, d_xTrans, isStart, isEnd, revalidateIdx); //isStart -> rebuild jt, isEnd -> remove max residual
 
@@ -264,20 +265,20 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 #else
 		////!!!debugging
 		//{
-		//	std::ofstream s("debug/_logs/" + std::to_string(siftManager->getNumImages()) + "-" + std::to_string(siftManager->getCurrentFrame()) + ".txt");
-		//	s << imageIndices << " : " << m_maxResidual << std::endl;
+		//	//std::ofstream s("debug/logs/" + std::to_string(siftManager->getNumImages()) + "-" + std::to_string(siftManager->getCurrentFrame()) + ".txt");
+		//	//s << imageIndices << " : " << m_maxResidual << std::endl;
 		//	//if (siftManager->getCurrentFrame() >= 70) {
-		//	//	float4x4* d_transforms = NULL;
-		//	//	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
-		//	//	convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, siftManager->getValidImagesGPU());
-		//	//	std::vector<mat4f> transforms(numImages);
-		//	//	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		//	//	const std::vector<int>& valid = siftManager->getValidImages();
-		//	//	for (unsigned int i = 0; i < numImages; i++) if (valid[i] == 0) transforms[i].setZero(-std::numeric_limits<float>::infinity());
-		//	//	BinaryDataStreamFile ofs("debug/_logs/" + std::to_string(siftManager->getCurrentFrame()) + ".trajectory", true);
-		//	//	ofs << transforms; ofs.closeStream();
-		//	//	MLIB_CUDA_SAFE_FREE(d_transforms);
-		//	//	siftManager->saveToFile("debug/_logs/" + std::to_string(siftManager->getCurrentFrame()) + ".sift");
+		//	//float4x4* d_transforms = NULL;
+		//	//MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
+		//	//convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, siftManager->getValidImagesGPU());
+		//	//std::vector<mat4f> transforms(numImages);
+		//	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
+		//	//const std::vector<int>& valid = siftManager->getValidImages();
+		//	//for (unsigned int i = 0; i < numImages; i++) if (valid[i] == 0) transforms[i].setZero(-std::numeric_limits<float>::infinity());
+		//	//BinaryDataStreamFile ofs("debug/logs/" + std::to_string(siftManager->getCurrentFrame()) + ".trajectory", true);
+		//	//ofs << transforms; ofs.closeStream();
+		//	//MLIB_CUDA_SAFE_FREE(d_transforms);
+		//	//siftManager->saveToFile("debug/logs/" + std::to_string(siftManager->getCurrentFrame()) + ".sift");
 		//	//}
 		//	//if (siftManager->getCurrentFrame() == 71) {
 		//	//	std::cout << "waiting..." << std::endl;

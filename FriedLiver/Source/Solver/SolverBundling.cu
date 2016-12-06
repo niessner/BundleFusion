@@ -1019,6 +1019,7 @@ bool PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 		std::cout << "Too many variables for this block size. Maximum number of variables for two kernel scan: " << THREADS_PER_BLOCK*THREADS_PER_BLOCK << std::endl;
 		while (1);
 	}
+	if (timer) timer->startEvent("PCGIteration");
 
 	cutilSafeCall(cudaMemset(state.d_scanAlpha, 0, sizeof(float) * 2));
 
@@ -1038,14 +1039,14 @@ bool PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 #endif
 	}
 	if (useDense) {
-		if (timer) timer->startEvent("apply JTJ dense");
+		//if (timer) timer->startEvent("apply JTJ dense");
 		PCGStep_Kernel_Dense << < N, THREADS_PER_BLOCK_JT_DENSE >> >(input, state, parameters);
 		//PCGStep_Kernel_Dense_Brute << < N, 1 >> >(input, state, parameters);
 #ifdef _DEBUG
 		cutilSafeCall(cudaDeviceSynchronize());
 		cutilCheckMsg(__FUNCTION__);
 #endif
-		if (timer) timer->endEvent();
+		//if (timer) timer->endEvent();
 	}
 	//!!!debugging
 	//float3* Ap_Rot = new float3[input.numberOfImages];
@@ -1084,6 +1085,7 @@ bool PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
+	if (timer) timer->endEvent();
 	
 	return lastIteration;
 }
@@ -1179,6 +1181,9 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 			float residual = EvalResidual(input, state, parameters, timer);
 			convergenceAnalysis[nIter + 1] = residual;
 		}
+
+		//if (timer) timer->evaluate(true);
+
 #ifdef ENABLE_EARLY_OUT //convergence
 		//if (nIter < parameters.nNonLinearIterations - 1 && EvalGNConvergence(input, state, analysis, timer) < 0.01f) { //!!! TODO CHECK HOW THESE GENERALIZE
 		if (nIter < parameters.nNonLinearIterations - 1 && EvalGNConvergence(input, state, analysis, timer) < 0.005f) { //0.001?

@@ -152,6 +152,7 @@ public:
 	const float4x4* getCompleteTrajectory() const { return d_completeTrajectory; }
 
 	//debugging
+	void saveGlobalSiftCorrespondences(const std::string& filename) const;
 	void saveGlobalSiftManagerAndCache(const std::string& prefix) const;
 	void saveCompleteTrajectory(const std::string& filename, unsigned int numTransforms) const;
 	void saveSiftTrajectory(const std::string& filename, unsigned int numTransforms) const;

@@ -1102,3 +1102,18 @@ void SubmapManager::invalidateLastGlobalFrame() {
 	//MLIB_ASSERT(m_global->getNumImages() > 1);
 	m_global->invalidateFrame(m_global->getNumImages() - 1);
 }
+
+void SubmapManager::saveGlobalSiftCorrespondences(const std::string& filename) const
+{
+	std::vector<EntryJ> correspondences(m_global->getNumGlobalCorrespondences());
+	if (correspondences.empty()) {
+		std::cout << "no global sift corrs to save" << std::endl;
+		return;
+	}
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), m_global->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
+	BinaryDataStreamFile s(filename, true);
+	s << (UINT64)correspondences.size();
+	s.writeData((const BYTE*)correspondences.data(), sizeof(EntryJ)*correspondences.size());
+	s.closeStream();
+	std::cout << "saved " << correspondences.size() << " corrs" << std::endl;
+}

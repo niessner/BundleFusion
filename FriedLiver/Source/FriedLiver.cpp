@@ -248,8 +248,9 @@ int main(int argc, char** argv)
 
 		//!!!DEBUGGING
 		if (false) {
-			const std::string runoptDataDir = "../data/runOpt/"; 
-			RunOpt::run(runoptDataDir + "recording15.sens", runoptDataDir + "71.sift", runoptDataDir + "71-initial.trajectory");
+			//const std::string runoptDataDir = "../data/runOpt/";
+			//RunOpt::run(runoptDataDir + "recording15.sens", runoptDataDir + "71.sift", runoptDataDir + "71-initial.trajectory");
+			RunOpt::run("../data/sens/copyroom200.sens", "debug/logs/100.sift", "debug/logs/100.trajectory");
 			std::cout << "done!" << std::endl;
 			getchar();
 			return 0;

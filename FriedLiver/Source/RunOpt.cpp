@@ -34,11 +34,15 @@ void RunOpt::run(const std::string& sensFile, const std::string& siftFile, const
 	std::cout << "done!" << std::endl;
 	MLIB_ASSERT(trajectory.size() == numKeys);
 
+	//debugging
+	trajectory = std::vector<mat4f>(trajectory.size(), mat4f::identity());
+	//debugging
+
 	//save out point cloud of initial
-	SiftVisualization::saveToPointCloud("init.ply", depthImages, colorImages, trajectory, depthIntrinsicsInverse);
+	SiftVisualization::saveToPointCloud("debug/init.ply", depthImages, colorImages, trajectory, depthIntrinsicsInverse, 10, numKeys);
 
 	//optimization
-	const unsigned int maxNumIters = 5; const unsigned int numPCGIts = 150;
+	const unsigned int maxNumIters = 10; const unsigned int numPCGIts = 150;
 	const bool useVerify = false;
 	SBA sba;
 	const unsigned int maxNumImages = GlobalBundlingState::get().s_maxNumImages;
@@ -46,19 +50,27 @@ void RunOpt::run(const std::string& sensFile, const std::string& siftFile, const
 	sba.init(numKeys, maxNumResiduals);
 
 	//gpu transforms
+	CUDATimer miscTimer;
 	float4x4* d_transforms = NULL; MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numKeys));
+	miscTimer.startEvent("transform copy");
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_transforms, trajectory.data(), sizeof(float4x4)*numKeys, cudaMemcpyHostToDevice));
-	
+	miscTimer.endEvent();
+
 	//set weights to sparse only solve
 	sba.setGlobalWeights(std::vector<float>(maxNumIters, 1.0f), std::vector<float>(maxNumIters, 0.0f), std::vector<float>(maxNumIters, 0.0f), false); 
 	//optimize!
 	sba.align(&manager, NULL, d_transforms, maxNumIters, numPCGIts, useVerify, false, false, true, true, false);
+	sba.evaluateSolverTimings();
 	
 	//copy optimized poses to cpu
 	std::vector<mat4f> optTrajectory(numKeys);
+	miscTimer.startEvent("transform copy");
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(optTrajectory.data(), d_transforms, sizeof(float4x4)*numKeys, cudaMemcpyDeviceToHost));
+	miscTimer.endEvent();
 	MLIB_CUDA_SAFE_FREE(d_transforms); //free gpu transforms
 
+	miscTimer.evaluate(true);
+
 	//save out point cloud of optimized
-	SiftVisualization::saveToPointCloud("opt.ply", depthImages, colorImages, optTrajectory, depthIntrinsicsInverse);
+	SiftVisualization::saveToPointCloud("debug/opt.ply", depthImages, colorImages, optTrajectory, depthIntrinsicsInverse, 10, numKeys);
 }

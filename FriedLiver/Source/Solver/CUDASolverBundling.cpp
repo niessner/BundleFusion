@@ -27,6 +27,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	, THREADS_PER_BLOCK(512) // keep consistent with the GPU
 {
 	m_timer = NULL;
+	//m_timer = new CUDATimer();
 	//if (GlobalBundlingState::get().s_enableDetailedTimings) m_timer = new CUDATimer();
 	m_bRecordConvergence = GlobalBundlingState::get().s_recordSolverConvergence;
 
@@ -310,7 +311,7 @@ void CUDASolverBundling::computeMaxResidual(SolverInput& solverInput, SolverPara
 {
 	if (m_timer) m_timer->startEvent(__FUNCTION__);
 	if (parameters.weightSparse > 0.0f) {
-		evalMaxResidual(solverInput, m_solverState, m_solverExtra, parameters, m_timer);
+		evalMaxResidual(solverInput, m_solverState, m_solverExtra, parameters, NULL);//m_timer);
 		// copy to cpu
 		unsigned int n = (solverInput.numberOfCorrespondences + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 		cutilSafeCall(cudaMemcpy(m_solverExtra.h_maxResidual, m_solverExtra.d_maxResidual, sizeof(float) * n, cudaMemcpyDeviceToHost));

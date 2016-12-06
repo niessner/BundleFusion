@@ -2358,6 +2358,29 @@ void dfs(unsigned int frame, const std::vector< std::vector<unsigned int> > imag
 //#define LOAD_REFERENCE
 void TestMatching::debug()
 {
+	{
+		const std::string sensFile = "../data/sens/copyroom200.sens";
+		const std::string trajFile = "debug/100.trajectory";
+		const std::string initTrajFile = "debug/logs/100.trajectory";
+		std::vector<mat4f> transforms, initTransforms;
+		{
+			BinaryDataStreamFile s(trajFile, false);
+			s >> transforms;
+		}
+		{
+			BinaryDataStreamFile s(initTrajFile, false);
+			s >> initTransforms;
+		}
+		loadCachedFramesFromSensor(NULL, sensFile, 10, (unsigned int)transforms.size());
+		const unsigned int saveSkip = 10;
+		SiftVisualization::saveToPointCloud(util::removeExtensions(trajFile) + "-init.ply", m_depthImages, m_colorImages, initTransforms,
+			m_depthCalibration.m_IntrinsicInverse, saveSkip, (unsigned int)initTransforms.size());
+		SiftVisualization::saveToPointCloud(util::removeExtensions(trajFile) + ".ply", m_depthImages, m_colorImages, transforms, 
+			m_depthCalibration.m_IntrinsicInverse, saveSkip, (unsigned int)transforms.size());
+		std::cout << "DONE" << std::endl;
+		return;
+	}
+
 	const std::string siftFile = "debug/filtMatches/241.sift";
 	const std::string trajFile = "debug/filtMatches/241.trajectory";
 	const std::string sensFile = "../data/testing/2016-08-08_03-04-30__C7BA9586-8237-4204-9116-02AE5804338A.sens";

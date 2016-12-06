@@ -239,6 +239,21 @@ void Bundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numL
 		}
 	}
 
+	////debugging
+	//static unsigned int counter = 0;
+	//if (m_bIsScanDoneGlobalOpt) {
+	//	std::cout << "saving corrs and trajectory" << std::endl;
+	//	std::vector<mat4f> transforms;
+	//	m_trajectoryManager->getOptimizedTransforms(transforms);
+	//	BinaryDataStreamFile s("debug/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile)) + ".traj", true);
+	//	s << transforms;
+	//	s.closeStream();
+	//	
+	//	m_SubmapManager.saveGlobalSiftCorrespondences("debug/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile)) + ".corrs");
+	//}
+	//counter++;
+	////debugging
+
 }
 
 void Bundler::saveCompleteTrajectory(const std::string& filename) const
