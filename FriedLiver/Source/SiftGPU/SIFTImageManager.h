@@ -66,8 +66,7 @@ public:
 	friend class SIFTMatchFilter;
 	friend class TestMatching;
 
-	SIFTImageManager(unsigned int submapSize, 
-		unsigned int maxImages = 500,
+	SIFTImageManager(unsigned int maxImages = 500,
 		unsigned int maxKeyPointsPerImage = 4096);
 
 	~SIFTImageManager();
@@ -334,10 +333,6 @@ private:
 
 	unsigned int m_maxNumImages;			//max number of images maintained by the manager
 	unsigned int m_maxKeyPointsPerImage;	//max number of SIFT key point that can be detected per image
-
-	int* d_fuseGlobalKeyCount;
-	int* d_fuseGlobalKeyMarker; // which local keys are used for global key fuse
-	unsigned int m_submapSize;
 
 	std::list<unsigned int> m_imagesToRetry;
 	unsigned int			m_currentImage;

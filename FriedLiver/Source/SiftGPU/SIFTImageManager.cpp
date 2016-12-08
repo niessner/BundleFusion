@@ -4,11 +4,10 @@
 #include "../GlobalAppState.h"
 #include "mLibCuda.h"
 
-SIFTImageManager::SIFTImageManager(unsigned int submapSize, unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
+SIFTImageManager::SIFTImageManager(unsigned int maxImages /*= 500*/, unsigned int maxKeyPointsPerImage /*= 4096*/)
 {
 	m_maxNumImages = maxImages;
 	m_maxKeyPointsPerImage = maxKeyPointsPerImage;
-	m_submapSize = submapSize;
 
 	m_timer = NULL;
 	m_currentImage = 0;
@@ -164,8 +163,6 @@ void SIFTImageManager::saveToFile(const std::string& s)
 	}
 	out.write((char*)&validOpt, sizeof(unsigned int));
 
-	out.write((char*)&m_submapSize, sizeof(unsigned int));
-
 	out.close();
 }
 
@@ -256,9 +253,6 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 		in.read((char*)&validOpt, sizeof(unsigned int));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validOpt, &validOpt, sizeof(int), cudaMemcpyHostToDevice));
 	}
-	{
-		in.read((char*)&m_submapSize, sizeof(unsigned int));
-	}
 
 	for (unsigned int i = 0; i < numImages; i++) {
 		m_SIFTImagesGPU[i].d_keyPoints = d_keyPoints + m_numKeyPointsPerImagePrefixSum[i];
@@ -308,11 +302,6 @@ void SIFTImageManager::alloc()
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_globMatchesKeyPointIndices, sizeof(uint2)*maxResiduals));
 
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_validOpt, sizeof(int)));
-
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyCount, sizeof(int)));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(d_fuseGlobalKeyCount, 0, sizeof(int)));
-	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_fuseGlobalKeyMarker, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
-	MLIB_CUDA_SAFE_CALL(cudaMemset(d_fuseGlobalKeyMarker, 0, sizeof(int)*m_maxKeyPointsPerImage*m_submapSize));
 
 	initializeMatching();
 }
