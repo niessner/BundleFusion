@@ -29,7 +29,7 @@ struct std::hash<vec2ui> : public std::unary_function < vec2ui, size_t > {
 TestMatching::TestMatching()
 {
 	unsigned maxNumImages = GlobalBundlingState::get().s_maxNumImages;
-	m_siftManager = new SIFTImageManager(GlobalBundlingState::get().s_submapSize, maxNumImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
+	m_siftManager = new SIFTImageManager(maxNumImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
 
 	d_numMatchesPerImagePair = NULL;
 	d_matchDistancesPerImagePair = NULL;
@@ -1932,7 +1932,7 @@ void TestMatching::compareDEBUG()
 		s >> optTrajectoryTest;
 	}
 
-	SIFTImageManager siftManagerTest(GlobalBundlingState::get().s_submapSize, GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
+	SIFTImageManager siftManagerTest(GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
 
 	std::cout << "loading sift from file... ";
 	m_siftManager->loadFromFile("debug/" + ref + ".sift");

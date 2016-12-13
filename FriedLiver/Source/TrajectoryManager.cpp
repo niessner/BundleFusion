@@ -17,7 +17,7 @@ TrajectoryManager::TrajectoryManager(unsigned int numMaxImage)
 	m_numOptimizedFrames = 0;
 
 	m_topNActive = GlobalAppState::get().s_topNActive;
-	m_minPoseDistSqrt = GlobalAppState().s_minPoseDistSqrt;
+	m_minPoseDistSqrt = GlobalAppState::get().s_minPoseDistSqrt;
 	m_featureRescaleRotToTrans = 2.0f;
 }
 

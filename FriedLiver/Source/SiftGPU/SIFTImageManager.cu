@@ -768,7 +768,7 @@ void SIFTImageManager::CheckForInvalidFramesSimpleCU(const int* d_varToCorrNumEn
 	CheckErrorCUDA(__FUNCTION__);
 }
 
-
+/*
 #define MARK_FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X 128
 #define FUSE_TO_GLOBAL_KEY_KERNEL_THREADS_X 512
 
@@ -850,9 +850,9 @@ unsigned int SIFTImageManager::FuseToGlobalKeyCU(SIFTImageGPU& globalImage, cons
 
 	return numKeys;
 }
+*/
 
-
-
+/*
 __global__ void getSiftTransformCU_Kernel(unsigned int curFrameIndex,
 	const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform,
 	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll,
@@ -918,6 +918,7 @@ void SIFTImageManager::computeSiftTransformCU(const float4x4* d_completeTrajecto
 	cutilCheckMsg(__FUNCTION__);
 #endif
 }
+*/
 
 
 

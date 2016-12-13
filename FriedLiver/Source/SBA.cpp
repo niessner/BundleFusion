@@ -103,7 +103,7 @@ bool SBA::align(SIFTImageManager* siftManager, const CUDACache* cudaCache, float
 	if (!isScanDoneOpt && GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); s_timer.start(); }
 
 	unsigned int numImages = siftManager->getNumImages();
-	if (isStart) siftManager->updateGPUValidImages();
+	//if (isStart) siftManager->updateGPUValidImages(); //TODO CHECK
 	const int* d_validImages = siftManager->getValidImagesGPU();
 	convertMatricesToPosesCU(d_transforms, numImages, d_xRot, d_xTrans, d_validImages);
 

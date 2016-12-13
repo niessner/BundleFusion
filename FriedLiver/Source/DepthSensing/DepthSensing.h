@@ -1,9 +1,10 @@
 ﻿#pragma once
 
 #include "RGBDSensor.h"
-#include "Bundler.h"
+#include "TrajectoryManager.h"
+#include "OnlineBundler.h"
 #include "ConditionManager.h"
 
-int startDepthSensing(Bundler* bundler, RGBDSensor* sensor, CUDAImageManager* imageManager);
+int startDepthSensing(OnlineBundler* bundler, RGBDSensor* sensor, CUDAImageManager* imageManager);
 
 

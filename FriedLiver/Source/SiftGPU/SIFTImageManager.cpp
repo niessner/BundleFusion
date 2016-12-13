@@ -292,6 +292,7 @@ void SIFTImageManager::alloc()
 	m_validImages.resize(m_maxNumImages, 0);
 	m_validImages[0] = 1; // first is valid
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_validImages, sizeof(int) *  m_maxNumImages));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages, m_validImages.data(), sizeof(int), cudaMemcpyHostToDevice)); // first is valid
 
 	const unsigned int maxResiduals = MAX_MATCHES_PER_IMAGE_PAIR_FILTERED * (m_maxNumImages*(m_maxNumImages - 1)) / 2;
 	m_globNumResiduals = 0;
@@ -340,8 +341,8 @@ void SIFTImageManager::free()
 
 	MLIB_CUDA_SAFE_FREE(d_validOpt);
 
-	MLIB_CUDA_SAFE_FREE(d_fuseGlobalKeyCount);
-	MLIB_CUDA_SAFE_FREE(d_fuseGlobalKeyMarker);
+	//MLIB_CUDA_SAFE_FREE(d_fuseGlobalKeyCount);
+	//MLIB_CUDA_SAFE_FREE(d_fuseGlobalKeyMarker);
 
 	m_imagesToRetry.clear();
 
@@ -550,7 +551,7 @@ unsigned int SIFTImageManager::filterFrames(unsigned int curFrame, unsigned int 
 	unsigned int lastMatchedFrame = (unsigned int)-1;
 
 	std::vector<unsigned int> currNumFilteredMatchesPerImagePair(numFrames - startFrame);
-	cutilSafeCall(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair + startFrame, sizeof(unsigned int) * currNumFilteredMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair + startFrame, sizeof(unsigned int) * currNumFilteredMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
 
 	//for (unsigned int i = startFrame; i < numFrames; i++) { // previous frames
 	//	if (m_validImages[i] != 0 && currNumFilteredMatchesPerImagePair[i-startFrame] > 0 && i != curFrame) {
@@ -570,6 +571,7 @@ unsigned int SIFTImageManager::filterFrames(unsigned int curFrame, unsigned int 
 	//	std::cout << "frame " << curFrame << " not connected to previous!" << std::endl;
 
 	m_validImages[curFrame] = connected;
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages + curFrame, &m_validImages[curFrame], sizeof(int), cudaMemcpyHostToDevice)); //TODO CHECK 
 	return lastMatchedFrame;
 }
 

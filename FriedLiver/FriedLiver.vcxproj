@@ -189,6 +189,8 @@
     <ClInclude Include="Source\ImageHelper.h" />
     <ClInclude Include="Source\mLib.h" />
     <ClInclude Include="Source\mLibCuda.h" />
+    <ClInclude Include="Source\OnlineBundler.h" />
+    <ClInclude Include="Source\OnlineBundlerHelper.h" />
     <ClInclude Include="Source\PoseHelper.h" />
     <ClInclude Include="Source\PrimeSenseSensor.h" />
     <ClInclude Include="Source\RGBDSensor.h" />
@@ -225,7 +227,6 @@
     <ClInclude Include="Source\Solver\SolverBundlingUtil.h" />
     <ClInclude Include="Source\stdafx.h" />
     <ClInclude Include="Source\StructureSensor.h" />
-    <ClInclude Include="Source\SubmapManager.h" />
     <ClInclude Include="Source\testMatching.h" />
     <ClInclude Include="Source\testSIFT.h" />
     <ClInclude Include="Source\TimingLog.h" />
@@ -301,6 +302,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Source\OnlineBundler.cpp" />
     <ClCompile Include="Source\PrimeSenseSensor.cpp" />
     <ClCompile Include="Source\RGBDSensor.cpp" />
     <ClCompile Include="Source\RunOpt.cpp" />
@@ -320,7 +322,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\StructureSensor.cpp" />
-    <ClCompile Include="Source\SubmapManager.cpp" />
     <ClCompile Include="Source\testMatching.cpp" />
     <ClCompile Include="Source\testSIFT.cpp" />
     <ClCompile Include="Source\TimingLog.cpp" />
@@ -339,6 +340,7 @@
     <CudaCompile Include="Source\DepthSensing\CUDASceneRepChunkGrid.cu" />
     <CudaCompile Include="Source\DepthSensing\CUDASceneRepHashSDF.cu" />
     <CudaCompile Include="Source\DepthSensing\ScanCS.cu" />
+    <CudaCompile Include="Source\OnlineBundler.cu" />
     <CudaCompile Include="Source\SBA.cu" />
     <CudaCompile Include="Source\SiftGPU\CUDASiftConstant.cu" />
     <CudaCompile Include="Source\SiftGPU\ProgramCU.cu" />
@@ -349,7 +351,6 @@
       <PtxAsOptionV Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</PtxAsOptionV>
       <PtxAsOptionV Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</PtxAsOptionV>
     </CudaCompile>
-    <CudaCompile Include="Source\SubmapManager.cu" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\PhongLighting.hlsl">

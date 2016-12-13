@@ -35,6 +35,7 @@
 #include "CUDASceneRepChunkGrid.h"
 #include "CUDAImageManager.h"
 
+#include "../BinaryDumpReader.h"
 #include "../StructureSensor.h"
 #include "../SensorDataReader.h"
 #include "../TimingLog.h"
@@ -102,7 +103,7 @@ mat4f						g_lastRigidTransform = mat4f::identity();
 //managed externally
 CUDAImageManager*			g_CudaImageManager = NULL;
 RGBDSensor*					g_depthSensingRGBDSensor = NULL;
-Bundler*					g_depthSensingBundler = NULL;
+OnlineBundler*				g_depthSensingBundler = NULL;
 
 mat4f g_transformWorld = mat4f::identity();
 
@@ -111,7 +112,7 @@ void StopScanningAndExtractIsoSurfaceMC(const std::string& filename = "./scans/s
 void DumpinputManagerData(const std::string& filename = "./dump/dump.sensor");
 
 
-int startDepthSensing(Bundler* bundler, RGBDSensor* sensor, CUDAImageManager* imageManager)
+int startDepthSensing(OnlineBundler* bundler, RGBDSensor* sensor, CUDAImageManager* imageManager)
 {
 	g_depthSensingRGBDSensor = sensor;
 	g_CudaImageManager = imageManager;
@@ -1078,9 +1079,8 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	////// Bundling Optimization
 	///////////////////////////////////////////
 #ifndef RUN_MULTITHREADED
-	g_depthSensingBundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-	g_depthSensingBundler->processGlobal();
-	g_depthSensingBundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
+	g_depthSensingBundler->process(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations,
+		GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 	//g_depthSensingBundler->resetDEBUG(true);
 #endif
 

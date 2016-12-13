@@ -1,241 +1,89 @@
 #pragma once
 
-#include "SiftGPU/SiftCameraParams.h"
-#include "SubmapManager.h"
+#include "SBA.h"
 
-#include "RGBDSensor.h"
-#include "BinaryDumpReader.h"
-#include "TrajectoryManager.h"
-
-class CUDAImageManager;
+class SiftGPU;
+class SiftMatchGPU;
 class SIFTImageManager;
 class CUDACache;
+class CUDAImageManager;
+
+#define USE_RETRY //TODO MOVE OUT TO PARAMS
 
 class Bundler
 {
 public:
-	struct BundlerInputData {
-		unsigned int			m_inputDepthWidth, m_inputDepthHeight;
-		unsigned int			m_inputColorWidth, m_inputColorHeight;
-		unsigned int			m_widthSIFT, m_heightSIFT;
-		float*					d_inputDepthFilt, *d_inputDepthRaw;
-		uchar4*					d_inputColor;
-		float*					d_intensitySIFT;
-		mat4f					m_SIFTIntrinsics;
-		mat4f					m_SIFTIntrinsicsInv;
-		float*					d_intensityFilterHelper;
-
-		bool m_bFilterDepthValues;
-		float m_fBilateralFilterSigmaD, m_fBilateralFilterSigmaR;
-
-		BundlerInputData() {
-			m_inputDepthWidth = 0;	m_inputDepthHeight = 0;
-			m_inputColorWidth = 0;	m_inputColorHeight = 0;
-			m_widthSIFT = 0;		m_heightSIFT = 0;
-			d_inputDepthFilt = NULL;d_inputDepthRaw = NULL;
-			d_inputColor = NULL;
-			d_intensitySIFT = NULL;
-			d_intensityFilterHelper = NULL;
-		}
-		void alloc(const RGBDSensor* sensor) {
-			m_inputDepthWidth = sensor->getDepthWidth();
-			m_inputDepthHeight = sensor->getDepthHeight();
-			m_inputColorWidth = sensor->getColorWidth();
-			m_inputColorHeight = sensor->getColorHeight();
-			m_widthSIFT = GlobalBundlingState::get().s_widthSIFT;
-			m_heightSIFT = GlobalBundlingState::get().s_heightSIFT;
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepthFilt, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputDepthRaw, sizeof(float)*m_inputDepthWidth*m_inputDepthHeight));
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityFilterHelper, sizeof(float)*m_widthSIFT*m_heightSIFT));
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_inputColor, sizeof(uchar4)*m_inputColorWidth*m_inputColorHeight));
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensitySIFT, sizeof(float)*m_widthSIFT*m_heightSIFT));
-
-			m_SIFTIntrinsics = sensor->getColorIntrinsics();
-			m_SIFTIntrinsics._m00 *= (float)m_widthSIFT / (float)m_inputColorWidth;
-			m_SIFTIntrinsics._m11 *= (float)m_heightSIFT / (float)m_inputColorHeight;
-			m_SIFTIntrinsics._m02 *= (float)(m_widthSIFT -1)/ (float)(m_inputColorWidth-1);
-			m_SIFTIntrinsics._m12 *= (float)(m_heightSIFT-1) / (float)(m_inputColorHeight-1);
-			m_SIFTIntrinsicsInv = m_SIFTIntrinsics.getInverse();
-
-			m_bFilterDepthValues = GlobalBundlingState::get().s_depthFilter;
-			m_fBilateralFilterSigmaR = GlobalBundlingState::get().s_depthSigmaR;
-			m_fBilateralFilterSigmaD = GlobalBundlingState::get().s_depthSigmaD;
-		}
-		~BundlerInputData() {
-			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepthFilt));
-			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputDepthRaw));
-			MLIB_CUDA_SAFE_CALL(cudaFree(d_inputColor));
-			MLIB_CUDA_SAFE_CALL(cudaFree(d_intensitySIFT));
-			MLIB_CUDA_SAFE_CALL(cudaFree(d_intensityFilterHelper));
-		}
-	};
-	struct BundlerState {
-		enum PROCESS_STATE {
-			DO_NOTHING,
-			PROCESS,
-			INVALIDATE
-		};
-		//shared
-		int						m_localToSolve;		// index of local submap to solve (-1) if none
-
-		//only in process input
-		unsigned int			m_lastFrameProcessed;
-		bool					m_bLastFrameValid;
-
-		//only in opt
-		int						m_lastLocalSolved; // to check if can fuse to global
-		PROCESS_STATE			m_bOptimizeGlobal; // ready to optimize global
-
-		//unsigned int			m_lastNumLocalFrames;
-		unsigned int			m_numCompleteTransforms;
-		unsigned int			m_lastValidCompleteTransform;
-
-		PROCESS_STATE			m_bProcessGlobal;
-
-		unsigned int			m_totalNumOptLocalFrames;
-
-		//shared but constant
-		static int				s_markOffset;
-
-		BundlerState() {
-			m_localToSolve = -1;
-			m_bOptimizeGlobal = DO_NOTHING;
-			m_lastLocalSolved = -1;
-
-			m_lastFrameProcessed = 0;
-			m_bLastFrameValid = false;
-			//m_lastNumLocalFrames = 0;
-			m_numCompleteTransforms = 0;
-			m_lastValidCompleteTransform = 0;
-			m_bProcessGlobal = DO_NOTHING;
-
-			m_totalNumOptLocalFrames = 0;
-		}
-	};
-
-
-	Bundler(const RGBDSensor* sensor, const CUDAImageManager* imageManager);
+	Bundler(unsigned int maxNumImages, unsigned int maxNumKeysPerImage,
+		const mat4f& siftIntrinsicsInv, const CUDAImageManager* manager, bool isLocal);
 	~Bundler();
 
+	const float4x4* getTrajectoryGPU() const { return d_trajectory; }
+	float4x4* getTrajectoryGPU() { return d_trajectory; }
+	const std::vector<int>& getValidImages() const;
+	void getCacheIntrinsics(float4x4& intrinsics, float4x4& intrinsicsInv);
+	unsigned int getCurrFrameNumber() const { return m_siftManager->getCurrentFrame(); }
+	unsigned int getNumFrames() const { return m_siftManager->getNumImages(); }
 
-	//! takes last frame from imageManager: runs sift and sift matching (including filtering)
-	void processInput();
+	//whether has >1 valid frame
+	bool isValid() const;
 
-	void prepareLocalSolve(unsigned int curFrame, bool isLastFrame = false);
+	void reset();
 
-	//! returns the last frame-to-frame aligned matrix; could be invalid
-	bool getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx);
-	//! optimize current local submap (nextLocal in submapManager)
-	void optimizeLocal(unsigned int numNonLinIterations, unsigned int numLinIterations);
-	//! optimize global keys
-	void optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations, bool isStart = true, bool isEnd = true);
+	//TODO should this live outside?
+	void detectFeatures(float* d_intensitySift, const float* d_inputDepthFilt);
 
-	//! global key fuse and sift matching/filtering
-	void processGlobal();
+	void storeCachedFrame(unsigned int depthWidth, unsigned int depthHeight, const uchar4* d_inputColor,
+		unsigned int colorWidth, unsigned int colorHeight, const float* d_inputDepthRaw);
+	void copyFrame(const Bundler* b, unsigned int frame);
+	void addInvalidFrame();
+	void invalidateLastFrame();
 
+	const float4x4* getCurrentSiftTransformsGPU() const { return m_siftManager->getFiltTransformsToWorldGPU(); }
+	const int* getNumFiltMatchesGPU() const { return m_siftManager->getNumFiltMatchesGPU(); }
 
-
-	//bool process();
-
-
-	//void evaluateTimings() {
-	//	m_SubmapManager.evaluateTimings();
-	//	m_SparseBundler.evaluateSolverTimings();
-	//}
-	void saveConvergence(const std::string& filename) const {
-		m_SubmapManager.printConvergence(filename);
+	unsigned int matchAndFilter();
+	bool optimize(unsigned int numNonLinIterations, unsigned int numLinIterations, bool bUseVerify, bool bRemoveMaxResidual, bool bIsScanDone);
+	void setSolveWeights(const std::vector<float>& sparse, const std::vector<float>& densedepth, const std::vector<float>& densecolor) {
+		m_optimizer.setGlobalWeights(sparse, densedepth, densecolor, densedepth.back() > 0 || densecolor.back() > 0);
+		std::cout << "set end solve global dense weights" << std::endl;
 	}
+	void fuseToGlobal(Bundler* glob);
 
-	//! debug functions only call at end
-	void saveCompleteTrajectory(const std::string& filename) const;
-	void saveSiftTrajectory(const std::string& filename) const;
-	void saveIntegrateTrajectory(const std::string& filename);
-	void saveGlobalSiftManagerAndCacheToFile(const std::string& prefix) const { m_SubmapManager.saveGlobalSiftManagerAndCache(prefix); }
-#ifdef DEBUG_PRINT_MATCHING
-	void saveLogsToFile() const { m_SubmapManager.saveLogImImCorrsToFile("debug/_logs/log"); }
-#endif
-#ifdef EVALUATE_SPARSE_CORRESPONDENCES
-	void printSparseCorrEval() const { m_SubmapManager.printSparseCorrEval(); }
-#endif
-#ifdef PRINT_MEM_STATS
-	void printMemStats() const { m_SubmapManager.printMemStats(); }
-#endif
+	unsigned int tryRevalidation(unsigned int curGlobalFrame, bool bIsScanDone);
 
-	TrajectoryManager* getTrajectoryManager() {
-		return m_trajectoryManager;
-	}
-
-	bool hasProcssedInputFrame() const {
-		return m_bHasProcessedInputFrame;
-	}
-
-	void setProcessedInputFrame() {
-		m_bHasProcessedInputFrame = true;
-	}
-
-	void confirmProcessedInputFrame() {
-		m_bHasProcessedInputFrame = false;
-	}
-
-	void exitBundlingThread() {
-		m_bExitBundlingThread = true;
-	}
-	bool getExitBundlingThread() const {
-		return m_bExitBundlingThread;
-	}
-
-	unsigned int getCurrProcessedFrame() const {
-		return m_currentState.m_lastFrameProcessed;
-	}
-	unsigned int getNumProcessedFrames() const {
-		return m_currentState.m_lastFrameProcessed + 1;
-	}
-
-	unsigned int getSubMapSize() const {
-		return m_submapSize;
-	}
-
-	void setScanDoneGlobalOpt() {
-		m_bIsScanDoneGlobalOpt = true;
-	}
-
-	//! fake finish local opt without actually optimizing anything
-	void resetDEBUG(bool updateTrajectory) {
-		m_currentState.m_localToSolve = -1;
-		unsigned int curFrame = (m_currentState.m_lastLocalSolved < 0) ? (unsigned int)-1 : m_currentState.m_totalNumOptLocalFrames;
-		m_SubmapManager.resetDEBUG(updateTrajectory && m_currentState.m_bProcessGlobal == BundlerState::PROCESS, m_currentState.m_lastLocalSolved, curFrame);
-	}
+	//TODO logging for residual information
 
 private:
-	bool m_bHasProcessedInputFrame;
-	bool m_bExitBundlingThread;
-	bool m_bIsScanDoneGlobalOpt;
+	void initSift(unsigned int widthSift, unsigned int heightSift, bool isLocal);
 
-	void getCurrentFrame();
+	void initializeNextTransformUnknown() {
+		const unsigned int numFrames = m_siftManager->getNumImages();
+		MLIB_ASSERT(numFrames >= 1);
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory + numFrames, d_trajectory + numFrames - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+	}
 
-	const CUDAImageManager*	m_CudaImageManager;		//managed outside
-	const RGBDSensor*		m_RGBDSensor;			//managed outside
+	//*********** SIFT *******************
+	SiftGPU*				m_sift;
+	SiftMatchGPU*			m_siftMatcher;
+	float4x4				m_siftIntrinsics;
+	float4x4				m_siftIntrinsicsInv;
 
-	SubmapManager			m_SubmapManager;
+	int							m_continueRetry;
+	unsigned int				m_revalidatedIdx;
 
-	TrajectoryManager*		m_trajectoryManager;
+	//*********** OPTIMIZATION *******************
+	SIFTImageManager*		m_siftManager;
+	CUDACache*				m_cudaCache;
+	SBA						m_optimizer;
 
-	unsigned int			m_submapSize;
+	//*********** TRAJECTORIES *******************
+	float4x4*				d_trajectory;
 
-	//tmp buffers from cuda image manager
-	BundlerInputData		m_bundlerInputData;
+	unsigned int			m_lastMatchedFrame;
+	unsigned int			m_prevLastMatchedFrame;
 
-	static Timer			s_timer;
-
-	SiftCameraParams		m_siftCameraParams;
-
-	// state of processing/optimization
-	BundlerState			m_currentState;
-
-	unsigned int			m_numFramesPastLast;
-	unsigned int			m_numOptPerResidualRemoval;
-
-	bool m_useSolve;
+	bool					m_bIsLocal;
+	Timer					m_timer;
 };
 
 

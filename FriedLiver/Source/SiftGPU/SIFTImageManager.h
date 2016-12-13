@@ -147,11 +147,11 @@ public:
 	void CheckForInvalidFramesSimpleCU(const int* d_varToCorrNumEntriesPerRow, unsigned int numVars);
 	void CheckForInvalidFramesCU(const int* d_varToCorrNumEntriesPerRow, unsigned int numVars);
 
-	unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
+	//unsigned int FuseToGlobalKeyCU(SIFTImageGPU& globalImage, const float4x4* transforms, const float4x4& colorIntrinsics, const float4x4& colorIntrinsicsInv);
 
 	unsigned int filterFrames(unsigned int curFrame, unsigned int startFrame, unsigned int numFrames);
 
-	void computeSiftTransformCU(const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform, float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans);
+	//void computeSiftTransformCU(const float4x4* d_completeTrajectory, unsigned int lastValidCompleteTransform, float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans);
 
 	//only markers for up to num images have been set properly
 	const std::vector<int>& getValidImages() const { return m_validImages; }
@@ -243,7 +243,8 @@ public:
 	const EntryJ* getGlobalCorrespondencesGPU() const { return d_globMatches; }
 	EntryJ* getGlobalCorrespondencesGPU() { return d_globMatches; }
 	unsigned int getNumGlobalCorrespondences() const { return m_globNumResiduals; }
-	const float4x4* getFiltTransformsDEBUG() const { return d_currFilteredTransforms; }
+	const float4x4* getFiltTransformsToWorldGPU() const { return d_currFilteredTransformsInv; }
+	const int* getNumFiltMatchesGPU() const { return d_currNumFilteredMatchesPerImagePair; }
 
 	void fuseToGlobal(SIFTImageManager* global, const float4x4& colorIntrinsics, const float4x4* d_transforms,
 		const float4x4& colorIntrinsicsInv) const;

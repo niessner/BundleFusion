@@ -106,15 +106,13 @@ RGBDSensor* getRGBDSensor()
 
 RGBDSensor* g_RGBDSensor = NULL;
 CUDAImageManager* g_imageManager = NULL;
-Bundler* g_bundler = NULL;
+OnlineBundler* g_bundler = NULL;
 
 
 
 void bundlingOptimization() {
-	g_bundler->optimizeLocal(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations);
-	g_bundler->processGlobal();
-	g_bundler->optimizeGlobal(GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
-
+	g_bundler->process(GlobalBundlingState::get().s_numLocalNonLinIterations, GlobalBundlingState::get().s_numLocalLinIterations,
+		GlobalBundlingState::get().s_numGlobalNonLinIterations, GlobalBundlingState::get().s_numGlobalLinIterations);
 	//g_bundler->resetDEBUG(false, false); // for no opt
 }
 
@@ -128,7 +126,7 @@ void bundlingOptimizationThreadFunc() {
 void bundlingThreadFunc() {
 	assert(g_RGBDSensor && g_imageManager);
 	DualGPU::get().setDevice(DualGPU::DEVICE_BUNDLING);
-	g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
+	g_bundler = new OnlineBundler(g_RGBDSensor, g_imageManager);
 
 	std::thread tOpt;
 
@@ -217,8 +215,8 @@ int main(int argc, char** argv)
 			//fileNameDescGlobalApp = "zParametersAug.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
 
-			fileNameDescGlobalApp = "zParametersScanNet.txt";
-			fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
+			//fileNameDescGlobalApp = "zParametersScanNet.txt";
+			//fileNameDescGlobalBundling = "zParametersBundlingScanNet.txt";
 		}
 
 		std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;
@@ -270,7 +268,7 @@ int main(int argc, char** argv)
 		}
 		//!!!DEBUGGING
 
-		SIFTMatchFilter::init(); //TODO this is obsolete
+		//SIFTMatchFilter::init(); //TODO this is obsolete
 
 		DualGPU& dualGPU = DualGPU::get();	//needs to be called to initialize devices
 		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu
@@ -285,13 +283,12 @@ int main(int argc, char** argv)
 
 		g_imageManager = new CUDAImageManager(GlobalAppState::get().s_integrationWidth, GlobalAppState::get().s_integrationHeight,
 			GlobalBundlingState::get().s_widthSIFT, GlobalBundlingState::get().s_heightSIFT, g_RGBDSensor, false);
-
 #ifdef RUN_MULTITHREADED
 		std::thread bundlingThread(bundlingThreadFunc);
 		//waiting until bundler is initialized
 		while (!g_bundler)	Sleep(0);
 #else
-		g_bundler = new Bundler(g_RGBDSensor, g_imageManager);
+		g_bundler = new OnlineBundler(g_RGBDSensor, g_imageManager);
 #endif
 
 		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu

@@ -38,7 +38,7 @@ void TestSIFT::test()
 	updateConstantSiftCameraParams(siftCameraParams);
 
 	const unsigned int maxKeysPerImage = 2048;
-	SIFTImageManager siftManager(10, 2500, maxKeysPerImage);
+	SIFTImageManager siftManager(2500, maxKeysPerImage);
 	Timer t;
 	double detectTime = 0.0, matchTime = 0.0;
 	{ //detection

@@ -16,7 +16,7 @@ void RunOpt::run(const std::string& sensFile, const std::string& siftFile, const
 
 	//load sparse features
 	std::cout << "loading sift manager from file... ";
-	SIFTImageManager manager(GlobalBundlingState::get().s_submapSize, GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
+	SIFTImageManager manager(GlobalBundlingState::get().s_maxNumImages, GlobalBundlingState::get().s_maxNumKeysPerImage);
 	manager.loadFromFile(siftFile);
 	std::cout << "done!" << std::endl;
 	const unsigned int numKeys = manager.getNumImages();

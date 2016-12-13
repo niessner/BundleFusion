@@ -1220,8 +1220,9 @@ __global__ void BuildVariablesToCorrespondencesTableDevice(EntryJ* d_corresponde
 				d_variablesToCorrespondences[corr.imgIdx_j * maxNumCorrespondencesPerImage + offset1] = x;
 			}
 			else { //invalidate
+				printf("EXCEEDED MAX NUM CORR PER IMAGE IN SOLVER, INVALIDATING %d(%d,%d) [%d,%d | %d]\n",
+					x, corr.imgIdx_i, corr.imgIdx_j, offset0, offset1, maxNumCorrespondencesPerImage); //debugging
 				corr.setInvalid(); //make sure j corresponds to jt
-				printf("EXCEEDED MAX NUM CORR PER IMAGE IN SOLVER, INVALIDATING (%d,%d)\n", corr.imgIdx_i, corr.imgIdx_j); //debugging
 			}
 		}
 	}

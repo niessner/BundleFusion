@@ -127,7 +127,6 @@
     <ClCompile Include="Source\StructureSensor.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
-    <ClCompile Include="Source\SubmapManager.cpp" />
     <ClCompile Include="Source\ConditionManager.cpp" />
     <ClCompile Include="Source\SiftVisualization.cpp" />
     <ClCompile Include="Source\PrimeSenseSensor.cpp">
@@ -151,6 +150,7 @@
     <ClCompile Include="Source\CUDAImageCalibrator.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
+    <ClCompile Include="Source\OnlineBundler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -238,7 +238,6 @@
     <ClInclude Include="Source\SiftGPU\SIFTMatchFilter.h">
       <Filter>SiftGPU</Filter>
     </ClInclude>
-    <ClInclude Include="Source\SubmapManager.h" />
     <ClInclude Include="Source\PoseHelper.h" />
     <ClInclude Include="Source\Solver\ICPUtil.h">
       <Filter>SolverBundling</Filter>
@@ -402,6 +401,8 @@
     <ClInclude Include="Source\CUDAImageCalibrator.h">
       <Filter>Sensors</Filter>
     </ClInclude>
+    <ClInclude Include="Source\OnlineBundler.h" />
+    <ClInclude Include="Source\OnlineBundlerHelper.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
@@ -442,7 +443,6 @@
     <CudaCompile Include="Source\Solver\SolverBundling.cu">
       <Filter>SolverBundling</Filter>
     </CudaCompile>
-    <CudaCompile Include="Source\SubmapManager.cu" />
     <CudaCompile Include="Source\DepthSensing\CUDAMarchingCubesSDF.cu">
       <Filter>DepthSensing</Filter>
     </CudaCompile>
@@ -479,6 +479,7 @@
     <CudaCompile Include="Source\CUDACache.cu">
       <Filter>Sensors</Filter>
     </CudaCompile>
+    <CudaCompile Include="Source\OnlineBundler.cu" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\QuadDrawer.hlsl">
