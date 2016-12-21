@@ -239,7 +239,7 @@ void OnlineBundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int
 	}
 	m_state.m_localToSolve = (unsigned int)-1;
 	m_state.m_lastLocalSolved = curLocalIdx;
-	m_state.m_totalNumOptLocalFrames = m_submapSize * m_state.m_lastLocalSolved + numLocalFrames; //last local solved is 0-indexed so this doesn't overcount
+	m_state.m_totalNumOptLocalFrames = m_submapSize * m_state.m_lastLocalSolved + std::min(m_submapSize, numLocalFrames); //last local solved is 0-indexed so this doesn't overcount
 }
 
 void OnlineBundler::initializeNextGlobalTransform(unsigned int lastMatchedIdx, unsigned int lastValidLocal)
@@ -321,10 +321,11 @@ void OnlineBundler::updateTrajectory(unsigned int curFrame)
 void OnlineBundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations)
 {
 	MLIB_ASSERT(m_state.m_bUseSolve);
-	if (m_state.m_processState == BundlerState::DO_NOTHING) return;
+	const bool isSequenceDone = m_state.m_numFramesPastEnd > 0;
+	if (!isSequenceDone && m_state.m_processState == BundlerState::DO_NOTHING) return; //always solve after end of sequence
 	MLIB_ASSERT(m_state.m_lastLocalSolved >= 0);
 
-	const BundlerState::PROCESS_STATE state = m_state.m_processState;
+	const BundlerState::PROCESS_STATE state = isSequenceDone ? BundlerState::PROCESS : m_state.m_processState; //always solve after end of sequence
 	unsigned int numTotalFrames = m_state.m_totalNumOptLocalFrames;
 	if (state == BundlerState::PROCESS) {
 		const unsigned int countNumFrames = (m_state.m_numFramesPastEnd > 0) ? m_state.m_numFramesPastEnd : numTotalFrames / m_submapSize;
@@ -343,5 +344,6 @@ void OnlineBundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned in
 		m_trajectoryManager->updateOptimizedTransform(d_completeTrajectory, numTotalFrames);
 		m_state.m_numCompleteTransforms = numTotalFrames;
 	}
+
 	m_state.m_processState = BundlerState::DO_NOTHING;
 }
