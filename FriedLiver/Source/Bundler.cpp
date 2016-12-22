@@ -226,12 +226,12 @@ unsigned int Bundler::matchAndFilter()
 	return m_lastMatchedFrame;
 }
 
-bool Bundler::optimize(unsigned int numNonLinIterations, unsigned int numLinIterations, bool bUseVerify, bool bRemoveMaxResidual, bool bIsScanDone)
+bool Bundler::optimize(unsigned int numNonLinIterations, unsigned int numLinIterations, bool bUseVerify, bool bRemoveMaxResidual, bool bIsScanDone, bool& bOptRemoved)
 {
 	MLIB_ASSERT(m_siftManager->getNumImages() > 1);
 
 	bool ret = false;
-	m_optimizer.align(m_siftManager, m_cudaCache, d_trajectory, numNonLinIterations, numLinIterations, bUseVerify, m_bIsLocal,
+	bOptRemoved = m_optimizer.align(m_siftManager, m_cudaCache, d_trajectory, numNonLinIterations, numLinIterations, bUseVerify, m_bIsLocal,
 		false, true, bRemoveMaxResidual, bIsScanDone, m_revalidatedIdx); //false -> record convergence, true -> buildjt
 
 	if (m_optimizer.useVerification()) {

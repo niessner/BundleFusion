@@ -19,13 +19,7 @@ public:
 	void processInput();
 
 	//local opt and global match/opt
-	void process(unsigned int numNonLinItersLocal, unsigned int numLinItersLocal, unsigned int numNonLinItersGlobal, unsigned int numLinItersGlobal) {
-		if (!m_state.m_bUseSolve) return; //solver off
-
-		optimizeLocal(numNonLinItersLocal, numLinItersLocal);
-		processGlobal();
-		optimizeGlobal(numNonLinItersGlobal, numLinItersGlobal);
-	}
+	void process(unsigned int numNonLinItersLocal, unsigned int numLinItersLocal, unsigned int numNonLinItersGlobal, unsigned int numLinItersGlobal);
 
 	TrajectoryManager* getTrajectoryManager()	{ return m_trajectoryManager; }
 	bool hasProcssedInputFrame() const			{ return m_bHasProcessedInputFrame; }
@@ -81,11 +75,14 @@ private:
 	Bundler*					m_optLocal;
 	Bundler*					m_global;
 
+	std::mutex					mutex_optLocal;
+	std::mutex					mutex_siftMatcher; //TODO why can't this run multithreaded??
 	unsigned int				m_numOptPerResidualRemoval;
 
 	//*********** TRAJECTORIES ************
 	TrajectoryManager*			m_trajectoryManager;
 
+	std::mutex					mutex_completeTrajectory;
 	float4x4*					d_completeTrajectory;
 	float4x4*					d_localTrajectories;
 	std::vector<std::vector<int>> m_localTrajectoriesValid; //TODO CHECK IF NEEDED

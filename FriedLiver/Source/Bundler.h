@@ -42,7 +42,7 @@ public:
 	const int* getNumFiltMatchesGPU() const { return m_siftManager->getNumFiltMatchesGPU(); }
 
 	unsigned int matchAndFilter();
-	bool optimize(unsigned int numNonLinIterations, unsigned int numLinIterations, bool bUseVerify, bool bRemoveMaxResidual, bool bIsScanDone);
+	bool optimize(unsigned int numNonLinIterations, unsigned int numLinIterations, bool bUseVerify, bool bRemoveMaxResidual, bool bIsScanDone, bool& bOptRemoved);
 	void setSolveWeights(const std::vector<float>& sparse, const std::vector<float>& densedepth, const std::vector<float>& densecolor) {
 		m_optimizer.setGlobalWeights(sparse, densedepth, densecolor, densedepth.back() > 0 || densecolor.back() > 0);
 		std::cout << "set end solve global dense weights" << std::endl;
@@ -50,6 +50,7 @@ public:
 	void fuseToGlobal(Bundler* glob);
 
 	unsigned int tryRevalidation(unsigned int curGlobalFrame, bool bIsScanDone);
+	unsigned int getRevalidatedIdx() const { return m_revalidatedIdx; }
 
 	//TODO logging for residual information
 

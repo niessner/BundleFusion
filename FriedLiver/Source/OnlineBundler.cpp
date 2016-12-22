@@ -110,8 +110,10 @@ void OnlineBundler::computeCurrentSiftTransform(bool bIsValid, unsigned int fram
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_siftTrajectory + frameIdx, d_siftTrajectory + frameIdx - 1, sizeof(float4x4), cudaMemcpyDeviceToDevice)); //set invalid
 	}
 	else if (frameIdx > 0) {
+		mutex_completeTrajectory.lock();
 		computeSiftTransformCU(m_local->getCurrentSiftTransformsGPU(), m_local->getNumFiltMatchesGPU(),
 			d_completeTrajectory, lastValidCompleteTransform, d_siftTrajectory, frameIdx, localFrameIdx, d_currIntegrateTransform + frameIdx);
+		mutex_completeTrajectory.unlock();
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&m_currIntegrateTransform[frameIdx], d_currIntegrateTransform + frameIdx, sizeof(float4x4), cudaMemcpyDeviceToHost));
 	}
 }
@@ -144,7 +146,9 @@ void OnlineBundler::prepareLocalSolve(unsigned int curFrame, bool isSequenceEnd)
 	}
 
 	// switch local submaps
+	mutex_optLocal.lock();
 	std::swap(m_local, m_optLocal);
+	mutex_optLocal.unlock();
 }
 
 void OnlineBundler::processInput()
@@ -184,14 +188,18 @@ void OnlineBundler::processInput()
 	m_local->storeCachedFrame(m_input.m_inputDepthWidth, m_input.m_inputDepthHeight, m_input.d_inputColor, m_input.m_inputColorHeight, m_input.m_inputColorHeight, m_input.d_inputDepthRaw);
 	const unsigned int curLocalFrame = m_local->getCurrFrameNumber();
 	if (bIsLastLocal) {
+		mutex_optLocal.lock();
 		m_optLocal->copyFrame(m_local, curLocalFrame);
+		mutex_optLocal.unlock();
 	}
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(true).timeSiftDetection = m_timer.getElapsedTimeMS(); }
 
 	//feature match
 	m_state.m_bLastFrameValid = true;
 	if (curLocalFrame > 0) {
+		mutex_siftMatcher.lock();
 		m_state.m_bLastFrameValid = m_local->matchAndFilter() != ((unsigned int)-1);
+		mutex_siftMatcher.unlock();
 		computeCurrentSiftTransform(m_state.m_bLastFrameValid, curFrame, curLocalFrame, m_state.m_lastValidCompleteTransform);
 	}
 
@@ -219,14 +227,16 @@ void OnlineBundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int
 	MLIB_ASSERT(m_state.m_bUseSolve);
 	if (m_state.m_processState == BundlerState::DO_NOTHING) return;
 
+	mutex_optLocal.lock();
 	BundlerState::PROCESS_STATE optLocalState = m_state.m_processState;
 	m_state.m_processState = BundlerState::DO_NOTHING;
 	unsigned int curLocalIdx = (unsigned int)-1;
-	unsigned int numLocalFrames = m_optLocal->getNumFrames();
+	unsigned int numLocalFrames = std::min(m_submapSize, m_optLocal->getNumFrames());
 	if (optLocalState == BundlerState::PROCESS) {
 		curLocalIdx = m_state.m_localToSolve;
+		bool removed = false;
 		bool valid = m_optLocal->optimize(numNonLinIterations, numLinIterations, GlobalBundlingState::get().s_useLocalVerify,
-			false, m_state.m_numFramesPastEnd != 0); // no max res removal
+			false, m_state.m_numFramesPastEnd != 0, removed); // no max res removal
 		if (valid) {
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_localTrajectories + (m_submapSize + 1)*curLocalIdx, m_optLocal->getTrajectoryGPU(), sizeof(float4x4)*(m_submapSize + 1), cudaMemcpyDeviceToDevice));
 			m_state.m_processState = BundlerState::PROCESS;
@@ -239,7 +249,8 @@ void OnlineBundler::optimizeLocal(unsigned int numNonLinIterations, unsigned int
 	}
 	m_state.m_localToSolve = (unsigned int)-1;
 	m_state.m_lastLocalSolved = curLocalIdx;
-	m_state.m_totalNumOptLocalFrames = m_submapSize * m_state.m_lastLocalSolved + std::min(m_submapSize, numLocalFrames); //last local solved is 0-indexed so this doesn't overcount
+	m_state.m_totalNumOptLocalFrames = m_submapSize * m_state.m_lastLocalSolved + numLocalFrames; //last local solved is 0-indexed so this doesn't overcount
+	mutex_optLocal.unlock();
 }
 
 void OnlineBundler::initializeNextGlobalTransform(unsigned int lastMatchedIdx, unsigned int lastValidLocal)
@@ -258,8 +269,7 @@ void OnlineBundler::processGlobal()
 	if (processState == BundlerState::DO_NOTHING) {
 		if (m_state.m_numFramesPastEnd != 0) { //sequence is over, try revalidation still
 			unsigned int idx = m_global->tryRevalidation(m_state.m_lastLocalSolved, true);
-			if (idx != (unsigned int)-1) {
-				//validate chunk images
+			if (idx != (unsigned int)-1) { //validate chunk images
 				const std::vector<int>& validLocal = m_localTrajectoriesValid[idx];
 				for (unsigned int i = 0; i < validLocal.size(); i++) {
 					if (validLocal[i] == 1)	validateImages(idx * m_submapSize + i);
@@ -277,26 +287,40 @@ void OnlineBundler::processGlobal()
 			MLIB_ASSERT((int)m_global->getNumFrames() <= m_state.m_lastLocalSolved);
 			//fuse
 			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.start(); }
+			mutex_optLocal.lock();
 			m_optLocal->fuseToGlobal(m_global);//TODO GPU version of this??
 
 			const unsigned int curGlobalFrame = m_global->getCurrFrameNumber();
 			const std::vector<int>& validImagesLocal = m_optLocal->getValidImages(); 
-			for (unsigned int i = 0; i < std::min(m_submapSize, m_optLocal->getNumFrames()); i++) {
+			const unsigned int numLocalFrames = std::min(m_submapSize, m_optLocal->getNumFrames());
+			for (unsigned int i = 0; i < numLocalFrames; i++) {
 				if (validImagesLocal[i] == 0)
 					invalidateImages(curGlobalFrame * m_submapSize + i);
 			}
 			//TODO IS THIS NECESSARY?
-			m_localTrajectoriesValid[curGlobalFrame] = validImagesLocal; m_localTrajectoriesValid[curGlobalFrame].resize(std::min(m_submapSize, m_optLocal->getNumFrames()));
+			m_localTrajectoriesValid[curGlobalFrame] = validImagesLocal; m_localTrajectoriesValid[curGlobalFrame].resize(numLocalFrames);
 			initializeNextGlobalTransform(curGlobalFrame, (unsigned int)-1); //TODO try local idx too?
 			//done with local data
 			m_optLocal->reset();
+			mutex_optLocal.unlock();
 			if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(false).timeSiftDetection = m_timer.getElapsedTimeMS(); }
 
 			//match!
 			if (m_global->getNumFrames() > 1) {
+				mutex_siftMatcher.lock();
 				unsigned int lastMatchedGlobal = m_global->matchAndFilter();
+				mutex_siftMatcher.unlock();
 				if (lastMatchedGlobal == (unsigned int)-1) m_state.m_processState = BundlerState::INVALIDATE;
-				else m_state.m_processState = BundlerState::PROCESS; 
+				else {
+					const unsigned int revalidateIdx = m_global->getRevalidatedIdx();
+					if (revalidateIdx != (unsigned int)-1) { //validate chunk images
+						const std::vector<int>& validLocal = m_localTrajectoriesValid[revalidateIdx];
+						for (unsigned int i = 0; i < validLocal.size(); i++) {
+							if (validLocal[i] == 1)	validateImages(revalidateIdx * m_submapSize + i);
+						}
+					}
+					m_state.m_processState = BundlerState::PROCESS;
+				}
 			}
 		//}
 	}
@@ -305,7 +329,9 @@ void OnlineBundler::processGlobal()
 		m_state.m_processState = BundlerState::INVALIDATE; 
 		m_global->addInvalidFrame(); //add invalidated (fake) global frame
 		//finish local opt
+		mutex_optLocal.lock();
 		m_optLocal->reset();
+		mutex_optLocal.unlock();
 		invalidateImages(m_submapSize * m_state.m_lastLocalSolved, m_state.m_totalNumOptLocalFrames); 
 	}
 }
@@ -313,9 +339,11 @@ void OnlineBundler::processGlobal()
 void OnlineBundler::updateTrajectory(unsigned int curFrame)
 {
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
+	mutex_completeTrajectory.lock();
 	updateTrajectoryCU(m_global->getTrajectoryGPU(), m_global->getNumFrames(),
 		d_completeTrajectory, curFrame, d_localTrajectories, m_submapSize + 1,
 		m_global->getNumFrames(), d_imageInvalidateList);
+	mutex_completeTrajectory.unlock();
 }
 
 void OnlineBundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned int numLinIterations)
@@ -330,14 +358,21 @@ void OnlineBundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned in
 	if (state == BundlerState::PROCESS) {
 		const unsigned int countNumFrames = (m_state.m_numFramesPastEnd > 0) ? m_state.m_numFramesPastEnd : numTotalFrames / m_submapSize;
 		bool bRemoveMaxResidual = (countNumFrames % m_numOptPerResidualRemoval) == (m_numOptPerResidualRemoval - 1);
-		bool valid = m_global->optimize(numNonLinIterations, numLinIterations, false, bRemoveMaxResidual, m_state.m_numFramesPastEnd > 0);//no verify
+		bool removed = false;
+		bool valid = m_global->optimize(numNonLinIterations, numLinIterations, false, bRemoveMaxResidual, m_state.m_numFramesPastEnd > 0, removed);//no verify
+		if (removed) { // may invalidate already invalidated images
+			for (unsigned int i = 0; i < m_global->getNumFrames(); i++) {
+				if (m_global->getValidImages()[i] == 0)
+					invalidateImages(i * m_submapSize, std::min((i + 1)*m_submapSize, numTotalFrames));
+			}
+		}
 
 		updateTrajectory(numTotalFrames);
 		m_trajectoryManager->updateOptimizedTransform(d_completeTrajectory, numTotalFrames);
 		m_state.m_numCompleteTransforms = numTotalFrames;
 		if (valid) m_state.m_lastValidCompleteTransform = m_submapSize * m_state.m_lastLocalSolved; //TODO over-conservative but easier
 	}
-	else if (state == BundlerState::INVALIDATE) { //invalidate
+	else if (state == BundlerState::INVALIDATE) {
 		m_global->invalidateLastFrame();
 		invalidateImages(m_submapSize * m_state.m_lastLocalSolved, m_state.m_totalNumOptLocalFrames);
 		updateTrajectory(numTotalFrames);
@@ -346,4 +381,69 @@ void OnlineBundler::optimizeGlobal(unsigned int numNonLinIterations, unsigned in
 	}
 
 	m_state.m_processState = BundlerState::DO_NOTHING;
+}
+
+void OnlineBundler::process(unsigned int numNonLinItersLocal, unsigned int numLinItersLocal, unsigned int numNonLinItersGlobal, unsigned int numLinItersGlobal)
+{
+	if (!m_state.m_bUseSolve) return; //solver off
+
+	optimizeLocal(numNonLinItersLocal, numLinItersLocal);
+	processGlobal();
+	optimizeGlobal(numNonLinItersGlobal, numLinItersGlobal);
+
+	//{ //no opt
+	//	m_state.m_localToSolve = -1;
+	//	m_state.m_processState = BundlerState::DO_NOTHING;
+	//	mutex_optLocal.lock();
+	//	m_optLocal->reset();
+	//	mutex_optLocal.unlock();
+	//}
+	//{ //local solve only
+	//	optimizeLocal(numNonLinItersLocal, numLinItersLocal);
+	//	mutex_optLocal.lock();
+	//	unsigned int curFrame = (m_state.m_lastLocalSolved < 0) ? (unsigned int)-1 : m_state.m_totalNumOptLocalFrames;
+	//	if (m_state.m_lastLocalSolved >= 0) {
+	//		float4x4 relativeTransform;
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&relativeTransform, d_localTrajectories + m_state.m_lastLocalSolved*(m_submapSize + 1) + m_submapSize, sizeof(float4x4), cudaMemcpyDeviceToHost));
+	//		float4x4 prevTransform;
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&prevTransform, m_global->getTrajectoryGPU() + m_state.m_lastLocalSolved, sizeof(float4x4), cudaMemcpyDeviceToHost));
+	//		float4x4 newTransform = prevTransform * relativeTransform;
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_global->getTrajectoryGPU() + m_state.m_lastLocalSolved + 1, &newTransform, sizeof(float4x4), cudaMemcpyHostToDevice));
+	//	}
+	//	if (m_state.m_lastLocalSolved > 0) {
+	//		// update trajectory
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
+	//		updateTrajectoryCU(m_global->getTrajectoryGPU(), m_state.m_lastLocalSolved,
+	//			d_completeTrajectory, curFrame,
+	//			d_localTrajectories, m_submapSize + 1, m_state.m_lastLocalSolved,
+	//			d_imageInvalidateList);
+	//	}
+	//	m_optLocal->reset();
+	//	mutex_optLocal.unlock();
+	//	m_state.m_localToSolve = -1;
+	//	m_state.m_processState = BundlerState::DO_NOTHING;
+	//}
+	//{ //local solve + glob match only
+	//	optimizeLocal(numNonLinItersLocal, numLinItersLocal);
+	//	processGlobal();
+	//	unsigned int curFrame = (m_state.m_lastLocalSolved < 0) ? (unsigned int)-1 : m_state.m_totalNumOptLocalFrames;
+	//	if (m_state.m_lastLocalSolved >= 0) {
+	//		float4x4 relativeTransform;
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&relativeTransform, d_localTrajectories + m_state.m_lastLocalSolved*(m_submapSize + 1) + m_submapSize, sizeof(float4x4), cudaMemcpyDeviceToHost));
+	//		float4x4 prevTransform;
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(&prevTransform, m_global->getTrajectoryGPU() + m_state.m_lastLocalSolved, sizeof(float4x4), cudaMemcpyDeviceToHost));
+	//		float4x4 newTransform = prevTransform * relativeTransform;
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_global->getTrajectoryGPU() + m_state.m_lastLocalSolved + 1, &newTransform, sizeof(float4x4), cudaMemcpyHostToDevice));
+	//	}
+	//	if (m_state.m_lastLocalSolved > 0) {
+	//		// update trajectory
+	//		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_imageInvalidateList, m_invalidImagesList.data(), sizeof(int)*curFrame, cudaMemcpyHostToDevice));
+	//		updateTrajectoryCU(m_global->getTrajectoryGPU(), m_state.m_lastLocalSolved,
+	//			d_completeTrajectory, curFrame,
+	//			d_localTrajectories, m_submapSize + 1, m_state.m_lastLocalSolved,
+	//			d_imageInvalidateList);
+	//	}
+	//	m_state.m_localToSolve = -1;
+	//	m_state.m_processState = BundlerState::DO_NOTHING;
+	//}
 }
