@@ -80,9 +80,6 @@ private:
 	//*********** TRAJECTORIES *******************
 	float4x4*				d_trajectory;
 
-	unsigned int			m_lastMatchedFrame;
-	unsigned int			m_prevLastMatchedFrame;
-
 	bool					m_bIsLocal;
 	Timer					m_timer;
 };

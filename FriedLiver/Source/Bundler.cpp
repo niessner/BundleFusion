@@ -43,9 +43,6 @@ Bundler::Bundler(unsigned int maxNumImages, unsigned int maxNumKeysPerImage,
 	std::vector<mat4f> identityTrajectory(maxNumImages, mat4f::identity()); //initialize transforms to identity
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory, identityTrajectory.data(), sizeof(float4x4)*maxNumImages, cudaMemcpyHostToDevice));
 
-	m_lastMatchedFrame = (unsigned int)-1;
-	m_prevLastMatchedFrame = (unsigned int)-1;
-
 	m_continueRetry = 0;
 	m_revalidatedIdx = (unsigned int)-1;
 }
@@ -107,6 +104,7 @@ unsigned int Bundler::matchAndFilter()
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.start(); }
 	int num2 = (int)m_siftManager->getNumKeyPointsPerImage(curFrame);
 	if (num2 == 0) return (unsigned int)-1;
+
 	for (unsigned int prev = startFrame; prev < numFrames; prev++) {
 		if (prev == curFrame) continue;
 		uint2 keyPointOffset = make_uint2(0, 0);
@@ -129,17 +127,17 @@ unsigned int Bundler::matchAndFilter()
 	}
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeSiftMatching = m_timer.getElapsedTimeMS(); }
 
-	m_prevLastMatchedFrame = m_lastMatchedFrame;
-	m_lastMatchedFrame = (unsigned int)-1;
+	unsigned int lastMatchedFrame = (unsigned int)-1;
 	if (curFrame > 0) { // can have a match to another frame
 
 		// --- sort the current key point matches
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.start(); }
 		m_siftManager->SortKeyPointMatchesCU(curFrame, startFrame, numFrames);
 
-		////debugging
+		//debugging
+		//const bool usedebug = !m_bIsLocal && curFrame >= 49;
 		//std::vector<unsigned int> numMatches;
-		//if (!m_bIsLocal) {
+		//if (usedebug) {
 		//	m_siftManager->getNumRawMatchesDEBUG(numMatches);
 		//	int a = 5;
 		//}
@@ -153,7 +151,7 @@ unsigned int Bundler::matchAndFilter()
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMatchFilterKeyPoint = m_timer.getElapsedTimeMS(); }
 
 		////debugging
-		//if (!m_bIsLocal) {
+		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
 		//	int a = 5;
 		//}
@@ -167,7 +165,7 @@ unsigned int Bundler::matchAndFilter()
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMatchFilterSurfaceArea = m_timer.getElapsedTimeMS(); }
 
 		////debugging
-		//if (!m_bIsLocal) {
+		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
 		//	int a = 5;
 		//}
@@ -185,7 +183,7 @@ unsigned int Bundler::matchAndFilter()
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMatchFilterDenseVerify = m_timer.getElapsedTimeMS(); }
 
 		////debugging
-		//if (!m_bIsLocal) {
+		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
 		//	int a = 5;
 		//}
@@ -193,37 +191,38 @@ unsigned int Bundler::matchAndFilter()
 
 		// --- filter frames
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.start(); }
-		m_lastMatchedFrame = m_siftManager->filterFrames(curFrame, startFrame, numFrames);
+		lastMatchedFrame = m_siftManager->filterFrames(curFrame, startFrame, numFrames);
 		// --- add to global correspondences
-		MLIB_ASSERT((m_siftManager->getValidImages()[curFrame] != 0 && m_lastMatchedFrame != (unsigned int)-1) || (m_lastMatchedFrame == (unsigned int)-1 && m_siftManager->getValidImages()[curFrame] == 0)); //TODO REMOVE
-		if (m_lastMatchedFrame != (unsigned int)-1)//if (siftManager->getValidImages()[curFrame] != 0)
+		MLIB_ASSERT((m_siftManager->getValidImages()[curFrame] != 0 && lastMatchedFrame != (unsigned int)-1) || (lastMatchedFrame == (unsigned int)-1 && m_siftManager->getValidImages()[curFrame] == 0)); //TODO REMOVE
+		if (lastMatchedFrame != (unsigned int)-1)//if (siftManager->getValidImages()[curFrame] != 0)
 			m_siftManager->AddCurrToResidualsCU(curFrame, startFrame, numFrames, m_siftIntrinsicsInv);
 		//else lastValid = false;
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMisc = m_timer.getElapsedTimeMS(); }
 
 		if (!m_bIsLocal) { //global only
-			if (m_lastMatchedFrame != (unsigned int)-1 && m_lastMatchedFrame + 1 != curFrame) { //re-initialize to better location based off of last match
-				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory + curFrame, d_trajectory + m_lastMatchedFrame, sizeof(float4x4), cudaMemcpyDeviceToDevice));
-				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory + curFrame + 1, d_trajectory + m_lastMatchedFrame, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+			if (lastMatchedFrame != (unsigned int)-1 && lastMatchedFrame + 1 != curFrame) { //re-initialize to better location based off of last match
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory + curFrame, d_trajectory + lastMatchedFrame, sizeof(float4x4), cudaMemcpyDeviceToDevice));
+				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory + curFrame + 1, d_trajectory + lastMatchedFrame, sizeof(float4x4), cudaMemcpyDeviceToDevice));
 			}
 			//retry
-			if (m_lastMatchedFrame != (unsigned int)-1)
+			if (curFrame + 1 == numFrames && lastMatchedFrame != (unsigned int)-1) //1 revalidation per frame
 				tryRevalidation(curFrame, false);
 			else {
-				if (GlobalBundlingState::get().s_verbose) std::cout << "WARNING: last image (" << curFrame << ") not valid! no new global images for solve" << std::endl;
+				if (GlobalBundlingState::get().s_verbose && curFrame + 1 == numFrames) 
+					std::cout << "WARNING: last image (" << curFrame << ") not valid! no new global images for solve" << std::endl;
 				m_siftManager->addToRetryList(curFrame);
 			}
 		} //global only
 		
 		////debugging
-		//if (!m_bIsLocal) {
+		//if (usedebug) {
 		//	std::vector<EntryJ> corrs(m_siftManager->getNumGlobalCorrespondences());
 		//	if (!corrs.empty()) MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), m_siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*corrs.size(), cudaMemcpyDeviceToHost));
 		//	int a = 5;
 		//}
 		////debugging
 	}
-	return m_lastMatchedFrame;
+	return lastMatchedFrame;
 }
 
 bool Bundler::optimize(unsigned int numNonLinIterations, unsigned int numLinIterations, bool bUseVerify, bool bRemoveMaxResidual, bool bIsScanDone, bool& bOptRemoved)
@@ -274,7 +273,7 @@ bool Bundler::isValid() const
 {
 	const std::vector<int>& valid = m_siftManager->getValidImages();
 	const unsigned int numImages = m_siftManager->getNumImages();
-	for (unsigned int i = 0; i < numImages; i++) {
+	for (unsigned int i = 1; i < numImages; i++) {//for (unsigned int i = 0; i < numImages; i++) { //TODO allow single frame valid for local
 		if (valid[i] != 0)
 			return true;
 	}
