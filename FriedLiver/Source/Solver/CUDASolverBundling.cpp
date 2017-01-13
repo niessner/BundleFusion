@@ -37,7 +37,7 @@ CUDASolverBundling::CUDASolverBundling(unsigned int maxNumberOfImages, unsigned 
 	m_verifyOptPercentThresh = 0.05f;//GlobalAppState::get().s_verifyOptPercentThresh;
 
 	const unsigned int numberOfVariables = maxNumberOfImages;
-	m_maxCorrPerImage = math::clamp(maxNumResiduals / maxNumberOfImages, 1000u, 3000u);
+	m_maxCorrPerImage = math::clamp(maxNumResiduals / maxNumberOfImages, 1000u, 4000u);
 
 	// State
 	MLIB_CUDA_SAFE_CALL(cudaMalloc(&m_solverState.d_deltaRot, sizeof(float3)*numberOfVariables));

@@ -205,12 +205,14 @@ unsigned int Bundler::matchAndFilter()
 				MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory + curFrame + 1, d_trajectory + lastMatchedFrame, sizeof(float4x4), cudaMemcpyDeviceToDevice));
 			}
 			//retry
-			if (curFrame + 1 == numFrames && lastMatchedFrame != (unsigned int)-1) //1 revalidation per frame
-				tryRevalidation(curFrame, false);
-			else {
-				if (GlobalBundlingState::get().s_verbose && curFrame + 1 == numFrames) 
-					std::cout << "WARNING: last image (" << curFrame << ") not valid! no new global images for solve" << std::endl;
-				m_siftManager->addToRetryList(curFrame);
+			if (curFrame + 1 == numFrames) { // this is a current frame (and not a retry frame)
+				if (lastMatchedFrame != (unsigned int)-1) //1 revalidation per frame 
+					tryRevalidation(curFrame, false);
+				else {
+					if (GlobalBundlingState::get().s_verbose && curFrame + 1 == numFrames)
+						std::cout << "WARNING: last image (" << curFrame << ") not valid! no new global images for solve" << std::endl;
+					m_siftManager->addToRetryList(curFrame);
+				}
 			}
 		} //global only
 		
