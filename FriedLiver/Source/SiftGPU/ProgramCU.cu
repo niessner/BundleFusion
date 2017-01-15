@@ -644,13 +644,11 @@ void __global__ ComputeKEY_Kernel(float4* d_key, int width, int colmax, int rowm
 	{
 		d_key[index] = make_float4(result, dx, dy, ds);
 		// check if has valid depth
-		float depthx = (keyLocScale * (float)col + keyLocOffset) * (float)depthWidth / (float)c_siftCameraParams.m_intensityWidth;
-		float depthy = (keyLocScale * (float)row + keyLocOffset) * (float)depthHeight / (float)c_siftCameraParams.m_intensityHeight;
+		int depthx = round((keyLocScale * (float)col + keyLocOffset) * (float)(depthWidth-1) / (float)(c_siftCameraParams.m_intensityWidth-1));
+		int depthy = round((keyLocScale * (float)row + keyLocOffset) * (float)(depthHeight-1) / (float)(c_siftCameraParams.m_intensityHeight-1));
 		if (depthx < 0 || depthx >= depthWidth || depthy < 0 || depthy >= depthHeight) return;
-		//float depth = bilinearInterpolationFloat(dx, dy, d_depthData, 640, 480);
-		int depthxi = round(depthx);
-		int depthyi = round(depthy);
-		float depth = d_depthData[depthyi * depthWidth + depthxi];
+		//float depth = bilinearInterpolationFloat(depthx, depthy, d_depthData, 640, 480);
+		float depth = d_depthData[depthy * depthWidth + depthx];
 
 		if (depth == MINF || depth < siftDepthMin || depth > siftDepthMax) return;
 		data[1][1] = v = tex1Dfetch(texC, idx[1]);
@@ -2064,8 +2062,8 @@ void __global__  CreateGlobalKeyPointList_Kernel(const float4* d_curFeatureList,
 		d_outKeypointList[idx].y = posY;	//y
 		d_outKeypointList[idx].z = keyLocScale*key.z;	//s
 
-		float depthX = posX * (float)c_siftCameraParams.m_depthWidth / (float)c_siftCameraParams.m_intensityWidth;
-		float depthY = posY * (float)c_siftCameraParams.m_depthHeight / (float)c_siftCameraParams.m_intensityHeight;
+		float depthX = posX * (float)(c_siftCameraParams.m_depthWidth-1) / (float)(c_siftCameraParams.m_intensityWidth-1);
+		float depthY = posY * (float)(c_siftCameraParams.m_depthHeight-1) / (float)(c_siftCameraParams.m_intensityHeight-1);
 
 		const int iposX = round(depthX);
 		const int iposY = round(depthY);

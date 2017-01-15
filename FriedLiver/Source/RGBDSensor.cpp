@@ -319,8 +319,8 @@ void RGBDSensor::recordFrame()
 		else {
 			m_recordedDepthData.push_back(new float[m_recordDataWidth*m_recordDataHeight]);
 			float* depth = m_recordedDepthData.back();
-			float scaleX = (float)getDepthWidth() / m_recordDataWidth;
-			float scaleY = (float)getDepthHeight() / m_recordDataHeight;
+			float scaleX = (float)(getDepthWidth() - 1) / (m_recordDataWidth - 1);
+			float scaleY = (float)(getDepthHeight() - 1) / (m_recordDataHeight - 1);
 			for (unsigned int y = 0; y < m_recordDataHeight; y++) {
 				for (unsigned int x = 0; x < m_recordDataWidth; x++) {
 					unsigned int _x = math::round(scaleX*x);	_x = math::clamp(_x, 0u, getDepthWidth());
@@ -337,8 +337,8 @@ void RGBDSensor::recordFrame()
 		else {
 			m_recordedColorData.push_back(new vec4uc[m_recordDataWidth*m_recordDataHeight]);
 			vec4uc* color = m_recordedColorData.back();
-			float scaleX = (float)getColorWidth() / m_recordDataWidth;
-			float scaleY = (float)getColorHeight() / m_recordDataHeight;
+			float scaleX = (float)(getColorWidth() - 1) / (m_recordDataWidth - 1);
+			float scaleY = (float)(getColorHeight() - 1) / (m_recordDataHeight - 1);
 			for (unsigned int y = 0; y < m_recordDataHeight; y++) {
 				for (unsigned int x = 0; x < m_recordDataWidth; x++) {
 					unsigned int _x = math::round(scaleX*x);	_x = math::clamp(_x, 0u, getColorWidth());
@@ -528,8 +528,8 @@ ml::vec3f RGBDSensor::getNormal(unsigned int x, unsigned int y) const
 void RGBDSensor::computePointCurrentPointCloud(PointCloudf& pc, const mat4f& transform /*= mat4f::identity()*/) const
 {
 	//if (!(getColorWidth() == getDepthWidth() && getColorHeight() == getDepthHeight()))	throw MLIB_EXCEPTION("invalid dimensions");
-	const float scaleWidth = (float)getColorWidth() / (float)getDepthWidth();
-	const float scaleHeight = (float)getColorHeight() / (float)getDepthHeight();
+	const float scaleWidth = (float)(getColorWidth() - 1) / (float)(getDepthWidth() - 1);
+	const float scaleHeight = (float)(getColorHeight() - 1) / (float)(getDepthHeight() - 1);
 
 	for (unsigned int i = 0; i < getDepthWidth()*getDepthHeight(); i++) {
 		unsigned int x = i % getDepthWidth();

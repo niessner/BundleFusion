@@ -1205,7 +1205,8 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 // build variables to correspondences lookup
 ////////////////////////////////////////////////////////////////////
 
-__global__ void BuildVariablesToCorrespondencesTableDevice(EntryJ* d_correspondences, unsigned int numberOfCorrespondences, unsigned int maxNumCorrespondencesPerImage, int* d_variablesToCorrespondences, int* d_numEntriesPerRow)
+__global__ void BuildVariablesToCorrespondencesTableDevice(EntryJ* d_correspondences, unsigned int numberOfCorrespondences,
+	unsigned int maxNumCorrespondencesPerImage, int* d_variablesToCorrespondences, int* d_numEntriesPerRow)
 {
 	const unsigned int N = numberOfCorrespondences; // Number of block variables
 	const unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;

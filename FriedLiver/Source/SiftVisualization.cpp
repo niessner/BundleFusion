@@ -350,8 +350,8 @@ void SiftVisualization::saveImPairToPointCloud(const std::string& prefix, const 
 	const std::string separator = (prefix.back() == '/' || prefix.back() == '\\') ? "" : "_";
 	const std::string pre = prefix + separator + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y);
 
-	const float scaleWidthColor = (float)colorImage0.getWidth() / (float)depthImage0.getWidth();
-	const float scaleHeightColor = (float)colorImage0.getHeight() / (float)depthImage0.getHeight();
+	const float scaleWidthColor = (float)(colorImage0.getWidth() - 1) / (float)(depthImage0.getWidth() - 1);
+	const float scaleHeightColor = (float)(colorImage0.getHeight() - 1) / (float)(depthImage0.getHeight() - 1);
 	bool sameColorDepthRes = colorImage0.getDimensions() == depthImage0.getDimensions();
 
 	PointCloudf pc;
@@ -434,8 +434,8 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const float* depth, u
 
 				vec3f n = getNormal(depth, depthWidth, depthHeight, depthIntrinsicsInv, x, y);
 				if (n.x != -std::numeric_limits<float>::infinity()) {
-					unsigned int cx = (unsigned int)math::round((float)x * (float)colorWidth / (float)depthWidth);
-					unsigned int cy = (unsigned int)math::round((float)y * (float)colorHeight / (float)depthHeight);
+					unsigned int cx = (unsigned int)math::round((float)x * (float)(colorWidth - 1) / (float)(depthWidth - 1));
+					unsigned int cy = (unsigned int)math::round((float)y * (float)(colorHeight - 1) / (float)(depthHeight - 1));
 					vec3f c = vec3f(color[cy * colorWidth + cx]) / 255.0f;
 					if (!(c.x == 0 && c.y == 0 && c.z == 0)) {
 						pc.m_points.push_back(p);
@@ -473,8 +473,8 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 				if (n.x != -std::numeric_limits<float>::infinity()) {
 					vec3f c;
 					if (color.getWidth() != camPos.getWidth()) {
-						unsigned int cx = (unsigned int)math::round((float)x * (float)color.getWidth() / (float)camPos.getWidth());
-						unsigned int cy = (unsigned int)math::round((float)y * (float)color.getHeight() / (float)camPos.getHeight());
+						unsigned int cx = (unsigned int)math::round((float)x * (float)(color.getWidth() - 1) / (float)(camPos.getWidth() - 1));
+						unsigned int cy = (unsigned int)math::round((float)y * (float)(color.getHeight() - 1) / (float)(camPos.getHeight() - 1));
 						c = vec3f(color(cx, cy)) / 255.0f;
 					}
 					else {

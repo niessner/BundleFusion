@@ -469,8 +469,8 @@ void TestMatching::printMatches(const std::string& outDir, const std::vector<vec
 		matchImage.copyIntoImage(im1, 0, 0);
 		matchImage.copyIntoImage(im2, image1.getWidth(), 0);
 
-		const float scaleWidth = (float)m_colorImages[0].getWidth() / (float)GlobalBundlingState::get().s_widthSIFT;
-		const float scaleHeight = (float)m_colorImages[0].getHeight() / (float)GlobalBundlingState::get().s_heightSIFT;
+		const float scaleWidth = (float)(m_colorImages[0].getWidth() - 1) / (float)(GlobalBundlingState::get().s_widthSIFT - 1);
+		const float scaleHeight = (float)(m_colorImages[0].getHeight() - 1) / (float)(GlobalBundlingState::get().s_heightSIFT - 1);
 
 		float maxMatchDistance = 0.0f;
 		RGBColor lowColor = ml::RGBColor::Blue;
@@ -615,8 +615,8 @@ void TestMatching::recordPointCloud(PointCloudf& pc, unsigned int frame) const
 		return;
 	}
 	unsigned int depthWidth = m_depthImages[0].getWidth();
-	float scaleWidth = (float)m_colorImages[0].getWidth() / (float)m_depthImages[0].getWidth();
-	float scaleHeight = (float)m_colorImages[0].getHeight() / (float)m_depthImages[0].getHeight();
+	float scaleWidth = (float)(m_colorImages[0].getWidth() - 1) / (float)(m_depthImages[0].getWidth() - 1);
+	float scaleHeight = (float)(m_colorImages[0].getHeight() - 1) / (float)(m_depthImages[0].getHeight() - 1);
 
 	for (unsigned int p = 0; p < m_depthImages[frame].getNumPixels(); p++) {
 		unsigned int x = p%depthWidth; unsigned int y = p / depthWidth;
@@ -708,13 +708,11 @@ void TestMatching::initSiftParams(unsigned int widthDepth, unsigned int heightDe
 	m_heightDepth = heightDepth;
 	if (widthColor != m_widthSift && heightColor != m_heightSift) {
 		// adapt intrinsics
-		const float scaleWidth = (float)m_widthSift / (float)widthColor;
-		const float scaleHeight = (float)m_heightSift / (float)heightColor;
-
-		m_colorCalibration.m_Intrinsic._m00 *= scaleWidth;  m_colorCalibration.m_Intrinsic._m02 *= scaleWidth;
-		m_colorCalibration.m_Intrinsic._m11 *= scaleHeight; m_colorCalibration.m_Intrinsic._m12 *= scaleHeight;
-
-		m_colorCalibration.m_IntrinsicInverse._m00 /= scaleWidth; m_colorCalibration.m_IntrinsicInverse._m11 /= scaleHeight;
+		m_colorCalibration.m_Intrinsic._m00 *= (float)m_widthSift / (float)widthColor;
+		m_colorCalibration.m_Intrinsic._m11 *= (float)m_heightSift / (float)heightColor;
+		m_colorCalibration.m_Intrinsic._m02 *= (float)(m_widthSift - 1) / (float)(widthColor - 1);
+		m_colorCalibration.m_Intrinsic._m12 *= (float)(m_heightSift - 1) / (float)(heightColor - 1);
+		m_colorCalibration.m_IntrinsicInverse = m_colorCalibration.m_Intrinsic.getInverse();
 
 		for (unsigned int i = 0; i < m_colorImages.size(); i++) {
 			m_colorImages[i].resize(m_widthSift, m_heightSift);
@@ -773,11 +771,10 @@ void TestMatching::createCachedFrames()
 	unsigned int width = GlobalBundlingState::get().s_downsampledWidth;
 	unsigned int height = GlobalBundlingState::get().s_downsampledHeight;
 
-	const float scaleWidth = (float)width / (float)m_widthDepth;
-	const float scaleHeight = (float)height / (float)m_heightDepth;
-	m_intrinsicsDownsampled = m_depthCalibration.m_Intrinsic;
-	m_intrinsicsDownsampled._m00 *= scaleWidth;  m_intrinsicsDownsampled._m02 *= scaleWidth;
-	m_intrinsicsDownsampled._m11 *= scaleHeight; m_intrinsicsDownsampled._m12 *= scaleHeight;
+	m_intrinsicsDownsampled._m00 *= (float)width / (float)m_widthDepth;
+	m_intrinsicsDownsampled._m11 *= (float)height / (float)m_heightDepth;
+	m_intrinsicsDownsampled._m02 *= (float)(width - 1) / (float)(m_widthDepth - 1);
+	m_intrinsicsDownsampled._m12 *= (float)(height - 1) / (float)(m_heightDepth - 1);
 
 	allocCachedFrames((unsigned int)m_colorImages.size(), width, height);
 
@@ -2209,11 +2206,10 @@ void TestMatching::createCUDACache(CUDACache* cache)
 	std::vector<CUDACachedFrame>& cachedFrames = cache->getCachedFramesDEBUG();
 	unsigned int width = cache->getWidth(); unsigned int height = cache->getHeight();
 
-	const float scaleWidth = (float)width / (float)m_widthDepth;
-	const float scaleHeight = (float)height / (float)m_heightDepth;
-	m_intrinsicsDownsampled = m_depthCalibration.m_Intrinsic;
-	m_intrinsicsDownsampled._m00 *= scaleWidth;  m_intrinsicsDownsampled._m02 *= scaleWidth;
-	m_intrinsicsDownsampled._m11 *= scaleHeight; m_intrinsicsDownsampled._m12 *= scaleHeight;
+	m_intrinsicsDownsampled._m00 *= (float)width / (float)m_widthDepth;
+	m_intrinsicsDownsampled._m11 *= (float)height / (float)m_heightDepth;
+	m_intrinsicsDownsampled._m02 *= (float)(width - 1) / (float)(m_widthDepth - 1);
+	m_intrinsicsDownsampled._m12 *= (float)(height - 1) / (float)(m_heightDepth - 1);
 	cache->setIntrinsics(m_depthCalibration.m_Intrinsic, m_intrinsicsDownsampled);
 
 	float* d_depth = NULL; float* d_depthErodeHelper = NULL; uchar4* d_color = NULL;
