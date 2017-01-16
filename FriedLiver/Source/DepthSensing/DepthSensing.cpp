@@ -991,7 +991,6 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	while (g_CudaImageManager->hasBundlingFrameRdy()) { //wait until bundling is done with previous frame
 		ConditionManager::waitImageManagerFrameReady(ConditionManager::Recon);
 	}
-	std::cout << "done recon waitImageManagerFrameReady" << std::endl; //debugging only
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
 		g_CudaImageManager->setBundlingFrameRdy();					//ready for bundling thread
@@ -1002,7 +1001,6 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 
 		g_CudaImageManager->setBundlingFrameRdy();				// let bundling still optimize after scanning done
 		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
-		std::cout << "done recon setBundlingFrameRdy" << std::endl; //debugging only
 	}
 #else
 	bool bGotDepth = g_CudaImageManager->process();
@@ -1019,16 +1017,12 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 
 #ifdef RUN_MULTITHREADED
 	//wait until the bundling thread is done with: sift extraction, sift matching, and key point filtering
-	//if (bGotDepth) {
 	ConditionManager::lockBundlerProcessedInput(ConditionManager::Recon);
 	while (!g_depthSensingBundler->hasProcssedInputFrame()) ConditionManager::waitBundlerProcessedInput(ConditionManager::Recon);
-	std::cout << "done recon waitBundlerProcessedInput" << std::endl; //debugging only
-	//while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
-	//}
+
 	if (!g_depthSensingRGBDSensor->isReceivingFrames()) { // let bundling still optimize after scanning done
 		g_depthSensingBundler->confirmProcessedInputFrame();
 		ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Recon);
-		std::cout << "done recon confirmProcessedInputFrame" << std::endl; //debugging only
 	}
 #endif
 
@@ -1045,7 +1039,6 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 		//allow bundler to process new frame
 		g_depthSensingBundler->confirmProcessedInputFrame();
 		ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Recon);
-		std::cout << "done recon confirmProcessedInputFrame" << std::endl; //debugging only
 #endif
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {

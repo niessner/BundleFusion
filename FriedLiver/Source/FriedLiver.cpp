@@ -154,28 +154,21 @@ void bundlingThreadFunc() {
 		while (!g_imageManager->hasBundlingFrameRdy()) {
 			ConditionManager::waitImageManagerFrameReady(ConditionManager::Bundling); 
 		}
-		//while (!g_imageManager->hasBundlingFrameRdy()) Sleep(0);	//wait for a new input frame (LOCK IMAGE MANAGER)
-		std::cout << "done bundling waitImageManagerFrameReady;" << std::endl; //debugging only
-		{ //TODO BUNDLING STUCK HERE WHY???
+		{ 
 			ConditionManager::lockBundlerProcessedInput(ConditionManager::Bundling);
 			while (g_bundler->hasProcssedInputFrame()) { //wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
 				ConditionManager::waitBundlerProcessedInput(ConditionManager::Bundling);	
 			}
-			//while (g_bundler->hasProcssedInputFrame()) Sleep(0);		//wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
-			std::cout << "done bundling waitBundlerProcessedInput;" << std::endl; //debugging only
 			{
 				if (g_bundler->getExitBundlingThread()) {
-					std::cout << "attempt to exit bundling thread" << std::endl; //debugging only
 					if (tOpt.joinable()) {
 						tOpt.join();
 					}
 					ConditionManager::release(ConditionManager::Bundling);
-					std::cout << "joined bundling thread for exit" << std::endl; //debugging only
 					break;
 				}
 				g_bundler->processInput();						//perform sift and whatever
 			}
-			std::cout << "done bundling process input" << std::endl; //debugging only
 			g_bundler->setProcessedInputFrame();			//let depth sensing know we have a frame (UNLOCK BUNDLING)
 			ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Bundling);
 		}
@@ -183,7 +176,6 @@ void bundlingThreadFunc() {
 		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Bundling);
 
 		if (g_bundler->getExitBundlingThread()) {
-			std::cout << "exiting bundling thread" << std::endl; //debugging only
 			ConditionManager::release(ConditionManager::Bundling);
 			break;
 		}

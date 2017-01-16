@@ -363,7 +363,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	}
 	const int reductionGlobal = (input.denseDepthWidth*input.denseDepthHeight + THREADS_PER_BLOCK_DENSE_DEPTH - 1) / THREADS_PER_BLOCK_DENSE_DEPTH;
 	dim3 grid(numOverlapImagePairs, reductionGlobal);
-	if (N > 11) printf("num overlap image pairs = %d\n", numOverlapImagePairs); //debugging only
+	//if (N > 11) printf("num overlap image pairs = %d\n", numOverlapImagePairs); //debugging only
 
 	if (timer) timer->startEvent("BuildDenseDepthSystem - compute im-im weights");
 
@@ -407,28 +407,6 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	cutilCheckMsg(__FUNCTION__);
 #endif
 
-	//!!!debugging
-	//bool debugPrint = false;
-	//if (debugPrint) {
-	//	float* h_JtJ = new float[sizeJtJ];
-	//	float* h_Jtr = new float[sizeJtr];
-	//	cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
-	//	cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
-	//	printf("JtJ:\n");
-	//	//for (unsigned int i = 0; i < 6 * N; i++) {
-	//	//	for (unsigned int j = 0; j < 6 * N; j++)
-	//	for (unsigned int i = 6 * 1; i < 6 * 2; i++) {
-	//		for (unsigned int j = 6 * 1; j < 6 * 2; j++)
-	//			printf(" %f,", h_JtJ[j * 6 * N + i]);
-	//		printf("\n");
-	//	}
-	//	printf("Jtr:\n");
-	//	for (unsigned int i = 0; i < 6 * N; i++) {
-	//		printf(" %f,", h_Jtr[i]);
-	//	}
-	//	printf("\n");
-	//}
-	//!!!debugging
 #ifdef PRINT_RESIDUALS_DENSE
 	if (parameters.weightDenseDepth > 0) {
 		float sumResidual; int corrCount;
@@ -448,8 +426,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
-#endif	
-	if (N > 11) printf("built jtj dense\n");
+#endif
 	if (timer) timer->endEvent();
 }
 

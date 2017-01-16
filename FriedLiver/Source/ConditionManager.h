@@ -79,7 +79,6 @@ public:
 #endif
 
 	static void setExit() {
-		std::cout << "set condition manager exit" << std::endl; //debugging only
 		s_exit = true;
 	}
 	static bool shouldExit() {
