@@ -325,14 +325,12 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	const int sizeJtr = 6 * N;
 	const int sizeJtJ = sizeJtr * sizeJtr;
 
-	//!!!debugging
 #ifdef PRINT_RESIDUALS_DENSE
 	cutilSafeCall(cudaMemset(state.d_corrCount, 0, sizeof(int)));
 	cutilSafeCall(cudaMemset(state.d_sumResidual, 0, sizeof(float)));
 	cutilSafeCall(cudaMemset(state.d_corrCountColor, 0, sizeof(int)));
 	cutilSafeCall(cudaMemset(state.d_sumResidualColor, 0, sizeof(float)));
 #endif
-	//!!!debugging
 
 	const unsigned int maxDenseImPairs = input.numberOfImages * (input.numberOfImages - 1) / 2;
 	cutilSafeCall(cudaMemset(state.d_denseCorrCounts, 0, sizeof(float) * maxDenseImPairs));
@@ -365,7 +363,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	}
 	const int reductionGlobal = (input.denseDepthWidth*input.denseDepthHeight + THREADS_PER_BLOCK_DENSE_DEPTH - 1) / THREADS_PER_BLOCK_DENSE_DEPTH;
 	dim3 grid(numOverlapImagePairs, reductionGlobal);
-	//printf("num overlap image pairs = %d\n", numOverlapImagePairs);
+	if (N > 11) printf("num overlap image pairs = %d\n", numOverlapImagePairs); //debugging only
 
 	if (timer) timer->startEvent("BuildDenseDepthSystem - compute im-im weights");
 
@@ -451,7 +449,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif	
-
+	if (N > 11) printf("built jtj dense\n");
 	if (timer) timer->endEvent();
 }
 

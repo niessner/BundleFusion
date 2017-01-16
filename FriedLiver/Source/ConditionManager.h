@@ -68,9 +68,6 @@ public:
 		s_lockBundlerProcessedInput[type].unlock();
 		s_cvBundlerProcessedCheck.notify_one();
 	}
-	static void notifyBundlerProcessedInput() {
-		s_cvBundlerProcessedCheck.notify_one();
-	}
 #else 
 	static void lockImageManagerFrameReady(THREAD_NAME type) {}
 	static void waitImageManagerFrameReady(THREAD_NAME type) {}
@@ -79,10 +76,10 @@ public:
 	static void lockBundlerProcessedInput(THREAD_NAME type) {}
 	static void waitBundlerProcessedInput(THREAD_NAME type) {}
 	static void unlockAndNotifyBundlerProcessedInput(THREAD_NAME type) {}
-	static void notifyBundlerProcessedInput() {}
 #endif
 
 	static void setExit() {
+		std::cout << "set condition manager exit" << std::endl; //debugging only
 		s_exit = true;
 	}
 	static bool shouldExit() {

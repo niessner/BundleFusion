@@ -244,92 +244,92 @@ LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, boo
 /*
 void DumpinputManagerData(const std::string& filename)
 {
-	TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
-	unsigned int numFrames = g_depthSensingBundler->getNumProcessedFrames();
-	numFrames = std::min(numFrames, (unsigned int)tm->getFrames().size());
-	numFrames = std::min(numFrames, (unsigned int)g_CudaImageManager->getCurrFrameNumber() + 1);
+TrajectoryManager* tm = g_depthSensingBundler->getTrajectoryManager();
+unsigned int numFrames = g_depthSensingBundler->getNumProcessedFrames();
+numFrames = std::min(numFrames, (unsigned int)tm->getFrames().size());
+numFrames = std::min(numFrames, (unsigned int)g_CudaImageManager->getCurrFrameNumber() + 1);
 
-	if (numFrames == 0) return;
+if (numFrames == 0) return;
 
-	std::string folder = util::directoryFromPath(filename);
-	if (!util::directoryExists(folder)) {
-		util::makeDirectory(folder);
-	}
+std::string folder = util::directoryFromPath(filename);
+if (!util::directoryExists(folder)) {
+util::makeDirectory(folder);
+}
 
-	std::string actualFilename = filename;
-	while (util::fileExists(actualFilename)) {
-		std::string path = util::directoryFromPath(actualFilename);
-		std::string curr = util::fileNameFromPath(actualFilename);
-		std::string ext = util::getFileExtension(curr);
-		curr = util::removeExtensions(curr);
-		std::string base = util::getBaseBeforeNumericSuffix(curr);
-		unsigned int num = util::getNumericSuffix(curr);
-		if (num == (unsigned int)-1) {
-			num = 0;
-		}
-		actualFilename = path + base + std::to_string(num + 1) + "." + ext;
-	}
+std::string actualFilename = filename;
+while (util::fileExists(actualFilename)) {
+std::string path = util::directoryFromPath(actualFilename);
+std::string curr = util::fileNameFromPath(actualFilename);
+std::string ext = util::getFileExtension(curr);
+curr = util::removeExtensions(curr);
+std::string base = util::getBaseBeforeNumericSuffix(curr);
+unsigned int num = util::getNumericSuffix(curr);
+if (num == (unsigned int)-1) {
+num = 0;
+}
+actualFilename = path + base + std::to_string(num + 1) + "." + ext;
+}
 
-	CalibratedSensorData cs;
-	cs.m_DepthImageWidth = g_CudaImageManager->getIntegrationWidth();
-	cs.m_DepthImageHeight = g_CudaImageManager->getIntegrationHeight();
-	cs.m_ColorImageWidth = g_CudaImageManager->getIntegrationWidth();
-	cs.m_ColorImageHeight = g_CudaImageManager->getIntegrationHeight();
-	cs.m_DepthNumFrames = numFrames;
-	cs.m_ColorNumFrames = numFrames;
+CalibratedSensorData cs;
+cs.m_DepthImageWidth = g_CudaImageManager->getIntegrationWidth();
+cs.m_DepthImageHeight = g_CudaImageManager->getIntegrationHeight();
+cs.m_ColorImageWidth = g_CudaImageManager->getIntegrationWidth();
+cs.m_ColorImageHeight = g_CudaImageManager->getIntegrationHeight();
+cs.m_DepthNumFrames = numFrames;
+cs.m_ColorNumFrames = numFrames;
 
-	cs.m_CalibrationDepth.m_Intrinsic = g_CudaImageManager->getDepthIntrinsics();
-	cs.m_CalibrationDepth.m_Extrinsic = g_CudaImageManager->getDepthExtrinsics();
-	cs.m_CalibrationDepth.m_IntrinsicInverse = g_CudaImageManager->getDepthIntrinsicsInv();
-	cs.m_CalibrationDepth.m_ExtrinsicInverse = g_CudaImageManager->getDepthExtrinsicsInv();
-	if (GlobalAppState::get().s_bUseCameraCalibration) {
-		cs.m_CalibrationDepth.m_Intrinsic = g_CudaImageManager->getColorIntrinsics();
-		cs.m_CalibrationDepth.m_IntrinsicInverse = g_CudaImageManager->getColorIntrinsicsInv();
-	}
+cs.m_CalibrationDepth.m_Intrinsic = g_CudaImageManager->getDepthIntrinsics();
+cs.m_CalibrationDepth.m_Extrinsic = g_CudaImageManager->getDepthExtrinsics();
+cs.m_CalibrationDepth.m_IntrinsicInverse = g_CudaImageManager->getDepthIntrinsicsInv();
+cs.m_CalibrationDepth.m_ExtrinsicInverse = g_CudaImageManager->getDepthExtrinsicsInv();
+if (GlobalAppState::get().s_bUseCameraCalibration) {
+cs.m_CalibrationDepth.m_Intrinsic = g_CudaImageManager->getColorIntrinsics();
+cs.m_CalibrationDepth.m_IntrinsicInverse = g_CudaImageManager->getColorIntrinsicsInv();
+}
 
-	cs.m_CalibrationColor.m_Intrinsic = g_CudaImageManager->getColorIntrinsics();
-	cs.m_CalibrationColor.m_Extrinsic = g_CudaImageManager->getDepthExtrinsics();
-	cs.m_CalibrationColor.m_IntrinsicInverse = g_CudaImageManager->getColorIntrinsicsInv();
-	cs.m_CalibrationColor.m_ExtrinsicInverse = g_CudaImageManager->getDepthExtrinsicsInv();
+cs.m_CalibrationColor.m_Intrinsic = g_CudaImageManager->getColorIntrinsics();
+cs.m_CalibrationColor.m_Extrinsic = g_CudaImageManager->getDepthExtrinsics();
+cs.m_CalibrationColor.m_IntrinsicInverse = g_CudaImageManager->getColorIntrinsicsInv();
+cs.m_CalibrationColor.m_ExtrinsicInverse = g_CudaImageManager->getDepthExtrinsicsInv();
 
-	cs.m_DepthImages.resize(cs.m_DepthNumFrames);
-	cs.m_ColorImages.resize(cs.m_ColorNumFrames);
-	cs.m_trajectory.resize(cs.m_DepthNumFrames);
+cs.m_DepthImages.resize(cs.m_DepthNumFrames);
+cs.m_ColorImages.resize(cs.m_ColorNumFrames);
+cs.m_trajectory.resize(cs.m_DepthNumFrames);
 
-	tm->lockUpdateTransforms();
-	for (unsigned int i = 0; i < numFrames; i++) {
-		const float* depth = g_CudaImageManager->getIntegrateFrame(i).getDepthFrameCPU();
-		const uchar4* color = g_CudaImageManager->getIntegrateFrame(i).getColorFrameCPU();
+tm->lockUpdateTransforms();
+for (unsigned int i = 0; i < numFrames; i++) {
+const float* depth = g_CudaImageManager->getIntegrateFrame(i).getDepthFrameCPU();
+const uchar4* color = g_CudaImageManager->getIntegrateFrame(i).getColorFrameCPU();
 
-		cs.m_DepthImages[i] = (float*)depth;	// this non-const cast is hacky
-		cs.m_ColorImages[i] = (vec4uc*)color;	// this non-const cast is hacky
+cs.m_DepthImages[i] = (float*)depth;	// this non-const cast is hacky
+cs.m_ColorImages[i] = (vec4uc*)color;	// this non-const cast is hacky
 
-		const auto&f = tm->getFrames()[i];
-		if (f.type == TrajectoryManager::TrajectoryFrame::Invalid) {
-			assert(f.frameIdx == i);
-			for (unsigned int k = 0; k < 16; k++) {
-				cs.m_trajectory[i][k] = -std::numeric_limits<float>::infinity();
-			}
-		}
-		else {
-			cs.m_trajectory[i] = f.optimizedTransform;
-		}
-	}
-	tm->unlockUpdateTransforms();
+const auto&f = tm->getFrames()[i];
+if (f.type == TrajectoryManager::TrajectoryFrame::Invalid) {
+assert(f.frameIdx == i);
+for (unsigned int k = 0; k < 16; k++) {
+cs.m_trajectory[i][k] = -std::numeric_limits<float>::infinity();
+}
+}
+else {
+cs.m_trajectory[i] = f.optimizedTransform;
+}
+}
+tm->unlockUpdateTransforms();
 
-	std::cout << cs << std::endl;
-	std::cout << "dumping recorded frames (" << numFrames << ")... ";
+std::cout << cs << std::endl;
+std::cout << "dumping recorded frames (" << numFrames << ")... ";
 
-	BinaryDataStreamFile outStream(actualFilename, true);
-	//BinaryDataStreamZLibFile outStream(filename, true);
-	outStream << cs;
-	std::cout << "done" << std::endl;
+BinaryDataStreamFile outStream(actualFilename, true);
+//BinaryDataStreamZLibFile outStream(filename, true);
+outStream << cs;
+std::cout << "done" << std::endl;
 
-	//make sure we don't accidentally delete the data that doesn't belong to us
-	for (unsigned int i = 0; i < numFrames; i++) {
-		cs.m_DepthImages[i] = NULL;
-		cs.m_ColorImages[i] = NULL;
-	}
+//make sure we don't accidentally delete the data that doesn't belong to us
+for (unsigned int i = 0; i < numFrames; i++) {
+cs.m_DepthImages[i] = NULL;
+cs.m_ColorImages[i] = NULL;
+}
 }
 */
 void StopScanningAndExtractIsoSurfaceMC(const std::string& filename, bool overwriteExistingFile /*= false*/)
@@ -945,7 +945,8 @@ void StopScanningAndExit(bool aborted = false)
 		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile) + "_fried.sens", trajectory); //overwrite the original file
 		//save ply
 		std::cout << "[marching cubes] ";
-		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
+		//StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
+		StopScanningAndExtractIsoSurfaceMC("debug/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile)) + ".ply", true);
 		std::cout << "done!" << std::endl;
 		//write out confirmation file
 		std::ofstream s(util::directoryFromPath(GlobalAppState::get().s_binaryDumpSensorFile) + "processed.txt");
@@ -987,21 +988,21 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	///////////////////////////////////////
 #ifdef RUN_MULTITHREADED
 	ConditionManager::lockImageManagerFrameReady(ConditionManager::Recon);
-	while (g_CudaImageManager->hasBundlingFrameRdy()) {
+	while (g_CudaImageManager->hasBundlingFrameRdy()) { //wait until bundling is done with previous frame
 		ConditionManager::waitImageManagerFrameReady(ConditionManager::Recon);
 	}
+	std::cout << "done recon waitImageManagerFrameReady" << std::endl; //debugging only
 	bool bGotDepth = g_CudaImageManager->process();
 	if (bGotDepth) {
 		g_CudaImageManager->setBundlingFrameRdy();					//ready for bundling thread
 		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
 	}
-	if (!g_depthSensingRGBDSensor->isReceivingFrames()) {
-		if (!bGotDepth) {
-			g_CudaImageManager->setBundlingFrameRdy();				// let bundling still optimize after scanning done
-			ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
-		}
-		g_depthSensingBundler->confirmProcessedInputFrame();	// let bundling still optimize after scanning done
-		ConditionManager::notifyBundlerProcessedInput();
+	if (!g_depthSensingRGBDSensor->isReceivingFrames()) { //sequence is done
+		if (bGotDepth) throw MLIB_EXCEPTION("ERROR bGotDepth = true but sequence is done");
+
+		g_CudaImageManager->setBundlingFrameRdy();				// let bundling still optimize after scanning done
+		ConditionManager::unlockAndNotifyImageManagerFrameReady(ConditionManager::Recon);
+		std::cout << "done recon setBundlingFrameRdy" << std::endl; //debugging only
 	}
 #else
 	bool bGotDepth = g_CudaImageManager->process();
@@ -1016,12 +1017,18 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeReIntegrate = t.getElapsedTimeMS(); }
 
 
-	//wait until the bundling thread is done with: sift extraction, sift matching, and key point filtering
 #ifdef RUN_MULTITHREADED
-	if (bGotDepth) {
-		ConditionManager::lockBundlerProcessedInput(ConditionManager::Recon);
-		while (!g_depthSensingBundler->hasProcssedInputFrame()) ConditionManager::waitBundlerProcessedInput(ConditionManager::Recon);
-		//while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
+	//wait until the bundling thread is done with: sift extraction, sift matching, and key point filtering
+	//if (bGotDepth) {
+	ConditionManager::lockBundlerProcessedInput(ConditionManager::Recon);
+	while (!g_depthSensingBundler->hasProcssedInputFrame()) ConditionManager::waitBundlerProcessedInput(ConditionManager::Recon);
+	std::cout << "done recon waitBundlerProcessedInput" << std::endl; //debugging only
+	//while (!g_depthSensingBundler->hasProcssedInputFrame()) Sleep(0);
+	//}
+	if (!g_depthSensingRGBDSensor->isReceivingFrames()) { // let bundling still optimize after scanning done
+		g_depthSensingBundler->confirmProcessedInputFrame();
+		ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Recon);
+		std::cout << "done recon confirmProcessedInputFrame" << std::endl; //debugging only
 	}
 #endif
 
@@ -1035,8 +1042,10 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 		unsigned int frameIdx;
 		validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);
 #ifdef RUN_MULTITHREADED
+		//allow bundler to process new frame
 		g_depthSensingBundler->confirmProcessedInputFrame();
 		ConditionManager::unlockAndNotifyBundlerProcessedInput(ConditionManager::Recon);
+		std::cout << "done recon confirmProcessedInputFrame" << std::endl; //debugging only
 #endif
 
 		if (GlobalAppState::get().s_binaryDumpSensorUseTrajectory && GlobalAppState::get().s_sensorIdx == 3) {
