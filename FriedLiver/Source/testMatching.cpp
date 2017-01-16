@@ -514,7 +514,7 @@ void TestMatching::loadFromSensor(const std::string& sensorFile, const std::stri
 	{
 		BinaryDataStreamFile s(sensorFile, false);
 		s >> cs;
-		s.closeStream();
+		s.close();
 	}
 	if (!trajectoryFile.empty()) {
 		BinaryDataStreamFile s(trajectoryFile, false);
@@ -581,7 +581,7 @@ void TestMatching::loadFromSensor(const std::string& sensorFile, const std::stri
 
 		BinaryDataStreamFile s("debug/debug.sensor", true);
 		s << cs;
-		s.closeStream();
+		s.close();
 		std::cout << "done!" << std::endl;
 	}
 
@@ -695,8 +695,8 @@ void TestMatching::recordKeysMeshData(MeshDataf& keys0, MeshDataf& keys1, const 
 	std::vector<vec3f> srcPts(numMatches), tgtPts(numMatches);
 	getSrcAndTgtPts(keys.data(), matchKeyIndices.data(), numMatches, (float3*)srcPts.data(), (float3*)tgtPts.data(), MatrixConversion::toCUDA(m_colorCalibration.m_IntrinsicInverse));
 	for (unsigned int i = 0; i < numMatches; i++) {
-		keys0.merge(Shapesf::sphere(radius, m_referenceTrajectory[imageIndices.x] * srcPts[i], 10, 10, color0).getMeshData());
-		keys1.merge(Shapesf::sphere(radius, m_referenceTrajectory[imageIndices.y] * tgtPts[i], 10, 10, color1).getMeshData());
+		keys0.merge(Shapesf::sphere(radius, m_referenceTrajectory[imageIndices.x] * srcPts[i], 10, 10, color0).computeMeshData());
+		keys1.merge(Shapesf::sphere(radius, m_referenceTrajectory[imageIndices.y] * tgtPts[i], 10, 10, color1).computeMeshData());
 	}
 }
 
@@ -1502,10 +1502,10 @@ void TestMatching::analyzeLocalOpts()
 	if (util::getFileExtension(test0File) == "sensor") {
 		CalibratedSensorData cs;
 		BinaryDataStreamFile s(test0File, false);
-		s >> cs; s.closeStream();
+		s >> cs; s.close();
 		test0Trajectory = cs.m_trajectory;
 		BinaryDataStreamFile sout("debug/test0.trajectory", true);
-		sout << test0Trajectory; sout.closeStream();
+		sout << test0Trajectory; sout.close();
 	}
 	else {
 		BinaryDataStreamFile s(test0File, false);
@@ -1514,10 +1514,10 @@ void TestMatching::analyzeLocalOpts()
 	if (util::getFileExtension(test1File) == "sensor") {
 		CalibratedSensorData cs;
 		BinaryDataStreamFile s(test1File, false);
-		s >> cs; s.closeStream();
+		s >> cs; s.close();
 		test1Trajectory = cs.m_trajectory;
 		BinaryDataStreamFile sout("debug/test1.trajectory", true);
-		sout << test1Trajectory; sout.closeStream();
+		sout << test1Trajectory; sout.close();
 	}
 	else {
 		BinaryDataStreamFile s(test1File, false);
@@ -1526,10 +1526,10 @@ void TestMatching::analyzeLocalOpts()
 	if (util::getFileExtension(refFile) == "sensor") {
 		CalibratedSensorData cs;
 		BinaryDataStreamFile s(refFile, false);
-		s >> cs; s.closeStream();
+		s >> cs; s.close();
 		referenceTrajectory = cs.m_trajectory;
 		BinaryDataStreamFile sout("debug/ref.trajectory", true);
-		sout << referenceTrajectory; sout.closeStream();
+		sout << referenceTrajectory; sout.close();
 	}
 	else {
 		BinaryDataStreamFile s(refFile, false);
@@ -1659,10 +1659,10 @@ void TestMatching::testGlobalDense()
 
 		CalibratedSensorData cs;
 		BinaryDataStreamFile s(origFile, false);
-		s >> cs; s.closeStream();
+		s >> cs; s.close();
 		BinaryDataStreamFile o("debug/ref_" + whichRef + ".bin", true);
 		o << cs.m_trajectory;
-		o.closeStream();
+		o.close();
 
 		std::cout << "depth intrinsics:" << std::endl << cs.m_CalibrationDepth.m_Intrinsic << std::endl;
 		std::cout << "color intrinsics:" << std::endl << cs.m_CalibrationColor.m_Intrinsic << std::endl;
@@ -1866,7 +1866,7 @@ void TestMatching::testGlobalDense()
 		BinaryDataStreamFile s("debug/opt.bin", true);
 		s << trajectoryKeys;
 		s << trajectoryAll;
-		s.closeStream();
+		s.close();
 	}
 
 	if (writeSensorFile) {
@@ -2102,7 +2102,7 @@ void TestMatching::loadCachedFramesFromSensor(CUDACache* cache, const std::strin
 	{
 		BinaryDataStreamFile s(filename, false);
 		s >> cs;
-		s.closeStream();
+		s.close();
 	}
 	if (numFrames == (unsigned int)-1) numFrames = cs.m_DepthNumFrames / skip;
 
@@ -2384,7 +2384,7 @@ void TestMatching::debug()
 
 	std::vector<mat4f> keysTrajectory;
 	BinaryDataStreamFile sTraj(trajFile, false);
-	sTraj >> keysTrajectory; sTraj.closeStream();
+	sTraj >> keysTrajectory; sTraj.close();
 	//for (unsigned int i = 0; i < completeTrajectory.size(); i += submapSize) keysTrajectory.push_back(completeTrajectory[i]);
 
 	m_siftManager->loadFromFile(siftFile);

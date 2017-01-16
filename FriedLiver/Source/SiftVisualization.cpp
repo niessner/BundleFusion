@@ -594,11 +594,11 @@ void SiftVisualization::saveCamerasToPLY(const std::string& filename, const std:
 		if (t._m00 != -std::numeric_limits<float>::infinity()) {
 			const vec3f color = BaseImageHelper::convertDepthToRGB((float)i, 0.0f, (float)trajectory.size());
 			const vec3f eye = t.getTranslation();
-			MeshDataf eyeMesh = Shapesf::sphere(radius, eye, 10, 10, vec4f(color, 1.0f)).getMeshData();
+			MeshDataf eyeMesh = Shapesf::sphere(radius, eye, 10, 10, vec4f(color, 1.0f)).computeMeshData();
 			meshData.merge(eyeMesh);
 			if (printDir) {
-				MeshDataf upMesh = Shapesf::cylinder(eye, eye + t.getRotation() * up, radius, 10, 10, vec4f(0.0f, 0.0f, 1.0f, 1.0f)).getMeshData(); // blue for up
-				MeshDataf lookMesh = Shapesf::cylinder(eye, eye + t.getRotation() * look, radius, 10, 10, vec4f(1.0f, 0.0f, 1.0f, 0.0f)).getMeshData(); // red for look
+				MeshDataf upMesh = Shapesf::cylinder(eye, eye + t.getRotation() * up, radius, 10, 10, vec4f(0.0f, 0.0f, 1.0f, 1.0f)).computeMeshData(); // blue for up
+				MeshDataf lookMesh = Shapesf::cylinder(eye, eye + t.getRotation() * look, radius, 10, 10, vec4f(1.0f, 0.0f, 1.0f, 0.0f)).computeMeshData(); // red for look
 				meshData.merge(upMesh);
 				meshData.merge(lookMesh);
 			}
@@ -619,8 +619,8 @@ void SiftVisualization::saveKeyMatchToPointCloud(const std::string& filename, co
 	vec4f curColor(0.0f, 0.0f, 1.0f, 1.0f); // blue
 
 	const float radius = 0.02f;
-	MeshDataf prv = Shapesf::sphere(radius, prvPos, 10, 10, prvColor).getMeshData();
-	MeshDataf cur = Shapesf::sphere(radius, curPos, 10, 10, curColor).getMeshData();
+	MeshDataf prv = Shapesf::sphere(radius, prvPos, 10, 10, prvColor).computeMeshData();
+	MeshDataf cur = Shapesf::sphere(radius, curPos, 10, 10, curColor).computeMeshData();
 
 	meshData.merge(prv);
 	meshData.merge(cur);
@@ -787,8 +787,8 @@ void SiftVisualization::saveKeyMatchToPointCloud(const std::string& prefix, cons
 	MeshDataf keysMesh0, keysMesh1;
 	for (unsigned int i = 0; i < keys0.size(); i++) {
 		const vec3f color = BaseImageHelper::convertDepthToRGB(res[i].length(), 0.0f, 0.2f);//vec3f(RGBColor::randomColor());
-		keysMesh0.merge(Shapesf::sphere(radius, trajectory[imageIndices.x] * keys0[i], 10, 10, vec4f(color)).getMeshData());
-		keysMesh1.merge(Shapesf::sphere(radius, trajectory[imageIndices.y] * keys1[i], 10, 10, vec4f(color)).getMeshData());
+		keysMesh0.merge(Shapesf::sphere(radius, trajectory[imageIndices.x] * keys0[i], 10, 10, vec4f(color)).computeMeshData());
+		keysMesh1.merge(Shapesf::sphere(radius, trajectory[imageIndices.y] * keys1[i], 10, 10, vec4f(color)).computeMeshData());
 	}
 	std::ofstream s(prefix + "-residuals.txt");
 	for (unsigned int i = 0; i < res.size(); i++) s << res[i] << std::endl;

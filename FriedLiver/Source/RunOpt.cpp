@@ -30,7 +30,7 @@ void RunOpt::run(const std::string& sensFile, const std::string& siftFile, const
 	std::cout << "loading trajectory from file... ";
 	std::vector<mat4f> trajectory;
 	BinaryDataStreamFile s(trajectoryFile, false);
-	s >> trajectory; s.closeStream();
+	s >> trajectory; s.close();
 	std::cout << "done!" << std::endl;
 	MLIB_ASSERT(trajectory.size() == numKeys);
 

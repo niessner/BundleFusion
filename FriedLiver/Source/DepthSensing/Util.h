@@ -88,7 +88,7 @@ namespace Util
 		s >> numChannels;
 		float * result = new float[numChannels*width*height];
 		s.readData((BYTE*)result, width*height*sizeof(float)*numChannels);
-		s.closeStream();
+		s.close();
 		return result;
 	}
 
@@ -98,7 +98,7 @@ namespace Util
 		s >> size;
 		float * result = new float[size];
 		s.readData((BYTE*)result, size*sizeof(float));
-		s.closeStream();
+		s.close();
 		return result;
 	}
 
@@ -111,7 +111,7 @@ namespace Util
 		BinaryDataStreamFile s(filename, true);
 		s << width << height << 4;
 		s.writeData((BYTE*)h_buffer, size*sizeof(float)*4);
-		s.closeStream();
+		s.close();
 
 		SAFE_DELETE_ARRAY(h_buffer);
 	}

@@ -23,15 +23,15 @@ class DX11PhongLighting
 
 			void SetDefault() {
 				// default light settings
-				lightAmbient		= D3DXVECTOR4(GlobalAppState::get().s_lightAmbient .ptr());
-				lightDiffuse		= D3DXVECTOR4(GlobalAppState::get().s_lightDiffuse.ptr());
-				lightSpecular		= D3DXVECTOR4(GlobalAppState::get().s_lightSpecular.ptr());
-				lightDirection		= D3DXVECTOR3(GlobalAppState::get().s_lightDirection.ptr());
+				lightAmbient		= D3DXVECTOR4(GlobalAppState::get().s_lightAmbient.getData());
+				lightDiffuse		= D3DXVECTOR4(GlobalAppState::get().s_lightDiffuse.getData());
+				lightSpecular		= D3DXVECTOR4(GlobalAppState::get().s_lightSpecular.getData());
+				lightDirection		= D3DXVECTOR3(GlobalAppState::get().s_lightDirection.getData());
 
 
-				materialAmbient   = D3DXVECTOR4(GlobalAppState::get().s_materialAmbient.ptr());
-				materialSpecular  = D3DXVECTOR4(GlobalAppState::get().s_materialSpecular.ptr());
-				materialDiffuse	  = D3DXVECTOR4(GlobalAppState::get().s_materialDiffuse.ptr());
+				materialAmbient   = D3DXVECTOR4(GlobalAppState::get().s_materialAmbient.getData());
+				materialSpecular  = D3DXVECTOR4(GlobalAppState::get().s_materialSpecular.getData());
+				materialDiffuse	  = D3DXVECTOR4(GlobalAppState::get().s_materialDiffuse.getData());
 				materialShininess = GlobalAppState::get().s_materialShininess;
 			}
 		};

@@ -82,7 +82,7 @@ public:
 			s << intensityDerivative;
 			s << intensityOrig;
 		}
-		s.closeStream();
+		s.close();
 	}
 	//! warning: untested!
 	void loadFromFile(const std::string& filename) {
@@ -127,7 +127,7 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_intensityDerivsDownsampled, intensityDerivative.getData(), sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyHostToDevice));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_normalsDownsampledUCHAR4, intensityOrig.getData(), sizeof(float)*intensityOrig.getNumPixels(), cudaMemcpyHostToDevice));
 		}
-		s.closeStream();
+		s.close();
 	}
 
 	//!debugging only

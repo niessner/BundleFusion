@@ -463,7 +463,7 @@ public:
 			}
 		}
 
-		outStream.closeStream();
+		outStream.close();
 
 
 		unsigned int nStreamedBlocks;
@@ -491,7 +491,7 @@ public:
 			m_grid[index] = new ChunkDesc(m_initialChunkDescListSize);
 			inStream >> *m_grid[index];
 		}
-		inStream.closeStream();
+		inStream.close();
 
 		startMultiThreading();
 	}

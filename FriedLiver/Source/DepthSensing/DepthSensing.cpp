@@ -522,7 +522,7 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 				if (GlobalAppState::get().s_sensorIdx == 3) ((BinaryDumpReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
 				else										((SensorDataReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
 				BinaryDataStreamFile s("debug/opt.trajectory", true);
-				s << trajectory; s.closeStream();
+				s << trajectory; s.close();
 				std::cout << "press key to continue" << std::endl; getchar();
 			}
 			else {
@@ -945,8 +945,8 @@ void StopScanningAndExit(bool aborted = false)
 		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile) + "_fried.sens", trajectory); //overwrite the original file
 		//save ply
 		std::cout << "[marching cubes] ";
-		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
-		//StopScanningAndExtractIsoSurfaceMC("debug/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile)) + ".ply", true);
+		//StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
+		StopScanningAndExtractIsoSurfaceMC("debug/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile)) + ".ply", true);
 		std::cout << "done!" << std::endl;
 		//write out confirmation file
 		std::ofstream s(util::directoryFromPath(GlobalAppState::get().s_binaryDumpSensorFile) + "processed.txt");
@@ -1458,10 +1458,10 @@ void renderFrustum(const mat4f& transform, const mat4f& cameraMatrix, const vec4
 	float radius = 0.01f;
 	for (auto& line : frustum) {
 		auto triMesh = ml::Shapesf::cylinder(line.p0(), line.p1(), radius, 10, 10, color);
-		debugMesh.merge(triMesh.getMeshData());
+		debugMesh.merge(triMesh.computeMeshData());
 
 		ml::D3D11TriMesh renderLine;
-		renderLine.load(g, triMesh);
+		renderLine.init(g, triMesh);
 
 		g.getShaderManager().bindShaders("defaultBasic");
 		renderLine.render();

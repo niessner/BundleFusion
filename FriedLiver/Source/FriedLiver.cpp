@@ -233,8 +233,8 @@ int main(int argc, char** argv)
 			std::cout << "Overwriting s_binaryDumpSensorFile; now set to " << filename << std::endl;
 
 			//redirect stdout to file
-			out.open(util::removeExtensions(filename) + ".friedliver.log");
-			//out.open("debug/" + util::removeExtensions(util::fileNameFromPath(filename)) + ".friedliver.log");
+			//out.open(util::removeExtensions(filename) + ".friedliver.log");
+			out.open("debug/" + util::removeExtensions(util::fileNameFromPath(filename)) + ".friedliver.log");
 			if (!out.is_open()) throw MLIB_EXCEPTION("unable to open log file " + util::removeExtensions(filename) + ".friedliver.log");
 			//std::streambuf *coutbuf = std::cout.rdbuf(); //save old buf
 			std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!

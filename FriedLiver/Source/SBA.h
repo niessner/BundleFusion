@@ -70,7 +70,7 @@ public:
 		BinaryDataStreamFile s(prefix + ".bin", true);
 		s << _logRemovedImImCorrs.size();
 		if (!_logRemovedImImCorrs.empty()) s.writeData((const BYTE*)_logRemovedImImCorrs.data(), sizeof(std::pair<vec2ui, float>)*_logRemovedImImCorrs.size());
-		s.closeStream();
+		s.close();
 
 		// human readable version
 		std::ofstream os(prefix + ".txt");
