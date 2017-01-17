@@ -52,6 +52,9 @@ public:
 	unsigned int tryRevalidation(unsigned int curGlobalFrame, bool bIsScanDone);
 	unsigned int getRevalidatedIdx() const { return m_revalidatedIdx; }
 
+
+	// -- various logging
+	void saveSparseCorrsToFile(const std::string& filename) const;
 	//TODO logging for residual information
 
 private:

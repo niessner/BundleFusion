@@ -447,3 +447,8 @@ void OnlineBundler::process(unsigned int numNonLinItersLocal, unsigned int numLi
 	//	m_state.m_processState = BundlerState::DO_NOTHING;
 	//}
 }
+
+void OnlineBundler::saveGlobalSparseCorrsToFile(const std::string& filename) const
+{
+	m_global->saveSparseCorrsToFile(filename);
+}

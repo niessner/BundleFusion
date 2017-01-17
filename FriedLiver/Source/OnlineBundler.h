@@ -30,6 +30,9 @@ public:
 
 	unsigned int getCurrProcessedFrame() const	{ return m_state.m_lastFrameProcessed; }
 
+	// -- various logging
+	void saveGlobalSparseCorrsToFile(const std::string& filename) const;
+
 private:
 
 	bool isLastLocalFrame(unsigned int curFrame) const { return (curFrame >= m_submapSize && (curFrame % m_submapSize) == 0); }

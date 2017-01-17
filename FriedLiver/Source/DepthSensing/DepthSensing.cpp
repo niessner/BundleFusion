@@ -463,11 +463,9 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 		{
 			if (GlobalBundlingState::get().s_enableGlobalTimings || GlobalBundlingState::get().s_enablePerFrameTimings) TimingLog::printAllTimings();
 			else std::cout << "Cannot print timings: enable \"s_enableGlobalTimings\" or \"s_enablePerFrameTimings\" in parameter file" << std::endl;
-		}
-		break;
+		} break;
 		case '6':
-			//DumpinputManagerData("./dump/dump.sensor");
-			//std::cout << "press 8" << std::endl;
+			GlobalAppState::get().s_timingsTotalEnabled = !GlobalAppState::get().s_timingsTotalEnabled;
 			break;
 		case '7':
 			g_depthSensingRGBDSensor->stopReceivingFrames();
@@ -486,24 +484,21 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 			else {
 				std::cout << "Cannot save recording: enable \"s_recordData\" in parameter file" << std::endl;
 			}
-			break;
-		}
-		break;
+		} break;
 		case '9':
 			StopScanningAndExtractIsoSurfaceMC();
-			//g_depthSensingBundler->saveGlobalSiftManagerAndCacheToFile("debug/_logs/global"); //debugging only
-			//g_depthSensingBundler->saveCompleteTrajectory("debug/_logs/complete.trajectory");
-			break;
-		case '0':
-			DX11PhongLighting::OnD3D11DestroyDevice();
-			DX11PhongLighting::OnD3D11CreateDevice(DXUTGetD3D11Device(), DX11PhongLighting::getWidth(), DX11PhongLighting::getHeight());
 			break;
 		case 'T':
 			GlobalAppState::get().s_timingsDetailledEnabled = !GlobalAppState::get().s_timingsDetailledEnabled;
 			break;
-		case 'Z':
-			GlobalAppState::get().s_timingsTotalEnabled = !GlobalAppState::get().s_timingsTotalEnabled;
-			break;
+		case 'Z': //save out correspondences and trajectory
+		{
+			g_depthSensingBundler->saveGlobalSparseCorrsToFile(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".corrs");
+			std::vector<mat4f> trajectory; g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+			BinaryDataStreamFile s(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".traj", true);
+			s << trajectory; s.close();
+			std::cout << "saved trajectory and sparse global corrs" << std::endl;
+		} break;
 		case 'R':
 			ResetDepthSensing();
 			break;
@@ -526,19 +521,16 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 				std::cout << "press key to continue" << std::endl; getchar();
 			}
 			else {
-				std::cout << "Cannot evaluate trajectory (sensorIdx != 3)" << std::endl;
+				std::cout << "Cannot evaluate trajectory (need sensorIdx == 3 or sensorIdx == 8)" << std::endl;
 			}
-		}
+		} break;
 		case 'C':
 		{
-			if (GlobalAppState::get().s_sensorIdx == 8) {
-				std::vector<mat4f> trajectory;
-				g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
-				unsigned int numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);
-				std::cout << "#opt transforms = " << numValidTransforms << " of " << trajectory.size() << std::endl;
-			}
-		}
-		break;
+			std::vector<mat4f> trajectory;
+			g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+			unsigned int numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);
+			std::cout << "#opt transforms = " << numValidTransforms << " of " << trajectory.size() << std::endl;
+		} break;
 		case 'N':
 			StopScanningAndSaveSDFHash("test.hash");
 			break;
@@ -550,7 +542,7 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 			GlobalAppState::get().s_integrationEnabled = !GlobalAppState::get().s_integrationEnabled;
 			if (GlobalAppState::get().s_integrationEnabled)		std::cout << "integration enabled" << std::endl;
 			else std::cout << "integration disabled" << std::endl;
-		}
+		} break;
 
 		default:
 			break;
@@ -945,8 +937,8 @@ void StopScanningAndExit(bool aborted = false)
 		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile) + "_fried.sens", trajectory); //overwrite the original file
 		//save ply
 		std::cout << "[marching cubes] ";
-		//StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
-		StopScanningAndExtractIsoSurfaceMC("debug/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile)) + ".ply", true);
+		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
+		//StopScanningAndExtractIsoSurfaceMC("debug/" + util::removeExtensions(util::fileNameFromPath(GlobalAppState::get().s_binaryDumpSensorFile)) + ".ply", true);
 		std::cout << "done!" << std::endl;
 		//write out confirmation file
 		std::ofstream s(util::directoryFromPath(GlobalAppState::get().s_binaryDumpSensorFile) + "processed.txt");

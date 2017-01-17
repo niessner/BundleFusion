@@ -364,3 +364,18 @@ void Bundler::fuseToGlobal(Bundler* glob)
 	//m_cudaCache->fuseDepthFrames(glob->m_cudaCache, m_siftManager->getValidImagesGPU(), d_trajectory); //valid images have been updated in the solve
 }
 
+void Bundler::saveSparseCorrsToFile(const std::string& filename) const
+{
+	UINT64 numCorrs = (UINT64)m_siftManager->getNumGlobalCorrespondences();
+	std::vector<EntryJ> corrs(numCorrs);
+	if (corrs.empty()) {
+		std::cout << "warning: no sparse correspondences to save" << std::endl;
+		return;
+	}
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(corrs.data(), m_siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*numCorrs, cudaMemcpyDeviceToHost));
+	BinaryDataStreamFile s(filename, true);
+	s << (UINT64)corrs.size();
+	s.writeData((const BYTE*)corrs.data(), sizeof(EntryJ)*numCorrs);
+	s.close();
+}
+
