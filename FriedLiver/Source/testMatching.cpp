@@ -820,12 +820,15 @@ void TestMatching::createCachedFrames()
 		}
 		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(d_helperCamPos, d_depth, MatrixConversion::toCUDA(m_intrinsicsDownsampled.getInverse()), m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_cameraposDownsampled, width, height, d_helperCamPos, m_widthDepth, m_heightDepth);
-
+#ifdef CUDACACHE_UCHAR_NORMALS
+		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
+		CUDAImageUtil::resampleFloat4(d_helperCamPos, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
+		CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, d_helperCamPos, width, height);
+#else
 		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
-
-		CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, width, height);
-
+		//CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, width, height);
+#endif
 		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 
 		CUDAImageUtil::resampleToIntensity(d_filterHelperDown, width, height, d_color, m_widthSift, m_heightSift);
@@ -1376,22 +1379,22 @@ void TestMatching::printCacheFrames(const std::string& dir, const CUDACache* cac
 	for (unsigned int i = 0; i < numPrint; i++) {
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(depthImage.getData(), cachedFrames[i].d_depthDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPosImage.getData(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
-		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getData(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityImage.getData(), cachedFrames[i].d_intensityDownsampled, sizeof(float)*width*height, cudaMemcpyDeviceToHost));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivImage.getData(), cachedFrames[i].d_intensityDerivsDownsampled, sizeof(float2)*width*height, cudaMemcpyDeviceToHost));
 		intensityImage.setInvalidValue(-std::numeric_limits<float>::infinity());
 		dx.setInvalidValue(-std::numeric_limits<float>::infinity());
 		dy.setInvalidValue(-std::numeric_limits<float>::infinity());
-
-		//debug check, save to point cloud
+#ifndef CUDACACHE_UCHAR_NORMALS
+		MLIB_CUDA_SAFE_CALL(cudaMemcpy(normalImage.getData(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*width*height, cudaMemcpyDeviceToHost));
 		for (unsigned int k = 0; k < width*height; k++) {
 			normalImage.getData()[k] = (normalImage.getData()[k] + 1.0f) / 2.0f;
 			normalImage.getData()[k].w = 1.0f; // make visible
 		}
+		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_normal.png", normalImage);
+#endif
 
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_depth.png", ColorImageR32G32B32(depthImage));
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_camPos.png", camPosImage);
-		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_normal.png", normalImage);
 		FreeImageWrapper::saveImage(dir + std::to_string(i) + "_intensity.png", intensityImage);
 
 		for (unsigned int p = 0; p < intensityDerivImage.getNumPixels(); p++) {
@@ -2253,13 +2256,15 @@ void TestMatching::createCUDACache(CUDACache* cache)
 		}
 		CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(d_helperCamPos, d_depth, MatrixConversion::toCUDA(m_depthCalibration.m_IntrinsicInverse), m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_cameraposDownsampled, width, height, d_helperCamPos, m_widthDepth, m_heightDepth);
-
+#ifdef CUDACACHE_UCHAR_NORMALS
 		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
-		//CUDAImageUtil::computeNormalsSobel(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
+		CUDAImageUtil::resampleFloat4(d_helperCamPos, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
+		CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, d_helperCamPos, width, height);
+#else
+		CUDAImageUtil::computeNormals(d_helperNormal, d_helperCamPos, m_widthDepth, m_heightDepth);
 		CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, width, height, d_helperNormal, m_widthDepth, m_heightDepth);
-
-		CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, width, height);
-
+		//CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, width, height);
+#endif
 		CUDAImageUtil::resampleFloat(frame.d_depthDownsampled, width, height, d_depth, m_widthDepth, m_heightDepth);
 
 		CUDAImageUtil::resampleToIntensity(d_filterHelperDown, width, height, d_color, m_widthSift, m_heightSift);

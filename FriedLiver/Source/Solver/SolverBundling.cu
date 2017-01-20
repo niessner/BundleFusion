@@ -44,17 +44,20 @@ __global__ void visualizeCorrespondences_Kernel(uint2 imageIndices, SolverInput 
 		float4x4 transform = invTransform_i * transform_j;
 #endif
 		// find correspondence
-		//if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
-		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.depthIntrinsics,
-		//	input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
-		//	input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
-		//	parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
 		float3 camPosSrc; float3 camPosSrcToTgt; float2 tgtScreenPosf; float3 camPosTgt; float3 normalTgt;
+#ifdef CUDACACHE_UCHAR_NORMALS
+		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
+			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
+			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPosf, camPosTgt, normalTgt)) { //i tgt, j src
+#else
 		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
 			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPosf, camPosTgt, normalTgt)) { //i tgt, j src
+#endif
 
 			int2 tgtScreenPos = make_int2((int)round(tgtScreenPosf.x), (int)round(tgtScreenPosf.y));
 			d_corrImage[tgtScreenPos.y * input.denseDepthWidth + tgtScreenPos.x] = camPosSrc;
@@ -244,16 +247,19 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 
 		// find correspondence
 		float3 camPosSrc; float3 camPosSrcToTgt; float3 camPosTgt; float3 normalTgt; float2 tgtScreenPos;
-		//bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
-		//	parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
-		//	input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
-		//	input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
-		//	parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+#ifdef CUDACACHE_UCHAR_NORMALS
+		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
+			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
+			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+#else
 		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
 			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+#endif
 		if (useDepth) {
 			if (foundCorr) {
 				// point-to-plane residual

@@ -186,6 +186,9 @@ float2 SIFTMatchFilter::computeSurfaceArea(const SIFTKeyPoint* keys, const uint2
 
 void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const std::vector<CUDACachedFrame>& cachedFrames, const float4x4& depthIntrinsics, float depthMin, float depthMax)
 {
+#ifdef CUDACACHE_UCHAR_NORMALS
+	MLIB_EXCEPTION("need to update to uchar4 normals");
+#else
 	const unsigned int numImages = siftManager->getNumImages();
 	if (numImages <= 1) return;
 
@@ -235,6 +238,7 @@ void SIFTMatchFilter::filterByDenseVerify(SIFTImageManager* siftManager, const s
 			cutilSafeCall(cudaMemcpy(siftManager->d_currNumFilteredMatchesPerImagePair + i, &numMatches, sizeof(unsigned int), cudaMemcpyHostToDevice));
 		}
 	}
+#endif
 }
 
 bool SIFTMatchFilter::filterImagePairByDenseVerify(const float* inputDepth, const float4* inputCamPos, const float4* inputNormals, const float* inputColor,
@@ -713,6 +717,9 @@ void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const vec2ui& imageIndices, const std::vector<CUDACachedFrame>& cachedFrames,
 	const float4x4& depthIntrinsics, const float4x4& transformCurToPrv, float depthMin, float depthMax)
 {
+#ifdef CUDACACHE_UCHAR_NORMALS
+	throw MLIB_EXCEPTION("need to update to uchar4 normals");
+#else
 	const unsigned int numImages = siftManager->getNumImages();
 	MLIB_ASSERT(imageIndices.x < numImages && imageIndices.y < numImages);
 
@@ -788,6 +795,7 @@ void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const ve
 	if (projErrors.x == -std::numeric_limits<float>::infinity() || (projErrors.x > verifyOptErrThresh) || (projErrors.y < verifyOptCorrThresh)) { // tracking lost or bad match
 		valid = false; // invalid
 	}
+#endif
 }
 
 void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned int height, const float* inputDepth, const float4* input, const float4* inputNormals, const float* inputColor,

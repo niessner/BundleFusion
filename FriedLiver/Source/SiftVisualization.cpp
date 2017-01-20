@@ -464,13 +464,15 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 		std::cerr << "[computePointCloud] ERROR bad transform! skipping..." << std::endl;
 		return;
 	}
+	const bool hasNormals = normal.getNumPixels() > 0;
 	for (unsigned int y = 0; y < camPos.getHeight(); y++) {
 		for (unsigned int x = 0; x < camPos.getWidth(); x++) {
 			const vec4f& p = camPos(x, y);
 			if (p.x != -std::numeric_limits<float>::infinity() && p.z < maxDepth) {
 
-				const vec4f& n = normal(x, y);
-				if (n.x != -std::numeric_limits<float>::infinity()) {
+				vec4f n;
+				if (hasNormals) n = normal(x, y);
+				if (!hasNormals || n.x != -std::numeric_limits<float>::infinity()) {
 					vec3f c;
 					if (color.getWidth() != camPos.getWidth()) {
 						unsigned int cx = (unsigned int)math::round((float)x * (float)(color.getWidth() - 1) / (float)(camPos.getWidth() - 1));
@@ -481,7 +483,7 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 						c = vec3f(color(x, y)) / 255.0f;
 					}
 					pc.m_points.push_back(p.getVec3());
-					pc.m_normals.push_back(n.getVec3());
+					if (hasNormals) pc.m_normals.push_back(n.getVec3());
 					pc.m_colors.push_back(vec4f(c.x, c.y, c.z, 1.0f));
 				} // valid normal
 			} // valid depth
@@ -491,9 +493,11 @@ void SiftVisualization::computePointCloud(PointCloudf& pc, const ColorImageR8G8B
 	for (auto& p : pc.m_points) {
 		p = transform * p;
 	}
-	mat3f invTranspose = transform.getRotation();
-	for (auto& n : pc.m_normals) {
-		n = invTranspose * n;
+	if (hasNormals) {
+		mat3f invTranspose = transform.getRotation();
+		for (auto& n : pc.m_normals) {
+			n = invTranspose * n;
+		}
 	}
 }
 
@@ -546,16 +550,19 @@ void SiftVisualization::saveToPointCloud(const std::string& filename, const CUDA
 	const unsigned int height = cache->getHeight();
 
 	const std::vector<CUDACachedFrame>& cachedFrames = cache->getCacheFrames();
-	ColorImageR32G32B32A32 camPos(width, height), normals(width, height);
+	ColorImageR32G32B32A32 camPos(width, height), normals;
 	ColorImageR8G8B8 color(width, height);
 	ColorImageR32 intensity(width, height);
 	std::list<PointCloudf> pcs; std::vector<unsigned int> frameIdxs;
 	for (unsigned int i = 0; i < numFrames; i++) {
 		if (trajectory[i][0] != -std::numeric_limits<float>::infinity()) {
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(camPos.getData(), cachedFrames[i].d_cameraposDownsampled, sizeof(float4)*camPos.getNumPixels(), cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getData(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), cachedFrames[i].d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
 			convertIntensityToRGB(intensity, color);
+#ifndef CUDACACHE_UCHAR_NORMALS
+			normals.allocate(width, height);
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getData(), cachedFrames[i].d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
+#endif
 
 			pcs.push_back(PointCloudf());
 			computePointCloud(pcs.back(), color, camPos, normals, trajectory[i], maxDepth);

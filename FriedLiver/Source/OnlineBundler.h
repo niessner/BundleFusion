@@ -88,7 +88,7 @@ private:
 	std::mutex					mutex_completeTrajectory;
 	float4x4*					d_completeTrajectory;
 	float4x4*					d_localTrajectories;
-	std::vector<std::vector<int>> m_localTrajectoriesValid; //TODO CHECK IF NEEDED
+	std::vector<std::vector<int>> m_localTrajectoriesValid;
 
 	float4x4*					d_siftTrajectory; // frame-to-frame sift tracking for all frames in sequence
 	//************************************

@@ -553,12 +553,6 @@ unsigned int SIFTImageManager::filterFrames(unsigned int curFrame, unsigned int 
 	std::vector<unsigned int> currNumFilteredMatchesPerImagePair(numFrames - startFrame);
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(currNumFilteredMatchesPerImagePair.data(), d_currNumFilteredMatchesPerImagePair + startFrame, sizeof(unsigned int) * currNumFilteredMatchesPerImagePair.size(), cudaMemcpyDeviceToHost));
 
-	//for (unsigned int i = startFrame; i < numFrames; i++) { // previous frames
-	//	if (m_validImages[i] != 0 && currNumFilteredMatchesPerImagePair[i-startFrame] > 0 && i != curFrame) {
-	//		connected = 1;
-	//		break;
-	//	}
-	//}
 	for (int i = (int)numFrames-1; i >= (int)startFrame; i--) { // previous frames (reverse direction) 
 		if (m_validImages[i] != 0 && currNumFilteredMatchesPerImagePair[i - startFrame] > 0 && i != curFrame) {
 			connected = 1;
@@ -571,7 +565,7 @@ unsigned int SIFTImageManager::filterFrames(unsigned int curFrame, unsigned int 
 	//	std::cout << "frame " << curFrame << " not connected to previous!" << std::endl;
 
 	m_validImages[curFrame] = connected;
-	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages + curFrame, &m_validImages[curFrame], sizeof(int), cudaMemcpyHostToDevice)); //TODO CHECK 
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_validImages + curFrame, &m_validImages[curFrame], sizeof(int), cudaMemcpyHostToDevice));
 	return lastMatchedFrame;
 }
 
