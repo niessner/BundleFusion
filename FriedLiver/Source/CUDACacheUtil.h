@@ -4,7 +4,7 @@
 
 #include "mLibCuda.h"
 
-#define CUDACACHE_UCHAR_NORMALS
+//#define CUDACACHE_UCHAR_NORMALS
 
 struct CUDACachedFrame {
 	void alloc(unsigned int width, unsigned int height) {

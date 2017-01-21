@@ -47,7 +47,7 @@ public:
 	static unsigned int ReshapeFeatureList(CuTexImage* raw, CuTexImage* out, int* d_featureCount, float keyLocScale);	//returns the number of features
 	static void ComputeOrientation(CuTexImage*list, CuTexImage* got, CuTexImage*key, float sigma, float sigma_step);
 	static void ComputeDescriptor(CuTexImage*list, CuTexImage* got, float* d_outDescriptors, int rect = 0, int stream = 0);
-	static void CreateGlobalKeyPointList(CuTexImage* curLevelList, float4* d_outKeypointList, float keyLocScale, float keyLocOffset, const float* d_depthData);	//returns the number of features
+	static void CreateGlobalKeyPointList(CuTexImage* curLevelList, float4* d_outKeypointList, float keyLocScale, float keyLocOffset, const float* d_depthData, int maxNumElements);	//returns the number of features
 
     //data conversion
 	static void SampleImageU(CuTexImage *dst, CuTexImage *src, int log_scale);

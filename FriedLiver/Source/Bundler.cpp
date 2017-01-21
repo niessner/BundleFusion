@@ -84,10 +84,10 @@ void Bundler::detectFeatures(float* d_intensitySift, const float* d_inputDepthFi
 	SIFTImageGPU& cur = m_siftManager->createSIFTImageGPU();
 	int success = m_sift->RunSIFT(d_intensitySift, d_inputDepthFilt);
 	if (!success) throw MLIB_EXCEPTION("Error running SIFT detection");
-	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, d_inputDepthFilt);
-	//!!!debugging
-	if (numKeypoints > GlobalBundlingState::get().s_maxNumKeysPerImage) throw MLIB_EXCEPTION("too many keypoints");
-	//!!!debugging
+	unsigned int numKeypoints = m_sift->GetKeyPointsAndDescriptorsCUDA(cur, d_inputDepthFilt, m_siftManager->getMaxNumKeyPointsPerImage());
+
+	if (numKeypoints > GlobalBundlingState::get().s_maxNumKeysPerImage) throw MLIB_EXCEPTION("too many keypoints"); //should never happen
+
 	m_siftManager->finalizeSIFTImageGPU(numKeypoints);
 }
 
@@ -135,8 +135,8 @@ unsigned int Bundler::matchAndFilter()
 		m_siftManager->SortKeyPointMatchesCU(curFrame, startFrame, numFrames);
 
 		//debugging
-		//const bool usedebug = !m_bIsLocal && curFrame >= 49;
-		//std::vector<unsigned int> numMatches;
+		const bool usedebug = !m_bIsLocal;// && curFrame >= 49;
+		std::vector<unsigned int> numMatches;
 		//if (usedebug) {
 		//	m_siftManager->getNumRawMatchesDEBUG(numMatches);
 		//	int a = 5;
@@ -164,12 +164,12 @@ unsigned int Bundler::matchAndFilter()
 		m_siftManager->FilterMatchesBySurfaceAreaCU(curFrame, startFrame, numFrames, m_siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMatchFilterSurfaceArea = m_timer.getElapsedTimeMS(); }
 
-		////debugging
-		//if (usedebug) {
-		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
-		//	int a = 5;
-		//}
-		////debugging
+		//debugging
+		if (usedebug) {
+			m_siftManager->getNumFiltMatchesDEBUG(numMatches);
+			int a = 5;
+		}
+		//debugging
 
 		// --- dense verify filter
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.start(); }
@@ -182,12 +182,12 @@ unsigned int Bundler::matchAndFilter()
 		//0.1f, 3.0f);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMatchFilterDenseVerify = m_timer.getElapsedTimeMS(); }
 
-		////debugging
-		//if (usedebug) {
-		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
-		//	int a = 5;
-		//}
-		////debugging
+		//debugging
+		if (usedebug) {
+			m_siftManager->getNumFiltMatchesDEBUG(numMatches);
+			int a = 5;
+		}
+		//debugging
 
 		// --- filter frames
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.start(); }
@@ -251,6 +251,12 @@ bool Bundler::optimize(unsigned int numNonLinIterations, unsigned int numLinIter
 			std::cout << "WARNING: invalid local submap from verify" << std::endl;
 	}
 	else ret = true;
+
+	//debugging
+	std::vector<mat4f> transforms(m_siftManager->getNumImages());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_trajectory, sizeof(mat4f)*transforms.size(), cudaMemcpyDeviceToHost));
+	int a = 5;
+	//debugging
 
 	return ret;
 }

@@ -2080,11 +2080,13 @@ void __global__  CreateGlobalKeyPointList_Kernel(const float4* d_curFeatureList,
 	}
 }
 
-void ProgramCU::CreateGlobalKeyPointList(CuTexImage* curLevelList, float4* d_outKeypointList, float keyLocScale, float keyLocOffset, const float* d_depthData) {
+void ProgramCU::CreateGlobalKeyPointList(CuTexImage* curLevelList, float4* d_outKeypointList, float keyLocScale, float keyLocOffset, const float* d_depthData, int maxNumElements) {
 
 	const unsigned int threadsPerBlock = 64;
 	int curNumFeatures = curLevelList->GetImgWidth();
 	if (curNumFeatures == 0) return;
+	assert(maxNumElements <= curNumFeatures);
+	if (curNumFeatures > maxNumElements) curNumFeatures = maxNumElements;
 
 	dim3 grid((curNumFeatures + threadsPerBlock - 1) / threadsPerBlock);
 	dim3 block(threadsPerBlock, 1, 1);

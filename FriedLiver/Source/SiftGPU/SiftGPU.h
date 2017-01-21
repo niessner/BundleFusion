@@ -100,11 +100,11 @@ public:
 
 
 	//get sift keypoints & descriptors (compute into provided d_keypoints, d_descriptors)
-	 unsigned int GetKeyPointsAndDescriptorsCUDA(SIFTImageGPU& siftImage, const float* d_depthData);
+	 unsigned int GetKeyPointsAndDescriptorsCUDA(SIFTImageGPU& siftImage, const float* d_depthData, unsigned int maxNumKeyPoints = (unsigned int)-1);
 	//get sift keypoints (compute into provided d_keypoints)
-	 void GetKeyPointsCUDA(SiftKeypoint* d_keypoints, float* d_depthData);
+	 void GetKeyPointsCUDA(SiftKeypoint* d_keypoints, float* d_depthData, unsigned int maxNumKeyPoints = (unsigned int)-1);
 	//get sift descriptors (compute into provided d_descriptors)
-	 void GetDescriptorsCUDA(unsigned char* d_descriptors);
+	 void GetDescriptorsCUDA(unsigned char* d_descriptors, unsigned int maxNumKeyPoints = (unsigned int)-1);
 
 	//Copy the SIFT result to two vectors
 	// void CopyFeatureVectorToCPU(SiftKeypoint * keys, float * descriptors);

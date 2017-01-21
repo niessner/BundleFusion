@@ -727,40 +727,65 @@ int SiftPyramid::ResizeFeatureStorage()
 	return totalkb;
 }
 
-void SiftPyramid::CreateGlobalKeyPointList(float4* d_keypoints, const float* d_depthData)
+void SiftPyramid::CreateGlobalKeyPointList(float4* d_keypoints, const float* d_depthData, unsigned int maxNumKeyPoints)
 {
 	float os = _octave_min >= 0 ? float(1 << _octave_min) : 1.0f / (1 << (-_octave_min));
 
 	int n = param._dog_level_num*_octave_num;
 	unsigned int numKeyOffset = 0;
+	//for (int i = 0; i < n; i++) {
+	//	if (_levelFeatureNum[i] == 0) continue;
+
+	//	float keyLocScale = os * (1 << (i / param._dog_level_num));
+	//	float keyLocOffset = GlobalUtil::_LoweOrigin ? 0 : 0.5f;
+
+	//	ProgramCU::CreateGlobalKeyPointList(&_featureTexFinal[i], d_keypoints + numKeyOffset, keyLocScale, keyLocOffset, d_depthData, 9999);
+	//	numKeyOffset += _levelFeatureNum[i];
+	//}
+
+	//if needed, eliminate lower level keypoints first
+	std::vector<int> numKeysPerLevel(n, 0); int cur = 0;
+	const bool bHasMax = maxNumKeyPoints == (unsigned int)-1;
+	for (int i = n - 1; i >= 0; i--) {
+		if (!bHasMax) numKeysPerLevel[i] = _levelFeatureNum[i];
+		else {
+			int curnum = std::min(_levelFeatureNum[i], (int)maxNumKeyPoints - cur);
+			numKeysPerLevel[i] = curnum;
+			cur += curnum;
+			if (cur == maxNumKeyPoints) break;
+		}
+	}
+
 	for (int i = 0; i < n; i++) {
-		if (_levelFeatureNum[i] == 0) continue;
+		if (numKeysPerLevel[i] == 0) continue;
 
 		float keyLocScale = os * (1 << (i / param._dog_level_num));
 		float keyLocOffset = GlobalUtil::_LoweOrigin ? 0 : 0.5f;
 
-		ProgramCU::CreateGlobalKeyPointList(&_featureTexFinal[i], d_keypoints + numKeyOffset, keyLocScale, keyLocOffset, d_depthData);
-		numKeyOffset += _levelFeatureNum[i];
+		ProgramCU::CreateGlobalKeyPointList(&_featureTexFinal[i], d_keypoints + numKeyOffset, keyLocScale, keyLocOffset, d_depthData, numKeysPerLevel[i]);
+		numKeyOffset += numKeysPerLevel[i];
 	}
 }
 
-void SiftPyramid::GetFeatureVectorCUDA(unsigned char* d_descriptor)
+void SiftPyramid::GetFeatureVectorCUDA(unsigned char* d_descriptor, unsigned int maxNumKeyPoints)
 {
 	if (GlobalUtil::_EnableDetailedTimings) {
 		_timer->startEvent("ConvertDescriptorToUChar");
 	}
-	if (_featureNum > 0) ProgramCU::ConvertDescriptorToUChar(d_outDescriptorList, _featureNum * 128, d_descriptor);
+	int numDescriptors = (maxNumKeyPoints == (unsigned int)-1) ? _featureNum : std::min(_featureNum, (int)maxNumKeyPoints);
+	if (numDescriptors > 0) ProgramCU::ConvertDescriptorToUChar(d_outDescriptorList, numDescriptors * 128, d_descriptor);
+	//if (_featureNum > 0) ProgramCU::ConvertDescriptorToUChar(d_outDescriptorList, _featureNum * 128, d_descriptor);
 	if (GlobalUtil::_EnableDetailedTimings) {
 		_timer->endEvent();
 	}
 }
 
-void SiftPyramid::GetKeyPointsCUDA(float4* d_keypoints, const float* d_depthData)
+void SiftPyramid::GetKeyPointsCUDA(float4* d_keypoints, const float* d_depthData, unsigned int maxNumKeyPoints)
 {
 	if (GlobalUtil::_EnableDetailedTimings) {
 		_timer->startEvent("CreateGlobalKeyPointList");
 	}
-	CreateGlobalKeyPointList(d_keypoints, d_depthData);
+	CreateGlobalKeyPointList(d_keypoints, d_depthData, maxNumKeyPoints);
 	if (GlobalUtil::_EnableDetailedTimings) {
 		_timer->endEvent();
 	}

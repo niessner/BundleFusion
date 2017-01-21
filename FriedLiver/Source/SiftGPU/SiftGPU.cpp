@@ -264,21 +264,21 @@ int SiftGPU::GetFeatureNum()
 }
 
 
-unsigned int SiftGPU::GetKeyPointsAndDescriptorsCUDA(SIFTImageGPU& siftImage, const float* d_depthData)
+unsigned int SiftGPU::GetKeyPointsAndDescriptorsCUDA(SIFTImageGPU& siftImage, const float* d_depthData, unsigned int maxNumKeyPoints /*= (unsigned int)-1*/)
 {
-	_pyramid->GetKeyPointsCUDA((float4*)siftImage.d_keyPoints, d_depthData);
-	_pyramid->GetFeatureVectorCUDA((unsigned char*)siftImage.d_keyPointDescs);
+	_pyramid->GetKeyPointsCUDA((float4*)siftImage.d_keyPoints, d_depthData, maxNumKeyPoints);
+	_pyramid->GetFeatureVectorCUDA((unsigned char*)siftImage.d_keyPointDescs, maxNumKeyPoints);
 	return _pyramid->GetFeatureNum();
 }
 
-void SiftGPU::GetKeyPointsCUDA(SiftKeypoint* d_keypoints, float* d_depthData)
+void SiftGPU::GetKeyPointsCUDA(SiftKeypoint* d_keypoints, float* d_depthData, unsigned int maxNumKeyPoints /*= (unsigned int)-1*/)
 {
-	_pyramid->GetKeyPointsCUDA((float4*)d_keypoints, d_depthData);
+	_pyramid->GetKeyPointsCUDA((float4*)d_keypoints, d_depthData, maxNumKeyPoints);
 }
 
-void SiftGPU::GetDescriptorsCUDA(unsigned char* d_descriptors)
+void SiftGPU::GetDescriptorsCUDA(unsigned char* d_descriptors, unsigned int maxNumKeyPoints /*= (unsigned int)-1*/)
 {
-	_pyramid->GetFeatureVectorCUDA(d_descriptors);
+	_pyramid->GetFeatureVectorCUDA(d_descriptors, maxNumKeyPoints);
 }
 
 //void SiftGPU::CopyFeatureVectorToCPU(SiftKeypoint * keys, float * descriptors)

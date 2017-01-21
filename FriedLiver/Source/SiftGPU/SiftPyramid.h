@@ -65,8 +65,8 @@ public:
 	void DestroyPerLevelData();
 	void DestroyPyramidData();
 
-	void GetKeyPointsCUDA(float4* d_keypoints, const float* d_depthData);
-	void GetFeatureVectorCUDA(unsigned char* d_descriptor);
+	void GetKeyPointsCUDA(float4* d_keypoints, const float* d_depthData, unsigned int maxNumKeyPoints); //TODO limit in compute instead?
+	void GetFeatureVectorCUDA(unsigned char* d_descriptor, unsigned int maxNumKeyPoints);
 	//void CopyFeaturesToCPU(float*keys, float *descriptors);
 	//implementation-dependent functions
 	void GetFeatureDescriptors();
@@ -106,7 +106,7 @@ protected:
 	inline  void PrepareBuffer();
 	inline  void LimitFeatureCount(int have_keylist = 0);
 
-	void CreateGlobalKeyPointList(float4* d_keypoints, const float* d_depthData);
+	void CreateGlobalKeyPointList(float4* d_keypoints, const float* d_depthData, unsigned int maxNumKeyPoints);
 
 	SiftParam&	param;
 	int*		_levelFeatureNum;

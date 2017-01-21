@@ -41,6 +41,39 @@ __inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWid
 	return false;
 }
 
+__inline__ __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
+	float distThresh, float normalThresh, const float4x4& transform, const float4& intrinsics,
+	const float* tgtDepth, const float4* tgtNormals, const float* srcDepth, const float4* srcNormals,
+	float depthMin, float depthMax)
+{
+	unsigned int x = idx % imageWidth;		unsigned int y = idx / imageWidth;
+	const float3 cposj = depthToCamera(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, make_int2(x, y), srcDepth[idx]);
+	if (cposj.z > depthMin && cposj.z < depthMax) {
+		float3 nrmj = make_float3(srcNormals[idx]);
+		if (nrmj.x != MINF) {
+			nrmj = transform.getFloat3x3() * nrmj;
+			float3 camPosSrcToTgt = transform * cposj;
+			float2 tgtScreenPosf = cameraToDepth(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, camPosSrcToTgt);
+			int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
+			if (tgtScreenPos.x >= 0 && tgtScreenPos.y >= 0 && tgtScreenPos.x < (int)imageWidth && tgtScreenPos.y < (int)imageHeight) {
+				float3 camPosTgt = depthToCamera(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, tgtScreenPos, tgtDepth[tgtScreenPos.y * imageWidth + tgtScreenPos.x]);
+				if (camPosTgt.z > depthMin && camPosTgt.z < depthMax) {
+					float3 normalTgt = make_float3(tgtNormals[tgtScreenPos.y * imageWidth + tgtScreenPos.x]);
+					//float3 normalTgt = make_float3(bilinearInterpolationFloat4(tgtScreenPosf.x, tgtScreenPosf.y, tgtNormals, imageWidth, imageHeight));
+					if (normalTgt.x != MINF) {
+						float dist = length(camPosSrcToTgt - camPosTgt);
+						float dNormal = dot(nrmj, normalTgt);
+						if (dNormal >= normalThresh && dist <= distThresh) {
+							return true;
+						}
+					}
+				}
+			} // valid projection
+		} // valid src normal
+	} // valid src camera position
+	return false;
+}
+
 
 //using camera positions
 __device__ bool findDenseCorr(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,

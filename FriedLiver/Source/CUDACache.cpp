@@ -3,8 +3,13 @@
 #include "GlobalBundlingState.h"
 #include "MatrixConversion.h"
 
+#ifdef CUDACACHE_UCHAR_NORMALS
 extern "C" void fuseCacheFramesCU(const CUDACachedFrame* d_frames, const int* d_validImages, const float4& intrinsics, const float4x4* d_transforms,
 	unsigned int numFrames, unsigned int width, unsigned int height, float* d_output, float2* d_tmp, const uchar4* d_normals);
+#else
+extern "C" void fuseCacheFramesCU(const CUDACachedFrame* d_frames, const int* d_validImages, const float4& intrinsics, const float4x4* d_transforms,
+	unsigned int numFrames, unsigned int width, unsigned int height, float* d_output, float2* d_tmp, const float4* d_normals);
+#endif
 
 CUDACache::CUDACache(unsigned int widthDepthInput, unsigned int heightDepthInput, unsigned int widthDownSampled, unsigned int heightDownSampled, unsigned int maxNumImages, const mat4f& inputIntrinsics)
 {
@@ -89,9 +94,13 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 	CUDACachedFrame& tmpFrame = globalCache->m_cache[globalFrameIdx + 1];
 
 	float4 intrinsics = make_float4(m_intrinsics(0, 0), m_intrinsics(1, 1), m_intrinsics(0, 2), m_intrinsics(1, 2));
+#ifdef CUDACACHE_UCHAR_NORMALS
 	fuseCacheFramesCU(d_cache, d_validImages, intrinsics, d_transforms, numFrames, m_width, m_height,
 		globalFrame.d_depthDownsampled, tmpFrame.d_intensityDerivsDownsampled, globalFrame.d_normalsDownsampledUCHAR4);
-
+#else
+	fuseCacheFramesCU(d_cache, d_validImages, intrinsics, d_transforms, numFrames, m_width, m_height,
+		globalFrame.d_depthDownsampled, tmpFrame.d_intensityDerivsDownsampled, globalFrame.d_normalsDownsampled);
+#endif
 	CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(globalFrame.d_cameraposDownsampled, globalFrame.d_depthDownsampled, MatrixConversion::toCUDA(m_intrinsicsInv), m_width, m_height);
 #ifdef CUDACACHE_UCHAR_NORMALS
 	CUDAImageUtil::computeNormals(d_helperNormals, globalFrame.d_cameraposDownsampled, m_width, m_height);

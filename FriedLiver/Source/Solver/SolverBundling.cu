@@ -169,11 +169,19 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		__shared__ int s_count[numWarps];
 		s_count[0] = 0;
 		int count = 0.0f;
+#ifdef CUDACACHE_UCHAR_NORMALS
 		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
 			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
 			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
+#else
+		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
+			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
+			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
+			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
+#endif
 			//atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
 			count++;
 		} // found correspondence
