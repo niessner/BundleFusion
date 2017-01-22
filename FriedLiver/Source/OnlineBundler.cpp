@@ -17,7 +17,7 @@ extern "C" void computeSiftTransformCU(const float4x4* d_currFilteredTransformsI
 	float4x4* d_siftTrajectory, unsigned int curFrameIndexAll, unsigned int curFrameIndex, float4x4* d_currIntegrateTrans);
 extern "C" void initNextGlobalTransformCU(
 	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms, unsigned int initGlobalIdx,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory);
+	float4x4* d_localTrajectories, unsigned int lastValidLocal, unsigned int numLocalTransformsPerTrajectory);
 extern "C" void updateTrajectoryCU(
 	const float4x4* d_globalTrajectory, unsigned int numGlobalTransforms, float4x4* d_completeTrajectory, unsigned int numCompleteTransforms,
 	const float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory, unsigned int numLocalTrajectories,
@@ -258,7 +258,7 @@ void OnlineBundler::initializeNextGlobalTransform(unsigned int lastMatchedIdx, u
 {
 	const unsigned int numFrames = m_global->getNumFrames();
 	MLIB_ASSERT(numFrames >= 1);
-	initNextGlobalTransformCU(m_global->getTrajectoryGPU(), numFrames, lastMatchedIdx, d_localTrajectories, m_submapSize + 1);
+	initNextGlobalTransformCU(m_global->getTrajectoryGPU(), numFrames, lastMatchedIdx, d_localTrajectories, lastValidLocal, m_submapSize + 1);
 }
 
 void OnlineBundler::processGlobal()
@@ -294,12 +294,16 @@ void OnlineBundler::processGlobal()
 			const unsigned int curGlobalFrame = m_global->getCurrFrameNumber();
 			const std::vector<int>& validImagesLocal = m_optLocal->getValidImages(); 
 			const unsigned int numLocalFrames = std::min(m_submapSize, m_optLocal->getNumFrames());
+			unsigned int lastValidLocal = 0; 
+			for (int i = (int)m_optLocal->getNumFrames() - 1; i >= 0; i--) {
+				if (validImagesLocal[i]) { lastValidLocal = i; break; }
+			}
 			for (unsigned int i = 0; i < numLocalFrames; i++) {
 				if (validImagesLocal[i] == 0)
 					invalidateImages(curGlobalFrame * m_submapSize + i);
 			}
 			m_localTrajectoriesValid[curGlobalFrame] = validImagesLocal; m_localTrajectoriesValid[curGlobalFrame].resize(numLocalFrames);
-			initializeNextGlobalTransform(curGlobalFrame, (unsigned int)-1); //TODO try local idx too?
+			initializeNextGlobalTransform(curGlobalFrame, lastValidLocal); //(initializes 2 ahead) 
 			//done with local data
 			m_optLocal->reset();
 			mutex_optLocal.unlock();

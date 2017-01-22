@@ -111,24 +111,27 @@ extern "C" void updateTrajectoryCU(
 
 
 
-__global__ void initNextGlobalTransformCU_Kernel(float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
-	unsigned int initGlobalIdx,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
+__global__ void initNextGlobalTransformCU_Kernel(float4x4* d_globalTrajectory, unsigned int numGlobalTransforms, unsigned int initGlobalIdx,
+	float4x4* d_localTrajectories, unsigned int lastValidLocal, unsigned int numLocalTransformsPerTrajectory)
 {
-	if (d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1].m11 == MINF) {
+	//if (d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1].m11 == MINF) {
+	//	printf("[ERROR initNextGlobalTransformCU_Kernel]: d_localTrajectories[%d*%d-1] INVALID!\n", numGlobalTransforms, numLocalTransformsPerTrajectory);//debugging
+	//}
+	//d_globalTrajectory[numGlobalTransforms] = d_globalTrajectory[initGlobalIdx] * d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1];
+
+	if (d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - (numLocalTransformsPerTrajectory - lastValidLocal)].m11 == MINF) {
 		printf("[ERROR initNextGlobalTransformCU_Kernel]: d_localTrajectories[%d*%d-1] INVALID!\n", numGlobalTransforms, numLocalTransformsPerTrajectory);//debugging
 	}
-	d_globalTrajectory[numGlobalTransforms] = d_globalTrajectory[initGlobalIdx] * d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - 1];
+	d_globalTrajectory[numGlobalTransforms] = d_globalTrajectory[initGlobalIdx] * d_localTrajectories[numGlobalTransforms*numLocalTransformsPerTrajectory - (numLocalTransformsPerTrajectory - lastValidLocal)];
 }
 
 extern "C" void initNextGlobalTransformCU(
-	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms,
-	unsigned int initGlobalIdx,
-	float4x4* d_localTrajectories, unsigned int numLocalTransformsPerTrajectory)
+	float4x4* d_globalTrajectory, unsigned int numGlobalTransforms, unsigned int initGlobalIdx,
+	float4x4* d_localTrajectories, unsigned int lastValidLocal, unsigned int numLocalTransformsPerTrajectory)
 {
 	initNextGlobalTransformCU_Kernel <<< 1, 1 >>>(
 		d_globalTrajectory, numGlobalTransforms, initGlobalIdx,
-		d_localTrajectories, numLocalTransformsPerTrajectory);
+		d_localTrajectories, lastValidLocal, numLocalTransformsPerTrajectory);
 
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());

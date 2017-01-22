@@ -320,8 +320,8 @@ private:
 	int*			d_currNumFilteredMatchesPerImagePair;	// #key point matches
 	float*			d_currFilteredMatchDistances;			// array of distances per key point pair
 	uint2*			d_currFilteredMatchKeyPointIndices;		// array of indices to d_keyPoints
-	float4x4*		d_currFilteredTransforms;				// array of transforms estimated in the first filter stage
-	float4x4*		d_currFilteredTransformsInv;				// array of transforms estimated in the first filter stage
+	float4x4*		d_currFilteredTransforms;				// array of transforms estimated in the first filter stage, prev to cur
+	float4x4*		d_currFilteredTransformsInv;			// array of transforms estimated in the first filter stage, cur to prev
 
 	std::vector<int> m_validImages;
 	int*			 d_validImages; // for check invalid frames kernel only (from residual invalidation) //TODO some way to not have both?

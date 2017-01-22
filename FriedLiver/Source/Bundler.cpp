@@ -308,6 +308,14 @@ unsigned int Bundler::tryRevalidation(unsigned int curGlobalFrame, bool bIsScanD
 			MLIB_ASSERT(lastMatchedGlobal != (unsigned int)-1);
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory + idx, d_trajectory + lastMatchedGlobal, sizeof(float4x4), cudaMemcpyDeviceToDevice));
 
+			////debugging //TODO ENABLE THIS AND TEST
+			//mat4f lastMatchedTransform; mat4f relativeSiftTransform;
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(lastMatchedTransform.getData(), d_trajectory + lastMatchedGlobal, sizeof(float4x4), cudaMemcpyDeviceToHost));
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(relativeSiftTransform.getData(), m_siftManager->getFiltTransformsToWorldGPU() + lastMatchedGlobal, sizeof(float4x4), cudaMemcpyDeviceToHost));
+			//mat4f initTransform = lastMatchedTransform * relativeSiftTransform;
+			//MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_trajectory + idx, initTransform.getData(), sizeof(float4x4), cudaMemcpyHostToDevice));
+			////debugging
+
 			m_revalidatedIdx = idx;
 			if (GlobalBundlingState::get().s_verbose) std::cout << "re-validating " << idx << std::endl;
 		}
