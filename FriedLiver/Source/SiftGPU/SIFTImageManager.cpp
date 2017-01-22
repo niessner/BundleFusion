@@ -134,7 +134,9 @@ void SIFTImageManager::saveToFile(const std::string& s)
 	int validOpt;
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(&validOpt, d_validOpt, sizeof(int), cudaMemcpyDeviceToHost));
 
-	const unsigned int numImages = getNumImages();
+	const unsigned int numImages = getNumImages(); 
+	out.write((char*)&m_maxNumImages, sizeof(unsigned int));
+	out.write((char*)&m_maxKeyPointsPerImage, sizeof(unsigned int));
 	out.write((char*)&numImages, sizeof(unsigned int));
 	out.write((char*)&m_numKeyPoints, sizeof(unsigned int));
 	out.write((char*)m_numKeyPointsPerImage.data(), sizeof(unsigned int)*m_numKeyPointsPerImage.size());
@@ -176,6 +178,9 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 		std::cout << "Error opening " << s << " for read" << std::endl;
 		return;
 	}
+
+	in.read((char*)&m_maxNumImages, sizeof(unsigned int));
+	in.read((char*)&m_maxKeyPointsPerImage, sizeof(unsigned int));
 
 	unsigned int numImages = 0;
 	in.read((char*)&numImages, sizeof(unsigned int));
