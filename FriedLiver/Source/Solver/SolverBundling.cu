@@ -332,8 +332,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 	} // valid image pixel
 }
 
-extern "C"
-void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
+bool BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParameters& parameters, CUDATimer* timer)
 {
 	const unsigned int N = input.numberOfImages;
 	const int sizeJtr = 6 * N;
@@ -373,7 +372,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	cutilSafeCall(cudaMemcpy(&numOverlapImagePairs, state.d_numDenseOverlappingImages, sizeof(int), cudaMemcpyDeviceToHost));
 	if (numOverlapImagePairs == 0) {
 		printf("warning: no overlapping images for dense solve\n");
-		return;
+		return false;
 	}
 	const int reductionGlobal = (input.denseDepthWidth*input.denseDepthHeight + THREADS_PER_BLOCK_DENSE_DEPTH - 1) / THREADS_PER_BLOCK_DENSE_DEPTH;
 	dim3 grid(numOverlapImagePairs, reductionGlobal);
@@ -442,6 +441,7 @@ void BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	cutilCheckMsg(__FUNCTION__);
 #endif
 	if (timer) timer->endEvent();
+	return true;
 }
 
 //todo more efficient?? (there are multiple per image-image...)
@@ -1136,7 +1136,7 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 #ifdef USE_LIE_SPACE
 		convertLiePosesToMatricesCU(state.d_xRot, state.d_xTrans, input.numberOfImages, state.d_xTransforms, state.d_xTransformInverses);
 #endif
-		if (parameters.useDense) BuildDenseSystem(input, state, parameters, timer);
+		if (parameters.useDense) parameters.useDense = BuildDenseSystem(input, state, parameters, timer); //don't solve dense if no overlapping frames found
 		Initialization(input, state, parameters, timer);
 
 		if (parameters.weightSparse > 0.0f) {
