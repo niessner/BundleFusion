@@ -124,15 +124,15 @@ struct ExampleServerSession : uplink::DesktopServerSession
 
 				// Send ping-pong feedback image.
 				// FIXME: This const-cast sucks.
-				if (!cameraFrame.colorImage.isEmpty())
-					sendImage(const_cast<uplink::Image&>(cameraFrame.colorImage));
-				//if (m_bSendFeedbackImage) {
-				//	const uplink::Image& feedback = server().getFeedbackImage();
-				//	if (!feedback.isEmpty()) {
-				//		//FreeImageWrapper::saveImage("test.png", ColorImageR8G8B8(feedback.height, feedback.width, (vec3uc*)feedback.planes[0].buffer));
-				//		sendImage(const_cast<uplink::Image&>(feedback));
-				//	}
-				//}
+				//if (!cameraFrame.colorImage.isEmpty())
+					//sendImage(const_cast<uplink::Image&>(cameraFrame.colorImage));
+				if (m_bSendFeedbackImage) {
+					const uplink::Image& feedback = server().getFeedbackImage();
+					if (!feedback.isEmpty()) {
+						//FreeImageWrapper::saveImage("test.png", ColorImageR8G8B8(feedback.height, feedback.width, (vec3uc*)feedback.planes[0].buffer));
+						sendImage(const_cast<uplink::Image&>(feedback));
+					}
+				}
 				//std::cout << "FPS: " << s_timer.framesPerSecond() << std::endl;
 
 				break;
