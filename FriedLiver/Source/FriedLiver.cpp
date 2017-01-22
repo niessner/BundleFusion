@@ -238,6 +238,9 @@ int main(int argc, char** argv)
 			if (!out.is_open()) throw MLIB_EXCEPTION("unable to open log file " + util::removeExtensions(filename) + ".friedliver.log");
 			//std::streambuf *coutbuf = std::cout.rdbuf(); //save old buf
 			std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
+			std::cout << VAR_NAME(fileNameDescGlobalApp) << " = " << fileNameDescGlobalApp << std::endl;		//log the param file used
+			std::cout << VAR_NAME(fileNameDescGlobalBundling) << " = " << fileNameDescGlobalBundling << std::endl;
+			std::cout << std::endl;
 		}
 		GlobalAppState::getInstance().readMembers(parameterFileGlobalApp);
 

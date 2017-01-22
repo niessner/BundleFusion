@@ -11,7 +11,7 @@ TrajectoryManager::TrajectoryManager(unsigned int numMaxImage)
 	m_frames.reserve(numMaxImage);
 	m_framesSort.reserve(numMaxImage);
 	for (unsigned int i = 0; i < numMaxImage; i++) {
-		m_frames.push_back(TrajectoryFrame{ TrajectoryFrame::NotIntegrated_NoTransform, (unsigned int)-1, mat4f::zero(), m_optmizedTransforms[i] });
+		m_frames.push_back(TrajectoryFrame{ TrajectoryFrame::NotIntegrated_NoTransform, (unsigned int)-1, mat4f::zero(-std::numeric_limits<float>::infinity()), m_optmizedTransforms[i] });
 	}
 	m_numAddedFrames = 0;
 	m_numOptimizedFrames = 0;

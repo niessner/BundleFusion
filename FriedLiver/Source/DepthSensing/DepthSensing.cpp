@@ -933,8 +933,7 @@ void StopScanningAndExit(bool aborted = false)
 		numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);		numTransforms = (unsigned int)trajectory.size();
 		if (numValidTransforms < (unsigned int)std::round(0.5f * numTransforms)) valid = false; // not enough valid transforms
 		std::cout << "#VALID TRANSFORMS = " << numValidTransforms << std::endl;
-		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file //TODO UNCOMMENT
-		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(util::removeExtensions(saveFile) + "_fried.sens", trajectory); //overwrite the original file
+		((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file //TODO UNCOMMENT
 		//save ply
 		std::cout << "[marching cubes] ";
 		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
@@ -1022,11 +1021,11 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	// Reconstruction of current frame
 	///////////////////////////////////////	
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.start(); }
-	bool validTransform = true;
+	bool validTransform = true; bool bGlobalTrackingLost = false;
 	if (bGotDepth) {
 		mat4f transformation = mat4f::zero();
 		unsigned int frameIdx;
-		validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx);
+		validTransform = g_depthSensingBundler->getCurrentIntegrationFrame(transformation, frameIdx, bGlobalTrackingLost);
 #ifdef RUN_MULTITHREADED
 		//allow bundler to process new frame
 		g_depthSensingBundler->confirmProcessedInputFrame();
@@ -1050,7 +1049,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 			g_depthSensingBundler->getTrajectoryManager()->addFrame(TrajectoryManager::TrajectoryFrame::Integrated, transformation, g_CudaImageManager->getCurrFrameNumber());
 		}
 		else {
-			g_depthSensingBundler->getTrajectoryManager()->addFrame(TrajectoryManager::TrajectoryFrame::NotIntegrated_NoTransform, mat4f::zero(), g_CudaImageManager->getCurrFrameNumber());
+			g_depthSensingBundler->getTrajectoryManager()->addFrame(TrajectoryManager::TrajectoryFrame::NotIntegrated_NoTransform, mat4f::zero(-std::numeric_limits<float>::infinity()), g_CudaImageManager->getCurrFrameNumber());
 		}
 
 
@@ -1064,7 +1063,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	// Render with view of current frame
 	///////////////////////////////////////
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { t.start(); } // just sync-ed //{ GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.start(); }
-	bool trackingLost = bGotDepth && !validTransform;
+	bool trackingLost = bGotDepth && (!validTransform || bGlobalTrackingLost); //tracking lost when local frame has tracking lost or global frame has tracking lost
 	visualizeFrame(pd3dImmediateContext, pd3dDevice, g_transformWorld * g_lastRigidTransform, trackingLost);
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeVisualize = t.getElapsedTimeMS(); }
 
