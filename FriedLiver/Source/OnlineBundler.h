@@ -13,7 +13,7 @@ public:
 	~OnlineBundler();
 
 
-	bool getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx);
+	bool getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx, bool& bGlobalTrackingLost);
 
 	//feature detect/match for current frame
 	void processInput();

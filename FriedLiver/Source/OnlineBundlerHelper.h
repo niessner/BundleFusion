@@ -83,6 +83,7 @@ struct BundlerState {
 
 	unsigned int			m_numCompleteTransforms;
 	unsigned int			m_lastValidCompleteTransform;
+	bool					m_bGlobalTrackingLost;
 
 	PROCESS_STATE			m_processState;
 	bool					m_bUseSolve;
@@ -99,6 +100,7 @@ struct BundlerState {
 
 		m_numCompleteTransforms = 0;
 		m_lastValidCompleteTransform = 0;
+		m_bGlobalTrackingLost = false;
 		m_processState = DO_NOTHING;
 
 		m_bUseSolve = true;

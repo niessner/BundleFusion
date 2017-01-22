@@ -210,8 +210,9 @@ void OnlineBundler::processInput()
 	m_state.m_lastFrameProcessed = curFrame;
 }
 
-bool OnlineBundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx)
+bool OnlineBundler::getCurrentIntegrationFrame(mat4f& siftTransform, unsigned int& frameIdx, bool& bGlobalTrackingLost)
 {
+	bGlobalTrackingLost = m_state.m_bGlobalTrackingLost;
 	if (m_state.m_bLastFrameValid) {
 		siftTransform = m_currIntegrateTransform[m_state.m_lastFrameProcessed];
 		frameIdx = m_state.m_lastFrameProcessed;
@@ -297,7 +298,6 @@ void OnlineBundler::processGlobal()
 				if (validImagesLocal[i] == 0)
 					invalidateImages(curGlobalFrame * m_submapSize + i);
 			}
-			//TODO IS THIS NECESSARY?
 			m_localTrajectoriesValid[curGlobalFrame] = validImagesLocal; m_localTrajectoriesValid[curGlobalFrame].resize(numLocalFrames);
 			initializeNextGlobalTransform(curGlobalFrame, (unsigned int)-1); //TODO try local idx too?
 			//done with local data
@@ -310,8 +310,12 @@ void OnlineBundler::processGlobal()
 				mutex_siftMatcher.lock();
 				unsigned int lastMatchedGlobal = m_global->matchAndFilter();
 				mutex_siftMatcher.unlock();
-				if (lastMatchedGlobal == (unsigned int)-1) m_state.m_processState = BundlerState::INVALIDATE;
+				if (lastMatchedGlobal == (unsigned int)-1) {
+					m_state.m_bGlobalTrackingLost = true;
+					m_state.m_processState = BundlerState::INVALIDATE;
+				}
 				else {
+					m_state.m_bGlobalTrackingLost = false;
 					const unsigned int revalidateIdx = m_global->getRevalidatedIdx();
 					if (revalidateIdx != (unsigned int)-1) { //validate chunk images
 						const std::vector<int>& validLocal = m_localTrajectoriesValid[revalidateIdx];

@@ -238,7 +238,7 @@ void SIFTImageManager::loadFromFile(const std::string& s)
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredTransforms, currFilteredTransforms.data(), sizeof(float4x4)*maxImageMatches, cudaMemcpyHostToDevice));
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(d_currFilteredTransformsInv, currFilteredTransformsInv.data(), sizeof(float4x4)*maxImageMatches, cudaMemcpyHostToDevice));
 
-		m_validImages.resize(m_maxNumImages);
+		m_validImages.resize(m_maxNumImages, 0);
 		in.read((char*)m_validImages.data(), sizeof(int) * m_maxNumImages);
 	}
 
