@@ -446,7 +446,7 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 		const float4 nTransInput = transform * nInput;
 
 		float3 tmp = intrinsics * make_float3(pTransInput.x, pTransInput.y, pTransInput.z);
-		int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z), (int)roundf(tmp.y / tmp.z)); // subsampled space
+		const int2 screenPos = make_int2((int)roundf(tmp.x / tmp.z), (int)roundf(tmp.y / tmp.z)); // subsampled space
 
 		if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)imageWidth && screenPos.y < (int)imageHeight) {
 			float4 pTarget = d_modelCamPos[screenPos.y * imageWidth + screenPos.x]; //getBestCorrespondence1x1

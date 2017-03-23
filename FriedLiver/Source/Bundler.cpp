@@ -45,6 +45,10 @@ Bundler::Bundler(unsigned int maxNumImages, unsigned int maxNumKeysPerImage,
 
 	m_continueRetry = 0;
 	m_revalidatedIdx = (unsigned int)-1;
+
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	m_corrEvaluator = NULL;
+#endif
 }
 
 
@@ -71,6 +75,9 @@ Bundler::~Bundler()
 	SAFE_DELETE(m_cudaCache);
 
 	MLIB_CUDA_SAFE_FREE(d_trajectory);
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	SAFE_DELETE(m_corrEvaluator);
+#endif
 }
 
 void Bundler::getCacheIntrinsics(float4x4& intrinsics, float4x4& intrinsicsInv)
@@ -133,7 +140,9 @@ unsigned int Bundler::matchAndFilter()
 		// --- sort the current key point matches
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.start(); }
 		m_siftManager->SortKeyPointMatchesCU(curFrame, startFrame, numFrames);
-
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+		if (m_corrEvaluator) m_corrEvaluator->evaluate(m_siftManager, m_cudaCache, MatrixConversion::toMlib(m_siftIntrinsicsInv), false, true, false, "raw");
+#endif
 		//debugging
 		//const bool usedebug = !m_bIsLocal;// && curFrame >= 49;
 		//std::vector<unsigned int> numMatches;
@@ -141,7 +150,7 @@ unsigned int Bundler::matchAndFilter()
 		//	m_siftManager->getNumRawMatchesDEBUG(numMatches);
 		//	int a = 5;
 		//}
-		////debugging
+		//debugging
 
 		// --- filter matches
 		const unsigned int minNumMatches = m_bIsLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
@@ -149,7 +158,9 @@ unsigned int Bundler::matchAndFilter()
 		//SIFTMatchFilter::filterKeyPointMatches(siftManager, siftIntrinsicsInv, minNumMatches);
 		m_siftManager->FilterKeyPointMatchesCU(curFrame, startFrame, numFrames, m_siftIntrinsicsInv, minNumMatches, GlobalBundlingState::get().s_maxKabschResidual2);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMatchFilterKeyPoint = m_timer.getElapsedTimeMS(); }
-
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+		if (m_corrEvaluator) m_corrEvaluator->evaluate(m_siftManager, m_cudaCache, MatrixConversion::toMlib(m_siftIntrinsicsInv), true, false, false, "kabsch");
+#endif
 		////debugging
 		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
@@ -163,7 +174,9 @@ unsigned int Bundler::matchAndFilter()
 		//SIFTMatchFilter::filterBySurfaceArea(siftManager, cachedFrames);
 		m_siftManager->FilterMatchesBySurfaceAreaCU(curFrame, startFrame, numFrames, m_siftIntrinsicsInv, GlobalBundlingState::get().s_surfAreaPcaThresh);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMatchFilterSurfaceArea = m_timer.getElapsedTimeMS(); }
-
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+		if (m_corrEvaluator) m_corrEvaluator->evaluate(m_siftManager, m_cudaCache, MatrixConversion::toMlib(m_siftIntrinsicsInv), true, false, false, "sa");
+#endif
 		////debugging
 		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
@@ -181,7 +194,9 @@ unsigned int Bundler::matchAndFilter()
 			GlobalAppState::get().s_sensorDepthMin, GlobalAppState::get().s_sensorDepthMax);
 		//0.1f, 3.0f);
 		if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.stop(); TimingLog::getFrameTiming(m_bIsLocal).timeMatchFilterDenseVerify = m_timer.getElapsedTimeMS(); }
-
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+		if (m_corrEvaluator) m_corrEvaluator->evaluate(m_siftManager, m_cudaCache, MatrixConversion::toMlib(m_siftIntrinsicsInv), true, false, true, "dense");
+#endif
 		////debugging
 		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);

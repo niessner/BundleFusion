@@ -33,6 +33,10 @@ public:
 	// -- various logging
 	void saveGlobalSparseCorrsToFile(const std::string& filename) const;
 
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	void finishCorrespondenceEvaluatorLogging();
+#endif
+
 private:
 
 	bool isLastLocalFrame(unsigned int curFrame) const { return (curFrame >= m_submapSize && (curFrame % m_submapSize) == 0); }

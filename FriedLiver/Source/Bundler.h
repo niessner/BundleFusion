@@ -1,12 +1,16 @@
 #pragma once
 
 #include "SBA.h"
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+#include "CorrespondenceEvaluator.h"
+#endif
 
 class SiftGPU;
 class SiftMatchGPU;
 class SIFTImageManager;
 class CUDACache;
 class CUDAImageManager;
+
 
 #define USE_RETRY //TODO MOVE OUT TO PARAMS
 
@@ -54,6 +58,14 @@ public:
 
 
 	// -- various logging
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	void initializeCorrespondenceEvaluator(const std::vector<mat4f>& trajectory, const std::string& logFilePrefix) {
+		SAFE_DELETE(m_corrEvaluator);
+		m_corrEvaluator = new CorrespondenceEvaluator(trajectory, logFilePrefix);
+		std::cout << "[CorrespondenceEvaluator] " << logFilePrefix << std::endl;
+	}
+	void finishCorrespondenceEvaluatorLogging() { if (m_corrEvaluator) m_corrEvaluator->finishLoggingToFile(); }
+#endif
 	void saveSparseCorrsToFile(const std::string& filename) const;
 	//TODO logging for residual information
 
@@ -85,6 +97,10 @@ private:
 
 	bool					m_bIsLocal;
 	Timer					m_timer;
+
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	CorrespondenceEvaluator* m_corrEvaluator;
+#endif
 };
 
 

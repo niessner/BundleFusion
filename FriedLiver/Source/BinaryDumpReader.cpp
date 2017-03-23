@@ -162,13 +162,13 @@ void BinaryDumpReader::evaluateTrajectory(const std::vector<mat4f>& trajectory) 
 	std::cout << "*********************************" << std::endl;
 	std::cout << "ate rmse = " << transErr.first << ", " << transErr.second << std::endl;
 	std::cout << "*********************************" << std::endl;
-	{
-		std::vector<mat4f> optTrajectory = trajectory;
-		optTrajectory.resize(numTransforms);
-		referenceTrajectory.resize(numTransforms);
-		PoseHelper::saveToPoseFile("debug/opt.txt", optTrajectory);
-		PoseHelper::saveToPoseFile("debug/gt.txt", referenceTrajectory);
-	}
+	//{
+	//	std::vector<mat4f> optTrajectory = trajectory;
+	//	optTrajectory.resize(numTransforms);
+	//	referenceTrajectory.resize(numTransforms);
+	//	PoseHelper::saveToPoseFile("debug/opt.txt", optTrajectory);
+	//	PoseHelper::saveToPoseFile("debug/gt.txt", referenceTrajectory);
+	//}
 }
 
 

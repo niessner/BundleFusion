@@ -151,6 +151,7 @@
       <Filter>Sensors</Filter>
     </ClCompile>
     <ClCompile Include="Source\OnlineBundler.cpp" />
+    <ClCompile Include="Source\CorrespondenceEvaluator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -403,6 +404,7 @@
     </ClInclude>
     <ClInclude Include="Source\OnlineBundler.h" />
     <ClInclude Include="Source\OnlineBundlerHelper.h" />
+    <ClInclude Include="Source\CorrespondenceEvaluator.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">

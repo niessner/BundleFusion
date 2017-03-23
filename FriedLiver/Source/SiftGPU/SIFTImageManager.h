@@ -233,6 +233,14 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(matchDistances.data(), d_currFilteredMatchKeyPointIndices + imagePairIndex * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED, sizeof(float) * numMatches, cudaMemcpyDeviceToHost));
 		}
 	}
+	void getCurrMatchKeyPointIndicesDEBUG(std::vector<uint2>& keyPointIndices, std::vector<unsigned int>& numMatches, bool filtered) const
+	{
+		numMatches.resize(getNumImages());
+		if (filtered)	{ MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatches.data(), d_currNumFilteredMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost)); }
+		else			{ MLIB_CUDA_SAFE_CALL(cudaMemcpy(numMatches.data(), d_currNumMatchesPerImagePair, sizeof(unsigned int)*numMatches.size(), cudaMemcpyDeviceToHost)); }		
+		if (filtered)	{ keyPointIndices.resize(numMatches.size() * MAX_MATCHES_PER_IMAGE_PAIR_FILTERED); MLIB_CUDA_SAFE_CALL(cudaMemcpy(keyPointIndices.data(), d_currFilteredMatchKeyPointIndices, sizeof(uint2) * keyPointIndices.size(), cudaMemcpyDeviceToHost)); }
+		else			{ keyPointIndices.resize(numMatches.size() * MAX_MATCHES_PER_IMAGE_PAIR_RAW); MLIB_CUDA_SAFE_CALL(cudaMemcpy(keyPointIndices.data(), d_currMatchKeyPointIndices, sizeof(uint2) * keyPointIndices.size(), cudaMemcpyDeviceToHost)); }
+	}
 	void getFiltKeyPointIndicesDEBUG(unsigned int imagePairIndex, std::vector<uint2>& keyPointIndices) const
 	{
 		unsigned int numMatches;

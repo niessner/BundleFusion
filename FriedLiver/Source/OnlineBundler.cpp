@@ -6,6 +6,9 @@
 #include "CUDAImageManager.h"
 #include "Bundler.h"
 #include "TrajectoryManager.h"
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+#include "SensorDataReader.h"
+#endif
 
 #include "SiftGPU/SiftCameraParams.h"
 #include "SiftGPU/MatrixConversion.h"
@@ -75,6 +78,16 @@ OnlineBundler::OnlineBundler(const RGBDSensor* sensor, const CUDAImageManager* i
 
 	m_bHasProcessedInputFrame = false;
 	m_bExitBundlingThread = false;
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+	if (GlobalAppState::get().s_sensorIdx != 8) throw MLIB_EXCEPTION("unable to evaluate sparse corrs for non sens-data input");
+	std::vector<mat4f> trajectory; 
+	{ // only want global trajectory
+		std::vector<mat4f> completeTrajectory; 
+		((SensorDataReader*)sensor)->getTrajectory(completeTrajectory);
+		for (unsigned int i = 0; i < completeTrajectory.size(); i += m_submapSize) trajectory.push_back(completeTrajectory[i]);
+	}
+	m_global->initializeCorrespondenceEvaluator(trajectory, "debug/_corr-evaluation");
+#endif
 }
 
 OnlineBundler::~OnlineBundler()
@@ -460,3 +473,13 @@ void OnlineBundler::saveGlobalSparseCorrsToFile(const std::string& filename) con
 {
 	m_global->saveSparseCorrsToFile(filename);
 }
+
+#ifdef EVALUATE_SPARSE_CORRESPONDENCES
+void OnlineBundler::finishCorrespondenceEvaluatorLogging()
+{
+	m_global->finishCorrespondenceEvaluatorLogging();
+	//these ones shouldn't have it anyways...
+	m_local->finishCorrespondenceEvaluatorLogging();
+	m_optLocal->finishCorrespondenceEvaluatorLogging();
+}
+#endif

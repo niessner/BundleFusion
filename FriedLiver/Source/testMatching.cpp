@@ -2501,7 +2501,7 @@ void TestMatching::debug()
 			ColorImageR8G8B8 image1 = m_colorImages[impair.second.x];
 			ColorImageR8G8B8 image2 = m_colorImages[impair.second.y];
 			SiftVisualization::printMatch("debug/maxres/" + std::to_string((int)(100 * impair.first)) + "_" + std::to_string(impair.second.x) + "-" + std::to_string(impair.second.y) + ".png",
-				impair.second, correspondences, image1, image2, m_colorCalibration.m_Intrinsic);
+				image1, image2, correspondences, m_colorCalibration.m_Intrinsic, impair.second);
 			const DepthImage32& depth1 = m_depthImages[impair.second.x];
 			const DepthImage32& depth2 = m_depthImages[impair.second.y];
 			image1.resize(depth1.getWidth(), depth1.getHeight());	image2.resize(depth2.getWidth(), depth2.getHeight());

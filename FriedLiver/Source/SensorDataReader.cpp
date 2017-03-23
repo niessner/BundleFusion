@@ -187,4 +187,16 @@ void SensorDataReader::evaluateTrajectory(const std::vector<mat4f>& trajectory) 
 	//}
 }
 
+void SensorDataReader::getTrajectory(std::vector<mat4f>& trajectory) const
+{
+	trajectory.clear();
+	if (!m_sensorData) return;
+	trajectory.resize(m_sensorData->m_frames.size());
+	for (unsigned int f = 0; f < m_sensorData->m_frames.size(); f++) {
+		trajectory[f] = m_sensorData->m_frames[f].getCameraToWorld();
+		if (trajectory[f][0] == -std::numeric_limits<float>::infinity())
+			throw MLIB_EXCEPTION("ERROR invalid transform in reference trajectory");
+	}
+}
+
 #endif

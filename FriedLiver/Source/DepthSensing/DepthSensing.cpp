@@ -904,12 +904,10 @@ void reintegrate()
 void StopScanningAndExit(bool aborted = false)
 {
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
-	{
-		std::vector<mat4f> trajectory;
-		g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
-		((SensorDataReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
-	}
-	g_depthSensingBundler->printSparseCorrEval();
+	g_depthSensingBundler->finishCorrespondenceEvaluatorLogging();
+	std::vector<mat4f> trajectory;
+	g_depthSensingBundler->getTrajectoryManager()->getOptimizedTransforms(trajectory);
+	if (GlobalAppState::get().s_sensorIdx == 8) ((SensorDataReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
 #endif
 #ifdef PRINT_MEM_STATS
 	unsigned int heapOccCount = g_sceneRep->getHashParams().m_numSDFBlocks - g_sceneRep->getHeapFreeCount();
@@ -933,7 +931,7 @@ void StopScanningAndExit(bool aborted = false)
 		numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);		numTransforms = (unsigned int)trajectory.size();
 		if (numValidTransforms < (unsigned int)std::round(0.5f * numTransforms)) valid = false; // not enough valid transforms
 		std::cout << "#VALID TRANSFORMS = " << numValidTransforms << std::endl;
-		((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file //TODO UNCOMMENT
+		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file //TODO UNCOMMENT
 		//save ply
 		std::cout << "[marching cubes] ";
 		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys

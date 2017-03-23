@@ -106,76 +106,76 @@ void SiftVisualization::printMatch(const SIFTImageManager* siftManager, const st
 	FreeImageWrapper::saveImage(filename, matchImage);
 }
 
-void SiftVisualization::printMatch(const std::string& filename, const EntryJ& correspondence, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics)
-{
-	ColorImageR32G32B32 matchImage;
-	if (!util::fileExists(filename)) {
-		matchImage.allocate(image1.getWidth() * 2, image1.getHeight());
-		ColorImageR32G32B32 im1(image1);
-		ColorImageR32G32B32 im2(image2);
-		matchImage.copyIntoImage(im1, 0, 0);
-		matchImage.copyIntoImage(im2, image1.getWidth(), 0);
-	}
-	else {
-		FreeImageWrapper::loadImage(filename, matchImage);
-	}
-
-	const vec3f color = vec3f(0.0f, 0.0f, 1.0f); // blue
-
-	vec3f camPos0(correspondence.pos_i.x, correspondence.pos_i.y, correspondence.pos_i.z);
-	vec3f camPos1(correspondence.pos_j.x, correspondence.pos_j.y, correspondence.pos_j.z);
-
-	// project to image
-	vec3f projPos0 = colorIntrinsics * camPos0;
-	vec2i p0 = math::round(vec2f(projPos0.x / projPos0.z, projPos0.y / projPos0.z));
-	vec3f projPos1 = colorIntrinsics * camPos1;
-	vec2i p1 = math::round(vec2f(projPos1.x / projPos1.z, projPos1.y / projPos1.z));
-
-	p1 += vec2i(image1.getWidth(), 0);
-
-	const int radius = 3;
-	ImageHelper::drawCircle(matchImage, p0, radius, color);
-	ImageHelper::drawCircle(matchImage, p1, radius, color);
-	ImageHelper::drawLine(matchImage, p0, p1, color);
-	FreeImageWrapper::saveImage(filename, matchImage);
-}
-
-void SiftVisualization::printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics)
-{
-	ColorImageR32G32B32 matchImage;
-	matchImage.allocate(image1.getWidth() * 2, image1.getHeight());
-	ColorImageR32G32B32 im1(image1);
-	ColorImageR32G32B32 im2(image2);
-	matchImage.copyIntoImage(im1, 0, 0);
-	matchImage.copyIntoImage(im2, image1.getWidth(), 0);
-
-	std::vector<vec2i> from, to;
-	for (unsigned int i = 0; i < correspondences.size(); i++) {
-		const EntryJ& corr = correspondences[i];
-		if (corr.isValid() && corr.imgIdx_i == imageIndices.x && corr.imgIdx_j == imageIndices.y) {
-			vec3f proj0 = colorIntrinsics * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z);
-			vec3f proj1 = colorIntrinsics * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
-			vec2i p0 = math::round(vec2f(proj0.x / proj0.z, proj0.y / proj0.z));
-			vec2i p1 = math::round(vec2f(proj1.x / proj1.z, proj1.y / proj1.z));
-			from.push_back(p0);			to.push_back(p1);
-		}
-	}
-	if (from.empty()) {
-		std::cout << "no matches to print for images " << imageIndices << std::endl;
-		return;
-	}
-	//draw
-	const int radius = 3;
-	for (unsigned int i = 0; i < from.size(); i++) {
-		const vec3f color = vec3f(RGBColor::randomColor());
-		vec2i p0 = from[i];
-		vec2i p1 = to[i] + vec2i(image1.getWidth(), 0);
-		ImageHelper::drawCircle(matchImage, p0, radius, color);
-		ImageHelper::drawCircle(matchImage, p1, radius, color);
-		ImageHelper::drawLine(matchImage, p0, p1, color);
-	}
-	FreeImageWrapper::saveImage(filename, matchImage);
-}
+//void SiftVisualization::printMatch(const std::string& filename, const EntryJ& correspondence, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics)
+//{
+//	ColorImageR32G32B32 matchImage;
+//	if (!util::fileExists(filename)) {
+//		matchImage.allocate(image1.getWidth() * 2, image1.getHeight());
+//		ColorImageR32G32B32 im1(image1);
+//		ColorImageR32G32B32 im2(image2);
+//		matchImage.copyIntoImage(im1, 0, 0);
+//		matchImage.copyIntoImage(im2, image1.getWidth(), 0);
+//	}
+//	else {
+//		FreeImageWrapper::loadImage(filename, matchImage);
+//	}
+//
+//	const vec3f color = vec3f(0.0f, 0.0f, 1.0f); // blue
+//
+//	vec3f camPos0(correspondence.pos_i.x, correspondence.pos_i.y, correspondence.pos_i.z);
+//	vec3f camPos1(correspondence.pos_j.x, correspondence.pos_j.y, correspondence.pos_j.z);
+//
+//	// project to image
+//	vec3f projPos0 = colorIntrinsics * camPos0;
+//	vec2i p0 = math::round(vec2f(projPos0.x / projPos0.z, projPos0.y / projPos0.z));
+//	vec3f projPos1 = colorIntrinsics * camPos1;
+//	vec2i p1 = math::round(vec2f(projPos1.x / projPos1.z, projPos1.y / projPos1.z));
+//
+//	p1 += vec2i(image1.getWidth(), 0);
+//
+//	const int radius = 3;
+//	ImageHelper::drawCircle(matchImage, p0, radius, color);
+//	ImageHelper::drawCircle(matchImage, p1, radius, color);
+//	ImageHelper::drawLine(matchImage, p0, p1, color);
+//	FreeImageWrapper::saveImage(filename, matchImage);
+//}
+//
+//void SiftVisualization::printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics)
+//{
+//	ColorImageR32G32B32 matchImage;
+//	matchImage.allocate(image1.getWidth() * 2, image1.getHeight());
+//	ColorImageR32G32B32 im1(image1);
+//	ColorImageR32G32B32 im2(image2);
+//	matchImage.copyIntoImage(im1, 0, 0);
+//	matchImage.copyIntoImage(im2, image1.getWidth(), 0);
+//
+//	std::vector<vec2i> from, to;
+//	for (unsigned int i = 0; i < correspondences.size(); i++) {
+//		const EntryJ& corr = correspondences[i];
+//		if (corr.isValid() && corr.imgIdx_i == imageIndices.x && corr.imgIdx_j == imageIndices.y) {
+//			vec3f proj0 = colorIntrinsics * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z);
+//			vec3f proj1 = colorIntrinsics * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+//			vec2i p0 = math::round(vec2f(proj0.x / proj0.z, proj0.y / proj0.z));
+//			vec2i p1 = math::round(vec2f(proj1.x / proj1.z, proj1.y / proj1.z));
+//			from.push_back(p0);			to.push_back(p1);
+//		}
+//	}
+//	if (from.empty()) {
+//		std::cout << "no matches to print for images " << imageIndices << std::endl;
+//		return;
+//	}
+//	//draw
+//	const int radius = 3;
+//	for (unsigned int i = 0; i < from.size(); i++) {
+//		const vec3f color = vec3f(RGBColor::randomColor());
+//		vec2i p0 = from[i];
+//		vec2i p1 = to[i] + vec2i(image1.getWidth(), 0);
+//		ImageHelper::drawCircle(matchImage, p0, radius, color);
+//		ImageHelper::drawCircle(matchImage, p1, radius, color);
+//		ImageHelper::drawLine(matchImage, p0, p1, color);
+//	}
+//	FreeImageWrapper::saveImage(filename, matchImage);
+//}
 
 void SiftVisualization::printMatch(const std::string& filename, const SIFTImageManager* siftManager, const CUDACache* cudaCache, const vec2ui& imageIndices)
 {
@@ -199,18 +199,121 @@ void SiftVisualization::printMatch(const std::string& filename, const SIFTImageM
 	std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
 	MLIB_ASSERT(!correspondences.empty());
 	MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
-	std::vector<EntryJ> imagePairMatches;
-	for (const auto& corr : correspondences) {
-		if (corr.isValid() && corr.imgIdx_i == imageIndices.x && corr.imgIdx_j == imageIndices.y)
-			imagePairMatches.push_back(corr);
-	}
 
 	mat4f colorIntrinsics = cudaCache->getIntrinsics();
 	colorIntrinsics._m00 *= (float)widthSIFT / (float)cudaCache->getWidth();
 	colorIntrinsics._m11 *= (float)heightSIFT / (float)cudaCache->getHeight();
 	colorIntrinsics._m02 *= (float)(widthSIFT -1)/ (float)(cudaCache->getWidth()-1);
 	colorIntrinsics._m12 *= (float)(heightSIFT-1) / (float)(cudaCache->getHeight()-1);
-	printMatch(filename, imageIndices, imagePairMatches, xImage, yImage, colorIntrinsics);
+
+	printMatch(filename, xImage, yImage, correspondences, colorIntrinsics, imageIndices);
+}
+
+void SiftVisualization::printMatch(const std::string& filename, const CUDACache* cudaCache, const std::vector<SIFTKeyPoint>& keys, const std::vector<unsigned int>& numMatches, 
+	const std::vector<uint2>& keyPointIndices, const vec2ui& imageIndices, unsigned int keyIndicesOffset, bool filtered)
+{
+	if (numMatches[imageIndices.x] == 0) {
+		std::cout << "no matches to print for " << imageIndices << std::endl;
+		return;
+	}
+
+	const unsigned int widthSIFT = GlobalBundlingState::get().s_widthSIFT;
+	const unsigned int heightSIFT = GlobalBundlingState::get().s_heightSIFT;
+
+	//get images
+	const std::vector<CUDACachedFrame>& cachedFrames = cudaCache->getCacheFrames();
+
+	ColorImageR32 xIntensity(cudaCache->getWidth(), cudaCache->getHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(xIntensity.getData(), cachedFrames[imageIndices.x].d_intensityDownsampled, sizeof(float) * xIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	ColorImageR8G8B8 xImage; convertIntensityToRGB(xIntensity, xImage);
+	xImage.resize(widthSIFT, heightSIFT);
+	ColorImageR32 yIntensity(cudaCache->getWidth(), cudaCache->getHeight());
+	MLIB_CUDA_SAFE_CALL(cudaMemcpy(yIntensity.getData(), cachedFrames[imageIndices.y].d_intensityDownsampled, sizeof(float) * yIntensity.getNumPixels(), cudaMemcpyDeviceToHost));
+	ColorImageR8G8B8 yImage; convertIntensityToRGB(yIntensity, yImage);
+	yImage.resize(widthSIFT, heightSIFT);
+
+	//collect matches for these images
+	std::vector<std::pair<vec2f, vec2f>> imagePairMatches;
+	for (unsigned int m = 0; m < numMatches[imageIndices.x]; m++) {
+		const SIFTKeyPoint& k0 = keys[keyPointIndices[keyIndicesOffset + m].x];
+		const SIFTKeyPoint& k1 = keys[keyPointIndices[keyIndicesOffset + m].y];
+		imagePairMatches.push_back(std::make_pair(vec2f(k0.pos.x, k0.pos.y), vec2f(k1.pos.x, k1.pos.y)));
+	}
+	printMatch(filename, xImage, yImage, imagePairMatches);
+}
+
+void SiftVisualization::printMatch(const std::string& filename, const SensorData& sd, const std::vector<SIFTKeyPoint>& keys, 
+	const std::vector<unsigned int>& numMatches, const std::vector<uint2>& keyPointIndices, const vec2ui& imageIndices, 
+	unsigned int keyIndicesOffset, bool filtered, unsigned int singleMatchToPrint /*= (unsigned int)-1*/)
+{
+	if (numMatches[imageIndices.x] == 0) {
+		std::cout << "no matches to print for " << imageIndices << std::endl;
+		return;
+	}
+
+	//get images
+	ColorImageR8G8B8 xImage = sd.computeColorImage(imageIndices.x);
+	ColorImageR8G8B8 yImage = sd.computeColorImage(imageIndices.y);
+
+	//collect matches for these images
+	std::vector<std::pair<vec2f, vec2f>> imagePairMatches;
+	if (singleMatchToPrint == (unsigned int)-1) {
+		for (unsigned int m = 0; m < numMatches[imageIndices.x]; m++) {
+			const SIFTKeyPoint& k0 = keys[keyPointIndices[keyIndicesOffset + m].x];
+			const SIFTKeyPoint& k1 = keys[keyPointIndices[keyIndicesOffset + m].y];
+			imagePairMatches.push_back(std::make_pair(vec2f(k0.pos.x, k0.pos.y), vec2f(k1.pos.x, k1.pos.y)));
+		}
+	}
+	else {
+		const SIFTKeyPoint& k0 = keys[keyPointIndices[keyIndicesOffset + singleMatchToPrint].x];
+		const SIFTKeyPoint& k1 = keys[keyPointIndices[keyIndicesOffset + singleMatchToPrint].y];
+		imagePairMatches.push_back(std::make_pair(vec2f(k0.pos.x, k0.pos.y), vec2f(k1.pos.x, k1.pos.y)));
+	}
+	printMatch(filename, xImage, yImage, imagePairMatches);
+}
+
+void SiftVisualization::printMatch(const std::string& filename, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2,
+	const std::vector<std::pair<vec2f, vec2f>>& imagePairMatches)
+{
+	if (imagePairMatches.empty()) return; //no matches to print
+
+	ColorImageR32G32B32 matchImage(image1.getWidth() * 2, image1.getHeight());
+	{
+		ColorImageR32G32B32 im1(image1);
+		ColorImageR32G32B32 im2(image2);
+		matchImage.copyIntoImage(im1, 0, 0);
+		matchImage.copyIntoImage(im2, im1.getWidth(), 0);
+	}
+	for (const auto& m : imagePairMatches) {
+		const vec3f color = vec3f(RGBColor::randomColor());
+		const vec2i p0 = math::round(m.first);
+		const vec2i p1 = math::round(m.second) + vec2i(image1.getWidth(), 0);
+		const int radius = 3;
+		ImageHelper::drawCircle(matchImage, p0, radius, color);
+		ImageHelper::drawCircle(matchImage, p1, radius, color);
+		ImageHelper::drawLine(matchImage, p0, p1, color);
+	}
+	FreeImageWrapper::saveImage(filename, matchImage);
+}
+
+void SiftVisualization::printMatch(const std::string& filename, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const std::vector<EntryJ>& correspondences, const mat4f& colorIntrinsics, const vec2ui& imageIndices)
+{
+	std::vector<std::pair<vec2f, vec2f>> imagePairMatches;
+	for (unsigned int i = 0; i < correspondences.size(); i++) {
+		const EntryJ& corr = correspondences[i];
+		if (corr.isValid() && corr.imgIdx_i == imageIndices.x && corr.imgIdx_j == imageIndices.y) {
+			vec3f proj0 = colorIntrinsics * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z);
+			vec3f proj1 = colorIntrinsics * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
+			vec2f p0 = vec2f(proj0.x / proj0.z, proj0.y / proj0.z);
+			vec2f p1 = vec2f(proj1.x / proj1.z, proj1.y / proj1.z);
+			imagePairMatches.push_back(std::make_pair(p0, p1));
+		}
+	}
+	if (imagePairMatches.empty()) {
+		std::cout << "no matches to print for " << imageIndices << std::endl;
+		return;
+	}
+	printMatch(filename, image1, image2, imagePairMatches);
 }
 
 void SiftVisualization::printCurrentMatches(const std::string& outPath, const SIFTImageManager* siftManager, const CUDACache* cudaCache, bool filtered, int maxNumMatches /*= -1*/)
@@ -757,10 +860,10 @@ void SiftVisualization::printAllMatches(const std::string& outDirectory, const s
 
 	for (auto& a : imageImageCorrSet) {
 		vec2ui imageIndices = a.first;
-		const std::vector<EntryJ>& imagePairMatches = matches[a.second];
+		const std::vector<EntryJ>& imagePairCorrs = matches[a.second];
 		//print matches
 		const std::string filename = outDirectory + std::to_string(imageIndices.x) + "-" + std::to_string(imageIndices.y) + ".png";
-		printMatch(filename, imageIndices, imagePairMatches, colorImages[imageIndices.x], colorImages[imageIndices.y], colorIntrinsics);
+		printMatch(filename, colorImages[imageIndices.x], colorImages[imageIndices.y], imagePairCorrs, colorIntrinsics, imageIndices);
 	}
 	std::cout << "done!" << std::endl;
 }
@@ -811,48 +914,3 @@ void SiftVisualization::saveFrameToPointCloud(const std::string& filename, const
 	PointCloudIOf::saveToFile(filename, pc);
 }
 
-//void SiftVisualization::visualizeTrajectory(const std::vector<mat4f>& trajectory, const std::string& filename) //doesn't work
-//{
-//	if (trajectory.size() < 3) return; //cannot vis
-//
-//	//get camera positions (translation only)
-//	std::vector<vec3f> pts; std::vector<unsigned int> indices;
-//	for (unsigned int i = 0; i < trajectory.size(); i++) {
-//		if (trajectory[i]._m00 != -std::numeric_limits<float>::infinity()) {
-//			pts.push_back(trajectory[i].getTranslation());
-//			indices.push_back(i);
-//		}
-//	}
-//
-//	auto axes = math::pointSetPCA(pts);
-//	vec3f mean = std::accumulate(pts.begin(), pts.end(), vec3f::origin) / (float)pts.size();
-//	// project points to plane(axes[2].first, mean)
-//	std::vector<vec2f> ptsProj(pts.size()); 
-//	const vec3f& normal = axes[2].first;
-//	for (unsigned int i = 0; i < pts.size(); i++) {
-//		pts[i] = pts[i] - (normal | (pts[i] - mean)) * normal; // projected point (3d)
-//		ml::vec3f s = pts[i] - mean;
-//		ptsProj[i] = ml::vec2f(s | axes[0].first, s | axes[1].first); // projected point (2d plane basis)
-//	}
-//
-//	//re-center
-//	vec2f rangeMin(std::numeric_limits<float>::infinity()), rangeMax(-std::numeric_limits<float>::infinity());
-//	for (const vec2f& p : ptsProj) {
-//		if (p.x < rangeMin.x) rangeMin.x = p.x;
-//		if (p.y < rangeMin.y) rangeMin.y = p.y;
-//		if (p.x > rangeMax.x) rangeMax.x = p.x;
-//		if (p.y > rangeMax.y) rangeMax.y = p.y;
-//	}
-//
-//	float scaleFactor = 1.0f; const unsigned int minImageDim = 500;
-//	vec2i imageBounds = math::ceil(rangeMax - rangeMin);
-//	if (std::max(imageBounds.x, imageBounds.y) < minImageDim) scaleFactor = (float)minImageDim / (float)std::min(imageBounds.x, imageBounds.y);
-//	imageBounds *= scaleFactor;
-//	ColorImageR8G8B8 image(imageBounds.x, imageBounds.y); image.setPixels(vec3uc(255, 255, 255)); // white background
-//	for (unsigned int i = 0; i < ptsProj.size(); i++) { //plot points
-//		vec3uc color = vec3uc(255.0f * BaseImageHelper::convertDepthToRGB((float)indices[i], 0.0f, (float)indices.size()));
-//		vec2i position = math::round(scaleFactor * (ptsProj[i] - rangeMin));
-//		ImageHelper::drawCircle(image, position, 3, color);
-//	}
-//	FreeImageWrapper::saveImage(filename, image);
-//}

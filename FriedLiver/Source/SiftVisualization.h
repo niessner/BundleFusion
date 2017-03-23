@@ -20,15 +20,23 @@ public:
 	static void printMatches(const std::string& outPath, const SIFTImageManager* siftManager, const std::vector<ColorImageR8G8B8>& colorImages,
 		unsigned int frame, bool filtered, int maxNumMatches = -1);
 
-
+	//print from global corrs
 	static void printMatch(const std::string& filename, const SIFTImageManager* siftManager, const CUDACache* cudaCache, const vec2ui& imageIndices);
+	//print from cur match set
+	static void printMatch(const std::string& filename, const CUDACache* cudaCache, const std::vector<SIFTKeyPoint>& keys,
+		const std::vector<unsigned int>& numMatches, const std::vector<uint2>& keyPointIndices, const vec2ui& imageIndices, 
+		unsigned int keyIndicesOffset, bool filtered);
+	static void printMatch(const std::string& filename, const SensorData& sd, const std::vector<SIFTKeyPoint>& keys,
+		const std::vector<unsigned int>& numMatches, const std::vector<uint2>& keyPointIndices, const vec2ui& imageIndices,
+		unsigned int keyIndicesOffset, bool filtered, unsigned int singleMatchToPrint = (unsigned int)-1);
+
 	static void printMatch(const SIFTImageManager* siftManager, const std::string& filename, const vec2ui& imageIndices,
 		const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, float distMax, bool filtered, int maxNumMatches);
 
-	static void printMatch(const std::string& filename, const EntryJ& correspondence,
-		const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics);
-	static void printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences,
-		const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics);
+	//static void printMatch(const std::string& filename, const EntryJ& correspondence,
+	//	const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics);
+	//static void printMatch(const std::string& filename, const vec2ui& imageIndices, const std::vector<EntryJ>& correspondences,
+	//	const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2, const mat4f& colorIntrinsics);
 
 
 	static void saveImPairToPointCloud(const std::string& prefix, const DepthImage32& depthImage0, const ColorImageR8G8B8& colorImage0,
@@ -71,7 +79,10 @@ public:
 	static void printAllMatches(const std::string& outDirectory, const std::vector<EntryJ>& correspondences, unsigned int numImages,
 		const std::vector<ColorImageR8G8B8>& colorImages, const mat4f& colorIntrinsics);
 
-	//static void visualizeTrajectory(const std::vector<mat4f>& trajectory, const std::string& filename);//doesn't work //todo figure out
+	static void printMatch(const std::string& filename, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2,
+		const std::vector<EntryJ>& correspondences, const mat4f& colorIntrinsics, const vec2ui& imageIndices);
+	static void printMatch(const std::string& filename, const ColorImageR8G8B8& image1, const ColorImageR8G8B8& image2,
+		const std::vector<std::pair<vec2f, vec2f>>& imagePairMatches);
 private:
 
 	static void convertIntensityToRGB(const ColorImageR32& intensity, ColorImageR8G8B8& image) {
