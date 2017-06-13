@@ -1,10 +1,10 @@
 #include <iostream>
 
-//for debug purposes
+////for debug purposes
 //#define PRINT_RESIDUALS_SPARSE
 //#define PRINT_RESIDUALS_DENSE
 
-#define ENABLE_EARLY_OUT
+//#define ENABLE_EARLY_OUT
 
 #include "GlobalDefines.h"
 #include "SolverBundlingParameters.h"
@@ -21,63 +21,6 @@
 #define THREADS_PER_BLOCK_DENSE_DEPTH_FLIP 64
 
 #define THREADS_PER_BLOCK_DENSE_OVERLAP 512
-
-
-//!!!debugging
-__global__ void visualizeCorrespondences_Kernel(uint2 imageIndices, SolverInput input, SolverState state, SolverParameters parameters, float3* d_corrImage)
-{
-	const unsigned int i = imageIndices.x;	const unsigned int j = imageIndices.y;
-
-	const unsigned int tidx = threadIdx.x;
-	const unsigned int gidx = tidx * gridDim.x + blockIdx.x;
-
-	if (gidx < (input.denseDepthWidth * input.denseDepthHeight)) {
-		const unsigned int x = gidx % input.denseDepthWidth;
-		const unsigned int y = gidx / input.denseDepthWidth;
-		const bool printDebug = x == 81 && y == 97;
-#ifdef USE_LIE_SPACE
-		float4x4 transform = state.d_xTransformInverses[i] * state.d_xTransforms[j]; //invTransform_i * transform_j
-#else
-		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
-		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
-		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
-		float4x4 transform = invTransform_i * transform_j;
-#endif
-		// find correspondence
-		float3 camPosSrc; float3 camPosSrcToTgt; float2 tgtScreenPosf; float3 camPosTgt; float3 normalTgt;
-#ifdef CUDACACHE_UCHAR_NORMALS
-		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
-			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
-			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
-			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
-			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPosf, camPosTgt, normalTgt)) { //i tgt, j src
-#else
-		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
-			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
-			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
-			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
-			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPosf, camPosTgt, normalTgt)) { //i tgt, j src
-#endif
-
-			int2 tgtScreenPos = make_int2((int)round(tgtScreenPosf.x), (int)round(tgtScreenPosf.y));
-			d_corrImage[tgtScreenPos.y * input.denseDepthWidth + tgtScreenPos.x] = camPosSrc;
-			if (printDebug) printf("(%d,%d) -> (%d,%d) valid corr\n", x, y, tgtScreenPos.x, tgtScreenPos.y);
-		} // found correspondence
-	} // valid image pixel
-}
-extern "C"
-void VisualizeCorrespondences(const uint2& imageIndices, const SolverInput& input, SolverState& state, SolverParameters& parameters, float3* d_corrImage)
-{
-	const int grid = (input.denseDepthWidth*input.denseDepthHeight + THREADS_PER_BLOCK_DENSE_DEPTH - 1) / THREADS_PER_BLOCK_DENSE_DEPTH;
-
-	visualizeCorrespondences_Kernel << < grid, THREADS_PER_BLOCK_DENSE_DEPTH >> >(imageIndices, input, state, parameters, d_corrImage);
-#ifdef _DEBUG
-	cutilSafeCall(cudaDeviceSynchronize());
-	cutilCheckMsg(__FUNCTION__);
-#endif
-}
-//!!!debugging
-
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -109,12 +52,12 @@ __global__ void FindImageImageCorr_Kernel(SolverInput input, SolverState state, 
 #else
 		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
 		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
-		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
+		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE?
 		float4x4 transform = invTransform_i * transform_j;
 #endif
-		if (!computeAngleDiff(transform, 1.0f)) return; //~60 degrees
+		//if (!computeAngleDiff(transform, 1.0f)) return; //~60 degrees //TODO HERE ANGIE
 		//if (!computeAngleDiff(transform, 0.8f)) return; //~45 degrees
-		//if (!computeAngleDiff(transform, 0.52f)) return; //~30 degrees
+		if (!computeAngleDiff(transform, 0.52f)) return; //~30 degrees
 
 		// find correspondence
 		__shared__ int foundCorr[1]; foundCorr[0] = 0;
@@ -169,19 +112,33 @@ __global__ void FindDenseCorrespondences_Kernel(SolverInput input, SolverState s
 		__shared__ int s_count[numWarps];
 		s_count[0] = 0;
 		int count = 0.0f;
+		//TODO HERE ANGIE
 #ifdef CUDACACHE_UCHAR_NORMALS
 		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
 			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
 			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
-#else
+#elif defined(CUDACACHE_FLOAT_NORMALS)
 		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
 			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
 #endif
+//#ifdef CUDACACHE_UCHAR_NORMALS
+//		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
+//			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+//			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
+//			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
+//			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
+//#else
+//		if (findDenseCorr(gidx, input.denseDepthWidth, input.denseDepthHeight,
+//			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+//			input.d_cacheFrames[i].d_depthDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
+//			input.d_cacheFrames[j].d_depthDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
+//			parameters.denseDepthMin, parameters.denseDepthMax)) { //i tgt, j src
+//#endif
 			//atomicAdd(&state.d_denseCorrCounts[imPairIdx], 1.0f);
 			count++;
 		} // found correspondence
@@ -210,12 +167,14 @@ __global__ void WeightDenseCorrespondences_Kernel(unsigned int N, SolverState st
 		float x = state.d_denseCorrCounts[idx];
 		if (x > 0) {
 			//if (x < 3200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
-			//if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			if (x < 800) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
 			//if (x < 400) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
-			if (x < 200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS
+			//if (x < 200) state.d_denseCorrCounts[idx] = 0; //don't consider too small #corr //TODO PARAMS //TODO EVAL DEBUG
 			else {
 				state.d_denseCorrCounts[idx] = 1.0f / min(logf(x), 9.0f); // natural log //TODO PARAMS
 			}
+
+			//state.d_denseCorrCounts[idx] = 1.0f / clamp(logf(x), 2.0f, 9.0f); // natural log //TODO PARAMS
 		}
 	}
 }
@@ -243,7 +202,7 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 #else
 		float4x4 transform_i = evalRtMat(state.d_xRot[i], state.d_xTrans[i]);
 		float4x4 transform_j = evalRtMat(state.d_xRot[j], state.d_xTrans[j]);
-		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE THIS CRAP
+		float4x4 invTransform_i = transform_i.getInverse();						//TODO PRECOMPUTE?
 		float4x4 transform = invTransform_i * transform_j;
 #endif
 		// point-to-plane term
@@ -255,19 +214,33 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 
 		// find correspondence
 		float3 camPosSrc; float3 camPosSrcToTgt; float3 camPosTgt; float3 normalTgt; float2 tgtScreenPos;
-#ifdef CUDACACHE_UCHAR_NORMALS
-		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
-			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
-			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
-			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
-			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
-#else
+		//TODO HERE ANGIE
+#ifdef CUDACACHE_FLOAT_NORMALS
 		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
 			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
 			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
 			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
 			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+#elif defined(CUDACACHE_UCHAR_NORMALS)
+		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
+			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
+			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
+			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
 #endif
+//#ifdef CUDACACHE_UCHAR_NORMALS
+//		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
+//			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+//			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampledUCHAR4,
+//			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampledUCHAR4,
+//			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+//#else
+//		bool foundCorr = findDenseCorr(srcIdx, input.denseDepthWidth, input.denseDepthHeight,
+//			parameters.denseDistThresh, parameters.denseNormalThresh, transform, input.intrinsics,
+//			input.d_cacheFrames[i].d_cameraposDownsampled, input.d_cacheFrames[i].d_normalsDownsampled,
+//			input.d_cacheFrames[j].d_cameraposDownsampled, input.d_cacheFrames[j].d_normalsDownsampled,
+//			parameters.denseDepthMin, parameters.denseDepthMax, camPosSrc, camPosSrcToTgt, tgtScreenPos, camPosTgt, normalTgt); //i tgt, j src
+//#endif
 		if (useDepth) {
 			if (foundCorr) {
 				// point-to-plane residual
@@ -280,10 +253,10 @@ __global__ void BuildDenseSystem_Kernel(SolverInput input, SolverState state, So
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * max(0.0f, (1.0f - camPosTgt.z / 1.8f));
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.5f), 1.8f));
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.0f), 1.8f)); //fr3_office, fr1_desk_f20
-				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.0f), 2.5f)); //fr2_xyz_half
+				depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 2.0f), 2.5f)); //fr2_xyz_half
 				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / 3.5f), 1.8f)); //fr3_nstn
 
-				depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / parameters.denseDepthMax), 1.8f));
+				//depthWeight = parameters.weightDenseDepth * imPairWeight * (pow(max(0.0f, 1.0f - camPosTgt.z / parameters.denseDepthMax), 1.8f)); //TODO EVAL DEBUGGING
 
 				//float wtgt = (pow(max(0.0f, 1.0f - camPosTgt.z / 2.5f), 1.8f));
 				//float wsrc = (pow(max(0.0f, 1.0f - camPosSrc.z / 2.5f), 1.8f));
@@ -385,26 +358,55 @@ bool BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-	//!!!DEBUGGING //remember the delete!
-	//float* denseCorrCounts = new float[maxDenseImPairs];
-	//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
+	////debugging //remember the delete!
+	//float* denseCorrCounts = new float[numOverlapImagePairs];
+	//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*numOverlapImagePairs, cudaMemcpyDeviceToHost));
 	//unsigned int totalCount = 0;
-	//for (unsigned int i = 0; i < maxDenseImPairs; i++) { totalCount += (unsigned int)denseCorrCounts[i]; }
+	//for (unsigned int i = 0; i < numOverlapImagePairs; i++) { totalCount += (unsigned int)denseCorrCounts[i]; }
 	//printf("total count = %d\n", totalCount);
-	//!!!DEBUGGING
+
+	//uint2* imageIndices = new uint2[numOverlapImagePairs];
+	//cutilSafeCall(cudaMemcpy(imageIndices, state.d_denseOverlappingImages, sizeof(uint2)*numOverlapImagePairs, cudaMemcpyDeviceToHost));
+	//if (imageIndices) delete[] imageIndices;
+	////debugging
+
+	//debugging - compute some overlap stats
+	//if (true || input.numberOfImages > 11) {
+	//	float4x4* transforms = new float4x4[input.numberOfImages];
+	//	float* denseCorrCounts = new float[numOverlapImagePairs];
+	//	uint2* imageIndices = new uint2[numOverlapImagePairs];
+	//	cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*numOverlapImagePairs, cudaMemcpyDeviceToHost));
+	//	cutilSafeCall(cudaMemcpy(imageIndices, state.d_denseOverlappingImages, sizeof(uint2)*numOverlapImagePairs, cudaMemcpyDeviceToHost));
+	//	cutilSafeCall(cudaMemcpy(transforms, state.d_xTransforms, sizeof(float4x4)*input.numberOfImages, cudaMemcpyDeviceToHost));
+	//	FILE* fp = fopen("debug/overlaps.csv", "w");
+	//	char buffer[128];
+	//	for (int i = 0; i < numOverlapImagePairs; i++) {
+	//		if (denseCorrCounts[i] > 0) {
+	//			float3 d = transforms[imageIndices[i].x].getTranslation() - transforms[imageIndices[i].y].getTranslation();
+	//			sprintf(buffer, "%d,%d,%d,%f\n", imageIndices[i].x, imageIndices[i].y, (int)denseCorrCounts[i], length(d));
+	//			fwrite(buffer, sizeof(char), strlen(buffer), fp);
+	//		}
+	//	}
+	//	fclose(fp);
+	//	if (transforms) delete[] transforms;
+	//	if (denseCorrCounts) delete[] denseCorrCounts;
+	//	if (imageIndices) delete[] imageIndices;
+	//	int a = 5;
+	//}
+
 	int wgrid = (numOverlapImagePairs + THREADS_PER_BLOCK_DENSE_DEPTH_FLIP - 1) / THREADS_PER_BLOCK_DENSE_DEPTH_FLIP;
 	WeightDenseCorrespondences_Kernel << < wgrid, THREADS_PER_BLOCK_DENSE_DEPTH_FLIP >> >(maxDenseImPairs, state);
 #ifdef _DEBUG
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-	//!!!DEBUGGING
+	////debugging
 	//cutilSafeCall(cudaMemcpy(denseCorrCounts, state.d_denseCorrCounts, sizeof(float)*maxDenseImPairs, cudaMemcpyDeviceToHost));
 	//totalCount = 0;
 	//for (unsigned int i = 0; i < maxDenseImPairs; i++) { if (denseCorrCounts[i] > 0.0f) totalCount++; }
 	//printf("total count = %d\n", totalCount);
 	//if (denseCorrCounts) delete[] denseCorrCounts;
-	//!!!DEBUGGING
+	////debugging
 	if (timer) timer->endEvent();
 	if (timer) timer->startEvent("BuildDenseDepthSystem - build jtj/jtr");
 
@@ -419,7 +421,31 @@ bool BuildDenseSystem(const SolverInput& input, SolverState& state, SolverParame
 	cutilSafeCall(cudaDeviceSynchronize());
 	cutilCheckMsg(__FUNCTION__);
 #endif
-
+	
+	////debugging
+	//bool debugPrint = true;
+	//float* h_JtJ = NULL;
+	//float* h_Jtr = NULL;
+	//if (debugPrint) {
+	//	h_JtJ = new float[sizeJtJ];
+	//	h_Jtr = new float[sizeJtr];
+	//	cutilSafeCall(cudaMemcpy(h_JtJ, state.d_denseJtJ, sizeof(float) * sizeJtJ, cudaMemcpyDeviceToHost));
+	//	cutilSafeCall(cudaMemcpy(h_Jtr, state.d_denseJtr, sizeof(float) * sizeJtr, cudaMemcpyDeviceToHost));
+	//	printf("JtJ:\n");
+	//	//for (unsigned int i = 0; i < 6 * N; i++) {
+	//	//	for (unsigned int j = 0; j < 6 * N; j++)
+	//	for (unsigned int i = 6 * 1; i < 6 * 2; i++) {
+	//		for (unsigned int j = 6 * 1; j < 6 * 2; j++)
+	//			printf(" %f,", h_JtJ[j * 6 * N + i]);
+	//		printf("\n");
+	//	}
+	//	printf("Jtr:\n");
+	//	for (unsigned int i = 0; i < 6 * N; i++) {
+	//		printf(" %f,", h_Jtr[i]);
+	//	}
+	//	printf("\n");
+	//}
+	////debugging
 #ifdef PRINT_RESIDUALS_DENSE
 	if (parameters.weightDenseDepth > 0) {
 		float sumResidual; int corrCount;
@@ -1061,7 +1087,9 @@ bool PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 #endif
 #ifdef ENABLE_EARLY_OUT //for convergence
 	float scanAlpha; cutilSafeCall(cudaMemcpy(&scanAlpha, state.d_scanAlpha, sizeof(float), cudaMemcpyDeviceToHost));
-	if (fabs(scanAlpha) < 0.00005f) lastIteration = true;  //!!! TODO CHECK IF THIS GENERALIZES
+	//if (fabs(scanAlpha) < 0.00005f) lastIteration = true;  //todo check this part
+	//if (fabs(scanAlpha) < 1e-6) lastIteration = true;  //todo check this part
+	if (fabs(scanAlpha) < 5e-7) { lastIteration = true; }  //todo check this part
 #endif
 	if (lastIteration) {
 		PCGStep_Kernel3<true> << <blocksPerGrid, THREADS_PER_BLOCK >> >(input, state);
@@ -1075,11 +1103,11 @@ bool PCGIteration(SolverInput& input, SolverState& state, SolverParameters& para
 	cutilCheckMsg(__FUNCTION__);
 #endif
 	if (timer) timer->endEvent();
-	
+
 	return lastIteration;
 }
 
-#ifdef USE_LIE_SPACE //TODO FOR EULER AS WELL?
+#ifdef USE_LIE_SPACE //TODO
 ////////////////////////////////////////////////////////////////////
 // matrix <-> pose
 ////////////////////////////////////////////////////////////////////
@@ -1142,11 +1170,11 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 		if (parameters.weightSparse > 0.0f) {
 			if (parameters.useDense) {
 				for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
-					if (PCGIteration<true, true>(input, state, parameters, analysis, linIter == parameters.nLinIterations - 1, timer)) break;
+					if (PCGIteration<true, true>(input, state, parameters, analysis, linIter == parameters.nLinIterations - 1, timer)) { break; }
 			}
 			else {
 				for (unsigned int linIter = 0; linIter < parameters.nLinIterations; linIter++)
-					if (PCGIteration<true, false>(input, state, parameters, analysis, linIter == parameters.nLinIterations - 1, timer)) { 
+					if (PCGIteration<true, false>(input, state, parameters, analysis, linIter == parameters.nLinIterations - 1, timer)) {
 						//totalLinIters += (linIter+1); numLin++; 
 						break;
 					}
@@ -1176,19 +1204,20 @@ extern "C" void solveBundlingStub(SolverInput& input, SolverState& state, Solver
 #ifdef ENABLE_EARLY_OUT //convergence
 		//if (nIter < parameters.nNonLinearIterations - 1 && EvalGNConvergence(input, state, analysis, timer) < 0.01f) { //!!! TODO CHECK HOW THESE GENERALIZE
 		if (nIter < parameters.nNonLinearIterations - 1 && EvalGNConvergence(input, state, analysis, timer) < 0.005f) { //0.001?
+		//if (nIter < parameters.nNonLinearIterations - 1 && EvalGNConvergence(input, state, analysis, timer) < 0.001f) { 
 			//if (!parameters.useDense) { totalNonLinIters += (nIter+1); numNonLin++; }
 			break;
 		}
 		//else if (!parameters.useDense && nIter == parameters.nNonLinearIterations - 1) { totalNonLinIters += (nIter+1); numNonLin++; }
 #endif
-	}
+		}
 	//!!!debugging
 	//if (xRot) delete[] xRot;
 	//if (xTrans) delete[] xTrans;
 	//if (timer) { timer->evaluate(true, false); delete timer; }
 	//if (!parameters.useDense) { printf("mean #pcg its = %f\tmean #gn its = %f\n", (float)totalLinIters / (float)numLin, (float)totalNonLinIters / (float)numNonLin); } //just stats for global solve
 	//!!!debugging
-}
+	}
 
 ////////////////////////////////////////////////////////////////////
 // build variables to correspondences lookup

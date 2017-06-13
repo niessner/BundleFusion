@@ -13,6 +13,8 @@
 #include "ConditionManager.h"
 #include "TimingLog.h"
 
+//for debugging
+#include "SiftVisualization.h"
 
 Bundler::Bundler(unsigned int maxNumImages, unsigned int maxNumKeysPerImage, 
 	const mat4f& siftIntrinsicsInv, const CUDAImageManager* manager, bool isLocal)
@@ -143,14 +145,15 @@ unsigned int Bundler::matchAndFilter()
 #ifdef EVALUATE_SPARSE_CORRESPONDENCES
 		if (m_corrEvaluator) m_corrEvaluator->evaluate(m_siftManager, m_cudaCache, MatrixConversion::toMlib(m_siftIntrinsicsInv), false, true, false, "raw");
 #endif
-		//debugging
-		//const bool usedebug = !m_bIsLocal;// && curFrame >= 49;
+		////debugging
+		//const bool usedebug = true;//!m_bIsLocal;// && curFrame >= 49;
 		//std::vector<unsigned int> numMatches;
 		//if (usedebug) {
 		//	m_siftManager->getNumRawMatchesDEBUG(numMatches);
+		//	SiftVisualization::printCurrentMatches("debug/rawMatches/", m_siftManager, m_cudaCache, false);
 		//	int a = 5;
 		//}
-		//debugging
+		////debugging
 
 		// --- filter matches
 		const unsigned int minNumMatches = m_bIsLocal ? GlobalBundlingState::get().s_minNumMatchesLocal : GlobalBundlingState::get().s_minNumMatchesGlobal;
@@ -164,6 +167,7 @@ unsigned int Bundler::matchAndFilter()
 		////debugging
 		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
+		//	SiftVisualization::printCurrentMatches("debug/matchesKeyFilt/", m_siftManager, m_cudaCache, true);
 		//	int a = 5;
 		//}
 		////debugging
@@ -180,6 +184,7 @@ unsigned int Bundler::matchAndFilter()
 		////debugging
 		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
+		//	SiftVisualization::printCurrentMatches("debug/matchesSAFilt/", m_siftManager, m_cudaCache, true);
 		//	int a = 5;
 		//}
 		////debugging
@@ -200,6 +205,7 @@ unsigned int Bundler::matchAndFilter()
 		////debugging
 		//if (usedebug) {
 		//	m_siftManager->getNumFiltMatchesDEBUG(numMatches);
+		//	SiftVisualization::printCurrentMatches("debug/filtMatches/", m_siftManager, m_cudaCache, true);
 		//	int a = 5;
 		//}
 		////debugging

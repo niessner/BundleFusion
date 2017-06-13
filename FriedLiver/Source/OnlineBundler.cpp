@@ -174,6 +174,7 @@ void OnlineBundler::processInput()
 		}
 		const unsigned int numSolveFramesBeforeExit = GlobalAppState::get().s_numSolveFramesBeforeExit;
 		if (numSolveFramesBeforeExit != (unsigned int)-1) {
+#ifdef USE_GLOBAL_DENSE_AT_END
 			if (m_state.m_numFramesPastEnd == numSolveFramesBeforeExit) {
 				if (m_state.m_lastFrameProcessed < 10000) { //TODO fix here
 					GlobalBundlingState::get().s_numGlobalNonLinIterations = 3;
@@ -181,9 +182,11 @@ void OnlineBundler::processInput()
 					std::vector<float> sparseWeights(maxNumIts, 1.0f);
 					std::vector<float> denseDepthWeights(maxNumIts, 15.0f);
 					std::vector<float> denseColorWeights(maxNumIts, 0.0f);
+
 					m_global->setSolveWeights(sparseWeights, denseDepthWeights, denseColorWeights);
 				}
 			}
+#endif
 			if (m_state.m_numFramesPastEnd == numSolveFramesBeforeExit + 1) {
 				std::cout << "stopping solve" << std::endl;
 				m_state.m_bUseSolve = false;

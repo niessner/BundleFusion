@@ -30,7 +30,8 @@ public:
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_intensityDerivsDownsampled, other->m_cache[frameFrom].d_intensityDerivsDownsampled, sizeof(float2) * m_width * m_height, cudaMemcpyDeviceToDevice));
 #ifdef CUDACACHE_UCHAR_NORMALS
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_normalsDownsampledUCHAR4, other->m_cache[frameFrom].d_normalsDownsampledUCHAR4, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
-#else
+#endif
+#ifdef CUDACACHE_FLOAT_NORMALS
 		MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[m_currentFrame].d_normalsDownsampled, other->m_cache[frameFrom].d_normalsDownsampled, sizeof(float4) * m_width * m_height, cudaMemcpyDeviceToDevice));
 #endif
 		m_currentFrame++;
@@ -76,7 +77,8 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityDerivative.getData(), f.d_intensityDerivsDownsampled, sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyDeviceToHost));
 #ifdef CUDACACHE_UCHAR_NORMALS
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensityOrig.getData(), f.d_normalsDownsampledUCHAR4, sizeof(float)*intensityOrig.getNumPixels(), cudaMemcpyDeviceToHost));
-#else
+#endif
+#ifdef CUDACACHE_FLOAT_NORMALS
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(normals.getData(), f.d_normalsDownsampled, sizeof(float4)*normals.getNumPixels(), cudaMemcpyDeviceToHost));
 #endif
 			s << depth;
@@ -131,11 +133,41 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_intensityDerivsDownsampled, intensityDerivative.getData(), sizeof(float2)*intensityDerivative.getNumPixels(), cudaMemcpyHostToDevice));
 #ifdef CUDACACHE_UCHAR_NORMALS
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_normalsDownsampledUCHAR4, intensityOrig.getData(), sizeof(float)*intensityOrig.getNumPixels(), cudaMemcpyHostToDevice));
-#else
+#endif
+#ifdef CUDACACHE_FLOAT_NORMALS
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(f.d_normalsDownsampled, normals.getData(), sizeof(float4)*normals.getNumPixels(), cudaMemcpyHostToDevice));
 #endif
 		}
 		s.close();
+	}
+
+	void printCacheImages(std::string outDir) const {
+		if (m_cache.empty()) return;
+		if (!(outDir.back() == '/' || outDir.back() == '\\')) outDir.push_back('/');
+		if (!util::directoryExists(outDir)) util::makeDirectory(outDir);
+
+		ColorImageR32 intensity(m_width, m_height); DepthImage32 depth(m_width, m_height);
+		ColorImageR32G32B32A32 image(m_width, m_height); ColorImageR8G8B8A8 image8(m_width, m_height);
+		image.setInvalidValue(vec4f(-std::numeric_limits<float>::infinity()));
+		for (unsigned int i = 0; i < m_cache.size(); i++) {
+			const CUDACachedFrame& f = m_cache[i];
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(depth.getData(), f.d_depthDownsampled, sizeof(float)*depth.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(intensity.getData(), f.d_intensityDownsampled, sizeof(float)*intensity.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(image8.getData(), f.d_normalsDownsampledUCHAR4, sizeof(uchar4)*image8.getNumPixels(), cudaMemcpyDeviceToHost));
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getData(), f.d_normalsDownsampled, sizeof(float4)*image.getNumPixels(), cudaMemcpyDeviceToHost));
+			for (auto& p : image) {
+				if (p.value.x != -std::numeric_limits<float>::infinity()) {
+					p.value.w = 1.0f;
+					image8(p.x, p.y).w = 255;
+				}
+			}
+			FreeImageWrapper::saveImage(outDir + std::to_string(i) + "_cache-depth.png", ColorImageR32G32B32(depth));
+			FreeImageWrapper::saveImage(outDir + std::to_string(i) + "_cache-intensity.png", intensity);
+			FreeImageWrapper::saveImage(outDir + std::to_string(i) + "_cache-normal-uchar4.png", image8);
+			FreeImageWrapper::saveImage(outDir + std::to_string(i) + "_cache-normal.png", image);
+			MLIB_CUDA_SAFE_CALL(cudaMemcpy(image.getData(), f.d_cameraposDownsampled, sizeof(float4)*image.getNumPixels(), cudaMemcpyDeviceToHost));
+			FreeImageWrapper::saveImage(outDir + std::to_string(i) + "_cache-campos.png", image);
+		}
 	}
 
 	//!debugging only
@@ -157,7 +189,8 @@ public:
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_intensityDerivsDownsampled, cachedFrames[i].d_intensityDerivsDownsampled, sizeof(float2) * m_width * m_height, cudaMemcpyDeviceToDevice));
 #ifdef CUDACACHE_UCHAR_NORMALS
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_normalsDownsampledUCHAR4, cachedFrames[i].d_normalsDownsampledUCHAR4, sizeof(float) * m_width * m_height, cudaMemcpyDeviceToDevice));
-#else
+#endif
+#ifdef CUDACACHE_FLOAT_NORMALS
 			MLIB_CUDA_SAFE_CALL(cudaMemcpy(m_cache[i].d_normalsDownsampled, cachedFrames[i].d_normalsDownsampled, sizeof(float4) * m_width * m_height, cudaMemcpyDeviceToDevice));
 #endif
 		}

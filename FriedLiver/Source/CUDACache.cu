@@ -30,12 +30,13 @@ __global__ void fuseCacheFrames_Kernel(const CUDACachedFrame* d_frames, const in
 #ifdef CUDACACHE_UCHAR_NORMALS
 			const uchar4 srcNormalUCHAR4 = d_frames[srcFrameIdx].d_normalsDownsampledUCHAR4[srcIdx];
 			if (*(int*)&srcNormalUCHAR4 != 0) {
+				const float4x4 transform = d_transforms[srcFrameIdx];
 				const float3 srcNormal = transform * make_float3(srcNormalUCHAR4.x, srcNormalUCHAR4.y, srcNormalUCHAR4.z) / 255.0f * 2.0f - 1.0f;
 #else
-			const float3 srcNormal = make_float3(d_frames[srcFrameIdx].d_normalsDownsampled[srcIdx]);
+			const float3 srcNormal = transform * make_float3(d_frames[srcFrameIdx].d_normalsDownsampled[srcIdx]);
 			if (srcNormal.x != MINF) {
-#endif
 				const float4x4 transform = d_transforms[srcFrameIdx];
+#endif
 				const float3 tgtCamPos = transform * make_float3(srcCamPos.x, srcCamPos.y, srcCamPos.z);;
 				const float2 tgtScreenPosf = cameraToDepth(intrinsics.x, intrinsics.y, intrinsics.z, intrinsics.w, tgtCamPos);
 				const int2 tgtScreenPos = make_int2((int)roundf(tgtScreenPosf.x), (int)roundf(tgtScreenPosf.y));
@@ -85,10 +86,11 @@ __global__ void normalize_Kernel(unsigned int N, float* d_output, const float2* 
 	}
 }
 
+//TODO HERE ANGIE
 #ifdef CUDACACHE_UCHAR_NORMALS
 extern "C" void fuseCacheFramesCU(const CUDACachedFrame* d_frames, const int* d_validImages, const float4& intrinsics, const float4x4* d_transforms,
 	unsigned int numFrames, unsigned int width, unsigned int height, float* d_output, float2* d_tmp, const uchar4* d_normals) 
-#else
+#elif defined(CUDACACHE_FLOAT_NORMALS)
 extern "C" void fuseCacheFramesCU(const CUDACachedFrame* d_frames, const int* d_validImages, const float4& intrinsics, const float4x4* d_transforms,
 	unsigned int numFrames, unsigned int width, unsigned int height, float* d_output, float2* d_tmp, const float4* d_normals) 
 #endif

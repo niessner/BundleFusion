@@ -414,29 +414,29 @@ void SIFTImageManager::FilterMatchesBySurfaceAreaCU(unsigned int curFrame, unsig
 
 #define FILTER_DENSE_VERIFY_THREAD_SPLIT 32
 
-#ifdef CUDACACHE_UCHAR_NORMALS
-__device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
-	float distThresh, float normalThresh, float colorThresh, const float4x4& transform, const float4x4& intrinsics,
-	const float* d_inputDepth, const float4* d_inputCamPos, const uchar4* d_inputNormal, const float* d_inputColor,
-	const float* d_modelDepth, const float4* d_modelCamPos, const uchar4* d_modelNormal, const float* d_modelColor,
-	float sensorDepthMin, float sensorDepthMax)
-#else
+#ifdef CUDACACHE_FLOAT_NORMALS
 __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
 	float distThresh, float normalThresh, float colorThresh, const float4x4& transform, const float4x4& intrinsics,
 	const float* d_inputDepth, const float4* d_inputCamPos, const float4* d_inputNormal, const float* d_inputColor,
 	const float* d_modelDepth, const float4* d_modelCamPos, const float4* d_modelNormal, const float* d_modelColor,
+	float sensorDepthMin, float sensorDepthMax)
+#elif defined(CUDACACHE_UCHAR_NORMALS)
+__device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, unsigned int imageHeight,
+	float distThresh, float normalThresh, float colorThresh, const float4x4& transform, const float4x4& intrinsics,
+	const float* d_inputDepth, const float4* d_inputCamPos, const uchar4* d_inputNormal, const float* d_inputColor,
+	const float* d_modelDepth, const float4* d_modelCamPos, const uchar4* d_modelNormal, const float* d_modelColor,
 	float sensorDepthMin, float sensorDepthMax)
 #endif
 {
 	float3 out = make_float3(0.0f);
 
 	float4 pInput = d_inputCamPos[idx]; // point
-#ifdef CUDACACHE_UCHAR_NORMALS
+#ifdef CUDACACHE_FLOAT_NORMALS
+	float4 nInput = d_inputNormal[idx]; nInput.w = 0.0f; // vector
+#else
 	float4 nInput = make_float4(MINF);
 	uchar4 nInputU4 = d_inputNormal[idx];
 	if (*(int*)(&nInputU4) != 0) nInput = make_float4(make_float3(nInputU4.x, nInputU4.y, nInputU4.z) / 255.0f * 2.0f - 1.0f, 0.0f);  // vector
-#else
-	float4 nInput = d_inputNormal[idx]; nInput.w = 0.0f; // vector
 #endif
 	float dInput = d_inputDepth[idx];
 	//float cInput = d_inputColor[idx];
@@ -451,12 +451,12 @@ __device__ float3 computeProjError(unsigned int idx, unsigned int imageWidth, un
 		if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)imageWidth && screenPos.y < (int)imageHeight) {
 			float4 pTarget = d_modelCamPos[screenPos.y * imageWidth + screenPos.x]; //getBestCorrespondence1x1
 			//float cTarget = d_modelColor[screenPos.y * imageWidth + screenPos.x];
-#ifdef CUDACACHE_UCHAR_NORMALS
+#ifdef CUDACACHE_FLOAT_NORMALS
+			float4 nTarget = d_modelNormal[screenPos.y * imageWidth + screenPos.x];
+#else
 			float4 nTarget = make_float4(MINF);
 			uchar4 nTargetU4 = d_modelNormal[idx];
 			if (*(int*)(&nTargetU4) != 0) nTarget = make_float4(make_float3(nTargetU4.x, nTargetU4.y, nTargetU4.z) / 255.0f * 2.0f - 1.0f, 0.0f);  // vector
-#else
-			float4 nTarget = d_modelNormal[screenPos.y * imageWidth + screenPos.x];
 #endif
 			if (pTarget.x != MINF && nTarget.x != MINF) {
 				float d = length(pTransInput - pTarget);
@@ -507,12 +507,13 @@ void __global__ FilterMatchesByDenseVerifyCU_Kernel(unsigned int curImageIdx, un
 	const float*  d_modelDepth = d_cachedFrames[curImageIdx].d_depthDownsampled;
 	const float4* d_modelCamPos = d_cachedFrames[curImageIdx].d_cameraposDownsampled;
 	const float* d_modelColor = d_cachedFrames[curImageIdx].d_intensityDownsampled;
-#ifdef CUDACACHE_UCHAR_NORMALS
-	const uchar4* d_inputNormal = d_cachedFrames[imagePairIdx].d_normalsDownsampledUCHAR4;
-	const uchar4* d_modelNormal = d_cachedFrames[curImageIdx].d_normalsDownsampledUCHAR4;
-#else
+	//TODO HERE ANGIE
+#ifdef CUDACACHE_FLOAT_NORMALS
 	const float4* d_inputNormal = d_cachedFrames[imagePairIdx].d_normalsDownsampled;
 	const float4* d_modelNormal = d_cachedFrames[curImageIdx].d_normalsDownsampled;
+#elif defined(CUDACACHE_UCHAR_NORMALS)
+	const uchar4* d_inputNormal = d_cachedFrames[imagePairIdx].d_normalsDownsampledUCHAR4;
+	const uchar4* d_modelNormal = d_cachedFrames[curImageIdx].d_normalsDownsampledUCHAR4;
 #endif
 	const float4x4 transform = d_currFilteredTransforms[imagePairIdx];
 
@@ -1052,12 +1053,13 @@ void __global__ VerifyTrajectoryCU_Kernel(unsigned int numImages, int* d_validIm
 	const float4* d_modelCamPos = d_cachedFrames[img1].d_cameraposDownsampled;
 	const float* d_modelColor = d_cachedFrames[img1].d_intensityDownsampled;
 
-#ifdef CUDACACHE_UCHAR_NORMALS
-	const uchar4* d_inputNormal = d_cachedFrames[img0].d_normalsDownsampledUCHAR4;
-	const uchar4* d_modelNormal = d_cachedFrames[img1].d_normalsDownsampledUCHAR4;
-#else
+	//TODO HERE ANGIE
+#ifdef CUDACACHE_FLOAT_NORMALS
 	const float4* d_inputNormal = d_cachedFrames[img0].d_normalsDownsampled;
 	const float4* d_modelNormal = d_cachedFrames[img1].d_normalsDownsampled;
+#elif defined(CUDACACHE_UCHAR_NORMALS)
+	const uchar4* d_inputNormal = d_cachedFrames[img0].d_normalsDownsampledUCHAR4;
+	const uchar4* d_modelNormal = d_cachedFrames[img1].d_normalsDownsampledUCHAR4;
 #endif
 
 	const float4x4 transform = d_trajectory[img1].getInverse() * d_trajectory[img0];

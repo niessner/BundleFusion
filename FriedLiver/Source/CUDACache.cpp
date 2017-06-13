@@ -54,11 +54,16 @@ void CUDACache::storeFrame(const float* d_depth, unsigned int inputDepthWidth, u
 	}
 	CUDAImageUtil::convertDepthFloatToCameraSpaceFloat4(d_helperCamPos, d_inputDepth, *(float4x4*)&m_inputIntrinsicsInv, inputDepthWidth, inputDepthHeight);
 	CUDAImageUtil::resampleFloat4(frame.d_cameraposDownsampled, m_width, m_height, d_helperCamPos, inputDepthWidth, inputDepthHeight);
-#ifdef CUDACACHE_UCHAR_NORMALS
+#if defined(CUDACACHE_FLOAT_NORMALS) && defined(CUDACACHE_UCHAR_NORMALS)
+	CUDAImageUtil::computeNormals(d_helperNormals, d_helperCamPos, inputDepthWidth, inputDepthHeight);
+
+	CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, m_width, m_height, d_helperNormals, inputDepthWidth, inputDepthHeight);
+	CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, m_width, m_height);
+#elif defined(CUDACACHE_UCHAR_NORMALS)
 	CUDAImageUtil::computeNormals(d_helperNormals, d_helperCamPos, inputDepthWidth, inputDepthHeight);
 	CUDAImageUtil::resampleFloat4(d_helperCamPos, m_width, m_height, d_helperNormals, inputDepthWidth, inputDepthHeight); //just use the memory from helpercampos
 	CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, d_helperCamPos, m_width, m_height);
-#else
+#elif defined(CUDACACHE_FLOAT_NORMALS)
 	CUDAImageUtil::computeNormals(d_helperNormals, d_helperCamPos, inputDepthWidth, inputDepthHeight);
 	CUDAImageUtil::resampleFloat4(frame.d_normalsDownsampled, m_width, m_height, d_helperNormals, inputDepthWidth, inputDepthHeight);
 	//CUDAImageUtil::convertNormalsFloat4ToUCHAR4(frame.d_normalsDownsampledUCHAR4, frame.d_normalsDownsampled, m_width, m_height);
@@ -105,7 +110,8 @@ void CUDACache::fuseDepthFrames(CUDACache* globalCache, const int* d_validImages
 #ifdef CUDACACHE_UCHAR_NORMALS
 	CUDAImageUtil::computeNormals(d_helperNormals, globalFrame.d_cameraposDownsampled, m_width, m_height);
 	CUDAImageUtil::convertNormalsFloat4ToUCHAR4(globalFrame.d_normalsDownsampledUCHAR4, d_helperNormals, m_width, m_height);
-#else
+#endif
+#ifdef CUDACACHE_FLOAT_NORMALS
 	CUDAImageUtil::computeNormals(globalFrame.d_normalsDownsampled, globalFrame.d_cameraposDownsampled, m_width, m_height);
 	//CUDAImageUtil::convertNormalsFloat4ToUCHAR4(globalFrame.d_normalsDownsampledUCHAR4, globalFrame.d_normalsDownsampled, m_width, m_height);
 #endif

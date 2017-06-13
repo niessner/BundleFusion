@@ -4,7 +4,8 @@
 
 #include "mLibCuda.h"
 
-//#define CUDACACHE_UCHAR_NORMALS
+#define CUDACACHE_UCHAR_NORMALS
+#define CUDACACHE_FLOAT_NORMALS
 
 struct CUDACachedFrame {
 	void alloc(unsigned int width, unsigned int height) {
@@ -16,7 +17,8 @@ struct CUDACachedFrame {
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_intensityDerivsDownsampled, sizeof(float2) * width * height));
 #ifdef CUDACACHE_UCHAR_NORMALS
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_normalsDownsampledUCHAR4, sizeof(uchar4) * width * height));
-#else
+#endif
+#ifdef CUDACACHE_FLOAT_NORMALS
 		MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_normalsDownsampled, sizeof(float4) * width * height));
 #endif
 	}
@@ -29,7 +31,8 @@ struct CUDACachedFrame {
 		MLIB_CUDA_SAFE_FREE(d_intensityDerivsDownsampled);
 #ifdef CUDACACHE_UCHAR_NORMALS
 		MLIB_CUDA_SAFE_FREE(d_normalsDownsampledUCHAR4);
-#else
+#endif
+#ifdef CUDACACHE_FLOAT_NORMALS
 		MLIB_CUDA_SAFE_FREE(d_normalsDownsampled); 
 #endif
 	}
@@ -43,7 +46,8 @@ struct CUDACachedFrame {
 	float2* d_intensityDerivsDownsampled; //TODO could have energy over intensity gradient instead of intensity
 #ifdef CUDACACHE_UCHAR_NORMALS
 	uchar4* d_normalsDownsampledUCHAR4;
-#else
+#endif
+#ifdef CUDACACHE_FLOAT_NORMALS
 	float4* d_normalsDownsampled;
 #endif
 };

@@ -12,7 +12,7 @@ class CUDACache;
 class CUDAImageManager;
 
 
-#define USE_RETRY //TODO MOVE OUT TO PARAMS
+//#define USE_RETRY //TODO MOVE OUT TO PARAMS
 
 class Bundler
 {
