@@ -931,7 +931,10 @@ void StopScanningAndExit(bool aborted = false)
 		numValidTransforms = PoseHelper::countNumValidTransforms(trajectory);		numTransforms = (unsigned int)trajectory.size();
 		if (numValidTransforms < (unsigned int)std::round(0.5f * numTransforms)) valid = false; // not enough valid transforms
 		std::cout << "#VALID TRANSFORMS = " << numValidTransforms << std::endl;
-		//((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file //TODO UNCOMMENT
+		((SensorDataReader*)g_depthSensingRGBDSensor)->saveToFile(saveFile, trajectory); //overwrite the original file
+
+		//if (GlobalAppState::get().s_sensorIdx == 8) ((SensorDataReader*)g_depthSensingRGBDSensor)->evaluateTrajectory(trajectory);
+
 		//save ply
 		std::cout << "[marching cubes] ";
 		StopScanningAndExtractIsoSurfaceMC(util::removeExtensions(GlobalAppState::get().s_binaryDumpSensorFile) + ".ply", true); //force overwrite and existing plys
@@ -1000,7 +1003,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 	// Fix old frames
 	///////////////////////////////////////
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.start(); }
-	reintegrate();
+	reintegrate(); 
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { GlobalAppState::get().WaitForGPU(); cudaDeviceSynchronize(); t.stop(); TimingLog::getFrameTiming(true).timeReIntegrate = t.getElapsedTimeMS(); }
 
 

@@ -266,6 +266,10 @@ void CUDASolverBundling::solve(EntryJ* d_correspondences, unsigned int numberOfC
 		buildVariablesToCorrespondencesTable(d_correspondences, numberOfCorrespondences);
 	}
 
+	//if (cudaCache) {
+	//	cudaCache->printCacheImages("debug/cache/");
+	//	int a = 5;
+	//}
 	solveBundlingStub(solverInput, m_solverState, parameters, m_solverExtra, convergence, m_timer);
 
 	if (findMaxResidual) {

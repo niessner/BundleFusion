@@ -33,6 +33,8 @@ public:
 		//generateKCombinations(20, 4, s_combinations, 128);
 		s_bInit = true;
 	}
+
+	static void debugVis(const SensorData& sd, const vec2ui& imageIndices, const mat4f& transform, unsigned int subsampleFactor = 4);
 private:
 	static bool s_bInit;
 	static std::vector<std::vector<unsigned int>> s_combinations;
@@ -92,7 +94,19 @@ private:
 	static inline float cameraToKinectProjZ(float z, float depthMin, float depthMax) {
 		return (z - depthMin) / (depthMax - depthMin);
 	}
-
+	static vec2f cameraToDepth(const mat4f& depthIntrinsics, const vec3f& pos)
+	{
+		vec3f p = depthIntrinsics * pos;
+		return vec2f(p.x / p.z, p.y / p.z);
+	}
+	static inline void getBestCorrespondence1x1(
+		const vec2i& screenPos, vec3f& pTarget, vec3f& nTarget, vec3uc& cTarget,
+		const PointImage& target, const PointImage& targetNormals, const ColorImageR8G8B8& targetColor)
+	{
+		pTarget = target(screenPos.x, screenPos.y);
+		nTarget = targetNormals(screenPos.x, screenPos.y);
+		cTarget = targetColor(screenPos.x, screenPos.y);
+	}
 
 	static inline void getBestCorrespondence1x1(
 		const int2& screenPos, float4& pTarget, float4& nTarget, float& cTarget,

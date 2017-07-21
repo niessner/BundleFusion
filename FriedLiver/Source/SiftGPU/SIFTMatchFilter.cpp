@@ -717,7 +717,7 @@ void SIFTMatchFilter::filterKeyPointMatchesDEBUG(unsigned int curFrame, SIFTImag
 void SIFTMatchFilter::visualizeProjError(SIFTImageManager* siftManager, const vec2ui& imageIndices, const std::vector<CUDACachedFrame>& cachedFrames,
 	const float4x4& depthIntrinsics, const float4x4& transformCurToPrv, float depthMin, float depthMax)
 {
-#ifdef CUDACACHE_UCHAR_NORMALS
+#if defined(CUDACACHE_UCHAR_NORMALS) && !defined(CUDACACHE_FLOAT_NORMALS)
 	throw MLIB_EXCEPTION("need to update to uchar4 normals");
 #else
 	const unsigned int numImages = siftManager->getNumImages();
@@ -802,7 +802,7 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 	const float* modelDepth, const float4* model, const float4* modelNormals, const float* modelColor, const float4x4& transform, float distThres, float normalThres, float colorThresh,
 	const float4x4& depthIntrinsics, float depthMin, float depthMax, float& sumResidual, float& sumWeight, unsigned int& numCorr)
 {
-	PointCloudf pcSrc, pcTgt;
+	PointCloudf pcSrc, pcTgt, pcTransform; //debug vis
 
 	s_debugCorr.allocate(width, height);
 	s_debugCorr.setPixels(-std::numeric_limits<float>::infinity());
@@ -859,13 +859,14 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 								s_debugCorr(x, y) = length(pTransInput - pTarget);
 								pcSrc.m_points.push_back(vec3f(pTransInput.x, pTransInput.y, pTransInput.z));
 								pcTgt.m_points.push_back(vec3f(pTarget.x, pTarget.y, pTarget.z));
+								vec4f debugColor = BaseImageHelper::convertDepthToRGBA(std::sqrt(x*x + y*y), 0.0f, std::sqrt(width*width + height*height)); //distance from top left
 								if (d > distThres) {
-									pcSrc.m_colors.push_back(vec4f(1.0f, 0.0f, 0.0f, 1.0f));
-									pcTgt.m_colors.push_back(vec4f(0.0f, 1.0f, 0.0f, 1.0f));
+									pcSrc.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));//vec4f(1.0f, 0.0f, 0.0f, 1.0f));
+									pcTgt.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));//(vec4f(0.0f, 1.0f, 0.0f, 1.0f));
 								}
 								else {
-									pcSrc.m_colors.push_back(vec4f(cInput));
-									pcTgt.m_colors.push_back(vec4f(cTarget));
+									pcSrc.m_colors.push_back(debugColor);//vec4f(cInput));
+									pcTgt.m_colors.push_back(debugColor);//vec4f(cTarget));
 								}
 							}
 						} // target depth within depth min/max
@@ -878,6 +879,130 @@ void SIFTMatchFilter::computeCorrespondencesDEBUG(unsigned int width, unsigned i
 	std::cout << "transform:" << std::endl; transform.print();
 	PointCloudIOf::saveToFile("debug/src.ply", pcSrc);
 	PointCloudIOf::saveToFile("debug/tgt.ply", pcTgt);
+	//std::cout << "press key" << std::endl;
+	//getchar();
+	int a = 5;
+}
+
+void SIFTMatchFilter::debugVis(const SensorData& sd, const vec2ui& imageIndices, const mat4f& transform, unsigned int subsampleFactor /*= 4*/)
+{
+	const unsigned int width = sd.m_depthWidth;
+	const unsigned int height = sd.m_depthHeight;
+	const float distThres = 0.15f; const float normalThres = 0.97f;
+	const float depthMin = 0.4f; const float depthMax = 4.0f;
+
+	PointCloudf pcSrc, pcTgt, pcTransform; //debug vis
+	PointCloudf pcSrcColor, pcTgtColor, pcTransformColor; // debug vis
+
+	const mat4f depthIntrinsic = sd.m_calibrationDepth.m_intrinsic;
+	const mat4f depthIntrinsicInv = depthIntrinsic.getInverse();
+	DepthImage32 curDepth = sd.computeDepthImage(imageIndices.y);
+	DepthImage32 prvDepth = sd.computeDepthImage(imageIndices.x);
+	PointImage curCamPos = sd.computeCameraSpacePositions(depthIntrinsicInv, curDepth);
+	PointImage prvCamPos = sd.computeCameraSpacePositions(depthIntrinsicInv, prvDepth);
+	PointImage curNormal = sd.computeNormals(curCamPos);
+	PointImage prvNormal = sd.computeNormals(prvCamPos);
+
+	ColorImageR8G8B8 curColor = sd.computeColorImage(imageIndices.y);
+	ColorImageR8G8B8 prvColor = sd.computeColorImage(imageIndices.x);
+
+	Grid2<bool> marker(width, height); marker.setValues(false);
+
+	const float INVALID = -std::numeric_limits<float>::infinity();
+	for (unsigned int y = 0; y < height; y += subsampleFactor) {
+		for (unsigned int x = 0; x < width; x += subsampleFactor) {
+
+			const vec3f pInput = curCamPos(x, y);
+			const vec3f nInput = curNormal(x, y);
+			float dInput = curDepth(x, y);
+			const vec3uc& cInput = curColor(x, y);
+
+			if (pInput.x != INVALID && nInput.x != INVALID && dInput >= depthMin && dInput <= depthMax) {
+				const vec3f pTransInput = transform * pInput;
+				const vec3f nTransInput = transform.getRotation() * nInput;
+
+				vec2f screenPosf = cameraToDepth(depthIntrinsic, pTransInput);
+				vec2i screenPos = math::round(screenPosf);
+
+				if (screenPos.x >= 0 && screenPos.y >= 0 && screenPos.x < (int)width && screenPos.y < (int)height) {
+					vec3f pTarget; vec3f nTarget; vec3uc cTarget;
+					getBestCorrespondence1x1(screenPos, pTarget, nTarget, cTarget, prvCamPos, prvNormal, prvColor);
+
+					if (pTarget.x != INVALID && nTarget.x != INVALID) {
+						float d = vec3f::dist(pTransInput, pTarget);
+						float dNormal = nTransInput | nTarget;
+
+						float projInputDepth = pTransInput.z;//cameraToDepthZ(pTransInput);
+						float tgtDepth = prvDepth(screenPos.x, screenPos.y);
+
+						marker((screenPos.x/subsampleFactor)*subsampleFactor, (screenPos.y/subsampleFactor)*subsampleFactor) = true;
+						if (tgtDepth >= depthMin && tgtDepth <= depthMax) {
+							bool b = ((tgtDepth != INVALID && projInputDepth < tgtDepth) && d > distThres); // bad matches that are known
+							if ((dNormal >= normalThres && d <= distThres /*&& c <= colorThresh*/) || b) { // if normal/pos/color correspond or known bad match
+
+								pcSrc.m_points.push_back(pTransInput);
+								pcTgt.m_points.push_back(pTarget);
+								pcSrcColor.m_points.push_back(pTransInput);
+								pcTgtColor.m_points.push_back(pTarget);
+								vec4f debugColor = BaseImageHelper::convertDepthToRGBA(std::sqrt(x*x + y*y), 0.0f, std::sqrt(width*width + height*height)); //distance from top left
+								if (d > distThres) {
+									pcSrc.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));//vec4f(1.0f, 0.0f, 0.0f, 1.0f));
+									pcTgt.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));//(vec4f(0.0f, 1.0f, 0.0f, 1.0f));
+									pcSrcColor.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));
+									pcTgtColor.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));
+								}
+								else {
+									pcSrc.m_colors.push_back(debugColor);//vec4f(cInput));
+									pcTgt.m_colors.push_back(debugColor);//vec4f(cTarget));
+									pcSrcColor.m_colors.push_back(vec4f(vec3f(cInput)/255.0f));
+									pcTgtColor.m_colors.push_back(vec4f(vec3f(cTarget)/255.0f));
+								}
+							}
+						} // target depth within depth min/max
+					} // projected to valid depth
+				} // inside image
+				else {
+					pcSrc.m_points.push_back(pTransInput);
+					pcSrc.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));
+					pcSrcColor.m_points.push_back(pTransInput);
+					pcSrcColor.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));
+				}
+			}
+		} // x
+	} // y
+
+	for (unsigned int y = 0; y < height; y += subsampleFactor) {
+		for (unsigned int x = 0; x < width; x += subsampleFactor) {
+			if (!marker(x, y)) {
+				const vec3f& pTarget = prvCamPos(x, y);
+				pcTgt.m_points.push_back(pTarget);
+				pcTgt.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));
+				pcTgtColor.m_points.push_back(pTarget);
+				pcTgtColor.m_colors.push_back(vec4f(0.5f, 0.5f, 0.5f, 1.0f));
+			}
+		}
+	}
+
+	//PointCloudIOf::saveToFile("debug/src.ply", pcSrc);
+	//PointCloudIOf::saveToFile("debug/tgt.ply", pcTgt);
+	//PointCloudIOf::saveToFile("debug/src-color.ply", pcSrcColor);
+	//PointCloudIOf::saveToFile("debug/tgt-color.ply", pcTgtColor);
+
+	MeshDataf mdSrc, mdTgt, mdSrcColor, mdTgtColor;
+	unsigned int numSlice = 8;
+	for (unsigned int i = 0; i < pcSrc.m_points.size(); i++)
+		mdSrc.merge(Shapesf::sphere(0.01f, pcSrc.m_points[i], numSlice, numSlice, pcSrc.m_colors[i]).computeMeshData());
+	MeshIOf::saveToFile("debug/m_src.ply", mdSrc);
+	for (unsigned int i = 0; i < pcTgt.m_points.size(); i++)
+		mdTgt.merge(Shapesf::sphere(0.01f, pcTgt.m_points[i], numSlice, numSlice, pcTgt.m_colors[i]).computeMeshData());
+	MeshIOf::saveToFile("debug/m_tgt.ply", mdTgt);
+	for (unsigned int i = 0; i < pcSrcColor.m_points.size(); i++)
+		mdSrcColor.merge(Shapesf::sphere(0.01f, pcSrcColor.m_points[i], numSlice, numSlice, pcSrcColor.m_colors[i]).computeMeshData());
+	MeshIOf::saveToFile("debug/m_src-color.ply", mdSrcColor);
+	for (unsigned int i = 0; i < pcTgtColor.m_points.size(); i++)
+		mdTgtColor.merge(Shapesf::sphere(0.01f, pcTgtColor.m_points[i], numSlice, numSlice, pcTgtColor.m_colors[i]).computeMeshData());
+	MeshIOf::saveToFile("debug/m_tgt-color.ply", mdTgtColor);
+
 	//std::cout << "press key" << std::endl;
 	//getchar();
 	int a = 5;

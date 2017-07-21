@@ -150,14 +150,14 @@ void bundlingThreadFunc() {
 			tOpt = std::thread(bundlingOptimizationThreadFunc);
 		}
 		//wait for a new input frame (LOCK IMAGE MANAGER)
-		ConditionManager::lockImageManagerFrameReady(ConditionManager::Bundling); 
+		ConditionManager::lockImageManagerFrameReady(ConditionManager::Bundling);
 		while (!g_imageManager->hasBundlingFrameRdy()) {
-			ConditionManager::waitImageManagerFrameReady(ConditionManager::Bundling); 
+			ConditionManager::waitImageManagerFrameReady(ConditionManager::Bundling);
 		}
-		{ 
+		{
 			ConditionManager::lockBundlerProcessedInput(ConditionManager::Bundling);
 			while (g_bundler->hasProcssedInputFrame()) { //wait until depth sensing has confirmed the last one (WAITING THAT DEPTH SENSING RELEASES ITS LOCK)
-				ConditionManager::waitBundlerProcessedInput(ConditionManager::Bundling);	
+				ConditionManager::waitBundlerProcessedInput(ConditionManager::Bundling);
 			}
 			{
 				if (g_bundler->getExitBundlingThread()) {
@@ -211,6 +211,8 @@ int main(int argc, char** argv)
 
 			//fileNameDescGlobalApp = "zParametersTUM.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
+			//fileNameDescGlobalApp = "zParametersICL.txt"; //TODO HERE ANGIE
+			//fileNameDescGlobalBundling = "zParametersBundlingTUM.txt";
 
 			//fileNameDescGlobalApp = "zParametersAug.txt";
 			//fileNameDescGlobalBundling = "zParametersBundlingAug.txt";
@@ -247,32 +249,6 @@ int main(int argc, char** argv)
 		//Read the global camera tracking state
 		ParameterFile parameterFileGlobalBundling(fileNameDescGlobalBundling);
 		GlobalBundlingState::getInstance().readMembers(parameterFileGlobalBundling);
-
-		//!!!DEBUGGING
-		if (false) {
-			//const std::string runoptDataDir = "../data/runOpt/";
-			//RunOpt::run(runoptDataDir + "recording15.sens", runoptDataDir + "71.sift", runoptDataDir + "71-initial.trajectory");
-			RunOpt::run("../data/sens/copyroom200.sens", "debug/logs/100.sift", "debug/logs/100.trajectory");
-			std::cout << "done!" << std::endl;
-			getchar();
-			return 0;
-		}
-		if (GlobalAppState::get().s_generateVideo) { std::cout << "remember to change raycast for top-down rendering!" << std::endl; getchar(); }
-		if (GlobalAppState::get().s_numSolveFramesBeforeExit != (unsigned int)-1 && GlobalAppState::get().s_sensorIdx != 8) std::cout << "warning: overwrite trajectory/save ply not implemented for non-SensorData type sensors" << std::endl;
-		if (false) {
-			TestMatching test;
-			//test.analyzeLocalOpts();
-			//test.testGlobalDense();
-			//test.compareDEBUG();
-			test.debug();
-
-			std::cout << "done!" << std::endl;
-			getchar();
-			return 0;
-		}
-		//!!!DEBUGGING
-
-		//SIFTMatchFilter::init(); //TODO this is obsolete
 
 		DualGPU& dualGPU = DualGPU::get();	//needs to be called to initialize devices
 		dualGPU.setDevice(DualGPU::DEVICE_RECONSTRUCTION);	//main gpu

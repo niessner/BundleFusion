@@ -16,7 +16,7 @@
 //for debugging
 #include "SiftVisualization.h"
 
-Bundler::Bundler(unsigned int maxNumImages, unsigned int maxNumKeysPerImage, 
+Bundler::Bundler(unsigned int maxNumImages, unsigned int maxNumKeysPerImage,
 	const mat4f& siftIntrinsicsInv, const CUDAImageManager* manager, bool isLocal)
 {
 	//initialize sift
@@ -236,7 +236,7 @@ unsigned int Bundler::matchAndFilter()
 				}
 			}
 		} //global only
-		
+
 		////debugging
 		//if (usedebug) {
 		//	std::vector<EntryJ> corrs(m_siftManager->getNumGlobalCorrespondences());
