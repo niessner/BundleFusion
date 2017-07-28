@@ -4,7 +4,7 @@
 //#define PRINT_RESIDUALS_SPARSE
 //#define PRINT_RESIDUALS_DENSE
 
-//#define ENABLE_EARLY_OUT
+#define ENABLE_EARLY_OUT
 
 #include "GlobalDefines.h"
 #include "SolverBundlingParameters.h"
