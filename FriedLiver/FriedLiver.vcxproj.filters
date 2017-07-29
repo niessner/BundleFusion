@@ -138,15 +138,6 @@
     <ClCompile Include="Source\SensorDataReader.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
-    <ClCompile Include="Source\testMatching.cpp">
-      <Filter>Testing</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\testSIFT.cpp">
-      <Filter>Testing</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\RunOpt.cpp">
-      <Filter>Testing</Filter>
-    </ClCompile>
     <ClCompile Include="Source\CUDAImageCalibrator.cpp">
       <Filter>Sensors</Filter>
     </ClCompile>
@@ -390,15 +381,6 @@
       <Filter>SolverBundling</Filter>
     </ClInclude>
     <ClInclude Include="Source\CUDACameraUtil.h" />
-    <ClInclude Include="Source\testSIFT.h">
-      <Filter>Testing</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\testMatching.h">
-      <Filter>Testing</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\RunOpt.h">
-      <Filter>Testing</Filter>
-    </ClInclude>
     <ClInclude Include="Source\CUDAImageCalibrator.h">
       <Filter>Sensors</Filter>
     </ClInclude>
@@ -427,9 +409,6 @@
     </Filter>
     <Filter Include="SBA">
       <UniqueIdentifier>{c3dc0052-729c-4526-b930-a469d7d017a9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Testing">
-      <UniqueIdentifier>{59055ef3-aacc-44d4-8dd5-079c7f280f78}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

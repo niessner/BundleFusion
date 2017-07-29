@@ -195,7 +195,6 @@
     <ClInclude Include="Source\PoseHelper.h" />
     <ClInclude Include="Source\PrimeSenseSensor.h" />
     <ClInclude Include="Source\RGBDSensor.h" />
-    <ClInclude Include="Source\RunOpt.h" />
     <ClInclude Include="Source\SBA.h" />
     <ClInclude Include="Source\SensorDataReader.h" />
     <ClInclude Include="Source\SiftGPU\CUDATimer.h" />
@@ -228,8 +227,6 @@
     <ClInclude Include="Source\Solver\SolverBundlingUtil.h" />
     <ClInclude Include="Source\stdafx.h" />
     <ClInclude Include="Source\StructureSensor.h" />
-    <ClInclude Include="Source\testMatching.h" />
-    <ClInclude Include="Source\testSIFT.h" />
     <ClInclude Include="Source\TimingLog.h" />
     <ClInclude Include="Source\TrajectoryManager.h" />
   </ItemGroup>
@@ -307,7 +304,6 @@
     <ClCompile Include="Source\OnlineBundler.cpp" />
     <ClCompile Include="Source\PrimeSenseSensor.cpp" />
     <ClCompile Include="Source\RGBDSensor.cpp" />
-    <ClCompile Include="Source\RunOpt.cpp" />
     <ClCompile Include="Source\SBA.cpp" />
     <ClCompile Include="Source\SensorDataReader.cpp" />
     <ClCompile Include="Source\SiftGPU\CuTexImage.cpp" />
@@ -324,8 +320,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\StructureSensor.cpp" />
-    <ClCompile Include="Source\testMatching.cpp" />
-    <ClCompile Include="Source\testSIFT.cpp" />
     <ClCompile Include="Source\TimingLog.cpp" />
     <ClCompile Include="Source\TrajectoryManager.cpp" />
     <ClCompile Include="Source\uplink.cpp" />

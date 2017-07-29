@@ -29,23 +29,13 @@ SBA::SBA()
 	m_localWeightsSparse.resize(maxNumIts, 1.0f);
 	m_localWeightsDenseDepth.resize(maxNumIts);
 	for (unsigned int i = 0; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = (i + 1.0f);
-	m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //no color
-	//for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;//fr3_nstn
-	//// for tum data
-	//std::cout << "using FR2 params" << std::endl;
-	//m_localWeightsSparse.resize(maxNumIts, 1.0f);
-	//m_localWeightsDenseDepth.resize(maxNumIts, 1.0f); //for (unsigned int i = 1; i < maxNumIts; i++) m_localWeightsDenseDepth[i] = 1.0f;
-	//m_localWeightsDenseColor.resize(maxNumIts, 0.0f); //for (unsigned int i = 2; i < maxNumIts; i++) m_localWeightsDenseColor[i] = 1.0f;
-	////for (unsigned int i = 0; i < 2; i++) m_localWeightsSparse[maxNumIts - i - 1] = 0.0f; // turn off sparse at end
+	m_localWeightsDenseColor.resize(maxNumIts, 0.0f);
 
 	m_globalWeightsMutex.lock();
 	m_globalWeightsSparse.resize(maxNumIts, 1.0f);
 	m_globalWeightsDenseDepth.resize(maxNumIts, 1.0f);
-	m_globalWeightsDenseColor.resize(maxNumIts, 0.0f); //off
-	//// for tum data
-	//m_globalWeightsSparse.resize(maxNumIts, 1.0f);
-	//m_globalWeightsDenseDepth.resize(maxNumIts, 0.0f);
-	//m_globalWeightsDenseColor.resize(maxNumIts, 0.1f); //off
+	for (unsigned int i = 2; i < maxNumIts; i++) m_globalWeightsDenseDepth[i] = i;
+	m_globalWeightsDenseColor.resize(maxNumIts, 0.1f);
 
 	m_maxResidual = -1.0f;
 
@@ -145,7 +135,7 @@ bool SBA::alignCUDA(SIFTImageManager* siftManager, const CUDACache* cudaCache, b
 	return removed;
 }
 
-//!!!debugging
+//todo debugging
 #include "GlobalAppState.h"
 
 #include "MatrixConversion.h"
@@ -176,7 +166,6 @@ struct std::hash<vec2ui> : public std::unary_function < vec2ui, size_t > {
 	}
 };
 
-//!!!debugging
 bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numImages, unsigned int curFrame)
 {
 	ml::vec2ui imageIndices;
@@ -184,70 +173,6 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 	if (remove) {
 		if (GlobalBundlingState::get().s_verbose) std::cout << "\timages (" << imageIndices << "): invalid match " << m_maxResidual << std::endl;
 
-		/*if (false) {
-			static SensorData sd; 
-			if (sd.m_frames.empty()) sd.loadFromFile(GlobalAppState::get().s_binaryDumpSensorFile);
-			//get residual corrs
-			std::vector<EntryJ> correspondences(siftManager->getNumGlobalCorrespondences());
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(correspondences.data(), siftManager->getGlobalCorrespondencesGPU(), sizeof(EntryJ)*correspondences.size(), cudaMemcpyDeviceToHost));
-			//get transforms
-			float4x4* d_transforms = NULL;
-			MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages))
-			convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, siftManager->getValidImagesGPU());
-			std::vector<mat4f> transforms(numImages);
-			MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-			MLIB_CUDA_SAFE_FREE(d_transforms);
-			//get residuals
-			std::vector< std::pair<float, vec2ui> > residuals;
-			for (unsigned int i = 0; i < correspondences.size(); i++) {
-				const EntryJ& corr = correspondences[i];
-				if (corr.isValid()) {
-					vec3f res = transforms[corr.imgIdx_i] * vec3f(corr.pos_i.x, corr.pos_i.y, corr.pos_i.z) - transforms[corr.imgIdx_j] * vec3f(corr.pos_j.x, corr.pos_j.y, corr.pos_j.z);
-					res = math::abs(res);
-					float r = std::max(res.x, std::max(res.y, res.z));
-					residuals.push_back(std::make_pair(r, vec2ui(corr.imgIdx_i, corr.imgIdx_j)));
-				}
-			} //correspondences
-			std::sort(residuals.begin(), residuals.end(), [](const std::pair<float, vec2ui> &left, const std::pair<float, vec2ui> &right) {
-				return fabs(left.first) > fabs(right.first);
-			});
-			//find image-image 
-			const float thresh = 0.05f;
-			std::unordered_map<vec2ui, float> imageImageResidualsSet;
-			for (unsigned int i = 0; i < residuals.size(); i++) {
-				if (residuals[i].first < thresh) break;
-				auto it = imageImageResidualsSet.find(residuals[i].second);
-				if (it == imageImageResidualsSet.end()) imageImageResidualsSet[residuals[i].second] = residuals[i].first;
-				else it->second = std::max(it->second, residuals[i].first);
-			}//residuals
-			const unsigned int maxToPrint = 10;
-			residuals.clear();
-			for (const auto& a : imageImageResidualsSet) residuals.push_back(std::make_pair(a.second, a.first));
-			std::sort(residuals.begin(), residuals.end(), [](const std::pair<float, vec2ui> &left, const std::pair<float, vec2ui> &right) {
-				return fabs(left.first) > fabs(right.first);
-			});
-			if (residuals.size() > maxToPrint) residuals.resize(maxToPrint);
-			std::cout << "printing " << residuals.size() << " high residual" << std::endl;
-			for (const auto& impair : residuals) {
-				vec3uc* im1 = sd.decompressColorAlloc(impair.second.x * 10);
-				vec3uc* im2 = sd.decompressColorAlloc(impair.second.y * 10);
-				ColorImageR8G8B8 image1(sd.m_colorWidth, sd.m_colorHeight, im1);
-				ColorImageR8G8B8 image2(sd.m_colorWidth, sd.m_colorHeight, im2);
-				std::free(im1);		std::free(im2);
-				SiftVisualization::printMatch("debug/maxres/" + std::to_string((int)(100 * impair.first)) + "_" + std::to_string(impair.second.x) + "-" + std::to_string(impair.second.y) + ".png",
-					impair.second, correspondences, image1, image2, sd.m_calibrationColor.m_intrinsic);
-				unsigned short* d1 = sd.decompressDepthAlloc(impair.second.x * 10);
-				unsigned short* d2 = sd.decompressDepthAlloc(impair.second.y * 10);
-				DepthImage32 depth1(DepthImage16(sd.m_depthWidth, sd.m_depthHeight, d1));
-				DepthImage32 depth2(DepthImage16(sd.m_depthWidth, sd.m_depthHeight, d2));
-				std::free(d1);		std::free(d2);
-				image1.resize(depth1.getWidth(), depth1.getHeight());	image2.resize(depth2.getWidth(), depth2.getHeight());
-				SiftVisualization::saveKeyMatchToPointCloud("debug/maxres/" + std::to_string((int)(100 * impair.first)) + "_" + std::to_string(impair.second.x) + "-" + std::to_string(impair.second.y),
-					impair.second, correspondences, depth1, image1, depth2, image2, transforms, sd.m_calibrationDepth.m_intrinsic.getInverse());
-			} //print
-			std::cout << "waiting..." << std::endl;
-			getchar();
-		}*/
 #ifdef NEW_GUIDED_REMOVE
 		const std::vector<vec2ui>& imPairsToRemove = m_solver->getGuidedMaxResImagesToRemove();
 		if (imPairsToRemove.empty()) {
@@ -263,29 +188,6 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 			}
 		}
 #else
-		////!!!debugging
-		//{
-		//	//std::ofstream s("debug/logs/" + std::to_string(siftManager->getNumImages()) + "-" + std::to_string(siftManager->getCurrentFrame()) + ".txt");
-		//	//s << imageIndices << " : " << m_maxResidual << std::endl;
-		//	//if (siftManager->getCurrentFrame() >= 70) {
-		//	//float4x4* d_transforms = NULL;
-		//	//MLIB_CUDA_SAFE_CALL(cudaMalloc(&d_transforms, sizeof(float4x4)*numImages));
-		//	//convertPosesToMatricesCU(d_xRot, d_xTrans, numImages, d_transforms, siftManager->getValidImagesGPU());
-		//	//std::vector<mat4f> transforms(numImages);
-		//	//MLIB_CUDA_SAFE_CALL(cudaMemcpy(transforms.data(), d_transforms, sizeof(float4x4)*numImages, cudaMemcpyDeviceToHost));
-		//	//const std::vector<int>& valid = siftManager->getValidImages();
-		//	//for (unsigned int i = 0; i < numImages; i++) if (valid[i] == 0) transforms[i].setZero(-std::numeric_limits<float>::infinity());
-		//	//BinaryDataStreamFile ofs("debug/logs/" + std::to_string(siftManager->getCurrentFrame()) + ".trajectory", true);
-		//	//ofs << transforms; ofs.closeStream();
-		//	//MLIB_CUDA_SAFE_FREE(d_transforms);
-		//	//siftManager->saveToFile("debug/logs/" + std::to_string(siftManager->getCurrentFrame()) + ".sift");
-		//	//}
-		//	//if (siftManager->getCurrentFrame() == 71) {
-		//	//	std::cout << "waiting..." << std::endl;
-		//	//	getchar();
-		//	//}
-		//}
-		////!!!debugging
 
 		// invalidate correspondence
 		siftManager->InvalidateImageToImageCU(make_uint2(imageIndices.x, imageIndices.y));
@@ -298,24 +200,11 @@ bool SBA::removeMaxResidualCUDA(SIFTImageManager* siftManager, unsigned int numI
 
 		return true;
 	}
-	//else std::cout << "\thighest residual " << m_maxResidual << " from images (" << imageIndices << ")" << std::endl;
 	return false;
 }
 
 void SBA::printConvergence(const std::string& filename) const
 {
-	//if (m_recordedConvergence.empty()) return;
-	//std::ofstream s(filename);
-	//s << m_recordedConvergence.size() << " optimizations" << std::endl;
-	//s << std::endl;
-	//for (unsigned int i = 0; i < m_recordedConvergence.size(); i++) {
-	//	s << "[ opt# " << i << " ]" << std::endl;
-	//	for (unsigned int k = 0; k < m_recordedConvergence[i].size(); k++)
-	//		s << "\titer " << k << ": " << m_recordedConvergence[i][k] << std::endl;
-	//	s << std::endl;
-	//}
-	//s.close();
-
 	if (m_recordedConvergence.empty()) return;
 	std::ofstream s(filename);
 	for (unsigned int i = 0; i < m_recordedConvergence.size(); i++) {
