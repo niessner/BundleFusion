@@ -22,7 +22,7 @@ Optional:
 
 ## Citation:  
 ```
-@article{dai2017bundle,
+@article{dai2017bundlefusion,
   title={BundleFusion: Real-time Globally Consistent 3D Reconstruction using On-the-fly Surface Re-integration},
   author={Dai, Angela and Nie{\ss}ner, Matthias and Zoll{\"o}fer, Michael and Izadi, Shahram and Theobalt, Christian},
   journal={ACM Transactions on Graphics 2017 (TOG)},
