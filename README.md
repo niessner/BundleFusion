@@ -1,6 +1,8 @@
 # BundleFusion
 
-You are free to use this code with proper attribution in non-commercial applications (Please see License.txt).
+You are free to use this code with proper attribution in non-commercial applications (Please see [License.txt](License.txt)).
+
+More information about this project can be found in our [paper](https://arxiv.org/pdf/1604.01093v1.pdf) and [project website](http://graphics.stanford.edu/projects/bundlefusion/).
 
 ## Installation
 The code was developed under VS2013.
@@ -8,7 +10,8 @@ The code was developed under VS2013.
 Requirements:
 - DirectX SDK June 2010
 - NVIDIA CUDA 7.0
-- our research library [mLib](https://github.com/niessner/mLib)
+- our research library [mLib](mLib); original git repo can be found [here](https://github.com/niessner/mLib)
+- mLib external libraries can be downloaded [here](https://www.dropbox.com/s/fve3uen5mzonidx/mLibExternal.zip?dl=0)
 
 Optional:
 - Kinect SDK (2.0 and above)
