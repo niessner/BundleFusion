@@ -1,5 +1,7 @@
 # BundleFusion
 
+![BundleFusion](img/teaser.jpg)
+
 You are free to use this code with proper attribution in non-commercial applications (Please see [License.txt](License.txt)).
 
 More information about this project can be found in our [paper](https://arxiv.org/pdf/1604.01093v1.pdf) and [project website](http://graphics.stanford.edu/projects/bundlefusion/).
