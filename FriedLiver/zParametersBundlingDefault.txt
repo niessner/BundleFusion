@@ -1,0 +1,77 @@
+
+
+s_verbose = false;
+
+s_erodeSIFTdepth = true;
+s_sendUplinkFeedbackImage = true;
+
+s_recordSolverConvergence = false;
+
+s_enablePerFrameTimings = false;
+s_enableGlobalTimings = false;
+
+s_widthSIFT = 640;
+s_heightSIFT = 480;
+
+s_minKeyScale = 3.0f;//5.0f;
+s_siftMatchThresh = 0.7f;//0.5f;
+s_siftMatchRatioMaxLocal = 0.8f;
+s_siftMatchRatioMaxGlobal = 0.8f;
+
+s_optMaxResThresh = 0.08f;			//not squared (per axis component)
+s_denseDistThresh = 0.15f;
+s_denseNormalThresh = 0.97f;
+s_denseColorThresh = 0.1f;
+s_denseColorGradientMin = 0.005f;
+s_denseDepthMin = 0.5f;
+s_denseDepthMax = 4.0f;
+s_denseOverlapCheckSubsampleFactor = 4;
+
+s_maxNumImages = 1200;
+s_submapSize = 10;
+s_maxNumKeysPerImage = 1024;
+
+s_useLocalDense = true;
+s_numOptPerResidualRemoval = 1; 
+
+s_numLocalNonLinIterations = 2;
+s_numLocalLinIterations = 100;
+s_numGlobalNonLinIterations = 3;
+s_numGlobalLinIterations = 150;
+
+//s_downsampledWidth = 160;
+//s_downsampledHeight = 120;
+s_downsampledWidth = 80;
+s_downsampledHeight = 60;
+
+
+//dense term filtering
+s_colorDownSigma = 2.5f;
+s_depthDownSigmaD = 1.0f;
+s_depthDownSigmaR = 0.05f;
+
+s_maxKabschResidual2 = 0.0004f;
+
+s_projCorrDistThres = 0.15f;
+s_projCorrNormalThres = 0.97f;
+s_projCorrColorThresh = 0.1f;
+
+s_verifySiftErrThresh = 0.075f;
+s_verifySiftCorrThresh = 0.02f;
+
+s_useLocalVerify = true;
+s_verifyOptErrThresh = 0.05f; 
+s_verifyOptCorrThresh = 0.001f;
+
+s_surfAreaPcaThresh = 0.032f;
+
+s_minNumMatchesLocal = 5;
+s_minNumMatchesGlobal = 5;
+
+// filtering 
+s_depthSigmaD = 2.0f;	//bilateral filter sigma domain
+s_depthSigmaR = 0.05f;	//bilateral filter sigma range
+s_depthFilter = true;	//bilateral filter enabled depth
+
+s_useComprehensiveFrameInvalidation = true;
+
