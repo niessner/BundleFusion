@@ -34,7 +34,7 @@ SBA::SBA()
 	m_globalWeightsMutex.lock();
 	m_globalWeightsSparse.resize(maxNumIts, 1.0f);
 	m_globalWeightsDenseDepth.resize(maxNumIts, 1.0f);
-	for (unsigned int i = 2; i < maxNumIts; i++) m_globalWeightsDenseDepth[i] = i;
+	for (unsigned int i = 2; i < maxNumIts; i++) m_globalWeightsDenseDepth[i] = (float)i;
 	m_globalWeightsDenseColor.resize(maxNumIts, 0.1f);
 
 	m_maxResidual = -1.0f;

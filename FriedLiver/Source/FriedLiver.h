@@ -53,7 +53,6 @@
 #include "SiftGPU/CUDATimer.h"
 #include "SiftGPU/SIFTMatchFilter.h"
 #include "CUDAImageManager.h"
-#include "testMatching.h"
 
 #include "ConditionManager.h"
 #include "DualGPU.h"

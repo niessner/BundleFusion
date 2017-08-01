@@ -3,7 +3,6 @@
 #include "stdafx.h"
 
 #include "FriedLiver.h"
-#include "RunOpt.h"
 
 RGBDSensor* getRGBDSensor()
 {
