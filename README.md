@@ -12,7 +12,7 @@ The code was developed under VS2013.
 Requirements:
 - DirectX SDK June 2010
 - NVIDIA CUDA 7.0
-- our research library [mLib](mLib); original git repo can be found [here](https://github.com/niessner/mLib)
+- our research library [mLib](external/mLib) (a git submodule; original git repo can be found [here](https://github.com/niessner/mLib))
 - mLib external libraries can be downloaded [here](https://www.dropbox.com/s/fve3uen5mzonidx/mLibExternal.zip?dl=0)
 
 Optional:
