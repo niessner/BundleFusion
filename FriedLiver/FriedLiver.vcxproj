@@ -188,6 +188,8 @@
     <ClInclude Include="Source\GlobalBundlingState.h" />
     <ClInclude Include="Source\GlobalDefines.h" />
     <ClInclude Include="Source\ImageHelper.h" />
+    <ClInclude Include="Source\KinectOneSensor.h" />
+    <ClInclude Include="Source\KinectSensor.h" />
     <ClInclude Include="Source\mLib.h" />
     <ClInclude Include="Source\mLibCuda.h" />
     <ClInclude Include="Source\OnlineBundler.h" />
@@ -297,6 +299,8 @@
     </ClCompile>
     <ClCompile Include="Source\FriedLiver.cpp" />
     <ClCompile Include="Source\GlobalAppState.cpp" />
+    <ClCompile Include="Source\KinectOneSensor.cpp" />
+    <ClCompile Include="Source\KinectSensor.cpp" />
     <ClCompile Include="Source\mLib.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>

@@ -143,6 +143,12 @@
     </ClCompile>
     <ClCompile Include="Source\OnlineBundler.cpp" />
     <ClCompile Include="Source\CorrespondenceEvaluator.cpp" />
+    <ClCompile Include="Source\KinectSensor.cpp">
+      <Filter>Sensors</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\KinectOneSensor.cpp">
+      <Filter>Sensors</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\FriedLiver.h" />
@@ -387,6 +393,12 @@
     <ClInclude Include="Source\OnlineBundler.h" />
     <ClInclude Include="Source\OnlineBundlerHelper.h" />
     <ClInclude Include="Source\CorrespondenceEvaluator.h" />
+    <ClInclude Include="Source\KinectSensor.h">
+      <Filter>Sensors</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\KinectOneSensor.h">
+      <Filter>Sensors</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DXUT">
