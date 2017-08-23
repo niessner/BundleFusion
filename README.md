@@ -7,7 +7,7 @@ You are free to use this code with proper attribution in non-commercial applicat
 More information about this project can be found in our [paper](https://arxiv.org/pdf/1604.01093v1.pdf) and [project website](http://graphics.stanford.edu/projects/bundlefusion/).
 
 ## Installation
-The code was developed under VS2013.
+The code was developed under VS2013, and tested with a Structure Sensor.
 
 Requirements:
 - DirectX SDK June 2010
