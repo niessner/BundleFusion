@@ -201,7 +201,7 @@ void OnlineBundler::processInput()
 	// feature detect
 	if (GlobalBundlingState::get().s_enableGlobalTimings) { cudaDeviceSynchronize(); m_timer.start(); }
 	m_local->detectFeatures(m_input.d_intensitySIFT, m_input.d_inputDepthFilt);
-	m_local->storeCachedFrame(m_input.m_inputDepthWidth, m_input.m_inputDepthHeight, m_input.d_inputColor, m_input.m_inputColorHeight, m_input.m_inputColorHeight, m_input.d_inputDepthRaw);
+	m_local->storeCachedFrame(m_input.m_inputDepthWidth, m_input.m_inputDepthHeight, m_input.d_inputColor, m_input.m_inputColorWidth, m_input.m_inputColorHeight, m_input.d_inputDepthRaw);
 	const unsigned int curLocalFrame = m_local->getCurrFrameNumber();
 	if (bIsLastLocal) {
 		mutex_optLocal.lock();
