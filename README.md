@@ -13,7 +13,7 @@ Requirements:
 - DirectX SDK June 2010
 - NVIDIA CUDA 7.0
 - our research library mLib, a git submodule in external/mLib
-- mLib external libraries can be downloaded [here](https://www.dropbox.com/s/fve3uen5mzonidx/mLibExternal.zip?dl=0)
+- mLib external libraries can be downloaded [here](http://kaldir.vc.in.tum.de/mLib/mLibExternal.zip)
 
 Optional:
 - Kinect SDK (2.0 and above)
